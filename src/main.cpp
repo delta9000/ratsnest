@@ -143,15 +143,22 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
   bool down_since_set = false;
   std::chrono::steady_clock::time_point down_since{};
   while (!g_stop.load()) {
-    if (watcher.ok() && watcher.poll_changed(100)) {
-      if (!read_file(patch, src)) {
-        std::fprintf(stderr, "\nerror: cannot re-read '%s'\n", patch.c_str());
-      } else {
-        auto res = ctl.load(src);
-        if (!res.ok) report(res.errors);
-        else std::fprintf(stderr, "\nreloaded (%s)\n",
-                          res.topology ? "topology" : "params");
+    if (watcher.ok()) {
+      if (watcher.poll_changed(100)) {
+        if (!read_file(patch, src)) {
+          std::fprintf(stderr, "\nerror: cannot re-read '%s'\n", patch.c_str());
+        } else {
+          auto res = ctl.load(src);
+          if (!res.ok) report(res.errors);
+          else std::fprintf(stderr, "\nreloaded (%s)\n",
+                            res.topology ? "topology" : "params");
+        }
       }
+    } else {
+      // Hot-reload is disabled: poll_changed() would return immediately
+      // instead of blocking, so without this the loop spins at full CPU.
+      // Sleep to keep the same ~10 Hz cadence as the watcher-enabled path.
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     ctl.drain_retired();
     print_status(runner, *pw, watch != nullptr);
@@ -170,8 +177,9 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
 
     // Spec 7.5: PipeWire disconnects never kill the session. Recreate the
     // backend with a 2s backoff; the graph keeps its state and resumes.
-    if (!pw->error().empty() || silent_disconnect) {
-      std::string reason = !pw->error().empty() ? pw->error() : "disconnected";
+    const std::string pw_err = pw->error();
+    if (!pw_err.empty() || silent_disconnect) {
+      std::string reason = !pw_err.empty() ? pw_err : "disconnected";
       std::fprintf(stderr, "\nwarning: PipeWire: %s -- reconnecting...\n",
                    reason.c_str());
       pw.reset();
