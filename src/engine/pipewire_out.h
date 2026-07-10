@@ -6,7 +6,7 @@
 
 namespace ms::engine {
 
-// Stereo float32 PipeWire source via pw_filter. The render callback runs on
+// Stereo float32 PipeWire source via pw_stream. The render callback runs on
 // PipeWire's RT data thread: it must be RT-safe (this class guarantees its
 // own process path is; the callback's body is the caller's contract).
 // No PipeWire types leak from this header (pimpl) so the -Wconversion

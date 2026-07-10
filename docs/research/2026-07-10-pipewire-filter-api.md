@@ -187,3 +187,37 @@ int main(int argc, char *argv[]) {
 `PW_KEY_NODE_LATENCY` (e.g. `"256/48000"`) — natural `--latency` CLI flag; a *request*, negotiated with the driver. `PW_KEY_NODE_FORCE_QUANTUM` pins the graph quantum (affects every client — debug flag only). Also available: `PW_KEY_NODE_RATE`/`PW_KEY_NODE_FORCE_RATE` for `--sample-rate`, `PW_KEY_TARGET_OBJECT` for `--output-device`.
 
 Sources: docs.pipewire.org (pw_filter group, pw_filter_events, module-rt, thread_loop, Tutorial 7), audio-dsp-src.c example, local headers (libpipewire-0.3 1.6.7).
+
+## Addendum (2026-07-10): pw_stream switch
+
+Everything above is accurate and was compiled/run — but it describes an API
+that WirePlumber 0.5.15 cannot auto-route. Confirmed empirically (a working
+`pw_filter` node never gained links to the default sink) and in WP source:
+`create-item.lua`'s default policy dispatches purely on the node's
+`media.class` string ("Audio" → `si-audio-adapter`), and `si-audio-adapter`
+requires a node-level `EnumFormat` param to negotiate a format before it will
+link. `pw_filter` nodes only expose per-port DSP formats (always mono float,
+fixed), not a node-level `EnumFormat`, so `si-audio-adapter` never completes
+adapter setup for them — the node sits connectable-but-unrouted forever,
+regardless of `PW_KEY_NODE_AUTOCONNECT`/`MEDIA_CLASS`.
+
+`pw_stream` nodes go through the client-node adapter machinery and do expose
+a node-level `EnumFormat` (built here via `spa_format_audio_raw_build`,
+`SPA_AUDIO_FORMAT_F32P`, 2 channels FL/FR), so WirePlumber's ordinary
+audio-adapter policy links them to the default sink automatically. A
+`pw_stream` prototype (`stream_sine.c`) verified this on this machine: format
+negotiated to rate=48000, links appeared in `pw-link -l`, and audio was
+audible.
+
+Decision: rework `src/engine/pipewire_out.cpp` from `pw_filter` to
+`pw_stream`. The RT discipline, thread-loop lock ordering, teardown sequence,
+and `-Wconversion` pragma wrapper documented above all still apply verbatim
+to `pw_stream` — only the node/port/format API surface changes. Two notable
+API differences: `pw_stream`'s `process` callback takes no `spa_io_position`
+argument directly (the graph clock/rate is instead obtained via the
+`io_changed` event with `id == SPA_IO_Position`, or via `param_changed` with
+`id == SPA_PARAM_Format` for the negotiated sample rate through
+`spa_format_audio_raw_parse`); and buffers are dequeued/queued explicitly
+(`pw_stream_dequeue_buffer`/`pw_stream_queue_buffer`) against planar
+(F32P) `spa_data` slots rather than fetched per-port via
+`pw_filter_get_dsp_buffer`.
