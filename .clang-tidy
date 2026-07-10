@@ -1,0 +1,13 @@
+Checks: >
+  bugprone-*,
+  performance-*,
+  portability-*,
+  modernize-use-override,
+  modernize-use-nullptr,
+  modernize-use-make-unique,
+  readability-braces-around-statements,
+  cppcoreguidelines-owning-memory,
+  cppcoreguidelines-special-member-functions,
+  -bugprone-easily-swappable-parameters
+WarningsAsErrors: ''
+HeaderFilterRegex: '^src/'
