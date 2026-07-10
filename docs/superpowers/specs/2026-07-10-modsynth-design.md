@@ -1,0 +1,315 @@
+# modsynth — Design
+
+**Date:** 2026-07-10
+**Status:** Approved design, pre-implementation
+
+## 1. Vision
+
+A software modular synthesizer for Linux where **the patch is a plain-text file**.
+Hand-written C++ DSP underneath, PipeWire out, hot-reload on save so editing a
+patch feels like turning a knob. A graphical node canvas arrives later as
+another *view* of the same file — never as the source of truth.
+
+What it is not: a DAW, a plugin host, a livecoding performance language, or a
+module marketplace. It is a personal instrument whose patches are readable,
+diffable, versionable, and shareable as plain text.
+
+Primary use cases, in build order: generative drone/ambient, MIDI keyboard
+performance, sequenced patterns (Berlin school / techno), sound design and
+recording.
+
+## 2. Design principles
+
+1. **Patch as text.** The `.patch` file is the single source of truth. Anything
+   a GUI can do must round-trip through the file.
+2. **Everything is one signal.** Audio, CV, gates, clocks are all floats at
+   audio rate. Any output patches to any input. No separate control rate.
+3. **No normalling.** Hardware's unpatched-jack magic (Plaits' attenuverter
+   rerouting, Maths' bus-dropout, Veils' cascade) exists because panels are
+   fixed. Our modules expose ordinary named params with defaults. Nothing
+   implicit.
+4. **Small, single-purpose modules.** Hardware multifunction modules (Disting,
+   Pam's, Maths-as-five-things) are panel-economics workarounds. Cables are
+   free in text; compose instead.
+5. **Knob-per-function beats menus.** The regret-thread consensus: people sell
+   modules that hide state. Every parameter is a named field in the file.
+6. **Hot-reload is the instrument.** State survives edits; sound never stops
+   for a typo. This property is make-or-break and gets engineering priority.
+7. **Utilities outnumber sound sources.** The unanimous lesson of every mature
+   system (VCV's late additions, Reaktor Bento, first-rack wisdom).
+
+## 3. The patch DSL
+
+### 3.1 Grammar
+
+Two statement types only — modules and cables — mirroring hardware's two nouns.
+
+```ebnf
+patch     = { statement } ;
+statement = decl | cable ;
+decl      = ident "=" type [ "{" [ param { "," param } ] "}" ] ;
+param     = ident ":" value ;
+value     = number [ unit ] | ident | string | array ;
+array     = "[" [ value { "," value } ] "]" ;
+cable     = source "->" dest [ ":" number ] ;
+source    = ident [ "." port ] | number [ unit ] ;
+dest      = ident [ "." port ] ;
+comment   = "#" … end-of-line ;
+```
+
+- **Units** are optional sugar over floats: `hz`, `khz`, `ms`, `s`, `bpm`.
+- **Value kinds:** scalar (`0.4`, `800hz`), enum (`saw`, `minor`), string
+  (`"reel1.wav"`), array (`[0, 3, 5, 7, 10]`, `[x, x, _, x]` for gate
+  patterns). Arrays serve sequencers, scales, and mixer channel params.
+- **Literal sources:** a bare number may be a cable source
+  (`0.25 -> qnt.transpose`) — this is the offset/constant module, dissolved
+  into grammar.
+- Statement order is free; names must be unique; `out` is a reserved built-in.
+
+### 3.2 Semantics
+
+- **Declarations are knob positions.** `filt = ladder { cutoff: 800hz }` is
+  panel state.
+- **Cables are patch cords with built-in attenuverters.** `lfo -> filt.cutoff
+  : 0.5` — depth is per-cable, negative inverts, default `1.0`.
+- **Modulation sums onto the knob.** A param's effective value is its declared
+  value plus the sum of all cables targeting it. Multiple cables into any port
+  sum (mixing into audio inputs included).
+- **Default ports.** Every module has a main `in`/`out`; `mix -> filt` means
+  main-out to main-in. Named ports for everything else (`filt.cutoff`,
+  `out.left`).
+- **Seeds.** Every stochastic module takes an optional `seed:` int. Omitted =
+  nondeterministic (hardware spirit); present = reproducible renders (shared
+  patches, regression tests).
+
+### 3.3 Hot-reload semantics
+
+On save, the engine diffs old vs new IR:
+
+- **Param-only change:** engine glides each changed param over ~20 ms.
+  Feels like a knob turn.
+- **Topology change:** new graph built off-thread; every module whose
+  `(name, type)` pair survives has its internal state migrated (oscillator
+  phase, envelope stage, delay/register buffers); pointer-swap, then ~50 ms
+  equal-power crossfade old→new. Renaming a module intentionally resets it.
+- **Parse/validation error:** last good graph keeps playing; error reported
+  with line/column. The drone never stops because of a typo.
+
+### 3.4 Canvas sidecar
+
+The future GUI stores node positions in `<name>.patch.layout` (JSON), never in
+the patch. Losing the layout loses nothing musical; diffs stay musical-only.
+
+### 3.5 Deferred language features
+
+Recorded here so v1 doesn't accidentally preclude them:
+
+- **Enum-param modulation** (`lfo -> voice.model`): signal offsets the enum
+  index, rounded. Deliberately deferred; v1 enums are static.
+- **Subpatches / include:** a patch usable as a module with declared ports.
+- **`voice { … }` block** for polyphony (see §6).
+- **Expressions** (`freq: 55 * 2`) — probably never; a patch is data, not code.
+
+## 4. Signal conventions
+
+| Signal | Range/meaning |
+|---|---|
+| Audio, bipolar CV | ±1.0 |
+| Unipolar CV (envelopes, gates) | 0..1 |
+| Pitch | `v_oct`, octaves, offsetting the receiving module's `freq` param (0.0 = declared freq); `midi` emits 0.0 for A3/220 Hz |
+| Gate/trigger threshold | rising through 0.5 |
+| Sample rate | device rate via PipeWire (48 kHz typical); no internal resampling in v1 |
+
+Conventions are enforced by every built-in and documented per port; consistent
+defaults are "the 35th module."
+
+## 5. Module palette (34)
+
+Sound sources are the skeleton, envelopes/VCAs the muscles, utilities the
+brain. Checked against: the consensus-10 every software modular ships, VCV
+Fundamental's documented gaps (clock, quantizer, reverb, west-coast path — all
+covered), 0-Coast/Mother-32 voice completeness, and generative-patch
+essentials.
+
+### Phase 1 — the drone/generative box (18)
+
+| Module | Role | Key params | Key ports |
+|---|---|---|---|
+| `vco` | polyBLEP anti-aliased oscillator | `freq`, `wave` (sine\|tri\|saw\|pulse), `pw` | in: `v_oct` `fm` `pwm` `sync` · out: `out` |
+| `noise` | noise source | `color` (white\|pink) | out |
+| `svf` | state-variable filter | `cutoff`, `res` | in · out: `lp` (default) `bp` `hp` |
+| `ladder` | 4-pole ZDF ladder LPF | `cutoff`, `res`, `drive` | in · out |
+| `vca` | amplifier | `gain`, `response` (lin\|exp) | `in` `cv` · out |
+| `lpg` | vactrol-model low pass gate | `damp`, `decay` | `in` `cv` `strike` · out |
+| `fold` | wavefolder | `fold`, `sym` | `in` `fold` · out |
+| `drive` | saturation | `amount`, `mode` (soft\|hard) | in · out |
+| `func` | Maths-style function generator | `rise`, `fall`, `curve`, `cycle` (bool) | in: `trig` `in`(slew) `rise` `fall` · out: `out` `eor` `eoc` |
+| `lfo` | multi-wave LFO | `freq`, `wave`, `phase` | in: `reset` `rate` · out |
+| `random` | smooth/stepped wandering voltage | `rate`, `smooth`, `seed` | out: `out` `stepped` |
+| `sh` | sample & hold / track & hold | `mode` (sample\|track) | `in` `trig` · out |
+| `quant` | quantizer | `scale` (array), `root`, `transpose` | `in` `transpose` · out: `out` `changed`(gate) |
+| `math` | signal math (= ring mod, rectifier, min/max, …) | `op` (add\|sub\|mult\|min\|max\|abs\|clip\|wrap), `b` | `a` `b` · out |
+| `xfade` | equal-power crossfader | `mix` | `a` `b` `mix` · out |
+| `mix` | stereo mixer | `levels` (array), `pans` (array); defaults 1.0 / center | `in1..in8` `lvl1..lvl8` · out: `out_l` `out_r` |
+| `scope` | probe/meter for TUI & logs | `label` | in |
+| `out` | master out: limiter + PipeWire sink | `level` | `left` `right` `in`(→both) |
+
+Build order note: `svf` before `ladder` (much easier; instant gratification),
+`vco` first overall (polyBLEP is DSP lesson one).
+
+### Phase 2 — playable (+4)
+
+| Module | Role | Notes |
+|---|---|---|
+| `midi` | note/CC → CV | outs `v_oct` `gate` `vel` `cc<N>`; ALSA/PipeWire MIDI |
+| `adsr` | keyboard envelope | `func` covers AD; sustain needs its own module |
+| `delay` | feedback delay | `time` `feedback` `mix`; clock-sync later |
+| `reverb` | Dattorro/FDN | hardest DSP in the plan; ambient lives on it |
+
+### Phase 3 — the sequencer wing (+8)
+
+| Module | Role | Notes |
+|---|---|---|
+| `clock` | master clock | `bpm`; out + `run` gate |
+| `div` | clock divider/multiplier | `by` |
+| `euclid` | Euclidean gates | `steps` `hits` `rot` — Pam's essence |
+| `stepseq` | step sequencer | `steps`/`gates` arrays, `len`, `dir`; ratchets/probability as later params |
+| `turing` | lockable shift register | `len` `prob` `seed`; outs `out` `pulse` `bit1..bit8`; ins `write` `clear`. Volts/Pulses expanders = cables |
+| `bern` | Bernoulli gate | `prob`; coin-toss routing, outs `a` `b` |
+| `logic` | gate logic + comparator | `op` (and\|or\|xor\|not\|cmp), `threshold` |
+| `switch` | sequential/addressed switch | `n`, `mode` (seq\|addr) |
+
+Transposition (Berlin school) needs no module: pitch CVs sum on `v_oct`.
+Drums need no module: trigger → `lpg.strike` (kick), `noise`+`svf.hp`+fast
+`func` (hats), sine + noise bursts (snare).
+
+### Phase 4 — sound design (+4)
+
+| Module | Role | Notes |
+|---|---|---|
+| `sampler` | file playback | `file` (string), `pitch`, `loop`; outs `out` `eos` |
+| `rec` | tap any point to WAV | `file`; ins `in_l` `in_r` `gate` |
+| `extin` | external audio in | PipeWire capture ports |
+| `follow` | envelope follower | `attack` `release`; outs `env` `gate` — the audio→CV bridge |
+
+### Explicitly out of scope (Phase 5+ candidates)
+
+Granular processor, physical-modeling voice (Rings-alike), macro-oscillator
+(Plaits-alike), dedicated drum voice, `push` manual-gate (needs a GUI panel),
+wavetable VCO, module plugin ABI.
+
+## 6. Polyphony (decided now, built later)
+
+**Per-voice patch instancing** (the Bitwig Poly Grid / SuperCollider model): a
+future `voice { … }` block instantiates its subgraph once per held note;
+modules never know polyphony exists. Rejected alternative: VCV-style poly
+cables (documented confusion; needed four modules just to manage it). The
+decision is made now so no port or module design bakes in mono assumptions it
+needn't.
+
+## 7. Architecture
+
+### 7.1 Process model
+
+Per-sample processing in topologically sorted order. Feedback edges read the
+previous sample (one-sample delay — what a physical cable loop costs). This
+makes self-patching (`func.eoc -> func.trig`, audio-rate FM anywhere) work
+with no special cases. VCV-proven at scales far beyond ours.
+
+### 7.2 Components
+
+```
+patch.file ──▶ dsl/     lexer → parser → Patch IR (modules, cables, params)
+                │            errors with line/col, suggestions
+                ▼
+              graph/    IR → validated graph → topo order + feedback edges
+                │       diffing + state migration by (name, type)
+                ▼
+   ┌─ non-RT (main thread) ────────────────┐  lock-free SPSC queues
+   │ inotify watcher · CLI · WAV writer    │ ◀──▶ ┌─ RT audio thread ─────┐
+   │ scope/meter sink · (later: MIDI, TUI, │      │ run compiled graph;   │
+   │ GUI canvas)                           │      │ no alloc, no locks    │
+   └───────────────────────────────────────┘      └───────────────────────┘
+```
+
+- **`dsl/`** — hand-written lexer + recursive-descent parser (the grammar is
+  tiny) → Patch IR. Owns diagnostics quality.
+- **`graph/`** — IR validation (unknown types/ports/params, arity), topo sort,
+  feedback-edge marking, graph diffing, state migration.
+- **`dsp/`** — one file per module. Module interface: static port/param
+  metadata + `process()` (one sample) + state save/restore for migration.
+  Static registry; no plugin loading.
+- **`engine/`** — RT runner, PipeWire backend (`pw_filter`), SPSC command
+  queue in (param glides, graph swaps), ring buffers out (meters, scope taps,
+  record feed). Output limiter + NaN/denormal guards at the sink.
+- **`io/`** — inotify file watching, WAV writing (disk thread fed by ring
+  buffer).
+
+### 7.3 RT discipline
+
+The audio thread only: runs the graph, drains the command queue, feeds ring
+buffers. Never allocates, locks, or touches files. Graph handover is pointer
+swap; old graph freed on the main thread.
+
+### 7.4 CLI (the whole Phase 1 UX)
+
+```
+modsynth play   drone.patch          # watch + play + meters
+modsynth render drone.patch -d 30s -o take.wav   # offline, faster than RT
+modsynth check  drone.patch          # parse/validate — editor lint
+```
+
+### 7.5 Error handling
+
+- Parse/validation errors: report, keep last good graph running (§3.3).
+- Runtime: denormal flushing (FTZ/DAZ), NaN guard per module output (replace
+  with 0, count + report), brickwall limiter on `out`.
+- PipeWire xruns/disconnects: reconnect with silence fill; never crash the
+  session.
+
+## 8. Testing
+
+- **Parser:** unit tests per production; golden error-message tests (message
+  quality is a feature).
+- **DSP per module:** deterministic checks — FFT alias measurement on `vco`,
+  frequency response on filters, envelope timing tolerances.
+- **Integration:** seeded example patches in `patches/` rendered offline and
+  compared to golden WAVs (hash or spectral tolerance). Doubles as the demo
+  library.
+- **Hot-reload:** state-migration tests (edit param → no discontinuity beyond
+  glide; rename → reset; topology change → crossfade, no clicks measured).
+
+## 9. Tooling & layout
+
+C++20 · CMake · doctest · deps: PipeWire + doctest only · mise tasks wrapping
+configure/build/test/run.
+
+```
+modsynth/
+  src/{dsl,graph,dsp,engine,io}/   main.cpp
+  tests/
+  patches/            # examples = integration fixtures
+  docs/superpowers/specs/
+```
+
+## 10. Phasing
+
+1. **Drone box** — DSL, engine, hot-reload, 18 modules, `play`/`render`/
+   `check`. Exit: an evening of generative ambient that's genuinely good.
+2. **Playable** — MIDI in, `adsr`, `delay`, `reverb`.
+3. **Sequencer wing** — clock/div/euclid/stepseq/turing/bern/logic/switch.
+4. **Sound design** — sampler, rec, extin, follow.
+5. **Later** — GUI canvas over the same file (layout sidecar), polyphony
+   `voice` block, granular, physical modeling.
+
+## 11. Prior art notes
+
+- **DROID** — hardware CV computer programmed via plain-text config; closest
+  cousin to patch-as-text. Study its syntax choices and user complaints before
+  freezing grammar details.
+- **VCV Fundamental history** — its late utility additions and famous gaps
+  directly shaped the palette.
+- **Pd/SuperCollider** — evidence that raw signal math (`math` module)
+  replaces a half-dozen dedicated utility modules.
+- **0-Coast** — the west-coast trio (`fold` + `func` + `lpg`) is what makes a
+  small system percussion- and generative-capable.
