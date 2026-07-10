@@ -19,6 +19,7 @@ class PatchWatcher {
 
  private:
   void arm();
+  void drain();  // read all currently-available inotify events (non-blocking)
 
   int fd_ = -1;
   int wd_ = -1;
