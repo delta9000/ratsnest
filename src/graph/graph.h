@@ -23,6 +23,10 @@ struct Graph {
   std::vector<std::vector<Cable>> in_cables;
   int out_node = -1;
   double sample_rate = 48000.0;
+  // Filled by plan_reload on topology changes: (old_node_idx, new_node_idx)
+  // for every module whose (name, type) survives. Consumed on the RT thread
+  // by Engine::migrate_from at swap adoption.
+  std::vector<std::pair<int, int>> migrate_pairs;
 };
 
 struct CompileResult {

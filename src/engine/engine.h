@@ -17,6 +17,10 @@ class Engine {
   // Last processed sample's value on an output port; 0.0f if out of range.
   float output_value(size_t node, size_t slot) const;
   const graph::Graph& graph() const { return *g_; }
+  // Copy migratable module state from the engine being replaced, following
+  // graph().migrate_pairs. RT-called at swap adoption, when the RT thread
+  // owns both engines: race-free and allocation-free by construction.
+  void migrate_from(const Engine& old);
 
  private:
   void step_glides();
