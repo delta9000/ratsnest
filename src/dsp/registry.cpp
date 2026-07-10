@@ -2,7 +2,7 @@
 
 namespace ms::dsp {
 namespace {
-const ModuleInfo* const kRegistry[] = {&vca_info, &out_info};
+const ModuleInfo* const kRegistry[] = {&vca_info, &out_info, &vco_info};
 }
 
 const ModuleInfo* find_module(std::string_view type) {
