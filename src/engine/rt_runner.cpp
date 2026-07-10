@@ -82,8 +82,8 @@ void RtRunner::render_block(float* l, float* r, size_t frames) {
           : static_cast<float>(p) / static_cast<float>(fade_samples_);
       const float gn = std::sin(t * kHalfPi);
       const float go = std::cos(t * kHalfPi);
-      l[i] = l[i] * gn + scratch_l_[i] * go;
-      r[i] = r[i] * gn + scratch_r_[i] * go;
+      l[i] = std::clamp(l[i] * gn + scratch_l_[i] * go, -1.0f, 1.0f);
+      r[i] = std::clamp(r[i] * gn + scratch_r_[i] * go, -1.0f, 1.0f);
     }
     fade_pos_ += frames;
     if (fade_pos_ >= fade_samples_) {

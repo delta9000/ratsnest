@@ -75,9 +75,13 @@ float Engine::output_value(size_t node, size_t slot) const {
 }
 
 void Engine::migrate_from(const Engine& old) {
-  for (auto [oi, ni] : g_->migrate_pairs)
+  for (auto [oi, ni] : g_->migrate_pairs) {
+    if (oi < 0 || ni < 0) continue;
+    if (static_cast<size_t>(oi) >= old.g_->nodes.size()) continue;
+    if (static_cast<size_t>(ni) >= g_->nodes.size()) continue;
     g_->nodes[static_cast<size_t>(ni)].instance->copy_state_from(
         *old.g_->nodes[static_cast<size_t>(oi)].instance);
+  }
 }
 
 }  // namespace ms::engine

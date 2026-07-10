@@ -183,7 +183,11 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
       std::fprintf(stderr, "\nwarning: PipeWire: %s -- reconnecting...\n",
                    reason.c_str());
       pw.reset();
-      std::this_thread::sleep_for(std::chrono::seconds(2));
+      // Back off ~2s in short slices so Ctrl-C is honored promptly instead
+      // of blocking through the whole backoff.
+      for (int waited_ms = 0; waited_ms < 2000 && !g_stop.load(); waited_ms += 100)
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      if (g_stop.load()) break;
       pw = std::make_unique<ms::engine::PipewireOut>(
           "modsynth", &render_trampoline, &runner, latency,
           static_cast<uint32_t>(rate));
