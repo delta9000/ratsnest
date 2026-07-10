@@ -221,3 +221,7 @@ argument directly (the graph clock/rate is instead obtained via the
 (`pw_stream_dequeue_buffer`/`pw_stream_queue_buffer`) against planar
 (F32P) `spa_data` slots rather than fetched per-port via
 `pw_filter_get_dsp_buffer`.
+
+This document predates the `pw_stream` switch: everything above the addendum
+describes the abandoned `pw_filter` approach and should not be read as current
+guidance — see spec §7.2 for the implemented backend.
