@@ -44,3 +44,8 @@ run = "./build/modsynth check"
 description = "Render a patch to WAV offline. Usage: mise run render -- patches/first.patch -d 10s -o take.wav"
 depends = ["build"]
 run = "./build/modsynth render"
+
+[tasks.play]
+description = "Play a patch live with hot-reload. Usage: mise run play -- patches/first.patch"
+depends = ["build"]
+run = "./build/modsynth play"

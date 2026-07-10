@@ -95,6 +95,10 @@ struct PipewireOut::Impl {
       self->ok.store(false, std::memory_order_release);
       std::lock_guard<std::mutex> lk(self->err_mu);
       self->err = error != nullptr ? error : "unknown PipeWire error";
+    } else if (state == PW_STREAM_STATE_UNCONNECTED) {
+      // A silent server death (no ERROR, just UNCONNECTED) must also flip
+      // ok() false, or the reconnect loop in cmd_play never fires.
+      self->ok.store(false, std::memory_order_release);
     } else if (state == PW_STREAM_STATE_STREAMING ||
                state == PW_STREAM_STATE_PAUSED) {
       self->ok.store(true, std::memory_order_release);
