@@ -69,6 +69,12 @@ class Vco final : public Module {
     outs[0] = v;
   }
 
+  void copy_state_from(const Module& other) override {
+    const auto& o = static_cast<const Vco&>(other);
+    phase_ = o.phase_;
+    prev_sync_ = o.prev_sync_;
+  }
+
  private:
   float rate_ = 48000.0f;
   int wave_ = 0;
