@@ -36,3 +36,12 @@ file(GLOB MSTEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 add_executable(mstests ${MSTEST_SOURCES})
 target_link_libraries(mstests PRIVATE mscore doctest::doctest)
 add_test(NAME unit COMMAND mstests)
+
+add_test(NAME cli_check
+  COMMAND modsynth check ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch)
+add_test(NAME cli_render
+  COMMAND modsynth render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+          -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first.wav)
+add_test(NAME cli_check_rejects_bad_patch
+  COMMAND modsynth check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
+set_tests_properties(cli_check_rejects_bad_patch PROPERTIES WILL_FAIL TRUE)
