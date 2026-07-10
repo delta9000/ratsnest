@@ -305,8 +305,18 @@ modsynth/
 ## 11. Prior art notes
 
 - **DROID** — hardware CV computer programmed via plain-text config; closest
-  cousin to patch-as-text. Study its syntax choices and user complaints before
-  freezing grammar details.
+  cousin to patch-as-text. Studied in depth (see
+  `docs/research/2026-07-10-droid-prior-art.md`). Five years of its user
+  feedback validate this design's core choices: named instances (DROID's
+  positional identity silently corrupts state on reorder — our worst-flaw
+  avoided), per-cable depth as the only inline math (their hard `A·B+C` limit
+  proved fast and idiomatically right), and no expression creep. Lessons
+  adopted: **freeze the grammar, grow the vocabulary** (DROID shipped 7
+  firmware generations with zero syntax changes — version the module library,
+  not the language); `check` warns on unreachable modules / never-read
+  outputs; runtime introspection (watch any port) is a Phase 1b deliverable,
+  not a nicety — its absence was DROID's longest-running complaint; and for
+  the GUI era, DROID's "CV-driven values are never state" boundary.
 - **VCV Fundamental history** — its late utility additions and famous gaps
   directly shaped the palette.
 - **Pd/SuperCollider** — evidence that raw signal math (`math` module)
