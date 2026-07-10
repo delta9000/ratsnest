@@ -18,6 +18,7 @@ Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
 void Engine::process(float* left, float* right, size_t frames) {
   const auto& nodes = g_->nodes;
   for (size_t f = 0; f < frames; ++f) {
+    step_glides();
     for (size_t ni = 0; ni < nodes.size(); ++ni) {
       const graph::Node& n = nodes[ni];
       const size_t n_ins = n.info->inputs.size();
@@ -34,6 +35,43 @@ void Engine::process(float* left, float* right, size_t frames) {
     left[f]  = std::clamp(outs_[oo],     -1.0f, 1.0f);
     right[f] = std::clamp(outs_[oo + 1], -1.0f, 1.0f);
   }
+}
+
+void Engine::set_param(size_t node, size_t slot, float target, size_t glide_samples) {
+  if (node >= g_->nodes.size()) return;
+  auto& base = g_->nodes[node].input_base;
+  if (slot >= base.size()) return;
+  for (size_t i = 0; i < n_glides_; ++i)
+    if (glides_[i].node == node && glides_[i].slot == slot) {
+      glides_[i] = glides_[--n_glides_];  // replace in-flight glide on this param
+      break;
+    }
+  if (glide_samples == 0 || n_glides_ == kMaxGlides) {
+    base[slot] = target;
+    return;
+  }
+  glides_[n_glides_++] = Glide{node, slot, target,
+      (target - base[slot]) / static_cast<float>(glide_samples), glide_samples};
+}
+
+void Engine::step_glides() {
+  for (size_t i = 0; i < n_glides_;) {
+    Glide& gl = glides_[i];
+    float& base = g_->nodes[gl.node].input_base[gl.slot];
+    base += gl.step;
+    if (--gl.remaining == 0) {
+      base = gl.target;                 // land exactly, no float drift
+      glides_[i] = glides_[--n_glides_];
+    } else {
+      ++i;
+    }
+  }
+}
+
+float Engine::output_value(size_t node, size_t slot) const {
+  if (node >= g_->nodes.size()) return 0.0f;
+  if (slot >= g_->nodes[node].info->outputs.size()) return 0.0f;
+  return outs_[out_offset_[node] + slot];
 }
 
 }  // namespace ms::engine
