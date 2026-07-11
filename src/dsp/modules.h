@@ -12,4 +12,5 @@ extern const ModuleInfo func_info;
 extern const ModuleInfo svf_info;
 extern const ModuleInfo noise_info;
 extern const ModuleInfo math_info;
+extern const ModuleInfo xfade_info;
 }  // namespace ms::dsp
