@@ -2,8 +2,10 @@
 #include <vector>
 #include <doctest/doctest.h>
 #include "dsp/modules.h"
+#include "bank_conformance.h"
 
 using namespace ms::dsp;
+using ms::dsp::test::check_bank_conformance;
 
 namespace {
 ConfigValue number(double n) {
@@ -220,4 +222,51 @@ TEST_CASE("alloc migrates claim state") {
     for (int j = 0; j < 32; ++j)
       CHECK(out_a[j] == doctest::Approx(out_b[j]));
   }
+}
+
+namespace {
+// Drives an AllocRig through repeating claim/release cycles: 5 samples
+// high, 3 samples low, forever. Each rising edge bumps `edge` (used to vary
+// voct/vel per claim so the hold rule and per-bank tracking are both
+// exercised) — shared shape for all three bank-conformance instantiations
+// below; only `n`/`mode` differ per rig.
+struct CyclingFeed {
+  AllocRig& rig;
+  int edge = 0;
+
+  void operator()(int step) {
+    const int period = 8;
+    const int phase = step % period;
+    const bool gate_on = phase < 5;
+    if (gate_on && phase == 0) ++edge;
+    rig.ins[0] = gate_on ? 1.0f : 0.0f;
+    rig.ins[1] = 0.1f + 0.05f * static_cast<float>(edge);
+    rig.ins[2] = (edge % 2 == 0) ? 0.4f : 0.8f;
+  }
+};
+}  // namespace
+
+TEST_CASE("bank conformance: rr n=3") {
+  AllocRig rig(3, "rr");
+  CyclingFeed feed{rig};
+  // alloc is driven by a single mono `gate` input: a claim can only occur
+  // on a rising edge, which by construction already requires the prior
+  // sample to be low, so the reclaim-gap property can never be exercised
+  // through this seam — see bank_conformance.h property 4.
+  check_bank_conformance(*rig.module, *rig.info, 3, rig.ins,
+                          feed, /*can_reclaim_while_sounding=*/false);
+}
+
+TEST_CASE("bank conformance: unison n=4") {
+  AllocRig rig(4, "unison");
+  CyclingFeed feed{rig};
+  check_bank_conformance(*rig.module, *rig.info, 4, rig.ins,
+                          feed, /*can_reclaim_while_sounding=*/false);
+}
+
+TEST_CASE("bank conformance: rr n=1") {
+  AllocRig rig(1, "rr");
+  CyclingFeed feed{rig};
+  check_bank_conformance(*rig.module, *rig.info, 1, rig.ins,
+                          feed, /*can_reclaim_while_sounding=*/false);
 }
