@@ -9,6 +9,7 @@ extern const ModuleInfo lfo_info;
 extern const ModuleInfo clock_info;
 extern const ModuleInfo div_info;
 extern const ModuleInfo func_info;
+extern const ModuleInfo adsr_info;
 extern const ModuleInfo svf_info;
 extern const ModuleInfo noise_info;
 extern const ModuleInfo math_info;
