@@ -36,7 +36,7 @@ overall peak/RMS/DC plus a per-window level timeline for mix work.
 | Sources | `vco`, `lfo`, `noise`, `random` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
-| Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo` |
+| Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc` |
 | Effects/I/O | `delay`, `reverb`, `scope`, `out` |
 
 ## `vca`
@@ -230,6 +230,15 @@ s.trig -> env.trig
 Inputs `bpm` 120 and `beats` 1; outputs `seconds = 60 * beats / bpm` and `hz`.
 Beat values: quarter 1, eighth .5, dotted eighth .75, sixteenth .25. Example:
 `tempo { bpm: 120, beats: .75 }` produces .375 seconds.
+
+## `alloc`
+
+`alloc { n: 4, mode: rr }` — inputs `gate`, `voct`, `vel` 1; output banks
+`gate1..8`, `voct1..8`, `vel1..8`, `spread1..8` (bipolar constants spread
+over -1..+1; 0 when n = 1). Each rising gate claims the next voice (`rr`)
+or all voices (`unison`); a voice tracks `voct` while it is the newest
+claim and holds it after, so release tails keep pitch. Reclaims insert a
+one-sample gap. Strum polyphony from any mono sequencer; see `voice`.
 
 ## Recipes
 
