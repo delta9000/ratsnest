@@ -10,4 +10,16 @@ extern const ModuleInfo clock_info;
 extern const ModuleInfo div_info;
 extern const ModuleInfo func_info;
 extern const ModuleInfo svf_info;
+extern const ModuleInfo noise_info;
+extern const ModuleInfo math_info;
+extern const ModuleInfo xfade_info;
+extern const ModuleInfo drive_info;
+extern const ModuleInfo fold_info;
+extern const ModuleInfo sh_info;
+extern const ModuleInfo ladder_info;
+extern const ModuleInfo lpg_info;
+extern const ModuleInfo random_info;
+extern const ModuleInfo quant_info;
+extern const ModuleInfo mix_info;
+extern const ModuleInfo scope_info;
 }  // namespace ms::dsp

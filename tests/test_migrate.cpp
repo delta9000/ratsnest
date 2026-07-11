@@ -280,3 +280,144 @@ TEST_CASE("copy_state_from on stateless modules is a safe no-op") {
   b->process(ins, out);
   CHECK(out[0] == doctest::Approx(0.5f));
 }
+
+TEST_CASE("sh migrates held value and prev_trig_ edge memory") {
+  const ModuleInfo* info = find_module("sh");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float out_a[1], out_b[1];
+  float ins[2] = {0.55f, 0.0f};
+  a->process(ins, out_a);
+  ins[1] = 1.0f;  // rising edge: a latches 0.55, prev_trig_ becomes 1.0
+  a->process(ins, out_a);
+  b->copy_state_from(*a);
+  // Trigger stays high but the input changes: a fresh prev_trig_ (0.0)
+  // would see a spurious edge and latch -0.9 instead of holding 0.55.
+  ins[0] = -0.9f;
+  for (int i = 0; i < 8; ++i) {
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[0] == doctest::Approx(0.55f));
+  }
+}
+
+TEST_CASE("ladder migrates all four stage states") {
+  const ModuleInfo* info = find_module("ladder");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[4] = {0.0f, 800.0f, 0.6f, 0.0f};
+  float out_a[1] = {0}, out_b[1] = {0};
+  for (int i = 0; i < 1000; ++i) {
+    ins[0] = (i / 24) % 2 == 0 ? 0.7f : -0.7f;
+    a->process(ins, out_a);
+  }
+  b->copy_state_from(*a);
+  for (int i = 1000; i < 1032; ++i) {
+    ins[0] = (i / 24) % 2 == 0 ? 0.7f : -0.7f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
+
+TEST_CASE("lpg migrates envelope and filter state mid-pluck") {
+  const ModuleInfo* info = find_module("lpg");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[5] = {0.0f, 0.0f, 0.0f, 0.5f, 0.1f};
+  float out_a[1], out_b[1];
+  ins[2] = 1.0f;  // strike
+  a->process(ins, out_a);
+  // Decay for a while with audio flowing so env_, lp1_, lp2_ are all nonzero.
+  for (int i = 1; i < 400; ++i) {
+    ins[0] = (i / 20) % 2 == 0 ? 0.6f : -0.6f;
+    a->process(ins, out_a);  // strike stays high: prev_strike_ is 1.0
+  }
+  b->copy_state_from(*a);
+  // Strike held high across the copy: a forgotten prev_strike_ re-plucks b.
+  for (int i = 400; i < 432; ++i) {
+    ins[0] = (i / 20) % 2 == 0 ? 0.6f : -0.6f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
+
+TEST_CASE("noise migrates rng and pink filter state") {
+  const ModuleInfo* info = find_module("noise");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  Config cfg;
+  ConfigValue c; c.str = "pink";
+  cfg.push_back({"color", c});
+  a->init(48000.0, cfg);
+  b->init(48000.0, cfg);
+  float out_a[1], out_b[1];
+  for (int i = 0; i < 500; ++i) a->process(nullptr, out_a);
+  b->copy_state_from(*a);
+  for (int i = 0; i < 8; ++i) {
+    a->process(nullptr, out_a);
+    b->process(nullptr, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
+
+TEST_CASE("quant migrates changed-gate state") {
+  const ModuleInfo* info = find_module("quant");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[3] = {0.25f, 0.0f, 0.0f};
+  float out_a[2], out_b[2];
+  a->process(ins, out_a);  // a: first_ consumed, last_q_ = 3
+  b->copy_state_from(*a);
+  // Change the degree on the first post-copy sample: `a` fires changed
+  // because last_q_ was 3; a fresh last_q_ of 0 would stay silent.
+  ins[0] = 0.0f;
+  a->process(ins, out_a);
+  b->process(ins, out_b);
+  CHECK(out_a[1] == doctest::Approx(1.0f));
+  CHECK(out_b[1] == doctest::Approx(out_a[1]));
+  for (int i = 0; i < 8; ++i) {
+    ins[0] = i % 2 == 0 ? 0.25f : 0.5f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[1] == doctest::Approx(out_b[1]));
+  }
+}
+
+TEST_CASE("random migrates rng, phase, and segment endpoints") {
+  const ModuleInfo* info = find_module("random");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  Config cfg;
+  ConfigValue s; s.num = 4.0; s.is_num = true;
+  cfg.push_back({"seed", s});
+  a->init(48000.0, cfg);
+  b->init(48000.0, cfg);
+  const float ins[2] = {200.0f, 1.0f};  // 240-sample segments, smoothing on
+  float out_a[2], out_b[2];
+  for (int i = 0; i < 500; ++i) a->process(ins, out_a);  // mid-segment
+  b->copy_state_from(*a);
+  for (int i = 0; i < 480; ++i) {  // crosses at least one clock tick
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[1] == doctest::Approx(out_b[1]));
+  }
+}
