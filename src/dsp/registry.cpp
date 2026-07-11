@@ -6,7 +6,7 @@ const ModuleInfo* const kRegistry[] = {
     &vca_info, &out_info, &vco_info, &lfo_info, &clock_info, &div_info, &func_info,
     &svf_info, &noise_info, &math_info, &xfade_info, &drive_info, &fold_info,
     &sh_info, &ladder_info, &lpg_info, &random_info, &quant_info, &mix_info,
-    &scope_info};
+    &scope_info, &delay_info};
 }
 
 const ModuleInfo* find_module(std::string_view type) {

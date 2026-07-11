@@ -22,4 +22,5 @@ extern const ModuleInfo random_info;
 extern const ModuleInfo quant_info;
 extern const ModuleInfo mix_info;
 extern const ModuleInfo scope_info;
+extern const ModuleInfo delay_info;
 }  // namespace ms::dsp

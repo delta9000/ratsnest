@@ -19,6 +19,7 @@
 #include "graph/graph.h"
 #include "io/wav.h"
 #include "io/watcher.h"
+#include "rt/denormal.h"
 
 namespace {
 
@@ -237,6 +238,8 @@ int main(int argc, char** argv) {
 
     const size_t frames = static_cast<size_t>(seconds * rate);
     std::vector<float> l(frames), r(frames), interleaved(frames * 2);
+    // Decaying filter tails hit denormals; match the PipeWire thread's FTZ.
+    ms::rt::flush_denormals_on_this_thread();
     engine.process(l.data(), r.data(), frames);
     for (size_t i = 0; i < frames; ++i) {
       interleaved[2 * i] = l[i];
