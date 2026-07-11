@@ -135,3 +135,17 @@ TEST_CASE("decayed tails flush to exact silence, no denormal residue") {
   }
   CHECK(silent);  // the state flush reaches exact zero, render == play
 }
+
+TEST_CASE("delay survives a hostile pitch input without going silent") {
+  DelayRig d;
+  d.ins[1] = 0.0f;   // time clamps to 0
+  d.ins[2] = -1e30f; // exp2(+1e30) overflows to inf: 0 * inf would be NaN
+  for (int i = 0; i < 8; ++i) (void)d.tick(0.5f);
+  d.ins[1] = 0.1f;   // recover to a sane time
+  d.ins[2] = 0.0f;
+  (void)d.tick(1.0f);
+  bool alive = false;
+  for (int i = 0; i < 5000; ++i)
+    if (std::abs(d.tick(0.0f)) > 0.5f) alive = true;
+  CHECK(alive);  // a NaN-poisoned delay_ would never echo again
+}

@@ -34,9 +34,11 @@ class Delay final : public Module {
   void process(const float* ins, float* outs) override {
     const float secs =
         std::clamp(ins[1], 0.0f, kMaxSeconds) * std::exp2(-ins[2]);
-    const double target =
-        std::clamp(static_cast<double>(secs) * static_cast<double>(rate_),
-                   2.0, static_cast<double>(buf_.size() - 4));
+    double target = static_cast<double>(secs) * static_cast<double>(rate_);
+    // NaN-proof lower clamp: 0 * inf from a hostile pitch input must not
+    // poison delay_ forever. !(x >= 2) catches NaN as well as small values.
+    if (!(target >= 2.0)) target = 2.0;
+    target = std::min(target, static_cast<double>(buf_.size() - 4));
     if (delay_ < 0.0) delay_ = target;
     const float slew_samples = std::max(ins[6], 0.0f) * rate_;
     const double a =

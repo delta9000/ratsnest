@@ -403,8 +403,9 @@ TEST_CASE("quant migrates changed-gate state") {
 // The copy must carry the ring buffer itself (echoes in flight), the write
 // head, the slewed delay length, and the feedback-filter states. A short
 // delay with feedback keeps energy circulating through ALL of that state at
-// the copy point; comparing across the next echo arrival makes each copied
-// member load-bearing.
+// the copy point; comparing across the next echo arrival makes the buffer,
+// write head, and lp_ copies load-bearing (delay_ and the DC pair are
+// defense-in-depth: slew 0 re-snaps delay_ identically).
 TEST_CASE("delay migrates ring buffer, write head, and loop filter state") {
   const ModuleInfo* info = find_module("delay");
   REQUIRE(info != nullptr);

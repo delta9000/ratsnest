@@ -38,13 +38,13 @@ No config. Stereo is two instances (rule 5: compose with cables).
   write. tanh bounds runaway at feedback > 1 into musical saturation; the DC
   blocker stops rectified/asymmetric material from accumulating offset.
 - **Denormals**: the offline render path and tests run without FTZ/DAZ (only
-  the PipeWire thread sets it), so the two feedback-filter states flush
+  the PipeWire thread sets it), so the three feedback-filter states (`lp_`, `dc_x_`, `dc_y_`) flush
   themselves to zero below 1e−20 — identical behavior in `render` and `play`.
 - **Migration**: `copy_state_from` copies write index, slewed delay, filter
   states, and the buffer contents (`std::copy`, min of the two sizes —
   defensive, no alloc). ~2 MB ≈ 130 µs memcpy on the RT thread, ~2.5% of even
   a 256-frame callback; spec §3.3 explicitly promises delay buffers survive
-  hot-reload. Echo tails ride through a patch edit.
+  hot-reload. Echo tails ride through a patch edit. Copy cost scales with the number of delay instances (~130 µs each); fine at patch scale, revisit if a patch ever carries dozens.
 
 ## Non-goals (deferred, deliberately)
 
