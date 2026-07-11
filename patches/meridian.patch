@@ -1,0 +1,314 @@
+# meridian -- an arranged melodic techno track, 124 BPM, A minor, ~4:54.
+#
+# Every other patch here is a scene; this one is a SONG. Eight stepseq lanes
+# clocked once per four bars form a tracker-style arrangement grid: each lane
+# holds forty numbers, one per 4-bar block, and func slew limiters turn those
+# steps into section crossfades. The music conducts itself:
+#
+#   block  0  0:00  intro -- pads breathe alone
+#   block  2  0:15  turing arp fades in, sparse
+#   block  4  0:31  hats enter (euclid density rides the lane)
+#   block  6  0:46  offbeat bass slides under
+#   block  7  0:54  noise riser
+#   block  8  1:02  DROP 1 -- kick + clap, full groove
+#   block 12  1:33  chord stabs join
+#   block 16  2:04  breakdown -- drums gone, pad blooms, filter opens
+#   block 18  2:19  long two-block riser
+#   block 20  2:35  DROP 2 -- everything, arp density at maximum
+#   block 30  3:52  stabs out
+#   block 32  4:08  kick and clap out, bass fading
+#   block 34  4:23  afterglow -- pads back up, arp thinning
+#   block 36  4:39  master fade to silence
+#
+# Harmony is Am | F | C | G, one chord per bar, encoded as three voicing
+# lanes; the bass and pads read the same lanes, so the whole track re-voices
+# from four numbers. The arp is a mutating 16-step turing loop whose note
+# density (bern.prob) and the hats' euclid hit count are both automated by
+# the arrangement. Delays are tempo-synced through the tempo module. The kick
+# envelope sidechain-ducks bass, pads, stabs, and both FX returns.
+
+# ---- clock tree: master runs sixteenths at 124 BPM ----
+master   = clock { bpm: 496 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> four_bar.in
+
+# ---- arrangement grid: forty 4-bar blocks (7.74 s each), one value per block.
+# Lanes are read as held CV and slewed below. Blocks 38-39 are silent tail so
+# a 300 s render ends before the sequence wraps.
+arr_kick = stepseq { steps: [0,0,0,0,0,0,0,0, 1,1,1,1,1,1,1,1, 0,0,0,0,
+                             1,1,1,1,1,1,1,1,1,1,1,1, 0,0,0,0,0,0,0,0] }
+arr_bass = stepseq { steps: [0,0,0,0,0,0,.7,.7, 1,1,1,1,1,1,1,1, 0,0,0,0,
+                             1,1,1,1,1,1,1,1,1,1,1,1, .6,.4,0,0,0,0,0,0] }
+arr_hats = stepseq { steps: [0,0,0,0,.5,.5,.5,.5, .75,.75,.75,.75,.75,.75,.75,.75,
+                             .2,.2,.35,.35, 1,1,1,1,1,1,1,1,1,1,
+                             .8,.8,.6,.6,.35,.2,0,0,0,0] }
+arr_arp  = stepseq { steps: [0,0,.35,.35,.55,.55,.55,.55, .7,.7,.7,.7,.7,.7,.7,.7,
+                             .5,.5,.5,.5, 1,1,1,1,1,1,1,1,1,1,
+                             .7,.7,.7,.7,.45,.45,.25,0,0,0] }
+arr_pad  = stepseq { steps: [.85,.85,.85,.85,.6,.6,.6,.6, .35,.35,.35,.35,.35,.35,.35,.35,
+                             1,1,1,1, .4,.4,.4,.4,.4,.4,.4,.4,.4,.4,
+                             .5,.5,.65,.65,.8,.8,.5,.25,0,0] }
+arr_stab = stepseq { steps: [0,0,0,0,0,0,0,0,0,0,0,0, .7,.7,.7,.7, .45,.45,.45,.45,
+                             1,1,1,1,1,1,1,1,1,1, .4,.4,0,0,0,0,0,0,0,0] }
+arr_rise = stepseq { steps: [0,0,0,0,0,0,0,1, 0,0,0,0,0,0,0,0,0,0, 1,1,
+                             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] }
+arr_main = stepseq { steps: [1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1, 1,1,1,1,
+                             1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1, .7,0,0,0] }
+four_bar -> arr_kick.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_hats.clock
+four_bar -> arr_arp.clock
+four_bar -> arr_pad.clock
+four_bar -> arr_stab.clock
+four_bar -> arr_rise.clock
+four_bar -> arr_main.clock
+
+# Slew limiters turn lane steps into fades (func with nothing on trig).
+bass_lvl = func { rise: 3, fall: 3 }
+hats_lvl = func { rise: 3, fall: 3 }
+arp_lvl  = func { rise: 4, fall: 4 }
+pad_lvl  = func { rise: 5, fall: 5 }
+stab_lvl = func { rise: 3, fall: 3 }
+rise_cv  = func { rise: 7, fall: 0.4 }
+main_out = func { rise: 2, fall: 8 }
+arr_bass.cv -> bass_lvl.in
+arr_hats.cv -> hats_lvl.in
+arr_arp.cv -> arp_lvl.in
+arr_pad.cv -> pad_lvl.in
+arr_stab.cv -> stab_lvl.in
+arr_rise.cv -> rise_cv.in
+arr_main.cv -> main_out.in
+
+# ---- harmony: Am | F | C | G, one chord per bar, three voicing lanes.
+# Values are v/oct around A; root lane doubles as the bass line and pad root.
+ch_root = stepseq { steps: [0, -0.33333, 0.25, -0.16667] }
+ch_v2   = stepseq { steps: [0.25, 0, 0.58333, 0.16667] }
+ch_v3   = stepseq { steps: [0.58333, 0.25, 0.83333, 0.41667] }
+bar -> ch_root.clock
+bar -> ch_v2.clock
+bar -> ch_v3.clock
+
+# ---- kick: gated four-on-the-floor, pitch-thump sine, log envelope ----
+kick_gate = logic { op: and }
+quarter -> kick_gate.a
+arr_kick.cv -> kick_gate.b
+kick_env = func { rise: 0.0006, fall: 0.19, curve: log }
+kick_gate -> kick_env.trig
+kick_osc = vco { freq: 48hz, wave: sine }
+kick_gate -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.7
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : 0.95
+kick_drive = drive { amount: 0.25, mode: soft }
+kick_amp -> kick_drive.in
+
+# ---- clap on beats 2 and 4, band-passed noise, only while the kick plays ----
+clap_seq = stepseq { steps: [0,0,0,0], gates: [0,1,0,1] }
+quarter -> clap_seq.clock
+clap_gate = logic { op: and }
+clap_seq.trig -> clap_gate.a
+arr_kick.cv -> clap_gate.b
+clap_env = func { rise: 0.001, fall: 0.14, curve: exp }
+clap_gate -> clap_env.trig
+clap_noise = noise { color: white, seed: 5 }
+clap_filter = svf { cutoff: 1500, res: 0.55 }
+clap_noise -> clap_filter.in
+clap_amp = vca { gain: 0 }
+clap_filter.bp -> clap_amp.in
+clap_env -> clap_amp.cv : 0.8
+
+# ---- bass: rolling offbeat eighths on the chord root ----
+# Offbeat = eighth AND NOT quarter; both gates come from the same div chain,
+# so the edges are phase-locked.
+beat_not = logic { op: not }
+quarter -> beat_not.a
+offbeat = logic { op: and }
+eighth -> offbeat.a
+beat_not -> offbeat.b
+bass_env = func { rise: 0.0015, fall: 0.14, curve: exp }
+offbeat -> bass_env.trig
+bass_osc = vco { freq: 110hz, wave: saw }
+ch_root.cv -> bass_osc.v_oct
+bass_filter = ladder { cutoff: 140, res: 0.18, drive: 0.5 }
+bass_osc -> bass_filter.in
+bass_env -> bass_filter.cutoff : 1050
+bass_lvl -> bass_filter.cutoff : 250
+bass_amp = vca { gain: 0 }
+bass_filter -> bass_amp.in
+bass_env -> bass_amp.cv : 0.9
+
+# ---- hats: euclid sixteenths whose density rides the arrangement ----
+hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
+master -> hat_pattern.clock
+hats_lvl -> hat_pattern.hits : 6
+hat_env = func { rise: 0.0006, fall: 0.04, curve: exp }
+hat_pattern.trig -> hat_env.trig
+hats_lvl -> hat_env.fall : 0.03
+hat_noise = noise { color: white, seed: 19 }
+hat_filter = svf { cutoff: 8800, res: 0.3 }
+hat_noise -> hat_filter.in
+hat_amp = vca { gain: 0 }
+hat_filter.hp -> hat_amp.in
+hat_env -> hat_amp.cv : 0.5
+quarter -> hat_amp.cv : -0.13
+
+# ---- arp: 16-step turing loop, A minor pentatonic, density automated ----
+# The register mutates slowly (prob .06); bern decides which sixteenths speak,
+# and its probability follows the arrangement, so the riff thickens into the
+# drops. Pitch is sampled only when a note actually strikes.
+riff = turing { len: 16, prob: 0.06, seed: 47 }
+master -> riff.clock
+arp_quant = quant { scale: [0, 3, 5, 7, 10] }
+riff.out -> arp_quant.in : 0.85
+arp_coin = bern { prob: 0.12, seed: 9 }
+master -> arp_coin.gate
+arp_lvl -> arp_coin.prob : 0.55
+arp_note = sh { mode: sample }
+arp_quant -> arp_note.in
+arp_coin.a -> arp_note.trig
+arp_osc = vco { freq: 220hz, wave: saw }
+arp_note -> arp_osc.v_oct
+arp_pluck = lpg { damp: 0.55, decay: 0.22 }
+arp_osc -> arp_pluck.in
+arp_coin.a -> arp_pluck.strike
+arp_amp = vca { gain: 0 }
+arp_pluck -> arp_amp.in
+arp_lvl -> arp_amp.cv : 0.85
+
+# ---- stabs: three-voice pulse chord, syncopated over two bars ----
+stab_seq = stepseq { steps: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                     gates: [0,1,0,0, 1,0,0,1, 0,0,1,0, 0,1,0,0] }
+eighth -> stab_seq.clock
+stab_env = func { rise: 0.002, fall: 0.3, curve: exp }
+stab_seq.trig -> stab_env.trig
+stab_osc1 = vco { freq: 220hz, wave: pulse, pw: 0.5 }
+stab_osc2 = vco { freq: 220hz, wave: pulse, pw: 0.5 }
+stab_osc3 = vco { freq: 220hz, wave: pulse, pw: 0.5 }
+ch_root.cv -> stab_osc1.v_oct
+ch_v2.cv -> stab_osc2.v_oct
+ch_v3.cv -> stab_osc3.v_oct
+0.007 -> stab_osc2.v_oct
+-0.008 -> stab_osc3.v_oct
+stab_wander = lfo { wave: tri, freq: 0.067hz }
+stab_filter = svf { cutoff: 750, res: 0.3 }
+stab_osc1 -> stab_filter.in : 0.34
+stab_osc2 -> stab_filter.in : 0.3
+stab_osc3 -> stab_filter.in : 0.3
+stab_env -> stab_filter.cutoff : 2400
+stab_wander -> stab_filter.cutoff : 250
+stab_amp = vca { gain: 0, response: exp }
+stab_filter.lp -> stab_amp.in
+stab_env -> stab_amp.cv : 0.8
+# Post-fader stage: the arrangement lane gates the stabs BEFORE the FX sends,
+# so muted stabs cannot bleed into the reverb and delay returns.
+stab_out = vca { gain: 0 }
+stab_amp -> stab_out.in
+stab_lvl -> stab_out.cv
+
+# ---- pads: two saws a third apart, slewed pitch, filters that bloom in the
+# breakdown because the arrangement lane feeds the cutoff ----
+pad_glide_a = func { rise: 0.06, fall: 0.06 }
+pad_glide_b = func { rise: 0.06, fall: 0.06 }
+ch_root.cv -> pad_glide_a.in
+ch_v2.cv -> pad_glide_b.in
+pad_osc_a = vco { freq: 110hz, wave: saw }
+pad_osc_b = vco { freq: 110hz, wave: saw }
+pad_glide_a -> pad_osc_a.v_oct
+pad_glide_b -> pad_osc_b.v_oct
+0.008 -> pad_osc_b.v_oct
+pad_breath = lfo { wave: sine, freq: 0.043hz }
+pad_filter_a = svf { cutoff: 380, res: 0.2 }
+pad_filter_b = svf { cutoff: 380, res: 0.2 }
+pad_osc_a -> pad_filter_a.in
+pad_osc_b -> pad_filter_b.in
+pad_breath -> pad_filter_a.cutoff : 180
+pad_breath -> pad_filter_b.cutoff : -160
+pad_lvl -> pad_filter_a.cutoff : 700
+pad_lvl -> pad_filter_b.cutoff : 700
+
+# ---- riser: filtered noise swell into each drop ----
+riser_noise = noise { color: white, seed: 7 }
+riser_filter = svf { cutoff: 300, res: 0.55 }
+riser_noise -> riser_filter.in
+rise_cv -> riser_filter.cutoff : 5200
+riser_amp = vca { gain: 0 }
+riser_filter.lp -> riser_amp.in
+rise_cv -> riser_amp.cv : 0.6
+
+# ---- band mix: dry voices, kick ducks everything tonal ----
+band = mix { levels: [0.78, 0, 0.5, 0, 0.7, 0.72, 0, 0],
+             pans: [0, 0, 0.15, -0.2, 0.25, -0.1, -0.65, 0.65] }
+kick_drive -> band.in1
+bass_amp -> band.in2
+clap_amp -> band.in3
+hat_amp -> band.in4
+arp_amp -> band.in5
+stab_out -> band.in6
+pad_filter_a.lp -> band.in7
+pad_filter_b.lp -> band.in8
+bass_lvl -> band.lvl2 : 0.55
+hats_lvl -> band.lvl4 : 0.45
+pad_lvl -> band.lvl7 : 0.26
+pad_lvl -> band.lvl8 : 0.26
+kick_env -> band.lvl2 : -0.22
+kick_env -> band.lvl5 : -0.1
+kick_env -> band.lvl6 : -0.12
+kick_env -> band.lvl7 : -0.15
+kick_env -> band.lvl8 : -0.15
+
+# ---- FX: tempo-synced dotted-eighth / straight-eighth delays, plate reverb.
+# Delay time bases are zeroed so the tempo module owns them outright.
+sync_de = tempo { bpm: 124, beats: 0.75 }
+sync_e  = tempo { bpm: 124, beats: 0.5 }
+dly_l = delay { time: 0ms, feedback: 0.45, tone: 3800, mix: 1, slew: 0.2 }
+dly_r = delay { time: 0ms, feedback: 0.5, tone: 3200, mix: 1, slew: 0.2 }
+sync_de.seconds -> dly_l.time
+sync_e.seconds -> dly_r.time
+arp_amp -> dly_l.in : 0.5
+arp_amp -> dly_r.in : 0.38
+stab_out -> dly_l.in : 0.15
+
+space = reverb { decay: 0.82, damp: 0.3, mix: 1,
+                 predelay: 0.02, bandwidth: 0.92,
+                 mod_rate: 0.6, mod_depth: 24 }
+pad_filter_a.lp -> space.in_l : 0.3
+pad_filter_b.lp -> space.in_r : 0.3
+stab_out -> space.in_l : 0.25
+stab_out -> space.in_r : 0.2
+clap_amp -> space.in_l : 0.15
+clap_amp -> space.in_r : 0.2
+arp_amp -> space.in_l : 0.12
+arp_amp -> space.in_r : 0.16
+riser_amp -> space.in_l : 0.22
+riser_amp -> space.in_r : 0.22
+
+# ---- master: band + returns, returns ducked by the kick ----
+master_mix = mix { levels: [1, 1, 0.55, 0.55, 0.42, 0.42, 0.5],
+                   pans: [-1, 1, -1, 1, -0.85, 0.85, 0] }
+band.out_l -> master_mix.in1
+band.out_r -> master_mix.in2
+space.out_l -> master_mix.in3
+space.out_r -> master_mix.in4
+dly_l -> master_mix.in5
+dly_r -> master_mix.in6
+riser_amp -> master_mix.in7
+kick_env -> master_mix.lvl3 : -0.18
+kick_env -> master_mix.lvl4 : -0.18
+kick_env -> master_mix.lvl5 : -0.12
+kick_env -> master_mix.lvl6 : -0.12
+
+master_mix.out_l -> out.left
+master_mix.out_r -> out.right
+
+# The arrangement's last lane fades the whole track out through out.level.
+-1 -> out.level
+main_out -> out.level : 0.62
