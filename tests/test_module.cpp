@@ -55,3 +55,23 @@ TEST_CASE("out module mixes 'in' into both sides and applies level") {
   CHECK(outs[0] == doctest::Approx(0.375f));  // (0.25 + 0.5) * 0.5
   CHECK(outs[1] == doctest::Approx(0.25f));   // (0.0  + 0.5) * 0.5
 }
+
+TEST_CASE("cfg_num returns numeric config values and defaults") {
+  Config c;
+  ConfigValue seven; seven.num = 7.0; seven.is_num = true;
+  c.push_back({"seed", seven});
+  ConfigValue name; name.str = "pink";
+  c.push_back({"color", name});
+  CHECK(cfg_num(c, "seed", 1.0) == doctest::Approx(7.0));
+  CHECK(cfg_num(c, "missing", 42.0) == doctest::Approx(42.0));
+  CHECK(cfg_num(c, "color", 3.0) == doctest::Approx(3.0));  // non-numeric -> default
+}
+
+TEST_CASE("cfg_arr returns array config values or an empty vector") {
+  Config c;
+  ConfigValue scale; scale.arr = {0.0, 3.0, 7.0};
+  c.push_back({"scale", scale});
+  CHECK(cfg_arr(c, "scale").size() == 3);
+  CHECK(cfg_arr(c, "scale")[1] == doctest::Approx(3.0));
+  CHECK(cfg_arr(c, "missing").empty());
+}

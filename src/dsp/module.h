@@ -21,6 +21,8 @@ struct ConfigValue {
 using Config = std::vector<std::pair<std::string, ConfigValue>>;
 
 std::string cfg_str(const Config& c, std::string_view name, std::string_view def);
+double cfg_num(const Config& c, std::string_view name, double def);
+const std::vector<double>& cfg_arr(const Config& c, std::string_view name);
 
 class Module {
  public:
