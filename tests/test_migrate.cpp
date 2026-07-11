@@ -400,6 +400,37 @@ TEST_CASE("quant migrates changed-gate state") {
   }
 }
 
+// The copy must carry the ring buffer itself (echoes in flight), the write
+// head, the slewed delay length, and the feedback-filter states. A short
+// delay with feedback keeps energy circulating through ALL of that state at
+// the copy point; comparing across the next echo arrival makes each copied
+// member load-bearing.
+TEST_CASE("delay migrates ring buffer, write head, and loop filter state") {
+  const ModuleInfo* info = find_module("delay");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  // in, time, pitch, feedback, mix, tone, slew
+  float ins[7] = {0.0f, 0.005f, 0.0f, 0.8f, 1.0f, 3000.0f, 0.0f};
+  float out_a[1], out_b[1];
+  ins[0] = 1.0f;
+  a->process(ins, out_a);
+  ins[0] = 0.0f;
+  for (int i = 1; i < 700; ++i) {
+    ins[0] = i % 190 == 0 ? 0.7f : 0.0f;  // keep fresh energy circulating
+    a->process(ins, out_a);
+  }
+  b->copy_state_from(*a);
+  for (int i = 700; i < 1400; ++i) {  // crosses several 240-sample echoes
+    ins[0] = i % 190 == 0 ? 0.7f : 0.0f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
+
 TEST_CASE("random migrates rng, phase, and segment endpoints") {
   const ModuleInfo* info = find_module("random");
   REQUIRE(info != nullptr);
