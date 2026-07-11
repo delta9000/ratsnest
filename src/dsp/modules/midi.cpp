@@ -134,11 +134,19 @@ class Midi final : public Module {
       mono_press(note, vel);
       return;
     }
-    // Poly: claim a free voice round-robin; if none free, steal the oldest.
+    // Re-strike of a note already sounding or sustained: reclaim its own
+    // voice rather than claiming another one, so a pedal-sustained note
+    // struck again doesn't strand a second voice once the pedal lifts.
     int claim = -1;
-    for (int s = 1; s <= voices_; ++s) {
-      const int i = (rr_ + s) % voices_;
-      if (!gate_[i]) { claim = i; break; }
+    for (int i = 0; i < voices_; ++i) {
+      if (gate_[i] && note_[i] == note) { claim = i; break; }
+    }
+    if (claim < 0) {
+      // Poly: claim a free voice round-robin; if none free, steal the oldest.
+      for (int s = 1; s <= voices_; ++s) {
+        const int i = (rr_ + s) % voices_;
+        if (!gate_[i]) { claim = i; break; }
+      }
     }
     if (claim < 0) {
       // No free voice: steal the oldest sounding one (smallest order_).

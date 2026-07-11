@@ -199,6 +199,47 @@ TEST_CASE("sustain pedal defers note-off until pedal release") {
   CHECK(m.out("gate1") == doctest::Approx(0.f));
 }
 
+TEST_CASE("poly re-strike of a sustained note reclaims its voice") {
+  // Repro (voices:2): noteon 60 -> voice1; pedal down; noteoff 60 -> voice1
+  // sustained; noteon 60 again must RECLAIM voice1 (one-sample gap, fresh
+  // vel), never claim voice2. Without the fix, the re-strike steals voice2
+  // and the later note-off re-marks voice1 (first gate-high match), leaving
+  // voice2 gated forever once the pedal lifts.
+  MidiRig m({{"voices", number(2)}});
+  m.noteon(0, 60, 100);  // claims voice1
+  m.step();
+  CHECK(m.out("gate1") == doctest::Approx(1.f));
+  CHECK(m.out("gate2") == doctest::Approx(0.f));
+
+  m.cc(0, 64, 127);   // pedal down
+  m.noteoff(0, 60);   // deferred: voice1 stays sounding (sustained)
+  m.step();
+  CHECK(m.out("gate1") == doctest::Approx(1.f));
+  CHECK(m.out("gate2") == doctest::Approx(0.f));
+
+  m.noteon(0, 60, 110);  // re-strike same note while sustained
+  m.step();
+  // Reclaim of voice1: one-sample gate gap, voice2 untouched.
+  CHECK(m.out("gate1") == doctest::Approx(0.f));
+  CHECK(m.out("gate2") == doctest::Approx(0.f));
+  m.step();
+  // Resumes high on voice1 with the fresh velocity; still only one voice.
+  CHECK(m.out("gate1") == doctest::Approx(1.f));
+  CHECK(m.out("vel1") == doctest::Approx(110.f / 127.f));
+  CHECK(m.out("gate2") == doctest::Approx(0.f));
+
+  m.noteoff(0, 60);   // deferred again (pedal still down)
+  m.step();
+  CHECK(m.out("gate1") == doctest::Approx(1.f));
+  CHECK(m.out("gate2") == doctest::Approx(0.f));
+
+  m.cc(0, 64, 0);     // pedal up: releases the sustained voice
+  m.step();
+  // No stranded voice: every gate must be low.
+  for (int i = 1; i <= 2; ++i)
+    CHECK(m.out("gate" + std::to_string(i)) == doctest::Approx(0.f));
+}
+
 TEST_CASE("bend folds into voct and its own output") {
   MidiRig m({{"voices", number(1)}, {"bend", number(2)}});
   m.noteon(0, 57, 100);
