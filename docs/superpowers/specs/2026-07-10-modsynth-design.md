@@ -163,7 +163,7 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 |---|---|---|
 | `midi` | note/CC → CV | outs `v_oct` `gate` `vel` `cc<N>`; ALSA/PipeWire MIDI |
 | `adsr` | keyboard envelope | `func` covers AD; sustain needs its own module |
-| `delay` | feedback delay | `time` `feedback` `mix`; clock-sync later |
+| `delay` | tape-style feedback delay, 10 s max | ins `in` `time`(s) `pitch`(v_oct: t·2^−p) `feedback`(0..1.2, tanh loop) `mix` `tone`(Hz) `slew`(s) · out. Clock-sync stays patchable (clock→seconds module later) |
 | `reverb` | Dattorro/FDN | hardest DSP in the plan; ambient lives on it |
 
 ### Phase 3 — the sequencer wing (+8)
