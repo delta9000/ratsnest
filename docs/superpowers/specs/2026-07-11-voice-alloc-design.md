@@ -44,7 +44,9 @@ Claim semantics (`rr`):
 - When superseded or released, `voct<i>` **holds** its last value, so release
   tails keep their pitch. `vel<i>` holds until the next claim of that voice.
 - Reclaiming a voice whose gate is still high inserts a one-sample low gap so
-  downstream envelopes retrigger.
+  downstream envelopes retrigger (defensive for alloc's mono input, where a
+  rising edge always implies the prior sample was low; observable in bank
+  producers with note identity, see the midi design in §5).
 
 A mono stream can only express one *held* note at a time, so this is strum
 polyphony: each trigger takes a fresh voice and older voices ring out through

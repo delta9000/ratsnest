@@ -95,7 +95,17 @@ TEST_CASE("supersede drops gate the same sample a new voice is claimed") {
   CHECK(m.out("voct1") == doctest::Approx(0.1f));  // held, not reset to 0
 }
 
-TEST_CASE("reclaim inserts one-sample gate gap") {
+TEST_CASE("wrapped reclaim re-sounds the voice with the new pitch on the claim sample") {
+  // Note: this is NOT a test of the gap_ mechanism. With a single mono gate
+  // input, a rising edge implies the previous sample was <=0.5, which already
+  // dropped every voice's gate — so gap_[i] is always false at the moment a
+  // voice is reclaimed and the defensive one-sample gap can never fire here.
+  // It stays in alloc.cpp because it defines the bank-producer convention a
+  // future producer with real note identity (midi) must honor when it CAN
+  // reclaim a voice while its gate is still high; midi's own tests exercise
+  // that path. Here we only assert the ordinary, reachable behavior: the
+  // reclaimed voice's gate is high and its voct is the new pitch on the very
+  // sample it is claimed.
   AllocRig m(3);
   auto claim_and_release = [&](float voct) {
     m.step(1, voct, 1);
@@ -108,6 +118,38 @@ TEST_CASE("reclaim inserts one-sample gate gap") {
   m.step(1, 0.4f, 1);
   CHECK(m.out("gate1") == doctest::Approx(1.0f));
   CHECK(m.out("voct1") == doctest::Approx(0.4f));
+}
+
+TEST_CASE("vel latches at claim and holds until the voice's next claim") {
+  AllocRig m(2);
+  m.step(1, 0.1f, 0.3f);  // claim voice1 (newest=0) at vel 0.3
+  CHECK(m.out("vel1") == doctest::Approx(0.3f));
+  m.step(1, 0.1f, 0.9f);  // gate still high, vel input changes: no re-claim
+  CHECK(m.out("vel1") == doctest::Approx(0.3f));  // latched, not tracking
+  m.step(0, 0.1f, 0.9f);  // release: vel still holds
+  CHECK(m.out("vel1") == doctest::Approx(0.3f));
+  m.step(1, 0.5f, 0.9f);  // claim voice2 (newest=1), voice1 untouched
+  CHECK(m.out("vel1") == doctest::Approx(0.3f));
+  CHECK(m.out("vel2") == doctest::Approx(0.9f));
+  m.step(0, 0.5f, 0.9f);  // release voice2
+  m.step(1, 0.9f, 0.6f);  // rising edge wraps (newest=0): reclaims voice1
+  CHECK(m.out("vel1") == doctest::Approx(0.6f));  // re-latched on new claim
+}
+
+TEST_CASE("n=1 rr is legato: gate held high tracks voct continuously with no retrigger") {
+  AllocRig m(1);
+  m.step(1, 0.2f, 1);
+  CHECK(m.out("gate1") == doctest::Approx(1.0f));
+  CHECK(m.out("voct1") == doctest::Approx(0.2f));
+  m.step(1, 0.4f, 1);  // still high: same claim, voct tracks, no retrigger
+  CHECK(m.out("gate1") == doctest::Approx(1.0f));
+  CHECK(m.out("voct1") == doctest::Approx(0.4f));
+  m.step(1, 0.7f, 1);
+  CHECK(m.out("gate1") == doctest::Approx(1.0f));
+  CHECK(m.out("voct1") == doctest::Approx(0.7f));
+  m.step(0, 0.7f, 1);  // gate falls: voct holds at its last tracked value
+  CHECK(m.out("gate1") == doctest::Approx(0.0f));
+  CHECK(m.out("voct1") == doctest::Approx(0.7f));
 }
 
 TEST_CASE("unison: all gates follow, spread is centered") {

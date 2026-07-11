@@ -238,7 +238,9 @@ Beat values: quarter 1, eighth .5, dotted eighth .75, sixteenth .25. Example:
 over -1..+1; 0 when n = 1). Each rising gate claims the next voice (`rr`)
 or all voices (`unison`); a voice tracks `voct` while it is the newest
 claim and holds it after, so release tails keep pitch. Reclaims insert a
-one-sample gap. Strum polyphony from any mono sequencer; see `voice`.
+one-sample gap (a defensive guarantee of the bank convention — unreachable
+from a mono gate, where every reclaim already follows a low sample; midi
+exercises it). Strum polyphony from any mono sequencer; see `voice`.
 
 ## Recipes
 
