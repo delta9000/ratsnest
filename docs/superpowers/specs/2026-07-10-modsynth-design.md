@@ -107,8 +107,12 @@ Recorded here so v1 doesn't accidentally preclude them:
 - **Enum-param modulation** (`lfo -> voice.model`): signal offsets the enum
   index, rounded. Deliberately deferred; v1 enums are static.
 - **Subpatches / include:** a patch usable as a module with declared ports.
-- **`voice { … }` block** for polyphony (see §6).
 - **Expressions** (`freq: 55 * 2`) — probably never; a patch is data, not code.
+
+`voice { … }` for polyphony (§6) is no longer deferred: implemented as
+compile-time dotted-namespace groups over `alloc`'s indexed banks, no new
+statement types or runtime voice machinery. Full design:
+`2026-07-11-voice-alloc-design.md`.
 
 ## 4. Signal conventions
 

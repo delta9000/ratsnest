@@ -29,6 +29,52 @@ Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output
 `modsynth check patch.patch`; `modsynth render ... --stats [Ns]` prints
 overall peak/RMS/DC plus a per-window level timeline for mix work.
 
+### Voice groups
+
+Declared names may contain a dot (`lead.osc = vco { ... }`); no new statement
+type, just a name. A dotted declaration whose prefix isn't a `voice` group is
+an ordinary module with a dotted name.
+
+```text
+poly = alloc { n: 3 }
+clk -> poly.gate
+key -> poly.voct
+
+harp = voice { notes: poly }
+harp.osc = vco { freq: 220hz, wave: tri }
+harp.pluck = lpg { damp: 0.5, decay: 0.9 }
+poly.voct -> harp.osc.v_oct     # bound bank, bare name: per-instance
+harp.osc -> harp.pluck.in       # inside -> inside: instance-local
+poly.gate -> harp.pluck.strike
+harp.pluck -> out.in : 0.45     # inside -> outside: straight sum of voices
+```
+
+`name = voice { notes: <module> }` stamps every `name.<member>` declaration
+once per voice, as `name.<member>#i` (`#` starts a comment in source, so
+instance names never collide with user names; `watch` shows `harp.osc#2`
+like any node). Voice count `n` is inherited from the module bound by
+`notes:` — usually `alloc` — which must expose `gate<i>`/`voct<i>` banks; an
+explicit `n:` on the `voice` block must match or it is a compile error.
+
+Cable resolution depends on where each endpoint lives:
+
+1. **inside -> inside** (same group): instance-local, one cable per voice.
+2. **bound module's bare bank name, read inside** (`poly.voct`,
+   `poly.spread`): resolves to `<bank><i>` per instance, for every output
+   family the bound module exposes. This shadows nothing — `alloc` has no
+   mono output named `voct`, so that spelling is an error everywhere else.
+3. **outside -> inside**: broadcast; the same source feeds every instance.
+4. **inside -> outside**: the outside port receives the straight sum of all
+   instances. No hidden `1/n` normalization — gain staging is the author's
+   job via cable depth, same as every other sum in the DSL.
+
+A mono gate/voct stream (a sequencer, `stepseq`, `turing.bit1..8`, …) can only
+express one held note at a time, so this is strum polyphony: each trigger
+claims a fresh voice and older voices ring out through their own releases.
+See `patches/strum.patch` for a complete three-voice recipe (clocked
+random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
+`docs/superpowers/specs/2026-07-11-voice-alloc-design.md` for the full design.
+
 ## Quick palette
 
 | Area | Modules |
