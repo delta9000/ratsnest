@@ -94,6 +94,53 @@ TEST_CASE("four cable cases expand correctly") {
   CHECK(has_cable(ast, "lead.amp#1", "out.in"));
 }
 
+TEST_CASE("kPatch runs the full compiler: node count, in_cables shapes, "
+          "and per-instance nodes for a no-output member") {
+  // Extend kPatch with a `scope` member (input-only, no outputs) wired
+  // instance-locally: exercises full compile (topo sort, cable resolution,
+  // instantiation) for a member type with an empty output list.
+  std::string src = std::string(kPatch) + "lead.scope = scope\nlead.osc -> lead.scope.in\n";
+  auto p = dsl::parse(src);
+  REQUIRE(p.ok());
+  auto c = graph::compile(p.ast, 48000.0);
+  REQUIRE(c.ok());
+  const graph::Graph& g = *c.graph;
+
+  auto idx = [&](const char* name) -> int {
+    for (size_t i = 0; i < g.nodes.size(); ++i)
+      if (g.nodes[i].name == name) return static_cast<int>(i);
+    return -1;
+  };
+
+  // poly, lfo1, lead.osc#0/#1, lead.amp#0/#1, lead.scope#0/#1, out.
+  CHECK(g.nodes.size() == 9);
+  CHECK(g.in_cables.size() == g.nodes.size());
+  for (const char* name : {"poly", "lfo1", "lead.osc#0", "lead.osc#1", "lead.amp#0",
+                            "lead.amp#1", "lead.scope#0", "lead.scope#1", "out"})
+    CHECK(idx(name) >= 0);
+
+  int osc0 = idx("lead.osc#0"), osc1 = idx("lead.osc#1");
+  int amp0 = idx("lead.amp#0"), amp1 = idx("lead.amp#1");
+  int scope0 = idx("lead.scope#0"), scope1 = idx("lead.scope#1");
+  REQUIRE((osc0 >= 0 && osc1 >= 0 && amp0 >= 0 && amp1 >= 0 && scope0 >= 0 && scope1 >= 0));
+
+  auto fed_by = [&](int dst, int src_node) {
+    for (const auto& cab : g.in_cables[static_cast<size_t>(dst)])
+      if (cab.src_mod == src_node) return true;
+    return false;
+  };
+  // Case 1 instance-local cables survive compile with no cross terms, for
+  // both members wired to lead.osc (amp and the new no-output scope).
+  CHECK(fed_by(amp0, osc0));
+  CHECK(fed_by(amp1, osc1));
+  CHECK_FALSE(fed_by(amp1, osc0));
+  CHECK_FALSE(fed_by(amp0, osc1));
+  CHECK(fed_by(scope0, osc0));
+  CHECK(fed_by(scope1, osc1));
+  CHECK_FALSE(fed_by(scope1, osc0));
+  CHECK_FALSE(fed_by(scope0, osc1));
+}
+
 TEST_CASE("cross-group member links expand to n1 * n2 cables") {
   const char* src =
       "pa = alloc { n: 2 }\n"
