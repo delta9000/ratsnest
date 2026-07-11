@@ -281,6 +281,30 @@ TEST_CASE("copy_state_from on stateless modules is a safe no-op") {
   CHECK(out[0] == doctest::Approx(0.5f));
 }
 
+TEST_CASE("sh migrates held value and prev_trig_ edge memory") {
+  const ModuleInfo* info = find_module("sh");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float out_a[1], out_b[1];
+  float ins[2] = {0.55f, 0.0f};
+  a->process(ins, out_a);
+  ins[1] = 1.0f;  // rising edge: a latches 0.55, prev_trig_ becomes 1.0
+  a->process(ins, out_a);
+  b->copy_state_from(*a);
+  // Trigger stays high but the input changes: a fresh prev_trig_ (0.0)
+  // would see a spurious edge and latch -0.9 instead of holding 0.55.
+  ins[0] = -0.9f;
+  for (int i = 0; i < 8; ++i) {
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[0] == doctest::Approx(0.55f));
+  }
+}
+
 TEST_CASE("noise migrates rng and pink filter state") {
   const ModuleInfo* info = find_module("noise");
   REQUIRE(info != nullptr);

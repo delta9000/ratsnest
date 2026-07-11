@@ -15,4 +15,5 @@ extern const ModuleInfo math_info;
 extern const ModuleInfo xfade_info;
 extern const ModuleInfo drive_info;
 extern const ModuleInfo fold_info;
+extern const ModuleInfo sh_info;
 }  // namespace ms::dsp
