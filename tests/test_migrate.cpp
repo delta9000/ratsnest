@@ -280,3 +280,23 @@ TEST_CASE("copy_state_from on stateless modules is a safe no-op") {
   b->process(ins, out);
   CHECK(out[0] == doctest::Approx(0.5f));
 }
+
+TEST_CASE("noise migrates rng and pink filter state") {
+  const ModuleInfo* info = find_module("noise");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  Config cfg;
+  ConfigValue c; c.str = "pink";
+  cfg.push_back({"color", c});
+  a->init(48000.0, cfg);
+  b->init(48000.0, cfg);
+  float out_a[1], out_b[1];
+  for (int i = 0; i < 500; ++i) a->process(nullptr, out_a);
+  b->copy_state_from(*a);
+  for (int i = 0; i < 8; ++i) {
+    a->process(nullptr, out_a);
+    b->process(nullptr, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}

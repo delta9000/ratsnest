@@ -136,7 +136,7 @@ essentials.
 | Module | Role | Key params | Key ports |
 |---|---|---|---|
 | `vco` | polyBLEP anti-aliased oscillator | `freq`, `wave` (sine\|tri\|saw\|pulse), `pw` | in: `v_oct` `fm` `pwm` `sync` · out: `out` |
-| `noise` | noise source | `color` (white\|pink) | out |
+| `noise` | noise source | `color` (white\|pink), `seed` | out |
 | `svf` | state-variable filter | `cutoff`, `res` | in · out: `lp` (default) `bp` `hp` |
 | `ladder` | 4-pole ZDF ladder LPF | `cutoff`, `res`, `drive` | in · out |
 | `vca` | amplifier | `gain`, `response` (lin\|exp) | `in` `cv` · out |
