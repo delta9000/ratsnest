@@ -70,6 +70,10 @@ class Reverb final : public Module {
     mod_rate_ = static_cast<float>(std::clamp(cfg_num(cfg, "mod_rate", 1.0), 0.0, 20.0));
     mod_depth_ = static_cast<float>(std::clamp(cfg_num(cfg, "mod_depth", 13.0), 0.0,
                                                static_cast<double>(kMaxExcursion)));
+    // The modulated taps read at len - depth; keep depth below both lengths
+    // so the invariant holds even at absurdly low sample rates.
+    const float max_safe = static_cast<float>(std::min(lenA1_, lenB1_)) - 2.0f;
+    mod_depth_ = std::min(mod_depth_, max_safe);
     lp_in_ = lpA_ = lpB_ = 0.0f;
     lfo_ = 0.0;
     freeze_ = 0.0f;
@@ -90,8 +94,9 @@ class Reverb final : public Module {
 
     // mono sum -> predelay -> bandwidth lowpass -> 4 input diffusers
     float x = 0.5f * (ins[0] + ins[1]) * (1.0f - freeze_);
+    const float delayed = dread(ln_[kPre], pre_back_);
     dwrite(ln_[kPre], x);
-    x = dread(ln_[kPre], pre_back_);
+    x = delayed;
     lp_in_ = bw_ * x + (1.0f - bw_) * lp_in_;
     if (std::abs(lp_in_) < 1e-20f) lp_in_ = 0.0f;
     x = lp_in_;
