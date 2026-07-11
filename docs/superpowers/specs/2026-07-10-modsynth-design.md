@@ -165,7 +165,7 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 
 | Module | Role | Notes |
 |---|---|---|
-| `midi` | note/CC → CV | outs `v_oct` `gate` `vel` `cc<N>`; ALSA/PipeWire MIDI |
+| `midi` | note/CC → CV | cfg `channel`(0=omni) `voices`(1..8) `mode`(last\|lowest) `bend`(semitones) `cc`(≤4 controller numbers); outs banks `gate1..8` `voct1..8` `vel1..8`, plus `bend` `at` `cc1..cc4`. No mono `gate`/`voct`/`vel` outs — those bare names are reserved by the voice-group bank-resolution rule (§6); a mono synth is `voices: 1` and `mid.gate1`. PipeWire MIDI |
 | `adsr` | keyboard envelope | ins `gate` `attack` `decay` `sustain`(0..1, live) `release` · out (0..1); `curve` (lin\|exp\|log); release from current level, retrigger from current level |
 | `delay` | tape-style feedback delay, 10 s max | ins `in` `time`(s) `pitch`(v_oct: t·2^−p) `feedback`(0..1.2, tanh loop) `mix` `tone`(Hz) `slew`(s) · out. Clock-sync stays patchable (clock→seconds module later) |
 | `reverb` | Dattorro 1997 plate | ins `in_l` `in_r` `decay` `damp` `mix` `freeze`(gate) · outs `out_l` `out_r`; cfg `predelay`(s) `bandwidth` `mod_rate` `mod_depth`. FDN variant is a Phase 5+ sibling |
@@ -311,11 +311,17 @@ modsynth/
 
 1. **Drone box** — DSL, engine, hot-reload, 18 modules, `play`/`render`/
    `check`. Exit: an evening of generative ambient that's genuinely good.
-2. **Playable** — MIDI in, `adsr`, `delay`, `reverb`.
+2. **Playable** — MIDI in, `adsr`, `delay`, `reverb`. Implemented order
+   deliberately inverted the listed sequence: polyphony (`alloc` + the
+   `voice` block, §6) landed *before* `midi` so midi's indexed banks
+   (`gate1..8`/`voct1..8`/`vel1..8`) target a voice-group mechanism already
+   proven by `alloc` and `patches/strum.patch`, rather than midi inventing
+   its own polyphony story. See `patches/keys-poly.patch` for the combined
+   result.
 3. **Sequencer wing** — clock/div/euclid/stepseq/turing/bern/logic/switch.
 4. **Sound design** — sampler, rec, extin, follow.
-5. **Later** — GUI canvas over the same file (layout sidecar), polyphony
-   `voice` block, granular, physical modeling.
+5. **Later** — GUI canvas over the same file (layout sidecar), granular,
+   physical modeling.
 
 ## 11. Prior art notes
 
