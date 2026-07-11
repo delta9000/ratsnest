@@ -123,7 +123,7 @@ Recorded here so v1 doesn't accidentally preclude them:
 Conventions are enforced by every built-in and documented per port; consistent
 defaults are "the 35th module."
 
-## 5. Module palette (34)
+## 5. Module palette (35)
 
 Sound sources are the skeleton, envelopes/VCAs the muscles, utilities the
 brain. Checked against: the consensus-10 every software modular ships, VCV
@@ -202,11 +202,15 @@ wavetable VCO, module plugin ABI.
 ## 6. Polyphony (decided now, built later)
 
 **Per-voice patch instancing** (the Bitwig Poly Grid / SuperCollider model): a
-future `voice { … }` block instantiates its subgraph once per held note;
-modules never know polyphony exists. Rejected alternative: VCV-style poly
-cables (documented confusion; needed four modules just to manage it). The
-decision is made now so no port or module design bakes in mono assumptions it
-needn't.
+`voice` group instantiates its members once per voice; modules never know
+polyphony exists. Rejected alternative: VCV-style poly cables (documented
+confusion; needed four modules just to manage it). The decision is made now
+so no port or module design bakes in mono assumptions it needn't.
+
+Designed in full (before `midi`, so midi's ports target a proven mechanism):
+`2026-07-11-voice-alloc-design.md` — an ordinary `alloc` module with indexed
+port banks plus compile-time expansion over dotted names (`lead.osc`); no new
+statement types, no runtime voice machinery.
 
 ## 7. Architecture
 
