@@ -1,0 +1,84 @@
+# berlin -- evolving sequencer piece for the Phase 1a module set
+# (vco/lfo/vca/out only: no filter, envelope, or real sequencer yet)
+#
+# The "sequencer" is three octave-related square LFOs binary-weighted onto
+# v_oct -> a stable 8-step staircase melody that loops every second. Timbre,
+# detune, PWM, FM-brightness and level evolve underneath over 20-90s cycles.
+
+# ---- step clock: 4/2/1 Hz squares, weights 1:2:4 -> 8 even pitch steps ----
+seq_a = lfo { wave: square, freq: 4hz }
+seq_b = lfo { wave: square, freq: 2hz }
+seq_c = lfo { wave: square, freq: 1hz }
+
+# ---- per-step pluck: saw ramps a gain 1->0 every 8th note ----
+pluck = lfo { wave: saw, freq: 8hz }
+
+# ---- subtle vibrato ----
+vib = lfo { wave: sine, freq: 5.03hz }
+
+# ---- slow evolution LFOs (sub-Hz: 20s .. 90s) ----
+evo_detune = lfo { wave: sine, freq: 0.05hz }
+evo_pwm    = lfo { wave: tri,  freq: 0.037hz }
+evo_bright = lfo { wave: sine, freq: 0.023hz }
+evo_level  = lfo { wave: sine, freq: 0.017hz }
+pad_oct    = lfo { wave: square, freq: 0.06hz }
+
+# ---- voices: two detuned saws (the sequence) ----
+osc1 = vco { freq: 110hz, wave: saw }
+osc2 = vco { freq: 109hz, wave: tri }
+
+# ---- FM modulator (2:1 over the carriers) for swept brightness ----
+fmosc = vco { freq: 222hz, wave: sine }
+fmamt = vca { gain: 0.15 }
+
+# ---- pad: pulse sub-octave with PWM movement + slow octave jumps ----
+pad = vco { freq: 55hz, wave: pulse, pw: 0.3 }
+
+# ---- amp stages ----
+amp1    = vca { gain: 0.5, response: exp }
+amp2    = vca { gain: 0.5, response: exp }
+pad_amp = vca { gain: 0.18 }
+
+# ================= patching =================
+
+# -- 8-step pitch staircase onto both saws and the FM osc (tracked) --
+seq_a -> osc1.v_oct : 0.0417
+seq_b -> osc1.v_oct : 0.0833
+seq_c -> osc1.v_oct : 0.1667
+seq_a -> osc2.v_oct : 0.0417
+seq_b -> osc2.v_oct : 0.0833
+seq_c -> osc2.v_oct : 0.1667
+seq_a -> fmosc.v_oct : 0.0417
+seq_b -> fmosc.v_oct : 0.0833
+seq_c -> fmosc.v_oct : 0.1667
+
+# -- vibrato + slow detune (osc2 drifts against osc1) --
+vib -> osc1.v_oct : 0.006
+vib -> osc2.v_oct : 0.006
+evo_detune -> osc2.v_oct : 0.02
+
+# -- swept FM brightness: fmosc -> (gain swept by evo_bright) -> carriers.fm --
+fmosc -> fmamt.in
+evo_bright -> fmamt.gain : 0.15
+fmamt -> osc1.fm : 0.15
+fmamt -> osc2.fm : 0.15
+
+# -- pad: slow octave jumps + evolving PWM --
+pad_oct -> pad.v_oct : 0.5
+evo_pwm -> pad.pwm : 0.35
+
+# -- pluck the two saws (base 0.5 gain, saw ramps it 1.0 -> 0.0) --
+pluck -> amp1.gain : -0.5
+pluck -> amp2.gain : -0.5
+osc1 -> amp1.in
+osc2 -> amp2.in
+
+# -- pad through its amp --
+pad -> pad_amp.in
+
+# ---- master: saws panned L/R, pad centered, slow level swell ----
+amp1    -> out.left : 0.5
+amp2    -> out.right : 0.5
+pad_amp -> out.in : 1.0
+-0.2 -> out.level
+evo_level -> out.level : 0.15

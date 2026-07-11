@@ -6,5 +6,8 @@ extern const ModuleInfo vca_info;
 extern const ModuleInfo out_info;
 extern const ModuleInfo vco_info;
 extern const ModuleInfo lfo_info;
-// Appended by later tasks: vco_info, lfo_info.
+extern const ModuleInfo clock_info;
+extern const ModuleInfo div_info;
+extern const ModuleInfo func_info;
+extern const ModuleInfo svf_info;
 }  // namespace ms::dsp

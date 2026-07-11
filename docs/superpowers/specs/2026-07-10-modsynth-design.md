@@ -170,8 +170,8 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 
 | Module | Role | Notes |
 |---|---|---|
-| `clock` | master clock | `bpm`; out + `run` gate |
-| `div` | clock divider/multiplier | `by` |
+| `clock` | master clock | `bpm`; ins `run` `reset` · outs `out` + `run` gate |
+| `div` | clock divider | `by`; ins `in` `reset` · out. Multiplication deferred |
 | `euclid` | Euclidean gates | `steps` `hits` `rot` — Pam's essence |
 | `stepseq` | step sequencer | `steps`/`gates` arrays, `len`, `dir`; ratchets/probability as later params |
 | `turing` | lockable shift register | `len` `prob` `seed`; outs `out` `pulse` `bit1..bit8`; ins `write` `clear`. Volts/Pulses expanders = cables |

@@ -1,0 +1,341 @@
+# black atrium -- Dm / Bb / F / C at 124 BPM
+# Four-bar chords, rolling bass, and a phase-aligned four-on-the-floor.
+
+# ---- phase-locked timing tree ----
+# The master runs at eighth-note rate. Every slower gate clock is derived from
+# it, so the gate-driven layers (kick, tick, arp, stabs) stay phase-locked.
+# The LFO/envelope rates below are wall-clock values tuned to 124 BPM; a tempo
+# edit retimes the gate tree but those must be retuned by hand.
+master = clock { bpm: 248 }
+quarter = div { by: 2 }
+half = div { by: 2 }
+bar = div { by: 4 }
+two_bar = div { by: 2 }
+four_bar = div { by: 2 }
+cycle16 = div { by: 4 }
+cycle32 = div { by: 2 }
+
+master -> quarter.in
+quarter -> half.in
+quarter -> bar.in
+bar -> two_bar.in
+two_bar -> four_bar.in
+four_bar -> cycle16.in
+cycle16 -> cycle32.in
+
+# ---- progression clocks: one 16-bar cycle, four bars per chord ----
+dm_env = lfo { freq: 0.0322917hz, wave: tri, phase: 0 }
+bb_env = lfo { freq: 0.0322917hz, wave: tri, phase: 0.75 }
+f_env  = lfo { freq: 0.0322917hz, wave: tri, phase: 0.5 }
+c_env  = lfo { freq: 0.0322917hz, wave: tri, phase: 0.25 }
+cycle16 -> dm_env.reset
+cycle16 -> bb_env.reset
+cycle16 -> f_env.reset
+cycle16 -> c_env.reset
+
+# ---- D minor: D1 / D2 / F2 / A2 / D3 halo ----
+dm_bass  = vco { freq: 36.71hz, wave: sine }
+dm_root  = vco { freq: 73.42hz, wave: tri }
+dm_third = vco { freq: 87.31hz, wave: sine }
+dm_fifth = vco { freq: 110hz, wave: tri }
+dm_halo  = vco { freq: 220hz, wave: saw }
+dm_amp   = vca { gain: 0 }
+
+# ---- B-flat major over Bb: Bb0 / D2 / F2 / Bb2 / Bb3 halo ----
+bb_bass  = vco { freq: 29.14hz, wave: sine }
+bb_root  = vco { freq: 73.42hz, wave: tri }
+bb_third = vco { freq: 87.31hz, wave: sine }
+bb_fifth = vco { freq: 116.54hz, wave: tri }
+bb_halo  = vco { freq: 233.08hz, wave: saw }
+bb_amp   = vca { gain: 0 }
+
+# ---- F major over F: F1 / C2 / F2 / A2 / A3 halo ----
+f_bass  = vco { freq: 43.65hz, wave: sine }
+f_root  = vco { freq: 65.41hz, wave: tri }
+f_third = vco { freq: 87.31hz, wave: sine }
+f_fifth = vco { freq: 110hz, wave: tri }
+f_halo  = vco { freq: 220hz, wave: saw }
+f_amp   = vca { gain: 0 }
+
+# ---- C major: C1 / C2 / E2 / G2 / C3 halo ----
+c_bass  = vco { freq: 32.70hz, wave: sine }
+c_root  = vco { freq: 65.41hz, wave: tri }
+c_third = vco { freq: 82.41hz, wave: sine }
+c_fifth = vco { freq: 98hz, wave: tri }
+c_halo  = vco { freq: 196hz, wave: saw }
+c_amp   = vca { gain: 0 }
+
+# Each bank gets the same dark voicing. Saw energy remains a quiet upper edge.
+dm_bass -> dm_amp.in : 0.32
+dm_root -> dm_amp.in : 0.48
+dm_third -> dm_amp.in : 0.42
+dm_fifth -> dm_amp.in : 0.3
+dm_halo -> dm_amp.in : 0.07
+dm_env -> dm_amp.gain : 0.74
+
+bb_bass -> bb_amp.in : 0.32
+bb_root -> bb_amp.in : 0.48
+bb_third -> bb_amp.in : 0.42
+bb_fifth -> bb_amp.in : 0.3
+bb_halo -> bb_amp.in : 0.07
+bb_env -> bb_amp.gain : 0.74
+
+f_bass -> f_amp.in : 0.3
+f_root -> f_amp.in : 0.46
+f_third -> f_amp.in : 0.4
+f_fifth -> f_amp.in : 0.28
+f_halo -> f_amp.in : 0.065
+f_env -> f_amp.gain : 0.74
+
+c_bass -> c_amp.in : 0.31
+c_root -> c_amp.in : 0.48
+c_third -> c_amp.in : 0.4
+c_fifth -> c_amp.in : 0.3
+c_halo -> c_amp.in : 0.065
+c_env -> c_amp.gain : 0.74
+
+# ---- 124 BPM rhythm ----
+# Smooth sidechain curve: minimum at the downbeat, no discontinuous reset.
+pump124 = lfo { freq: 2.0667hz, wave: sine, phase: 0.75 }
+kick = vco { freq: 46hz, wave: sine }
+tick = vco { freq: 1760hz, wave: sine }
+kick_env = func { rise: 0.002, fall: 0.18, curve: log }
+tick_env = func { rise: 0.001, fall: 0.035, curve: log }
+kick_amp = vca { gain: 0 }
+tick_amp = vca { gain: 0 }
+
+quarter -> kick_env.trig
+quarter -> kick.sync
+kick_env -> kick_amp.cv
+kick_env -> kick.v_oct : 0.5
+kick -> kick_amp.in
+
+master -> tick_env.trig
+master -> tick.sync
+tick_env -> tick_amp.cv
+tick -> tick_amp.in
+quarter -> pump124.reset
+
+# ---- rolling root bassline ----
+# Chord selection happens before a shared quarter-note recovery VCA. The bass
+# therefore ducks under every kick and leans into the spaces between them.
+bass_dm = vco { freq: 36.71hz, wave: tri }
+bass_bb = vco { freq: 29.14hz, wave: tri }
+bass_f  = vco { freq: 43.65hz, wave: tri }
+bass_c  = vco { freq: 32.70hz, wave: tri }
+bass_dm_amp = vca { gain: 0 }
+bass_bb_amp = vca { gain: 0 }
+bass_f_amp = vca { gain: 0 }
+bass_c_amp = vca { gain: 0 }
+bass_bus = vca { gain: 0.5, response: exp }
+bass_filter = svf { cutoff: 180, res: 0.2 }
+
+bass_dm -> bass_dm_amp.in
+bass_bb -> bass_bb_amp.in
+bass_f -> bass_f_amp.in
+bass_c -> bass_c_amp.in
+dm_env -> bass_dm_amp.gain : 0.55
+bb_env -> bass_bb_amp.gain : 0.55
+f_env -> bass_f_amp.gain : 0.55
+c_env -> bass_c_amp.gain : 0.55
+bass_dm_amp -> bass_bus.in : 0.72
+bass_bb_amp -> bass_bus.in : 0.72
+bass_f_amp -> bass_bus.in : 0.68
+bass_c_amp -> bass_bus.in : 0.7
+pump124 -> bass_bus.gain : 0.32
+pump124 -> bass_filter.cutoff : 70
+
+# One 32-bar performance arc: a 16-bar build followed by a 16-bar release.
+# Exponential rise holds tension early and accelerates into the drop.
+arrangement = func { rise: 30.968, fall: 30.968, curve: exp, cycle: on }
+cycle32 -> arrangement.trig
+arrangement -> bass_bus.gain : 0.1
+arrangement -> bass_filter.cutoff : 500
+bass_bus -> bass_filter.in
+
+# ---- chord-following eighth-note arpeggio ----
+# Quarter and half-note divider gates form four additive pitch states. D minor
+# uses 0/3/7/10 semitones; the major chords use 0/4/7/11.
+arp_dm = vco { freq: 146.83hz, wave: sine }
+arp_bb = vco { freq: 116.54hz, wave: sine }
+arp_f = vco { freq: 174.61hz, wave: sine }
+arp_c = vco { freq: 130.81hz, wave: sine }
+arp_dm_select = vca { gain: 0 }
+arp_bb_select = vca { gain: 0 }
+arp_f_select = vca { gain: 0 }
+arp_c_select = vca { gain: 0 }
+arp_env = func { rise: 0.004, fall: 0.13, curve: log }
+arp_pluck = vca { gain: 0 }
+arp_filter = svf { cutoff: 1800, res: 0.35 }
+arp_arrange = vca { gain: 0.5 }
+
+# Minor seventh offsets: 0, 0.25, 0.5833, 0.8333 octaves.
+quarter -> arp_dm.v_oct : 0.25
+half -> arp_dm.v_oct : 0.58333
+
+# Major seventh offsets: 0, 0.3333, 0.5833, 0.9167 octaves.
+quarter -> arp_bb.v_oct : 0.33333
+quarter -> arp_f.v_oct : 0.33333
+quarter -> arp_c.v_oct : 0.33333
+half -> arp_bb.v_oct : 0.58333
+half -> arp_f.v_oct : 0.58333
+half -> arp_c.v_oct : 0.58333
+
+master -> arp_env.trig
+master -> arp_dm.sync
+master -> arp_bb.sync
+master -> arp_f.sync
+master -> arp_c.sync
+arp_dm -> arp_dm_select.in
+arp_bb -> arp_bb_select.in
+arp_f -> arp_f_select.in
+arp_c -> arp_c_select.in
+dm_env -> arp_dm_select.gain : 0.62
+bb_env -> arp_bb_select.gain : 0.62
+f_env -> arp_f_select.gain : 0.62
+c_env -> arp_c_select.gain : 0.62
+arp_dm_select -> arp_pluck.in : 0.5
+arp_bb_select -> arp_pluck.in : 0.5
+arp_f_select -> arp_pluck.in : 0.5
+arp_c_select -> arp_pluck.in : 0.5
+arp_env -> arp_pluck.cv
+arp_pluck -> arp_filter.in
+arp_env -> arp_filter.cutoff : 3500
+arrangement -> arp_filter.cutoff : 1500
+arp_filter.lp -> arp_arrange.in : 0.72
+arp_filter.bp -> arp_arrange.in : 0.62
+arrangement -> arp_arrange.gain : -0.12
+
+# ---- soaring supersaw lead ----
+# Three narrowly detuned saws per chord follow a slower two-bar seventh-chord
+# motif. Crossfaded chord selectors keep the line harmonically attached.
+lead_swell = lfo { freq: 0.06458hz, wave: sine }
+
+lead_dm_l = vco { freq: 292.9hz, wave: saw }
+lead_dm_c = vco { freq: 293.66hz, wave: saw }
+lead_dm_r = vco { freq: 294.45hz, wave: saw }
+lead_bb_l = vco { freq: 232.45hz, wave: saw }
+lead_bb_c = vco { freq: 233.08hz, wave: saw }
+lead_bb_r = vco { freq: 233.72hz, wave: saw }
+lead_f_l = vco { freq: 348.3hz, wave: saw }
+lead_f_c = vco { freq: 349.23hz, wave: saw }
+lead_f_r = vco { freq: 350.18hz, wave: saw }
+lead_c_l = vco { freq: 260.9hz, wave: saw }
+lead_c_c = vco { freq: 261.63hz, wave: saw }
+lead_c_r = vco { freq: 262.36hz, wave: saw }
+
+lead_dm_select = vca { gain: 0 }
+lead_bb_select = vca { gain: 0 }
+lead_f_select = vca { gain: 0 }
+lead_c_select = vca { gain: 0 }
+lead_bus = vca { gain: 0.16 }
+lead_filter = svf { cutoff: 900, res: 0.45 }
+
+# Dm7 lead offsets.
+two_bar -> lead_dm_l.v_oct : 0.25
+two_bar -> lead_dm_c.v_oct : 0.25
+two_bar -> lead_dm_r.v_oct : 0.25
+four_bar -> lead_dm_l.v_oct : 0.58333
+four_bar -> lead_dm_c.v_oct : 0.58333
+four_bar -> lead_dm_r.v_oct : 0.58333
+
+# Major seventh lead offsets.
+two_bar -> lead_bb_l.v_oct : 0.33333
+two_bar -> lead_bb_c.v_oct : 0.33333
+two_bar -> lead_bb_r.v_oct : 0.33333
+two_bar -> lead_f_l.v_oct : 0.33333
+two_bar -> lead_f_c.v_oct : 0.33333
+two_bar -> lead_f_r.v_oct : 0.33333
+two_bar -> lead_c_l.v_oct : 0.33333
+two_bar -> lead_c_c.v_oct : 0.33333
+two_bar -> lead_c_r.v_oct : 0.33333
+four_bar -> lead_bb_l.v_oct : 0.58333
+four_bar -> lead_bb_c.v_oct : 0.58333
+four_bar -> lead_bb_r.v_oct : 0.58333
+four_bar -> lead_f_l.v_oct : 0.58333
+four_bar -> lead_f_c.v_oct : 0.58333
+four_bar -> lead_f_r.v_oct : 0.58333
+four_bar -> lead_c_l.v_oct : 0.58333
+four_bar -> lead_c_c.v_oct : 0.58333
+four_bar -> lead_c_r.v_oct : 0.58333
+
+lead_dm_l -> lead_dm_select.in : 0.22
+lead_dm_c -> lead_dm_select.in : 0.3
+lead_dm_r -> lead_dm_select.in : 0.22
+lead_bb_l -> lead_bb_select.in : 0.22
+lead_bb_c -> lead_bb_select.in : 0.3
+lead_bb_r -> lead_bb_select.in : 0.22
+lead_f_l -> lead_f_select.in : 0.22
+lead_f_c -> lead_f_select.in : 0.3
+lead_f_r -> lead_f_select.in : 0.22
+lead_c_l -> lead_c_select.in : 0.22
+lead_c_c -> lead_c_select.in : 0.3
+lead_c_r -> lead_c_select.in : 0.22
+dm_env -> lead_dm_select.gain : 0.5
+bb_env -> lead_bb_select.gain : 0.5
+f_env -> lead_f_select.gain : 0.5
+c_env -> lead_c_select.gain : 0.5
+lead_dm_select -> lead_bus.in
+lead_bb_select -> lead_bus.in
+lead_f_select -> lead_bus.in
+lead_c_select -> lead_bus.in
+
+# The lead rises as the arpeggio recedes, then hands focus back smoothly.
+arrangement -> lead_bus.gain : 0.12
+lead_swell -> lead_bus.gain : 0.045
+lead_bus -> lead_filter.in
+arrangement -> lead_filter.cutoff : 6500
+lead_swell -> lead_filter.cutoff : 500
+
+# ---- drop chord stabs ----
+# The active chord banks are re-articulated every half note. A second VCA
+# scales them with the arrangement arc, so they emerge only through the build.
+stab_env = func { rise: 0.008, fall: 0.24, curve: log }
+stab_amp = vca { gain: 0 }
+stab_drop = vca { gain: 0.015 }
+half -> stab_env.trig
+dm_amp -> stab_amp.in : 0.32
+bb_amp -> stab_amp.in : 0.32
+f_amp -> stab_amp.in : 0.32
+c_amp -> stab_amp.in : 0.32
+stab_env -> stab_amp.cv
+stab_amp -> stab_drop.in
+arrangement -> stab_drop.gain : 0.18
+
+# ---- stereo chord bus and sidechain pump ----
+# Both buses dip at each saw reset and recover across the quarter note.
+chord_left = vca { gain: 0.72 }
+chord_right = vca { gain: 0.72 }
+pump124 -> chord_left.gain : 0.14
+pump124 -> chord_right.gain : 0.14
+arrangement -> chord_left.gain : 0.07
+arrangement -> chord_right.gain : 0.07
+
+dm_amp -> chord_left.in : 0.72
+dm_amp -> chord_right.in : 0.48
+bb_amp -> chord_left.in : 0.44
+bb_amp -> chord_right.in : 0.76
+f_amp -> chord_left.in : 0.68
+f_amp -> chord_right.in : 0.52
+c_amp -> chord_left.in : 0.5
+c_amp -> chord_right.in : 0.7
+
+chord_left -> out.left : 1.0
+chord_right -> out.right : 1.0
+# Intro-to-drop mix VCAs add impact without abrupt layer switches.
+bass_mix = vca { gain: 0.64 }
+kick_mix = vca { gain: 0.68 }
+bass_filter.lp -> bass_mix.in
+kick_amp -> kick_mix.in
+arrangement -> bass_mix.gain : 0.3
+arrangement -> kick_mix.gain : 0.32
+bass_mix -> out.in : 0.55
+kick_mix -> out.in : 0.38
+tick_amp -> out.in : 0.008
+arp_arrange -> out.left : 0.13
+arp_arrange -> out.right : 0.13
+lead_filter.lp -> out.left : 0.3
+lead_filter.lp -> out.right : 0.3
+stab_drop -> out.left : 0.2
+stab_drop -> out.right : 0.2
+-0.1 -> out.level
