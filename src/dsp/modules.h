@@ -20,4 +20,5 @@ extern const ModuleInfo ladder_info;
 extern const ModuleInfo lpg_info;
 extern const ModuleInfo random_info;
 extern const ModuleInfo quant_info;
+extern const ModuleInfo mix_info;
 }  // namespace ms::dsp
