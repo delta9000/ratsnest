@@ -73,7 +73,7 @@ class Reverb final : public Module {
     // The modulated taps read at len - depth; keep depth below both lengths
     // so the invariant holds even at absurdly low sample rates.
     const float max_safe = static_cast<float>(std::min(lenA1_, lenB1_)) - 2.0f;
-    mod_depth_ = std::min(mod_depth_, max_safe);
+    mod_depth_ = std::max(0.0f, std::min(mod_depth_, max_safe));
     lp_in_ = lpA_ = lpB_ = 0.0f;
     lfo_ = 0.0;
     freeze_ = 0.0f;
