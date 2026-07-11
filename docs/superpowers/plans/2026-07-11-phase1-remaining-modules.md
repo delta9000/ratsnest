@@ -1345,7 +1345,11 @@ class Random final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = static_cast<float>(rate);
-    const auto seed = static_cast<std::uint32_t>(cfg_num(cfg, "seed", 1.0));
+    // Sanitize before the cast: double -> uint32_t is UB out of range.
+    double s = cfg_num(cfg, "seed", 1.0);
+    if (!std::isfinite(s)) s = 1.0;
+    const auto seed =
+        static_cast<std::uint32_t>(std::clamp(std::abs(s), 0.0, 4294967295.0));
     state_ = seed * 2654435761u;
     if (state_ == 0) state_ = 0x9E3779B9u;
     phase_ = 0.0f;
