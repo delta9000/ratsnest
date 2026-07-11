@@ -105,10 +105,12 @@ lead.amp -> mix.in1 : 0.4     # inside -> outside: straight sum of voices
   Changing `n` (via the allocator) is a topology change: surviving instances
   migrate, dropped instances vanish, new instances start fresh — consistent
   with §3.3.
-- **Errors** (all at compile, line:col): member declared for an undeclared
-  group; `notes:` module lacking the banks; `n:` mismatch; voice group
-  nested in a voice group (a member may not itself be a `voice`); a group
-  with zero members.
+- **Errors** (all at compile, line:col): `notes:` module lacking the banks;
+  `n:` mismatch; voice group nested in a voice group (a member may not
+  itself be a `voice`); a group with zero members. A dotted declaration
+  whose prefix is *not* a voice group is an ordinary module — dotted names
+  are general (§1), so a typo'd group name compiles as plain modules; the
+  planned `check` unreachable-module warning is the net for that.
 
 ## 4. Signal conventions
 
