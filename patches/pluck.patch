@@ -1,34 +1,98 @@
-# pluck -- Karplus-Strong voice: a 12 ms noise burst rings a tuned delay.
-# The delay's pitch input is v_oct, so the quantized melody keeps the string
-# in tune with itself; feedback 0.96 sets the decay, tone 3500 the damping.
-# (The loop lowpass flattens the pitch slightly, as real strings do.)
+# pluck -- Karplus-Strong strings in a tempo-synced echo groove, 180 BPM.
+#
+# The string is a 12 ms noise burst ringing a tuned feedback delay; the
+# quantized melody drives the delay's v_oct pitch input so it stays in tune.
+# Two echo delays are hand-tuned to the tempo (no clock-sync module yet):
+#   250 ms = a dotted eighth at 180 BPM -- gallops against the quarter plucks
+#   1 s    = three beats -- a slow polyrhythmic wash that laps the bar line
+# A soft kick and offbeat-accented hats anchor the grid, and the kick
+# envelope ducks both echoes through the mixer's lvl inputs.
 
-clk = clock { bpm: 180 }
+# ---- clock tree: master runs eighths at 180 BPM (360 gates/min) ----
+master  = clock { bpm: 360 }
+quarter = div { by: 2 }
+half    = div { by: 2 }
+bar     = div { by: 2 }
+master -> quarter.in
+quarter -> half.in
+half -> bar.in
 
-# -- exciter: short white-noise burst per beat --
+# ---- melody: wander below the pluck rate so notes sometimes hold ----
+wander = random { rate: 1.9, smooth: 0, seed: 6 }
+notes = sh { mode: sample }
+wander -> notes.in
+quarter -> notes.trig
+scale = quant { scale: [0, 3, 5, 7, 10] }
+notes -> scale.in : 0.3
+probe = scope { label: melody }
+scale -> probe.in
+
+# ---- the string: burst exciter into a tuned 9.09 ms loop (~110 Hz) ----
 burst = func { rise: 0.001, fall: 0.012, curve: exp }
-clk -> burst.trig
+quarter -> burst.trig
 hiss = noise { color: white, seed: 4 }
 exciter = vca { gain: 0 }
 hiss -> exciter.in
 burst -> exciter.cv
-
-# -- melody: wandering voltage, sampled per beat, major pentatonic --
-wander = random { rate: 2.3, smooth: 0, seed: 6 }
-notes = sh { mode: sample }
-wander -> notes.in
-clk -> notes.trig
-scale = quant { scale: [0, 2, 4, 7, 9] }
-notes -> scale.in : 0.3
-
-# -- the string: 9.09 ms loop is roughly A2 (110 Hz); pitch tracks the melody --
 string = delay { time: 9.09ms, pitch: 0, feedback: 0.96, tone: 3500, mix: 1, slew: 0 }
 exciter -> string.in
 scale -> string.pitch
 
-# -- space: a gentle echo behind the plucks --
-room = delay { time: 370ms, feedback: 0.45, tone: 4500, mix: 0.35 }
-string -> room.in : 0.8
+# ---- echoes: dotted-eighth gallop right, three-beat wash left ----
+gallop = delay { time: 250ms, feedback: 0.55, tone: 3800, mix: 1 }
+string -> gallop.in : 0.8
+wash = delay { time: 1s, feedback: 0.35, tone: 2200, mix: 1 }
+string -> wash.in : 0.5
 
-room -> out.in : 0.8
--0.1 -> out.level
+# ---- bass: melody roots held per bar, saw through a plucked ladder ----
+roots = sh { mode: sample }
+scale -> roots.in
+bar -> roots.trig
+bass_osc = vco { freq: 73.42hz, wave: saw }
+roots -> bass_osc.v_oct
+bass_env = func { rise: 0.008, fall: 0.4, curve: exp }
+half -> bass_env.trig
+bass_vcf = ladder { cutoff: 100, res: 0.3, drive: 0.5 }
+bass_osc -> bass_vcf.in
+bass_env -> bass_vcf.cutoff : 800
+bass_amp = vca { gain: 0, response: exp }
+bass_vcf -> bass_amp.in
+bass_env -> bass_amp.cv : 0.85
+
+# ---- drums: soft kick on quarters, hats on eighths (offbeats louder) ----
+kick_env = func { rise: 0.001, fall: 0.2, curve: log }
+quarter -> kick_env.trig
+kick_osc = vco { freq: 46hz, wave: sine }
+quarter -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.5
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv
+kick_drv = drive { amount: 0.25, mode: soft }
+kick_amp -> kick_drv.in
+
+hat_env = func { rise: 0.001, fall: 0.045, curve: exp }
+master -> hat_env.trig
+hat_noise = noise { color: white, seed: 11 }
+hat_hp = svf { cutoff: 9000, res: 0.15 }
+hat_noise -> hat_hp.in
+hat_amp = vca { gain: 0 }
+hat_hp.hp -> hat_amp.in
+hat_env -> hat_amp.cv : 0.6
+quarter -> hat_amp.cv : -0.2
+
+# ---- mix: string center-left, gallop right, wash left; kick ducks echoes ----
+mixer = mix { levels: [0.85, 0.22, 0.6, 0.75, 0.5, 0.45],
+              pans: [0, 0.35, 0, -0.1, 0.45, -0.5] }
+kick_drv -> mixer.in1
+hat_amp  -> mixer.in2
+bass_amp -> mixer.in3
+string   -> mixer.in4
+gallop   -> mixer.in5
+wash     -> mixer.in6
+kick_env -> mixer.lvl5 : -0.25
+kick_env -> mixer.lvl6 : -0.25
+
+mixer.out_l -> out.left
+mixer.out_r -> out.right
+-0.35 -> out.level
