@@ -11,4 +11,5 @@ extern const ModuleInfo div_info;
 extern const ModuleInfo func_info;
 extern const ModuleInfo svf_info;
 extern const ModuleInfo noise_info;
+extern const ModuleInfo math_info;
 }  // namespace ms::dsp
