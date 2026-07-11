@@ -70,7 +70,11 @@ void RtRunner::render_block(float* l, float* r, size_t frames) {
     return;
   }
 
-  current_->deliver_midi();  // block-start: quantize queued MIDI to this block
+  // Block-start: drain the ring owned by *this* runner (not current_ --
+  // see rt_runner.h) into the live engine, quantizing queued MIDI to this
+  // block boundary. current_ is guaranteed non-null here (checked above).
+  dsp::MidiEvent midi_e;
+  while (midi_ring_.try_pop(midi_e)) current_->deliver_midi_event(midi_e);
   current_->process(l, r, frames);
 
   if (old_) {

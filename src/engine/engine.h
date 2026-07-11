@@ -4,7 +4,6 @@
 #include <vector>
 #include "dsp/module.h"
 #include "graph/graph.h"
-#include "rt/spsc.h"
 
 namespace ms::engine {
 
@@ -24,20 +23,17 @@ class Engine {
   // owns both engines: race-free and allocation-free by construction.
   void migrate_from(const Engine& old);
 
-  // Producer side of the MIDI ring: lock-free, allocation-free, safe to call
-  // from any single thread (Task 9's PipeWire midi-in callback, which runs on
-  // its own RT thread distinct from the audio thread that calls render()).
-  // Only one thread may call push_midi on a given Engine (SPSC). Returns
-  // false and drops the event if the ring is full — drop-newest: a full ring
-  // means the consumer (deliver_midi, called once per block) is already
-  // behind, so the events already queued keep their place in line rather
-  // than being evicted by a late-arriving one.
-  bool push_midi(const dsp::MidiEvent& e) { return midi_ring_.try_push(e); }
-  // RT-called by the runner at block start, before this block's process()
-  // calls: drains the MIDI ring and fans each event, in arrival order, to
+  // RT-called by RtRunner once per queued MIDI event, in arrival order, at
+  // block start (before that block's process() calls): fans the event to
   // every node with ModuleInfo::wants_midi via Module::on_midi. No
   // allocation, no locks, no I/O.
-  void deliver_midi();
+  //
+  // The ring this drains lives on RtRunner, not here (see rt_runner.h):
+  // a topology hot-reload swaps in a brand-new Engine, and a ring owned by
+  // the outgoing Engine would silently drop any events queued at the swap
+  // moment (midi spec §4 requires the port/session to survive reload).
+  // RtRunner outlives every Engine, so its ring does too.
+  void deliver_midi_event(const dsp::MidiEvent& e);
 
  private:
   void step_glides();
@@ -55,7 +51,6 @@ class Engine {
   std::vector<float> ins_;         // scratch, sized to max input count
   std::array<Glide, kMaxGlides> glides_{};
   size_t n_glides_ = 0;
-  rt::SpscQueue<dsp::MidiEvent, 256> midi_ring_;
 };
 
 }  // namespace ms::engine

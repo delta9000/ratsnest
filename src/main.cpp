@@ -15,6 +15,7 @@
 #include "dsl/parser.h"
 #include "engine/controller.h"
 #include "engine/engine.h"
+#include "engine/midi_in.h"
 #include "engine/pipewire_out.h"
 #include "engine/rt_runner.h"
 #include "graph/graph.h"
@@ -127,6 +128,22 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
   auto pw = std::make_unique<ms::engine::PipewireOut>(
       "modsynth", &render_trampoline, &runner, latency,
       static_cast<uint32_t>(rate));
+
+  // Constructed once for the whole play session and never touched again:
+  // the port (and any patchbay connection to a controller) must survive
+  // every hot-reload below (midi spec §4). A refused port is a guarded,
+  // non-fatal condition -- keep playing audio-only (design rule 6 spirit).
+  ms::engine::MidiIn midi_in("modsynth-midi", runner);
+  // error() is only ever set by a definite failure (port/filter refused at
+  // connect time, or a later ERROR state); unlike ok() it does not race the
+  // async PipeWire connection handshake, so it is safe to check once, right
+  // here, without waiting.
+  if (!midi_in.error().empty()) {
+    std::fprintf(stderr,
+        "warning: MIDI input unavailable (%s); continuing audio-only\n",
+        midi_in.error().c_str());
+  }
+
   ms::io::PatchWatcher watcher(patch);
   if (!watcher.ok())
     std::fprintf(stderr, "warning: cannot watch '%s'; hot-reload disabled\n",

@@ -76,11 +76,9 @@ float Engine::output_value(size_t node, size_t slot) const {
   return outs_[out_offset_[node] + slot];
 }
 
-void Engine::deliver_midi() {
-  dsp::MidiEvent e;
-  while (midi_ring_.try_pop(e))
-    for (int ni : g_->midi_nodes)
-      g_->nodes[static_cast<size_t>(ni)].instance->on_midi(e.data, e.len);
+void Engine::deliver_midi_event(const dsp::MidiEvent& e) {
+  for (int ni : g_->midi_nodes)
+    g_->nodes[static_cast<size_t>(ni)].instance->on_midi(e.data, e.len);
 }
 
 void Engine::migrate_from(const Engine& old) {

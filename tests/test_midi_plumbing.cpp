@@ -12,6 +12,14 @@
 // production path src/engine/rt_runner.cpp uses (Swap command, then
 // render()). This exercises the actual block-start delivery code, not a
 // reimplementation of it.
+//
+// Task 9 moved the MIDI ring off Engine and onto RtRunner (see rt_runner.h):
+// a topology hot-reload swaps in a brand-new Engine, and a ring owned by the
+// outgoing Engine would silently drop events queued right at the swap. So
+// these tests push through RtRunner::push_midi, not Engine::push_midi (which
+// no longer exists) -- the ring must be created (RtRunner constructed)
+// before events can be queued, but need not wait for an engine to be
+// adopted; queued events simply wait for the first Swap to land.
 #include <doctest/doctest.h>
 #include <cstdint>
 #include <memory>
@@ -92,11 +100,11 @@ TEST_CASE("midi events queued before a block are delivered at block start, in or
   auto* stub = dynamic_cast<MidiStub*>(eng->graph().nodes[0].instance.get());
   REQUIRE(stub != nullptr);
 
-  REQUIRE(eng->push_midi({{0x90, 60, 100, 0}, 3}));
-  REQUIRE(eng->push_midi({{0x90, 64, 100, 0}, 3}));
-  REQUIRE(eng->push_midi({{0x80, 60, 0, 0}, 3}));
-
   engine::RtRunner run(48000.0);
+  REQUIRE(run.push_midi({{0x90, 60, 100, 0}, 3}));
+  REQUIRE(run.push_midi({{0x90, 64, 100, 0}, 3}));
+  REQUIRE(run.push_midi({{0x80, 60, 0, 0}, 3}));
+
   engine::Command swap;
   swap.kind = engine::Command::Kind::Swap;
   swap.engine = eng;
@@ -121,16 +129,17 @@ TEST_CASE("midi ring overflow drops the newest event, keeps queued order") {
   auto* stub = dynamic_cast<MidiStub*>(eng->graph().nodes[0].instance.get());
   REQUIRE(stub != nullptr);
 
+  engine::RtRunner run(48000.0);
+
   // Capacity is 256 with usable slots Cap-1 (see rt/spsc.h); fill it past
   // that and confirm push_midi reports failure without corrupting the queue.
   int pushed = 0;
   for (int i = 0; i < 300; ++i) {
     dsp::MidiEvent e{{0x90, static_cast<uint8_t>(i), 100, 0}, 3};
-    if (eng->push_midi(e)) ++pushed;
+    if (run.push_midi(e)) ++pushed;
   }
   CHECK(pushed == 255);  // Cap-1 usable slots
 
-  engine::RtRunner run(48000.0);
   engine::Command swap;
   swap.kind = engine::Command::Kind::Swap;
   swap.engine = eng;
