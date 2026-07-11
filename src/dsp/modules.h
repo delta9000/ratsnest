@@ -19,4 +19,5 @@ extern const ModuleInfo sh_info;
 extern const ModuleInfo ladder_info;
 extern const ModuleInfo lpg_info;
 extern const ModuleInfo random_info;
+extern const ModuleInfo quant_info;
 }  // namespace ms::dsp

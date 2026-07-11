@@ -373,6 +373,33 @@ TEST_CASE("noise migrates rng and pink filter state") {
   }
 }
 
+TEST_CASE("quant migrates changed-gate state") {
+  const ModuleInfo* info = find_module("quant");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[3] = {0.25f, 0.0f, 0.0f};
+  float out_a[2], out_b[2];
+  a->process(ins, out_a);  // a: first_ consumed, last_q_ = 3
+  b->copy_state_from(*a);
+  // Change the degree on the first post-copy sample: `a` fires changed
+  // because last_q_ was 3; a fresh `b` (first_ true) would stay silent.
+  ins[0] = 0.5f;
+  a->process(ins, out_a);
+  b->process(ins, out_b);
+  CHECK(out_a[1] == doctest::Approx(1.0f));
+  CHECK(out_b[1] == doctest::Approx(out_a[1]));
+  for (int i = 0; i < 8; ++i) {
+    ins[0] = i % 2 == 0 ? 0.25f : 0.5f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[1] == doctest::Approx(out_b[1]));
+  }
+}
+
 TEST_CASE("random migrates rng, phase, and segment endpoints") {
   const ModuleInfo* info = find_module("random");
   REQUIRE(info != nullptr);
