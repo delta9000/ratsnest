@@ -1,5 +1,5 @@
 # west coast -- random/quantized melody, folded triangle, vactrol plucks.
-# Exercises: random, quant, fold, lpg, drive, noise, svf, sh, xfade, math, mix, scope.
+# Exercises: clock, div, random, sh, quant, scope, vco, lfo, fold, lpg, noise, math, xfade, drive, mix, out.
 
 clk = clock { bpm: 112 }
 half = div { by: 2 }
@@ -28,7 +28,7 @@ gate = lpg { damp: 0.35, decay: 0.3 }
 folder -> gate.in
 half -> gate.strike
 
-# -- texture: pink noise, brightened by ring-modding with the raw osc --
+# -- texture: pink noise, amplitude-modulated by the raw osc --
 hiss = noise { color: pink, seed: 3 }
 shimmer = math { op: mult }
 hiss -> shimmer.a
