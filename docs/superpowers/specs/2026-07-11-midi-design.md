@@ -1,6 +1,6 @@
 # `midi` — Design
 
-2026-07-11. Status: designed, not implemented. Companion to
+2026-07-11. Status: implemented (2026-07-11, this branch). Companion to
 `2026-07-11-voice-alloc-design.md` (built in the same batch; midi is the
 second producer of that spec's port-bank convention, and the two are tested
 against the same conformance suite). Fulfills Phase 2's `midi` entry.
@@ -56,9 +56,14 @@ here and not in `alloc` because only midi knows note identity.
 
 ## 3. Transport and RT discipline
 
-- Input arrives on a PipeWire **control port** added to the existing filter
-  (`pipewire_out`), named `midi-in`; users wire a controller to it with any
-  patchbay tool. No new dependency (design rule 7); ALSA raw/seq is not used.
+- Input arrives on a PipeWire **control port** named `midi-in` on its own
+  standalone `pw_filter` (a separate `MidiIn` object, not a port added to the
+  `pipewire_out` audio filter): its process callback runs on PipeWire's own
+  RT data thread, distinct from the audio thread driving playback, so a
+  dedicated filter is what gives each side of the SPSC ring its own thread
+  and satisfies the single-producer contract. Users wire a controller to the
+  port with any patchbay tool. No new dependency (design rule 7); ALSA
+  raw/seq is not used.
 - The PipeWire process callback parses the control buffer's pod sequence and
   pushes raw 3-byte events into a fixed-size SPSC ring (`rt/spsc.h`, the
   existing bridge idiom). Parse failures drop the event, never block.

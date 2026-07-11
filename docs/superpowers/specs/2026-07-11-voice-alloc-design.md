@@ -1,6 +1,6 @@
 # Polyphony: `alloc` + `voice` groups — Design
 
-2026-07-11. Status: designed, not implemented. Refines §6 and §3.5 of
+2026-07-11. Status: implemented (2026-07-11, this branch). Refines §6 and §3.5 of
 `2026-07-10-modsynth-design.md` (per-voice patch instancing, decided there;
 poly cables rejected there). Built before `midi` so midi's port surface is
 designed against a proven voice mechanism, not the other way around.
@@ -123,12 +123,17 @@ v/oct, `vel` unipolar 0..1. `spread` is bipolar CV. Nothing new.
 
 ## 5. `midi` interaction (next, separate design)
 
-`midi` ships its own banks (`gate1..n`, `voct1..n`, `vel1..n`) plus mono
-conveniences, and binds directly: `keys = voice { notes: midi1 }`. Because it
-has real note identity it can implement `lowest` and oldest-steal properly.
-`alloc` stays the sequencer-side allocator; the `voice` mechanism is
-indifferent to which feeds it. Anything with banks qualifies —
-`turing.bit1..8` gating eight voices is legal and encouraged.
+`midi` ships its own banks (`gate1..n`, `voct1..n`, `vel1..n`) and binds
+directly: `keys = voice { notes: midi1 }`. Deliberately banks only — no mono
+`gate`/`voct`/`vel` convenience outputs; the absence is load-bearing for the
+"shadows nothing" rule in §3 case 2 (see `2026-07-11-midi-design.md` §1).
+Because it has real note identity it can implement `lowest` and oldest-steal
+properly. `alloc` stays the sequencer-side allocator; the `voice` mechanism
+is indifferent to which feeds it. Anything exposing a full 8-wide bank family
+qualifies as a `notes:` binding target — but binding validation keys on
+`gate1` (§3), so a module with banks that don't include `gate1..8` (e.g.
+`turing.bit1..8`) cannot bind via `notes:`; its bit bank is usable only via
+explicit indexed reads (`turing.bit1`, ...), not as a voice-group source.
 
 ## 6. Testing
 
