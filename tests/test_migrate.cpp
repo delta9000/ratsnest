@@ -385,8 +385,8 @@ TEST_CASE("quant migrates changed-gate state") {
   a->process(ins, out_a);  // a: first_ consumed, last_q_ = 3
   b->copy_state_from(*a);
   // Change the degree on the first post-copy sample: `a` fires changed
-  // because last_q_ was 3; a fresh `b` (first_ true) would stay silent.
-  ins[0] = 0.5f;
+  // because last_q_ was 3; a fresh last_q_ of 0 would stay silent.
+  ins[0] = 0.0f;
   a->process(ins, out_a);
   b->process(ins, out_b);
   CHECK(out_a[1] == doctest::Approx(1.0f));
