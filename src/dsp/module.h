@@ -27,6 +27,9 @@ class Module {
   virtual ~Module() = default;
   virtual void init(double sample_rate, const Config& cfg) { (void)sample_rate; (void)cfg; }
   virtual void process(const float* ins, float* outs) = 0;
+  // Copy migratable runtime state from another instance of the SAME concrete
+  // type (caller guarantees it). RT-called: no alloc, no locks, no I/O.
+  virtual void copy_state_from(const Module& other) { (void)other; }
 };
 
 struct ModuleInfo {

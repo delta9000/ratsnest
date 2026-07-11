@@ -22,6 +22,10 @@ list(REMOVE_ITEM MSCORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
 add_library(mscore STATIC ${MSCORE_SOURCES})
 target_include_directories(mscore PUBLIC src)
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
+target_link_libraries(mscore PUBLIC PkgConfig::PIPEWIRE)
+
 add_executable(modsynth src/main.cpp)
 target_link_libraries(modsynth PRIVATE mscore)
 

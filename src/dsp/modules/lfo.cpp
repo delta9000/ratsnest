@@ -38,6 +38,12 @@ class Lfo final : public Module {
     phase_ -= std::floor(phase_);
   }
 
+  void copy_state_from(const Module& other) override {
+    const auto& o = static_cast<const Lfo&>(other);
+    phase_ = o.phase_;
+    prev_reset_ = o.prev_reset_;
+  }
+
  private:
   float rate_ = 48000.0f;
   int wave_ = 0;

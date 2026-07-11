@@ -19,6 +19,7 @@ Prefer mise tasks (see `mise tasks`):
     mise run test-san     # same tests under ASan+UBSan (build-san/)
     mise run ci           # warnings-as-errors gate (build-ci/)
     mise run render -- patches/first.patch -d 10s -o take.wav
+    mise run play -- patches/first.patch          # live PipeWire + hot-reload
 
 ## Non-negotiable design rules
 

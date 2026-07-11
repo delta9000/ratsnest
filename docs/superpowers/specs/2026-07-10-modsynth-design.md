@@ -239,9 +239,13 @@ patch.file ──▶ dsl/     lexer → parser → Patch IR (modules, cables, pa
 - **`dsp/`** — one file per module. Module interface: static port/param
   metadata + `process()` (one sample) + state save/restore for migration.
   Static registry; no plugin loading.
-- **`engine/`** — RT runner, PipeWire backend (`pw_filter`), SPSC command
+- **`engine/`** — RT runner, PipeWire backend (`pw_stream`), SPSC command
   queue in (param glides, graph swaps), ring buffers out (meters, scope taps,
-  record feed). Output limiter + NaN/denormal guards at the sink.
+  record feed). Output limiter + NaN/denormal guards at the sink. (`pw_filter`
+  DSP nodes are never auto-routed by WirePlumber 0.5.15 — `create-item.lua`
+  string-matches `media.class` "Audio" to `si-audio-adapter`, which requires
+  node-level `EnumFormat` that filter nodes don't expose; `pw_stream` was
+  chosen so WirePlumber's default policy can auto-link the node.)
 - **`io/`** — inotify file watching, WAV writing (disk thread fed by ring
   buffer).
 
