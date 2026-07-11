@@ -217,6 +217,41 @@ TEST_CASE("errors: n mismatch, nested voice, no members, notes target lacks bank
   }
 }
 
+// Bank stems must require the *full* 8-wide family (<stem>1..<stem>8), not
+// just a <stem>1/<stem>2 pair -- otherwise midi's 4-wide cc1..cc4 falsely
+// qualifies as a bank, and bare `mid.cc` silently fans cc1..ccN across voice
+// instances (wrong wiring at voices<=4) instead of failing as the unknown
+// output it actually is.
+TEST_CASE("bare mid.cc does not resolve as a bank; bare mid.voct still does") {
+  const char* src =
+      "mid = midi { voices: 4 }\n"
+      "keys = voice { notes: mid }\n"
+      "keys.osc = vco\n"
+      "mid.voct -> keys.osc.v_oct\n"
+      "mid.cc -> keys.osc.fm\n";
+  auto p = dsl::parse(src);
+  REQUIRE(p.ok());
+
+  // voct is 8-wide on midi (voct1..voct8): still resolves per-instance.
+  Diags d;
+  graph::expand_voices(p.ast, d);
+  REQUIRE(d.empty());
+  CHECK(has_cable(p.ast, "mid.voct1", "keys.osc#0.v_oct"));
+  CHECK(has_cable(p.ast, "mid.voct4", "keys.osc#3.v_oct"));
+  CHECK_FALSE(has_cable(p.ast, "mid.voct5", "keys.osc#0.v_oct"));
+
+  // cc is only 4-wide on midi (cc1..cc4) and "cc" itself is not a valid
+  // output name at all, so bare `mid.cc` must NOT resolve as a bank; it
+  // must fail full compile as an unknown output, not silently broadcast
+  // or fan out across instances.
+  auto c = graph::compile(p.ast, 48000.0);
+  CHECK_FALSE(c.ok());
+  bool found_cc_error = false;
+  for (const auto& e : c.errors)
+    if (e.msg.find("no output 'cc'") != std::string::npos) found_cc_error = true;
+  CHECK(found_cc_error);
+}
+
 TEST_CASE("patches without voice decls are passed through unchanged") {
   const char* src = "a = vca\nb = vco\nb -> a.in\na -> out.in\n";
   auto ast = go(src);

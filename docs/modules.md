@@ -65,6 +65,9 @@ Cable resolution depends on where each endpoint lives:
    `poly.spread`): resolves to `<bank><i>` per instance, for every output
    family the bound module exposes. This shadows nothing — `alloc` has no
    mono output named `voct`, so that spelling is an error everywhere else.
+   Bank families are 8-wide (`<stem>1..<stem>8`); a narrower run such as
+   midi's `cc1..cc4` does not qualify, so bare `mid.cc` is an ordinary
+   unknown-output error rather than a bank read.
 3. **outside -> inside**: broadcast; the same source feeds every instance.
 4. **inside -> outside**: the outside port receives the straight sum of all
    instances. No hidden `1/n` normalization — gain staging is the author's

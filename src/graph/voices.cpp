@@ -83,14 +83,22 @@ void expand_voices(dsl::PatchAst& ast, Diags& errors) {
           if (n < 0) n = (b.type == "alloc") ? 4 : 1;
           g.n = std::clamp(n, 1, 8);
 
-          // Bank stems: every output <stem>1 whose <stem>2 also exists.
+          // Bank stems: the full 8-wide family <stem>1..<stem>8, matching the
+          // bank convention gate/voct/vel/spread satisfy (voice-alloc-design
+          // §3 case 2). A <stem>1/<stem>2 pair alone is not enough: midi's
+          // cc is only 4-wide (cc1..cc4), and requiring just a pair let bare
+          // `mid.cc` silently qualify as a bank, fanning cc1..ccN across
+          // voice instances instead of failing as the unknown output it is.
           std::unordered_set<std::string> out_names;
           for (const auto& o : info->outputs) out_names.insert(o.name);
           for (const auto& o : info->outputs) {
             std::string on = o.name;
             if (!on.empty() && on.back() == '1') {
               std::string stem = on.substr(0, on.size() - 1);
-              if (out_names.count(stem + "2")) g.stems.insert(stem);
+              bool full8 = true;
+              for (int k = 2; k <= 8; ++k)
+                if (!out_names.count(stem + std::to_string(k))) { full8 = false; break; }
+              if (full8) g.stems.insert(stem);
             }
           }
 

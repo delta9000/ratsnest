@@ -92,7 +92,11 @@ lead.amp -> mix.in1 : 0.4     # inside -> outside: straight sum of voices
      `poly.spread`): resolves to `<bank><i>` per instance, for every output
      family `<bank>1..<bank>N` the bound module exposes. This shadows
      nothing — `alloc` has no mono *output* named `voct`, so that spelling
-     is an error everywhere else, today and after this change.
+     is an error everywhere else, today and after this change. Bank
+     families are 8-wide (`<stem>1..<stem>8`) — a stem qualifies only if the
+     full family exists, so midi's 4-wide `cc1..cc4` does not qualify and
+     bare `mid.cc` is a normal unknown-output compile error, not a
+     silently-fanned bank read.
   3. outside → inside: broadcast; the same source feeds every instance.
   4. inside → outside: the outside port receives the **straight sum** of all
      instances. No hidden `1/n` normalization — modulation already sums onto
