@@ -327,6 +327,32 @@ TEST_CASE("ladder migrates all four stage states") {
   }
 }
 
+TEST_CASE("lpg migrates envelope and filter state mid-pluck") {
+  const ModuleInfo* info = find_module("lpg");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[5] = {0.0f, 0.0f, 0.0f, 0.5f, 0.1f};
+  float out_a[1], out_b[1];
+  ins[2] = 1.0f;  // strike
+  a->process(ins, out_a);
+  // Decay for a while with audio flowing so env_, lp1_, lp2_ are all nonzero.
+  for (int i = 1; i < 400; ++i) {
+    ins[0] = (i / 20) % 2 == 0 ? 0.6f : -0.6f;
+    a->process(ins, out_a);  // strike stays high: prev_strike_ is 1.0
+  }
+  b->copy_state_from(*a);
+  // Strike held high across the copy: a forgotten prev_strike_ re-plucks b.
+  for (int i = 400; i < 432; ++i) {
+    ins[0] = (i / 20) % 2 == 0 ? 0.6f : -0.6f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
+
 TEST_CASE("noise migrates rng and pink filter state") {
   const ModuleInfo* info = find_module("noise");
   REQUIRE(info != nullptr);
