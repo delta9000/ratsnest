@@ -1,0 +1,34 @@
+# pluck -- Karplus-Strong voice: a 12 ms noise burst rings a tuned delay.
+# The delay's pitch input is v_oct, so the quantized melody keeps the string
+# in tune with itself; feedback 0.96 sets the decay, tone 3500 the damping.
+# (The loop lowpass flattens the pitch slightly, as real strings do.)
+
+clk = clock { bpm: 180 }
+
+# -- exciter: short white-noise burst per beat --
+burst = func { rise: 0.001, fall: 0.012, curve: exp }
+clk -> burst.trig
+hiss = noise { color: white, seed: 4 }
+exciter = vca { gain: 0 }
+hiss -> exciter.in
+burst -> exciter.cv
+
+# -- melody: wandering voltage, sampled per beat, major pentatonic --
+wander = random { rate: 2.3, smooth: 0, seed: 6 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+scale = quant { scale: [0, 2, 4, 7, 9] }
+notes -> scale.in : 0.3
+
+# -- the string: 9.09 ms loop is roughly A2 (110 Hz); pitch tracks the melody --
+string = delay { time: 9.09ms, pitch: 0, feedback: 0.96, tone: 3500, mix: 1, slew: 0 }
+exciter -> string.in
+scale -> string.pitch
+
+# -- space: a gentle echo behind the plucks --
+room = delay { time: 370ms, feedback: 0.45, tone: 4500, mix: 0.35 }
+string -> room.in : 0.8
+
+room -> out.in : 0.8
+-0.1 -> out.level
