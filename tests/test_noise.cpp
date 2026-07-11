@@ -58,3 +58,14 @@ TEST_CASE("pink noise is smoother than white noise") {
   }
   CHECK(dp < dw * 0.5);  // pink: less high-frequency energy
 }
+
+TEST_CASE("noise tolerates hostile seed values") {
+  for (double s : {-3.0, 1e12, -1e300}) {
+    auto m = make_noise("white", s);
+    float out[1];
+    for (int i = 0; i < 64; ++i) {
+      m->process(nullptr, out);
+      CHECK(std::abs(out[0]) <= 1.0f);
+    }
+  }
+}
