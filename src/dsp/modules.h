@@ -25,4 +25,11 @@ extern const ModuleInfo scope_info;
 extern const ModuleInfo delay_info;
 extern const ModuleInfo adsr_info;
 extern const ModuleInfo reverb_info;
+extern const ModuleInfo euclid_info;
+extern const ModuleInfo bern_info;
+extern const ModuleInfo logic_info;
+extern const ModuleInfo switch_info;
+extern const ModuleInfo turing_info;
+extern const ModuleInfo stepseq_info;
+extern const ModuleInfo tempo_info;
 }  // namespace ms::dsp

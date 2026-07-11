@@ -166,18 +166,19 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 | `delay` | tape-style feedback delay, 10 s max | ins `in` `time`(s) `pitch`(v_oct: t·2^−p) `feedback`(0..1.2, tanh loop) `mix` `tone`(Hz) `slew`(s) · out. Clock-sync stays patchable (clock→seconds module later) |
 | `reverb` | Dattorro 1997 plate | ins `in_l` `in_r` `decay` `damp` `mix` `freeze`(gate) · outs `out_l` `out_r`; cfg `predelay`(s) `bandwidth` `mod_rate` `mod_depth`. FDN variant is a Phase 5+ sibling |
 
-### Phase 3 — the sequencer wing (+8)
+### Phase 3 — the sequencer wing (+9)
 
 | Module | Role | Notes |
 |---|---|---|
 | `clock` | master clock | `bpm`; ins `run` `reset` · outs `out` + `run` gate |
 | `div` | clock divider | `by`; ins `in` `reset` · out. Multiplication deferred |
-| `euclid` | Euclidean gates | `steps` `hits` `rot` — Pam's essence |
-| `stepseq` | step sequencer | `steps`/`gates` arrays, `len`, `dir`; ratchets/probability as later params |
-| `turing` | lockable shift register | `len` `prob` `seed`; outs `out` `pulse` `bit1..bit8`; ins `write` `clear`. Volts/Pulses expanders = cables |
-| `bern` | Bernoulli gate | `prob`; coin-toss routing, outs `a` `b` |
-| `logic` | gate logic + comparator | `op` (and\|or\|xor\|not\|cmp), `threshold` |
-| `switch` | sequential/addressed switch | `n`, `mode` (seq\|addr) |
+| `euclid` | Euclidean rhythm | ins `clock` `reset` `steps`(1..64) `hits`(0..steps) `rot`(wrapped); outs `trig`(one sample) `gate`(clock width). Live integer params round; reset makes the coincident/next edge step zero |
+| `stepseq` | step sequencer | cfg `steps`/`gates` arrays, `dir` (forward\|reverse\|pingpong\|random), `seed`; ins `clock` `reset` `len` `transpose`; outs `cv` `trig` `gate` `eoc` |
+| `turing` | lockable shift register | ins `clock` `write` `clear` `len`(1..16) `prob`; cfg `seed`; outs `out` `pulse` `bit1..bit8`. Volts/Pulses expanders = cables |
+| `bern` | Bernoulli gate | ins `gate` `prob`; cfg `seed`; mutually exclusive gate-width outs `a` `b` |
+| `logic` | gate logic + comparator | ins `a` `b` `threshold`; cfg `op` (and\|or\|xor\|not\|cmp); out |
+| `switch` | sequential/addressed switch | ins `in1..in8` `clock` `reset` `addr` `n`; cfg `mode` (seq\|addr); out |
+| `tempo` | musical time conversion | ins `bpm` `beats`; outs `seconds` `hz` |
 
 Transposition (Berlin school) needs no module: pitch CVs sum on `v_oct`.
 Drums need no module: trigger → `lpg.strike` (kick), `noise`+`svf.hp`+fast

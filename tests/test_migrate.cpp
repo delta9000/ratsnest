@@ -89,6 +89,122 @@ TEST_CASE("divider migrates counter gate and edge memory") {
   }
 }
 
+TEST_CASE("euclid migrates step hit and both edge memories") {
+  const ModuleInfo* info = find_module("euclid");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  // clock, reset, steps, hits, rot. A coincident reset+clock edge selects
+  // step zero (a hit) and leaves both edge memories high at copy time.
+  float ins[5] = {1.0f, 1.0f, 8.0f, 3.0f, 0.0f};
+  float out_a[2] = {}, out_b[2] = {};
+  a->process(ins, out_a);
+  b->copy_state_from(*a);
+
+  // Holding both inputs high exposes a dropped hit_, prev_clock_, or
+  // prev_reset_ immediately. Subsequent edges expose a dropped step_.
+  for (int i = 0; i < 20; ++i) {
+    if (i == 1) ins[0] = ins[1] = 0.0f;
+    if (i > 1) ins[0] = i % 2 == 0 ? 1.0f : 0.0f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[1] == doctest::Approx(out_b[1]));
+  }
+}
+
+TEST_CASE("bern migrates decision RNG and gate edge memory") {
+  const ModuleInfo* info = find_module("bern");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[2] = {1.0f, 1.0f};
+  float out_a[2] = {}, out_b[2] = {};
+  a->process(ins, out_a);  // selected A, input left high
+  b->copy_state_from(*a);
+  for (int i = 0; i < 40; ++i) {
+    ins[0] = i % 2 == 0 ? 1.0f : 0.0f;
+    ins[1] = 0.5f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[1] == doctest::Approx(out_b[1]));
+  }
+}
+
+TEST_CASE("switch migrates sequential index and both edge memories") {
+  const ModuleInfo* info = find_module("switch");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[12] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 1, 0, 4};
+  float out_a[1] = {}, out_b[1] = {};
+  a->process(ins, out_a);  // reset+clock selects input one; edges stay high
+  b->copy_state_from(*a);
+  for (int i = 0; i < 16; ++i) {
+    if (i == 1) ins[9] = 0.0f;
+    ins[8] = i % 2 == 0 ? 1.0f : 0.0f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
+
+TEST_CASE("turing migrates register RNG and clock edge memory") {
+  const ModuleInfo* info = find_module("turing");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[5] = {1.0f, 1.0f, 0.0f, 11.0f, 0.37f};
+  float out_a[10] = {}, out_b[10] = {};
+  a->process(ins, out_a);
+  b->copy_state_from(*a);
+  ins[1] = 0.0f;
+  for (int i = 0; i < 48; ++i) {
+    ins[0] = i % 2 == 0 ? 1.0f : 0.0f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    for (int j = 0; j < 10; ++j)
+      CHECK(out_a[j] == doctest::Approx(out_b[j]));
+  }
+}
+
+TEST_CASE("stepseq migrates position direction RNG gate and edge memories") {
+  const ModuleInfo* info = find_module("stepseq");
+  REQUIRE(info != nullptr);
+  Config cfg;
+  ConfigValue steps; steps.arr = {0.0, 0.2, 0.4, 0.7};
+  ConfigValue gates; gates.arr = {1.0, 0.0, 1.0, 1.0};
+  ConfigValue dir; dir.str = "random";
+  ConfigValue seed; seed.num = 23.0; seed.is_num = true;
+  cfg.push_back({"steps", steps}); cfg.push_back({"gates", gates});
+  cfg.push_back({"dir", dir}); cfg.push_back({"seed", seed});
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, cfg);
+  b->init(48000.0, cfg);
+  float ins[4] = {1.0f, 1.0f, 4.0f, 0.1f};
+  float out_a[4] = {}, out_b[4] = {};
+  a->process(ins, out_a);
+  b->copy_state_from(*a);
+  for (int i = 0; i < 48; ++i) {
+    if (i == 1) ins[1] = 0.0f;
+    ins[0] = i % 2 == 0 ? 1.0f : 0.0f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    for (int j = 0; j < 4; ++j)
+      CHECK(out_a[j] == doctest::Approx(out_b[j]));
+  }
+}
+
 // A constant DC input would let ic1eq_ (the band-pass integrator) decay to
 // its default 0.0f during warmup, making its copy invisible. A square wave
 // near cutoff keeps both integrators far from zero at the copy point.
