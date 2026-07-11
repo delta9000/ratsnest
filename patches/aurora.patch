@@ -1,0 +1,137 @@
+# aurora -- generative dawn techno at 96 BPM, D dorian.
+#
+# The melody writes itself: a wandering voltage is sampled on eighths and
+# snapped to the scale, and the quantizer's `changed` gate strikes the lead's
+# vactrol only when the note actually moves -- repeated samples become ties.
+# West-coast lead (fold -> lpg), east-coast bass (saw -> ladder), four-on-the-
+# floor drums, a pad that morphs between pulse and pink air, a true ring-mod
+# bloom, and kick-envelope ducking done inside the mixer's lvl inputs.
+
+# ---- clock tree: master runs sixteenths at 96 BPM (384 gates/min) ----
+master  = clock { bpm: 384 }
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+bar     = div { by: 4 }
+phrase  = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> bar.in
+bar -> phrase.in
+
+# ---- melody: wander -> sample on eighths -> D dorian ----
+# The wander rate sits just under the 3.2 Hz eighth-note rate, so the S&H
+# sometimes grabs the same note twice: `changed` stays silent and the lead
+# holds -- phrasing for free.
+wander = random { rate: 2.9, smooth: 1, seed: 17 }
+notes  = sh { mode: sample }
+wander -> notes.in
+eighth -> notes.trig
+melody = quant { scale: [0, 2, 3, 5, 7, 9, 10] }
+notes -> melody.in : 0.4
+probe_melody = scope { label: melody }
+melody -> probe_melody.in
+
+# ---- lead voice: triangle folded into brass, plucked only on new notes ----
+lead_osc = vco { freq: 293.66hz, wave: tri }
+melody -> lead_osc.v_oct
+breathe = lfo { wave: tri, freq: 0.1hz }
+lead_fold = fold { fold: 1.4 }
+lead_osc -> lead_fold.in
+breathe -> lead_fold.fold : 0.8
+lead_gate = lpg { damp: 0.25, decay: 0.45 }
+lead_fold -> lead_gate.in
+melody.changed -> lead_gate.strike
+
+# ---- bass: root notes held per bar, saw through a swept ladder ----
+roots = sh { mode: sample }
+melody -> roots.in
+bar -> roots.trig
+bass_osc = vco { freq: 73.42hz, wave: saw }
+roots -> bass_osc.v_oct
+bass_env = func { rise: 0.005, fall: 0.35, curve: exp }
+quarter -> bass_env.trig
+bass_vcf = ladder { cutoff: 120, res: 0.35, drive: 0.6 }
+bass_osc -> bass_vcf.in
+bass_env -> bass_vcf.cutoff : 900
+bass_amp = vca { gain: 0, response: exp }
+bass_vcf -> bass_amp.in
+bass_env -> bass_amp.cv : 0.9
+
+# ---- kick: synced sine with a fast log pitch-drop envelope, soft drive ----
+kick_env = func { rise: 0.001, fall: 0.22, curve: log }
+quarter -> kick_env.trig
+kick_osc = vco { freq: 47hz, wave: sine }
+quarter -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.6
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv
+kick_drv = drive { amount: 0.3, mode: soft }
+kick_amp -> kick_drv.in
+
+# ---- hats: white noise highpassed, sixteenths accented off the eighth grid ----
+hat_env = func { rise: 0.001, fall: 0.05, curve: exp }
+master -> hat_env.trig
+hiss = noise { color: white, seed: 5 }
+hat_hp = svf { cutoff: 8500, res: 0.2 }
+hiss -> hat_hp.in
+hat_amp = vca { gain: 0 }
+hat_hp.hp -> hat_amp.in
+hat_env -> hat_amp.cv : 0.7
+eighth -> hat_amp.cv : -0.25
+
+# ---- pad: pulse chord tone morphing into pink air, 4-bar filter swell ----
+pad_osc = vco { freq: 146.83hz, wave: pulse, pw: 0.4 }
+roots -> pad_osc.v_oct
+pad_pwm = lfo { wave: sine, freq: 0.23hz }
+pad_pwm -> pad_osc.pwm : 0.25
+air = noise { color: pink, seed: 9 }
+pad_mix = xfade { mix: 0.3 }
+pad_osc -> pad_mix.a
+air -> pad_mix.b : 0.7
+morph = lfo { wave: tri, freq: 0.033hz }
+morph -> pad_mix.mix : 0.25
+pad_vcf = svf { cutoff: 900, res: 0.3 }
+pad_mix -> pad_vcf.in
+# rise + fall = 10 s = exactly one 4-bar phrase at 96 BPM; the phrase gate
+# re-triggers the cycling envelope right at its own boundary, keeping the
+# swell phase-locked to the arrangement.
+swell = func { rise: 4.8, fall: 5.2, curve: lin, cycle: on }
+phrase -> swell.trig
+swell -> pad_vcf.cutoff : 1400
+pad_amp = vca { gain: 0.25 }
+pad_vcf.lp -> pad_amp.in
+swell -> pad_amp.gain : 0.3
+
+# ---- ring bloom: lead x fifth-above sine, opened once a bar ----
+# math.b's neutral base is 1.0 (so unpatched mult passes through); the -1.0
+# constant cancels it, leaving pure oscillator on b -- true ring mod, not AM.
+fifth = vco { freq: 440hz, wave: sine }
+melody -> fifth.v_oct
+ring = math { op: mult }
+lead_osc -> ring.a
+-1.0 -> ring.b
+fifth -> ring.b
+ring_gate = lpg { damp: 0.6, decay: 0.8 }
+ring -> ring_gate.in
+bar -> ring_gate.strike
+
+# ---- mix: kick center, hats right, lead left, pad wide-right, ring left ----
+# The kick envelope ducks pad and ring through their lvl inputs: sidechain
+# pumping with no extra modules.
+mixer = mix { levels: [0.8, 0.3, 0.65, 0.7, 0.5, 0.35],
+              pans: [0, 0.3, 0, -0.15, 0.4, -0.5] }
+kick_drv  -> mixer.in1
+hat_amp   -> mixer.in2
+bass_amp  -> mixer.in3
+lead_gate -> mixer.in4
+pad_amp   -> mixer.in5
+ring_gate -> mixer.in6
+kick_env -> mixer.lvl5 : -0.35
+kick_env -> mixer.lvl6 : -0.3
+probe_bus = scope { label: master_bus }
+mixer.out_l -> probe_bus.in
+
+mixer.out_l -> out.left
+mixer.out_r -> out.right
+-0.38 -> out.level
