@@ -53,7 +53,9 @@ harp.pluck -> out.in : 0.45     # inside -> outside: straight sum of voices
 once per voice, as `name.<member>#i` (`#` starts a comment in source, so
 instance names never collide with user names; `watch` shows `harp.osc#2`
 like any node). Voice count `n` is inherited from the module bound by
-`notes:` — usually `alloc` — which must expose `gate<i>`/`voct<i>` banks; an
+`notes:` — usually `alloc` — which must expose the indexed banks
+(`gate1..N`; `voct`/`vel` follow the same convention — validation keys on
+`gate1`); an
 explicit `n:` on the `voice` block must match or it is a compile error.
 
 Cable resolution depends on where each endpoint lives:

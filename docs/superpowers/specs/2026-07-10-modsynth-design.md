@@ -204,7 +204,7 @@ Granular processor, physical-modeling voice (Rings-alike), macro-oscillator
 (Plaits-alike), dedicated drum voice, `push` manual-gate (needs a GUI panel),
 wavetable VCO, module plugin ABI.
 
-## 6. Polyphony (decided now, built later)
+## 6. Polyphony (implemented: see §3.5 and the voice-alloc spec)
 
 **Per-voice patch instancing** (the Bitwig Poly Grid / SuperCollider model): a
 `voice` group instantiates its members once per voice; modules never know
