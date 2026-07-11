@@ -22,7 +22,7 @@ wander = random { rate: 1.9, smooth: 0, seed: 6 }
 notes = sh { mode: sample }
 wander -> notes.in
 quarter -> notes.trig
-scale = quant { scale: [0, 3, 5, 7, 10] }
+scale = quant { root: 4, scale: [0, 3, 5, 7, 10] }
 notes -> scale.in : 0.3
 probe = scope { label: melody }
 scale -> probe.in
@@ -39,7 +39,7 @@ exciter -> string.in
 scale -> string.pitch
 
 # ---- echoes: dotted-eighth gallop right, three-beat wash left ----
-gallop = delay { time: 250ms, feedback: 0.55, tone: 3800, mix: 1 }
+gallop = delay { time: 250ms, feedback: 0.99, tone: 3800, mix: 1 }
 string -> gallop.in : 0.8
 wash = delay { time: 1s, feedback: 0.35, tone: 2200, mix: 1 }
 string -> wash.in : 0.5
@@ -74,7 +74,7 @@ kick_amp -> kick_drv.in
 hat_env = func { rise: 0.001, fall: 0.045, curve: exp }
 master -> hat_env.trig
 hat_noise = noise { color: white, seed: 11 }
-hat_hp = svf { cutoff: 9000, res: 0.15 }
+hat_hp = svf { cutoff: 9000, res: 0.75 }
 hat_noise -> hat_hp.in
 hat_amp = vca { gain: 0 }
 hat_hp.hp -> hat_amp.in
