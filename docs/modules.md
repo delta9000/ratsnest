@@ -56,7 +56,9 @@ Inputs `in` 0 (both channels), `left` 0, `right` 0, `level` 1; engine outputs
 `vco { freq: 440hz, wave: sine, pw: 0.5 }` — inputs `freq`, `v_oct`, relative
 linear `fm`, `pw`, `pwm`, rising-edge `sync`; output `out`. Waves: `sine`,
 `tri`, `saw`, `pulse`. `+1` v/oct doubles pitch; frequency is band-limited and
-clamped below Nyquist.
+clamped below Nyquist. A pulse at `pw != 0.5` carries a DC offset of about
+`2 * pw - 1` that low-pass filters (`svf.lp`, `ladder`) pass straight through;
+keep `pw` at `0.5` or block DC downstream if the path is DC-coupled.
 
 ## `lfo`
 
@@ -80,7 +82,9 @@ and input edge counts as step zero.
 
 `func { rise: 0.01, fall: 0.1, curve: lin, cycle: off }` — inputs rising-edge
 `trig`, slew `in`, rise/fall seconds; outputs unipolar `out`, `eor` gate, and
-one-sample `eoc`. Curves: `lin`, `exp`, `log`; cycle: `off`/`on`.
+one-sample `eoc`. Curves: `lin`, `exp`, `log`; cycle: `off`/`on`. With nothing
+patched to `trig`, `out` slews toward `in` at the rise/fall rates — this is
+the intended way to smooth stepped CV (section fades, portamento).
 
 ## `svf`
 
@@ -106,7 +110,10 @@ than linear, so both inputs are -3 dB at midpoint.
 ## `drive`
 
 `drive { amount: 0.5, mode: soft }` — inputs `in`, amount `0..1`; output
-`out`. Modes: tanh `soft` and clipping `hard`.
+`out`. The pre-gain is `1 + 9 * amount`, so `soft` computes
+`tanh(in * (1 + 9 * amount))` and `hard` clamps the same product to `-1..1`.
+Note even `amount: 0.1` is a ~2x boost into the curve; on a full mix that is
+a limiter, not glue.
 
 ## `fold`
 
