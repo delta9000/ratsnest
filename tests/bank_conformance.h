@@ -37,6 +37,18 @@
 //      first place — the property would hold trivially and prove nothing.
 //      Pass `can_reclaim_while_sounding = false` for such producers to
 //      SKIP this check explicitly (never silently assert-and-pass it).
+//   4b. Exact reclaim gap: when can_reclaim_while_sounding is true, a low
+//      run of gate<i> that separates two high runs and is shorter than the
+//      caller-declared `min_release_samples` is BY DEFINITION a reclaim
+//      gap (not a genuine release), and per spec §2 must be exactly one
+//      sample long. The harness cannot otherwise distinguish "producer
+//      reclaimed a still-sounding voice" from "producer released and then
+//      quickly re-claimed" — `min_release_samples` is the caller's
+//      declaration of the shortest gap its feed can produce via a genuine
+//      release, so anything shorter is unambiguously a reclaim. Pass 0 (or
+//      leave the default) when this distinction does not apply — no low
+//      run then qualifies as "shorter than the minimum" and the check is a
+//      no-op, not a silent pass of a real property.
 //   5. Banks with index > n stay 0 for gate/voct/vel, every step.
 #include <functional>
 #include <string>
@@ -52,7 +64,8 @@ inline void check_bank_conformance(Module& module, const ModuleInfo& info,
                                     int n, std::vector<float>& ins,
                                     const FeedFn& feed,
                                     bool can_reclaim_while_sounding,
-                                    int steps = 64) {
+                                    int steps = 64,
+                                    int min_release_samples = 0) {
   REQUIRE(ins.size() == info.inputs.size());
 
   // Property 1: named bank slots exist for i = 1..8, independent of n.
@@ -62,9 +75,14 @@ inline void check_bank_conformance(Module& module, const ModuleInfo& info,
     voct_idx[i] = info.output_index("voct" + std::to_string(i));
     vel_idx[i] = info.output_index("vel" + std::to_string(i));
     CAPTURE(i);
-    CHECK(gate_idx[i] >= 0);
-    CHECK(voct_idx[i] >= 0);
-    CHECK(vel_idx[i] >= 0);
+    // Fatal: gate_idx/voct_idx/vel_idx are used unconditionally below as
+    // static_cast<size_t>(idx) into `outs`. A missing bank output (idx ==
+    // -1) would otherwise UB-crash the whole test binary instead of
+    // failing this test case cleanly — matches AllocRig::out()'s
+    // REQUIRE(idx >= 0) convention in tests/test_alloc.cpp.
+    REQUIRE(gate_idx[i] >= 0);
+    REQUIRE(voct_idx[i] >= 0);
+    REQUIRE(vel_idx[i] >= 0);
   }
   REQUIRE(n >= 1);
   REQUIRE(n <= 8);
@@ -79,6 +97,13 @@ inline void check_bank_conformance(Module& module, const ModuleInfo& info,
   float run_vel[9] = {};         // vel<i> value at the start of the current
                                   // continuous gate-high run
   bool in_run[9] = {};           // currently inside a continuous high run
+  bool had_high[9] = {};         // gate<i> has been high at least once, so a
+                                  // subsequent low run is "between two high
+                                  // runs" (property 4b) rather than the
+                                  // initial idle-low state before first claim
+  int low_run_len[9] = {};       // length of the low run currently in
+                                  // progress since the last high run ended
+                                  // (only meaningful while had_high[i])
 
   for (int step = 0; step < steps; ++step) {
     feed(step);
@@ -114,16 +139,25 @@ inline void check_bank_conformance(Module& module, const ModuleInfo& info,
         held_voct[i] = voct;
       }
 
-      // Property 4: reclaim gap (conditional — see header comment).
+      // Property 4 / 4b: reclaim gap (conditional — see header comment).
       if (can_reclaim_while_sounding) {
         if (gate_high) {
           if (!in_run[i]) {
+            // Rising edge: the low run that just ended (if any, and if it
+            // followed a prior high run) is evaluated here, before it's
+            // reset — see property 4b in the header comment.
+            if (had_high[i] && low_run_len[i] < min_release_samples) {
+              CHECK(low_run_len[i] == 1);
+            }
             in_run[i] = true;
             run_vel[i] = vel;
           } else {
             CHECK(vel == doctest::Approx(run_vel[i]));
           }
+          had_high[i] = true;
+          low_run_len[i] = 0;
         } else {
+          low_run_len[i] = in_run[i] ? 1 : (had_high[i] ? low_run_len[i] + 1 : 0);
           in_run[i] = false;
         }
       }
