@@ -1,6 +1,7 @@
 #include "engine/controller.h"
 #include "dsl/parser.h"
 #include "graph/reload.h"
+#include "graph/voices.h"
 
 namespace ms::engine {
 
@@ -81,18 +82,23 @@ void Controller::clear_watch() {
 
 bool Controller::push_watch_for_shadow() {
   if (!shadow_ || watch_spec_.empty()) return false;
-  std::string_view spec = watch_spec_;
-  std::string_view mod = spec, port;
-  if (auto dot = spec.find('.'); dot != std::string_view::npos) {
-    mod = spec.substr(0, dot);
-    port = spec.substr(dot + 1);
-  }
+  // Node names may themselves contain dots (voice members: `lead.osc`,
+  // instanced as `lead.osc#0`), so the watch spec must be split by the same
+  // longest-declared-name rule as ordinary endpoint resolution, not by its
+  // first dot.
+  auto is_node_name = [&](const std::string& n) {
+    for (const auto& node : shadow_->nodes)
+      if (node.name == n) return true;
+    return false;
+  };
+  graph::SplitEndpoint s = graph::split_endpoint(is_node_name, watch_spec_);
+  if (!s.ok) return false;
   for (size_t i = 0; i < shadow_->nodes.size(); ++i) {
     const auto& n = shadow_->nodes[i];
-    if (n.name != mod) continue;
+    if (n.name != s.module) continue;
     int slot = 0;
-    if (!port.empty()) {
-      slot = n.info->output_index(port);
+    if (!s.port.empty()) {
+      slot = n.info->output_index(s.port);
       if (slot < 0) return false;
     }
     Command cmd;

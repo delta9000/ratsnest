@@ -95,3 +95,27 @@ TEST_CASE("watch resolves names and survives a topology swap") {
   REQUIRE(rig.run.try_watch_value(v));
   CHECK(v == doctest::Approx(1.0f));
 }
+
+// Voice expansion (spec §3) names instances `<member>#<i>`, so node names
+// legitimately contain dots (from the member's own name, e.g. `lead.osc`)
+// as well as the `#i` instance suffix. A watch spec must resolve against the
+// actual compiled node names (longest node-name prefix, same rule as
+// endpoint resolution) rather than splitting on the first dot in the spec.
+TEST_CASE("watch resolves dotted, instanced voice member names") {
+  Rig rig;
+  REQUIRE(rig.ctl.load(
+              "poly = alloc { n: 2 }\n"
+              "lead = voice { notes: poly }\n"
+              "lead.osc = vco { freq: 220hz }\n"
+              "lead.osc -> out.in\n")
+              .ok);
+  // Bare instanced node name: no port suffix, falls back to the first output.
+  CHECK(rig.ctl.set_watch("lead.osc#1"));
+  rig.spin(64);
+  float v = 0.0f;
+  REQUIRE(rig.run.try_watch_value(v));
+  // Explicit port on a dotted, instanced node name.
+  CHECK(rig.ctl.set_watch("lead.osc#1.out"));
+  rig.spin(64);
+  REQUIRE(rig.run.try_watch_value(v));
+}
