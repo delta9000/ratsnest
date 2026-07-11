@@ -9,7 +9,6 @@ extern const ModuleInfo lfo_info;
 extern const ModuleInfo clock_info;
 extern const ModuleInfo div_info;
 extern const ModuleInfo func_info;
-extern const ModuleInfo adsr_info;
 extern const ModuleInfo svf_info;
 extern const ModuleInfo noise_info;
 extern const ModuleInfo math_info;
@@ -24,4 +23,5 @@ extern const ModuleInfo quant_info;
 extern const ModuleInfo mix_info;
 extern const ModuleInfo scope_info;
 extern const ModuleInfo delay_info;
+extern const ModuleInfo adsr_info;
 }  // namespace ms::dsp

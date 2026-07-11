@@ -1,4 +1,5 @@
 #include <doctest/doctest.h>
+#include <algorithm>
 #include <string>
 #include "dsp/modules.h"
 
