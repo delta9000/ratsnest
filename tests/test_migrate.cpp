@@ -453,3 +453,46 @@ TEST_CASE("random migrates rng, phase, and segment endpoints") {
     CHECK(out_a[1] == doctest::Approx(out_b[1]));
   }
 }
+
+TEST_CASE("adsr migrates an active decay with the gate held high") {
+  const ModuleInfo* info = find_module("adsr");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(1000.0, {});
+  b->init(1000.0, {});
+  // gate, attack, decay, sustain, release
+  float ins[5] = {1.0f, 0.01f, 0.2f, 0.4f, 0.05f};
+  float out_a[1], out_b[1];
+  for (int i = 0; i < 60; ++i) a->process(ins, out_a);  // mid-decay
+  b->copy_state_from(*a);
+  // Gate stays high across the copy: a fresh prev_gate_ (0.0) would see a
+  // spurious rising edge and restart the attack, diverging immediately.
+  for (int i = 0; i < 80; ++i) {
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
+
+TEST_CASE("adsr migrates a release tail without re-idling early") {
+  const ModuleInfo* info = find_module("adsr");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(1000.0, {});
+  b->init(1000.0, {});
+  float ins[5] = {1.0f, 0.01f, 0.02f, 0.6f, 0.5f};
+  float out_a[1], out_b[1];
+  for (int i = 0; i < 50; ++i) a->process(ins, out_a);  // through to sustain
+  ins[0] = 0.0f;
+  for (int i = 0; i < 100; ++i) a->process(ins, out_a);  // 100/500 through release
+  b->copy_state_from(*a);
+  // A dropped start_ or progress_ copy makes b's tail restart from the wrong
+  // height or the wrong point on the curve.
+  for (int i = 0; i < 120; ++i) {
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
