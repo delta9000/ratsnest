@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <string>
 #include <unordered_map>
+#include "graph/voices.h"
 
 namespace ms::graph {
 namespace {
@@ -28,26 +29,26 @@ dsp::ConfigValue to_config_value(const dsl::Value& v) {
   return cv;
 }
 
-// Longest declared name that is the chain or a dot-prefix of it wins; the
-// remainder (at most one segment) is the port. e.g. with `lead.osc` declared,
-// `lead.osc.v_oct` resolves to module `lead.osc`, port `v_oct`.
+// Resolve a dotted chain to a node index + port via the shared split rule
+// (see graph/voices.h split_endpoint): longest declared name wins.
 struct Resolved { int node = -1; std::string port; };
 Resolved resolve(const std::unordered_map<std::string, int>& index_of,
                   const std::string& chain) {
-  auto it = index_of.find(chain);
-  if (it != index_of.end()) return {it->second, ""};
-  auto pos = chain.rfind('.');
-  if (pos != std::string::npos) {
-    auto head = index_of.find(chain.substr(0, pos));
-    if (head != index_of.end()) return {head->second, chain.substr(pos + 1)};
-  }
-  return {};
+  SplitEndpoint s =
+      split_endpoint([&](const std::string& n) { return index_of.count(n) > 0; }, chain);
+  if (!s.ok) return {};
+  return {index_of.at(s.module), std::move(s.port)};
 }
 
 }  // namespace
 
-CompileResult compile(const dsl::PatchAst& ast, double sample_rate) {
+CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
   CompileResult r;
+  // Voice groups expand first (spec §3); everything downstream is ordinary.
+  dsl::PatchAst ast = ast_in;
+  expand_voices(ast, r.errors);
+  if (!r.errors.empty()) return r;
+
   auto g = std::make_unique<Graph>();
   g->sample_rate = sample_rate;
   auto err = [&](int line, int col, std::string msg) {
