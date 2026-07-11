@@ -83,6 +83,11 @@ TEST_CASE("errors: unknown type, module, port, param, enum value") {
   CHECK(r.errors[4].msg.find("no input 'nope'") != std::string::npos);
 }
 
+TEST_CASE("dotted module names resolve by longest prefix") {
+  auto r = go("a.b = vca\nc = vca\nc -> a.b.cv : 2\na.b -> c\n");
+  REQUIRE(r.ok());
+}
+
 TEST_CASE("'out' is reserved") {
   auto p = dsl::parse("out = vca\n");
   REQUIRE(p.ok());

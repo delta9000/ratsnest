@@ -28,6 +28,22 @@ dsp::ConfigValue to_config_value(const dsl::Value& v) {
   return cv;
 }
 
+// Longest declared name that is the chain or a dot-prefix of it wins; the
+// remainder (at most one segment) is the port. e.g. with `lead.osc` declared,
+// `lead.osc.v_oct` resolves to module `lead.osc`, port `v_oct`.
+struct Resolved { int node = -1; std::string port; };
+Resolved resolve(const std::unordered_map<std::string, int>& index_of,
+                  const std::string& chain) {
+  auto it = index_of.find(chain);
+  if (it != index_of.end()) return {it->second, ""};
+  auto pos = chain.rfind('.');
+  if (pos != std::string::npos) {
+    auto head = index_of.find(chain.substr(0, pos));
+    if (head != index_of.end()) return {head->second, chain.substr(pos + 1)};
+  }
+  return {};
+}
+
 }  // namespace
 
 CompileResult compile(const dsl::PatchAst& ast, double sample_rate) {
@@ -95,13 +111,14 @@ CompileResult compile(const dsl::PatchAst& ast, double sample_rate) {
   std::vector<Cable> cables;
   for (const auto& c : ast.cables) {
     int dst;
+    std::string dport;
     {
-      auto it = index_of.find(c.dst.module);
-      if (it == index_of.end()) { err(c.dst.line, c.dst.col, "unknown module '" + c.dst.module + "'"); continue; }
-      dst = it->second;
+      Resolved rd = resolve(index_of, c.dst.module);
+      if (rd.node < 0) { err(c.dst.line, c.dst.col, "unknown module '" + c.dst.module + "'"); continue; }
+      dst = rd.node;
+      dport = rd.port.empty() ? "in" : rd.port;
     }
     const Node& dn = g->nodes[static_cast<size_t>(dst)];
-    std::string dport = c.dst.port.empty() ? "in" : c.dst.port;
     int dslot = dn.info->input_index(dport);
     if (dslot < 0) {
       err(c.dst.line, c.dst.col, "module '" + dn.name + "' has no input '" + dport +
@@ -113,15 +130,15 @@ CompileResult compile(const dsl::PatchAst& ast, double sample_rate) {
           static_cast<float>(c.src.literal * c.depth);
       continue;
     }
-    auto it = index_of.find(c.src.module);
-    if (it == index_of.end()) { err(c.src.line, c.src.col, "unknown module '" + c.src.module + "'"); continue; }
-    int src = it->second;
+    Resolved rs = resolve(index_of, c.src.module);
+    if (rs.node < 0) { err(c.src.line, c.src.col, "unknown module '" + c.src.module + "'"); continue; }
+    int src = rs.node;
     const Node& sn = g->nodes[static_cast<size_t>(src)];
     // A bare module name means its first output (spec §DSL; e.g. `seq -> ...`
     // reads stepseq's cv, not a port literally named "out").
-    std::string sport = c.src.port.empty()
+    std::string sport = rs.port.empty()
         ? (sn.info->outputs.empty() ? "" : sn.info->outputs[0].name)
-        : c.src.port;
+        : rs.port;
     int sslot = sn.info->output_index(sport);
     if (sslot < 0) {
       err(c.src.line, c.src.col, "module '" + sn.name + "' has no output '" + sport +

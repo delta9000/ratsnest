@@ -28,7 +28,8 @@ TEST_CASE("parses cables with ports and depth") {
   REQUIRE(r.ast.cables.size() == 2);
   CHECK(r.ast.cables[0].src.module == "lfo1");
   CHECK(r.ast.cables[0].src.port.empty());
-  CHECK(r.ast.cables[0].dst.port == "cutoff");
+  CHECK(r.ast.cables[0].dst.module == "filt.cutoff");  // graph splits, not parser
+  CHECK(r.ast.cables[0].dst.port.empty());
   CHECK(r.ast.cables[0].depth == doctest::Approx(0.5));
   CHECK(r.ast.cables[1].depth == doctest::Approx(1.0));
 }
@@ -63,4 +64,18 @@ TEST_CASE("duplicate module name is an error") {
   auto r = parse("a = vca\na = vca\n");
   REQUIRE(r.errors.size() == 1);
   CHECK(r.errors[0].msg.find("duplicate") != std::string::npos);
+}
+
+TEST_CASE("dotted declaration names parse") {
+  auto r = parse("lead.osc = vco { wave: saw }\n");
+  REQUIRE(r.ok());
+  CHECK(r.ast.modules[0].name == "lead.osc");
+}
+
+TEST_CASE("dotted cable endpoints keep the full chain") {
+  auto r = parse("a.b = vca\nc = vca\na.b -> c.cv\nc -> a.b.cv\n");
+  REQUIRE(r.ok());
+  CHECK(r.ast.cables[0].src.module == "a.b");
+  CHECK(r.ast.cables[0].src.port.empty());
+  CHECK(r.ast.cables[1].dst.module == "a.b.cv");  // graph splits, not parser
 }
