@@ -496,3 +496,37 @@ TEST_CASE("adsr migrates a release tail without re-idling early") {
     CHECK(out_a[0] == doctest::Approx(out_b[0]));
   }
 }
+
+// The reverb's audible state is the arena (all 13 lines), the per-line write
+// positions, the damping/bandwidth filters, and the tank LFO phase. Copying
+// mid-tail with modulation active makes each of those observable: a missing
+// arena copy silences b's tail, a missing pos array shears every line, a
+// missing lfo_ copy detunes the modulated allpasses within a few hundred
+// samples.
+TEST_CASE("reverb migrates tank contents, line positions, and lfo phase") {
+  const ModuleInfo* info = find_module("reverb");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  Config cfg;
+  ConfigValue depth; depth.num = 60.0; depth.is_num = true;  // strong mod
+  cfg.push_back({"mod_depth", depth});
+  a->init(48000.0, cfg);
+  b->init(48000.0, cfg);
+  // in_l, in_r, decay, damp, mix, freeze
+  float ins[6] = {0.0f, 0.0f, 0.8f, 0.3f, 1.0f, 0.0f};
+  float out_a[2], out_b[2];
+  for (int i = 0; i < 24000; ++i) {
+    ins[0] = i % 5 == 0 ? 0.6f : -0.2f;
+    ins[1] = i % 7 == 0 ? -0.5f : 0.3f;
+    a->process(ins, out_a);
+  }
+  ins[0] = ins[1] = 0.0f;
+  b->copy_state_from(*a);
+  for (int i = 0; i < 2000; ++i) {
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[1] == doctest::Approx(out_b[1]));
+  }
+}

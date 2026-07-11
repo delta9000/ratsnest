@@ -1,0 +1,48 @@
+# cathedral -- sparse Karplus plucks bloom in a huge plate; every other bar
+# the reverb FREEZES, holding the last chord as a wall while new plucks play
+# dry against it. Freeze is just a gate: bar -> div{2} -> reverb.freeze.
+
+clk = clock { bpm: 50 }
+bar = div { by: 4 }
+clk -> bar.in
+hold = div { by: 2 }
+bar -> hold.in
+
+# ---- melody: slow wander, sampled per beat, D minor pentatonic ----
+wander = random { rate: 0.9, smooth: 0, seed: 12 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+scale = quant { root: 5, scale: [0, 3, 5, 7, 10] }
+notes -> scale.in : 0.4
+
+# ---- plucked string (Karplus-Strong via tuned delay) ----
+burst = func { rise: 0.001, fall: 0.014, curve: exp }
+clk -> burst.trig
+hiss = noise { color: white, seed: 8 }
+exciter = vca { gain: 0 }
+hiss -> exciter.in
+burst -> exciter.cv
+string = delay { time: 9.09ms, feedback: 0.94, tone: 2800, mix: 1, slew: 0 }
+exciter -> string.in
+scale -> string.pitch
+
+# ---- low drone anchoring the key (D2), barely moving ----
+drone = vco { freq: 73.42hz, wave: tri }
+breath = lfo { wave: sine, freq: 0.05hz }
+drone_amp = vca { gain: 0.14 }
+breath -> drone_amp.gain : 0.05
+
+drone -> drone_amp.in
+
+# ---- the plate: long decay, gentle damping, MI-lush modulation ----
+verb = reverb { decay: 0.92, damp: 0.35, mix: 0.55, predelay: 0.05, mod_depth: 70 }
+string -> verb.in_l : 0.9
+string -> verb.in_r : 0.9
+drone_amp -> verb.in_l : 0.5
+drone_amp -> verb.in_r : 0.5
+hold -> verb.freeze
+
+verb.out_l -> out.left
+verb.out_r -> out.right
+-0.2 -> out.level
