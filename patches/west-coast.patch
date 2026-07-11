@@ -1,0 +1,50 @@
+# west coast -- random/quantized melody, folded triangle, vactrol plucks.
+# Exercises: random, quant, fold, lpg, drive, noise, svf, sh, xfade, math, mix, scope.
+
+clk = clock { bpm: 112 }
+half = div { by: 2 }
+clk -> half.in
+
+# -- melody: wandering voltage, sampled per step, snapped to a minor pentatonic --
+wander = random { rate: 7.3, seed: 11, smooth: 1 }
+stepper = sh { mode: sample }
+wander -> stepper.in
+clk -> stepper.trig
+qnt = quant { scale: [0, 3, 5, 7, 10] }
+stepper -> qnt.in : 0.4
+probe = scope { label: melody }
+qnt -> probe.in
+
+# -- voice: triangle into a wavefolder, fold depth breathes slowly --
+osc = vco { freq: 220hz, wave: tri }
+qnt -> osc.v_oct
+breathe = lfo { wave: sine, freq: 0.045hz }
+folder = fold { fold: 1.6 }
+osc -> folder.in
+breathe -> folder.fold : 1.2
+
+# -- vactrol pluck on every other step --
+gate = lpg { damp: 0.35, decay: 0.3 }
+folder -> gate.in
+half -> gate.strike
+
+# -- texture: pink noise, brightened by ring-modding with the raw osc --
+hiss = noise { color: pink, seed: 3 }
+shimmer = math { op: mult }
+hiss -> shimmer.a
+osc -> shimmer.b : 0.6
+bed = xfade { mix: 0.25 }
+hiss -> bed.a : 0.2
+shimmer -> bed.b : 0.5
+
+# -- gentle glue drive on the voice --
+warm = drive { amount: 0.15, mode: soft }
+gate -> warm.in
+
+# -- final mix: voice center-left, texture wide right --
+mixer = mix { levels: [0.9, 0.35], pans: [-0.2, 0.55] }
+warm -> mixer.in1
+bed -> mixer.in2
+mixer.out_l -> out.left
+mixer.out_r -> out.right
+-0.15 -> out.level
