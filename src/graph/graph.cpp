@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <string>
 #include <unordered_map>
+#include "graph/voices.h"
 
 namespace ms::graph {
 namespace {
@@ -28,10 +29,26 @@ dsp::ConfigValue to_config_value(const dsl::Value& v) {
   return cv;
 }
 
+// Resolve a dotted chain to a node index + port via the shared split rule
+// (see graph/voices.h split_endpoint): longest declared name wins.
+struct Resolved { int node = -1; std::string port; };
+Resolved resolve(const std::unordered_map<std::string, int>& index_of,
+                  const std::string& chain) {
+  SplitEndpoint s =
+      split_endpoint([&](const std::string& n) { return index_of.count(n) > 0; }, chain);
+  if (!s.ok) return {};
+  return {index_of.at(s.module), std::move(s.port)};
+}
+
 }  // namespace
 
-CompileResult compile(const dsl::PatchAst& ast, double sample_rate) {
+CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
   CompileResult r;
+  // Voice groups expand first (spec §3); everything downstream is ordinary.
+  dsl::PatchAst ast = ast_in;
+  expand_voices(ast, r.errors);
+  if (!r.errors.empty()) return r;
+
   auto g = std::make_unique<Graph>();
   g->sample_rate = sample_rate;
   auto err = [&](int line, int col, std::string msg) {
@@ -95,13 +112,14 @@ CompileResult compile(const dsl::PatchAst& ast, double sample_rate) {
   std::vector<Cable> cables;
   for (const auto& c : ast.cables) {
     int dst;
+    std::string dport;
     {
-      auto it = index_of.find(c.dst.module);
-      if (it == index_of.end()) { err(c.dst.line, c.dst.col, "unknown module '" + c.dst.module + "'"); continue; }
-      dst = it->second;
+      Resolved rd = resolve(index_of, c.dst.module);
+      if (rd.node < 0) { err(c.dst.line, c.dst.col, "unknown module '" + c.dst.module + "'"); continue; }
+      dst = rd.node;
+      dport = rd.port.empty() ? "in" : rd.port;
     }
     const Node& dn = g->nodes[static_cast<size_t>(dst)];
-    std::string dport = c.dst.port.empty() ? "in" : c.dst.port;
     int dslot = dn.info->input_index(dport);
     if (dslot < 0) {
       err(c.dst.line, c.dst.col, "module '" + dn.name + "' has no input '" + dport +
@@ -113,15 +131,15 @@ CompileResult compile(const dsl::PatchAst& ast, double sample_rate) {
           static_cast<float>(c.src.literal * c.depth);
       continue;
     }
-    auto it = index_of.find(c.src.module);
-    if (it == index_of.end()) { err(c.src.line, c.src.col, "unknown module '" + c.src.module + "'"); continue; }
-    int src = it->second;
+    Resolved rs = resolve(index_of, c.src.module);
+    if (rs.node < 0) { err(c.src.line, c.src.col, "unknown module '" + c.src.module + "'"); continue; }
+    int src = rs.node;
     const Node& sn = g->nodes[static_cast<size_t>(src)];
     // A bare module name means its first output (spec §DSL; e.g. `seq -> ...`
     // reads stepseq's cv, not a port literally named "out").
-    std::string sport = c.src.port.empty()
+    std::string sport = rs.port.empty()
         ? (sn.info->outputs.empty() ? "" : sn.info->outputs[0].name)
-        : c.src.port;
+        : rs.port;
     int sslot = sn.info->output_index(sport);
     if (sslot < 0) {
       err(c.src.line, c.src.col, "module '" + sn.name + "' has no output '" + sport +

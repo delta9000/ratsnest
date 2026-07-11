@@ -1,4 +1,6 @@
 #pragma once
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -24,6 +26,14 @@ std::string cfg_str(const Config& c, std::string_view name, std::string_view def
 double cfg_num(const Config& c, std::string_view name, double def);
 const std::vector<double>& cfg_arr(const Config& c, std::string_view name);
 
+// Raw MIDI event as delivered to on_midi: up to 4 status/data bytes (running
+// status is expanded by the producer, so len is 1..3 for channel voice
+// messages), trivially copyable so it can live in an rt::SpscQueue.
+struct MidiEvent {
+  uint8_t data[4];
+  uint8_t len;
+};
+
 class Module {
  public:
   virtual ~Module() = default;
@@ -32,6 +42,13 @@ class Module {
   // Copy migratable runtime state from another instance of the SAME concrete
   // type (caller guarantees it). RT-called: no alloc, no locks, no I/O.
   virtual void copy_state_from(const Module& other) { (void)other; }
+  // Delivered once per queued MIDI event, at the start of the block that
+  // contains it (events quantize to block boundaries; see
+  // docs/superpowers/specs/2026-07-11-midi-design.md §3). Only called on
+  // modules whose ModuleInfo::wants_midi is set. RT-called, ahead of that
+  // block's process() calls: no alloc, no locks, no I/O. `data` points into
+  // caller-owned storage valid only for the duration of the call.
+  virtual void on_midi(const uint8_t* data, size_t len) { (void)data; (void)len; }
 };
 
 struct ModuleInfo {
@@ -40,6 +57,9 @@ struct ModuleInfo {
   std::span<const ConfigInfo> configs;
   std::span<const OutputInfo> outputs;
   std::unique_ptr<Module> (*create)();
+  // Opts into on_midi delivery; the runner fans queued MIDI events to every
+  // node with wants_midi set, at block start, before that block is processed.
+  bool wants_midi = false;
 
   int input_index(std::string_view name) const;
   int output_index(std::string_view name) const;

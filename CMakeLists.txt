@@ -41,8 +41,12 @@ add_executable(mstests ${MSTEST_SOURCES})
 target_link_libraries(mstests PRIVATE mscore doctest::doctest)
 add_test(NAME unit COMMAND mstests)
 
-add_test(NAME cli_check
-  COMMAND modsynth check ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch)
+file(GLOB MSPATCHES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/patches/*.patch)
+foreach(patch ${MSPATCHES})
+  get_filename_component(patch_name ${patch} NAME_WE)
+  add_test(NAME cli_check_${patch_name} COMMAND modsynth check ${patch})
+endforeach()
+
 add_test(NAME cli_render
   COMMAND modsynth render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first.wav)

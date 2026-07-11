@@ -1,6 +1,6 @@
 # Polyphony: `alloc` + `voice` groups — Design
 
-2026-07-11. Status: designed, not implemented. Refines §6 and §3.5 of
+2026-07-11. Status: implemented (2026-07-11, this branch). Refines §6 and §3.5 of
 `2026-07-10-modsynth-design.md` (per-voice patch instancing, decided there;
 poly cables rejected there). Built before `midi` so midi's port surface is
 designed against a proven voice mechanism, not the other way around.
@@ -44,7 +44,9 @@ Claim semantics (`rr`):
 - When superseded or released, `voct<i>` **holds** its last value, so release
   tails keep their pitch. `vel<i>` holds until the next claim of that voice.
 - Reclaiming a voice whose gate is still high inserts a one-sample low gap so
-  downstream envelopes retrigger.
+  downstream envelopes retrigger (defensive for alloc's mono input, where a
+  rising edge always implies the prior sample was low; observable in bank
+  producers with note identity, see the midi design in §5).
 
 A mono stream can only express one *held* note at a time, so this is strum
 polyphony: each trigger takes a fresh voice and older voices ring out through
@@ -90,7 +92,11 @@ lead.amp -> mix.in1 : 0.4     # inside -> outside: straight sum of voices
      `poly.spread`): resolves to `<bank><i>` per instance, for every output
      family `<bank>1..<bank>N` the bound module exposes. This shadows
      nothing — `alloc` has no mono *output* named `voct`, so that spelling
-     is an error everywhere else, today and after this change.
+     is an error everywhere else, today and after this change. Bank
+     families are 8-wide (`<stem>1..<stem>8`) — a stem qualifies only if the
+     full family exists, so midi's 4-wide `cc1..cc4` does not qualify and
+     bare `mid.cc` is a normal unknown-output compile error, not a
+     silently-fanned bank read.
   3. outside → inside: broadcast; the same source feeds every instance.
   4. inside → outside: the outside port receives the **straight sum** of all
      instances. No hidden `1/n` normalization — modulation already sums onto
@@ -103,10 +109,12 @@ lead.amp -> mix.in1 : 0.4     # inside -> outside: straight sum of voices
   Changing `n` (via the allocator) is a topology change: surviving instances
   migrate, dropped instances vanish, new instances start fresh — consistent
   with §3.3.
-- **Errors** (all at compile, line:col): member declared for an undeclared
-  group; `notes:` module lacking the banks; `n:` mismatch; voice group
-  nested in a voice group (a member may not itself be a `voice`); a group
-  with zero members.
+- **Errors** (all at compile, line:col): `notes:` module lacking the banks;
+  `n:` mismatch; voice group nested in a voice group (a member may not
+  itself be a `voice`); a group with zero members. A dotted declaration
+  whose prefix is *not* a voice group is an ordinary module — dotted names
+  are general (§1), so a typo'd group name compiles as plain modules; the
+  planned `check` unreachable-module warning is the net for that.
 
 ## 4. Signal conventions
 
@@ -115,12 +123,17 @@ v/oct, `vel` unipolar 0..1. `spread` is bipolar CV. Nothing new.
 
 ## 5. `midi` interaction (next, separate design)
 
-`midi` ships its own banks (`gate1..n`, `voct1..n`, `vel1..n`) plus mono
-conveniences, and binds directly: `keys = voice { notes: midi1 }`. Because it
-has real note identity it can implement `lowest` and oldest-steal properly.
-`alloc` stays the sequencer-side allocator; the `voice` mechanism is
-indifferent to which feeds it. Anything with banks qualifies —
-`turing.bit1..8` gating eight voices is legal and encouraged.
+`midi` ships its own banks (`gate1..n`, `voct1..n`, `vel1..n`) and binds
+directly: `keys = voice { notes: midi1 }`. Deliberately banks only — no mono
+`gate`/`voct`/`vel` convenience outputs; the absence is load-bearing for the
+"shadows nothing" rule in §3 case 2 (see `2026-07-11-midi-design.md` §1).
+Because it has real note identity it can implement `lowest` and oldest-steal
+properly. `alloc` stays the sequencer-side allocator; the `voice` mechanism
+is indifferent to which feeds it. Anything exposing a full 8-wide bank family
+qualifies as a `notes:` binding target — but binding validation keys on
+`gate1` (§3), so a module with banks that don't include `gate1..8` (e.g.
+`turing.bit1..8`) cannot bind via `notes:`; its bit bank is usable only via
+explicit indexed reads (`turing.bit1`, ...), not as a voice-group source.
 
 ## 6. Testing
 

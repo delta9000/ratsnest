@@ -2,6 +2,7 @@
 #include <array>
 #include <memory>
 #include <vector>
+#include "dsp/module.h"
 #include "graph/graph.h"
 
 namespace ms::engine {
@@ -21,6 +22,18 @@ class Engine {
   // graph().migrate_pairs. RT-called at swap adoption, when the RT thread
   // owns both engines: race-free and allocation-free by construction.
   void migrate_from(const Engine& old);
+
+  // RT-called by RtRunner once per queued MIDI event, in arrival order, at
+  // block start (before that block's process() calls): fans the event to
+  // every node with ModuleInfo::wants_midi via Module::on_midi. No
+  // allocation, no locks, no I/O.
+  //
+  // The ring this drains lives on RtRunner, not here (see rt_runner.h):
+  // a topology hot-reload swaps in a brand-new Engine, and a ring owned by
+  // the outgoing Engine would silently drop any events queued at the swap
+  // moment (midi spec §4 requires the port/session to survive reload).
+  // RtRunner outlives every Engine, so its ring does too.
+  void deliver_midi_event(const dsp::MidiEvent& e);
 
  private:
   void step_glides();

@@ -1,0 +1,43 @@
+# keys-poly -- 4-voice MIDI subtractive keys, midi.cpp's sibling to strum's
+# sequencer-driven strum polyphony (docs/modules.md "Voice groups").
+#
+# `mid` claims up to 4 simultaneous notes round-robin, one CC mapped to
+# filter brightness (mod wheel style), velocity to level. Release is long
+# (0.6s) so sustain-pedal work -- which the midi module already defers
+# note-offs for -- has room to ring out naturally instead of choking.
+#
+# Offline `render` has no MIDI transport (spec §3: a keyboard nobody is
+# playing), so this patch renders digital silence -- that IS the pass/fail
+# signal here, alongside a clean compile: `mise run check -- patches/keys-poly.patch`
+# and `mise run render -- patches/keys-poly.patch -d 8s --stats 2s -o keys.wav`.
+
+mid = midi { voices: 4, cc: [74, 1] }
+
+# ---- per-voice subtractive voice: saw -> ladder -> vca ----
+keys = voice { notes: mid }
+keys.osc = vco { freq: 220hz, wave: saw }
+mid.voct -> keys.osc.v_oct
+
+keys.env = adsr { attack: 0.006, decay: 0.25, sustain: 0.65, release: 0.6, curve: exp }
+mid.gate -> keys.env.gate
+
+keys.filt = ladder { cutoff: 800, res: 0.25 }
+keys.osc -> keys.filt.in
+keys.env -> keys.filt.cutoff : 2400
+mid.cc1 -> keys.filt.cutoff : 4000
+
+keys.amp = vca { gain: 0, response: exp }
+keys.filt -> keys.amp.in
+keys.env -> keys.amp.cv : 0.8
+mid.vel -> keys.amp.cv : 0.5
+
+# ---- straight sum of all voices (inside -> outside, rule 4) into a gentle
+#      dry/reverb blend; levels kept well under 0 dBFS for four voices summed
+verb = reverb { decay: 0.55, damp: 0.35, mix: 0.3 }
+keys.amp -> verb.in_l : 0.16
+keys.amp -> verb.in_r : 0.16
+
+keys.amp -> out.in : 0.16
+verb.out_l -> out.left : 0.22
+verb.out_r -> out.right : 0.22
+-0.1 -> out.level

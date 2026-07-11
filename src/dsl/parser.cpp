@@ -16,7 +16,7 @@ class Parser {
       if (at(Tok::Newline)) { next(); continue; }
       if (at(Tok::Number)) { cable(); continue; }
       if (at(Tok::Ident)) {
-        if (peek(1).kind == Tok::Equals) {
+        if (starts_decl()) {
           auto m = decl();
           if (m && !names.insert(m->name).second)
             err(m->line, m->col, "duplicate module name '" + m->name + "'");
@@ -47,10 +47,29 @@ class Parser {
     return false;
   }
 
+  // Lookahead past a dotted `ident (. ident)*` chain to see whether it's
+  // followed by '=', i.e. whether the current position starts a decl rather
+  // than a cable.
+  bool starts_decl() const {
+    size_t j = i_ + 1;
+    while (toks_[j].kind == Tok::Dot && toks_[j + 1].kind == Tok::Ident) j += 2;
+    return toks_[j].kind == Tok::Equals;
+  }
+
   ModuleDecl* decl() {
     ModuleDecl m;
     const Token& name = next();
     m.name = name.text; m.line = name.line; m.col = name.col;
+    while (at(Tok::Dot)) {
+      next();
+      if (!at(Tok::Ident)) {
+        err(cur().line, cur().col, "expected name after '.'");
+        sync();
+        return nullptr;
+      }
+      m.name += '.';
+      m.name += next().text;
+    }
     const Token& eq = next();  // '='
     if (!at(Tok::Ident)) {
       err(eq.line, eq.col, "expected module type after '='");
@@ -129,16 +148,17 @@ class Parser {
   bool endpoint(Endpoint& e) {
     const Token& m = next();
     e.module = m.text; e.line = m.line; e.col = m.col;
-    if (at(Tok::Dot)) {
+    while (at(Tok::Dot)) {
       next();
       if (!at(Tok::Ident)) {
-        err(cur().line, cur().col, "expected port name after '.'");
+        err(cur().line, cur().col, "expected name after '.'");
         sync();
         return false;
       }
-      e.port = next().text;
+      e.module += '.';
+      e.module += next().text;
     }
-    return true;
+    return true;  // e.port stays empty; graph resolves module vs port
   }
 
   std::vector<Token> toks_;

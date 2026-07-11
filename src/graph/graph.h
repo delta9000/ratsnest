@@ -27,6 +27,12 @@ struct Graph {
   // for every module whose (name, type) survives. Consumed on the RT thread
   // by Engine::migrate_from at swap adoption.
   std::vector<std::pair<int, int>> migrate_pairs;
+  // Indices of nodes whose ModuleInfo::wants_midi is set. Populated once by
+  // Engine's constructor (every new Graph is wrapped in a fresh Engine, on
+  // both initial load and hot-reload swap), so it travels with the Graph
+  // through the pointer swap instead of living in a separate engine-side
+  // vector that could go stale relative to whichever graph is current.
+  std::vector<int> midi_nodes;
 };
 
 struct CompileResult {

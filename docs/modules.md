@@ -29,6 +29,57 @@ Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output
 `modsynth check patch.patch`; `modsynth render ... --stats [Ns]` prints
 overall peak/RMS/DC plus a per-window level timeline for mix work.
 
+### Voice groups
+
+Declared names may contain a dot (`lead.osc = vco { ... }`); no new statement
+type, just a name. A dotted declaration whose prefix isn't a `voice` group is
+an ordinary module with a dotted name.
+
+```text
+poly = alloc { n: 3 }
+clk -> poly.gate
+key -> poly.voct
+
+harp = voice { notes: poly }
+harp.osc = vco { freq: 220hz, wave: tri }
+harp.pluck = lpg { damp: 0.5, decay: 0.9 }
+poly.voct -> harp.osc.v_oct     # bound bank, bare name: per-instance
+harp.osc -> harp.pluck.in       # inside -> inside: instance-local
+poly.gate -> harp.pluck.strike
+harp.pluck -> out.in : 0.45     # inside -> outside: straight sum of voices
+```
+
+`name = voice { notes: <module> }` stamps every `name.<member>` declaration
+once per voice, as `name.<member>#i` (`#` starts a comment in source, so
+instance names never collide with user names; `watch` shows `harp.osc#2`
+like any node). Voice count `n` is inherited from the module bound by
+`notes:` — usually `alloc` — which must expose the indexed banks
+(`gate1..N`; `voct`/`vel` follow the same convention — validation keys on
+`gate1`); an
+explicit `n:` on the `voice` block must match or it is a compile error.
+
+Cable resolution depends on where each endpoint lives:
+
+1. **inside -> inside** (same group): instance-local, one cable per voice.
+2. **bound module's bare bank name, read inside** (`poly.voct`,
+   `poly.spread`): resolves to `<bank><i>` per instance, for every output
+   family the bound module exposes. This shadows nothing — `alloc` has no
+   mono output named `voct`, so that spelling is an error everywhere else.
+   Bank families are 8-wide (`<stem>1..<stem>8`); a narrower run such as
+   midi's `cc1..cc4` does not qualify, so bare `mid.cc` is an ordinary
+   unknown-output error rather than a bank read.
+3. **outside -> inside**: broadcast; the same source feeds every instance.
+4. **inside -> outside**: the outside port receives the straight sum of all
+   instances. No hidden `1/n` normalization — gain staging is the author's
+   job via cable depth, same as every other sum in the DSL.
+
+A mono gate/voct stream (a sequencer, `stepseq`, `turing.bit1..8`, …) can only
+express one held note at a time, so this is strum polyphony: each trigger
+claims a fresh voice and older voices ring out through their own releases.
+See `patches/strum.patch` for a complete three-voice recipe (clocked
+random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
+`docs/superpowers/specs/2026-07-11-voice-alloc-design.md` for the full design.
+
 ## Quick palette
 
 | Area | Modules |
@@ -36,7 +87,7 @@ overall peak/RMS/DC plus a per-window level timeline for mix work.
 | Sources | `vco`, `lfo`, `noise`, `random` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
-| Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo` |
+| Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
 | Effects/I/O | `delay`, `reverb`, `scope`, `out` |
 
 ## `vca`
@@ -230,6 +281,52 @@ s.trig -> env.trig
 Inputs `bpm` 120 and `beats` 1; outputs `seconds = 60 * beats / bpm` and `hz`.
 Beat values: quarter 1, eighth .5, dotted eighth .75, sixteenth .25. Example:
 `tempo { bpm: 120, beats: .75 }` produces .375 seconds.
+
+## `alloc`
+
+`alloc { n: 4, mode: rr }` — inputs `gate`, `voct`, `vel` 1; output banks
+`gate1..8`, `voct1..8`, `vel1..8`, `spread1..8` (bipolar constants spread
+over -1..+1; 0 when n = 1). Each rising gate claims the next voice (`rr`)
+or all voices (`unison`); a voice tracks `voct` while it is the newest
+claim and holds it after, so release tails keep pitch. Reclaims insert a
+one-sample gap (a defensive guarantee of the bank convention — unreachable
+from a mono gate, where every reclaim already follows a low sample; midi
+exercises it). Strum polyphony from any mono sequencer; see `voice`.
+
+## `midi`
+
+`midi { channel: 0, voices: 1, mode: last, bend: 2, cc: [] }` — no inputs;
+output banks `gate1..8`, `voct1..8`, `vel1..8`, plus `bend`, `at`, `cc1..cc4`.
+Pure event -> CV: it consumes raw MIDI (via the engine's `midi-in` port; see
+`docs/superpowers/specs/2026-07-11-midi-design.md`) and never touches the
+audio graph's inputs. Offline `render` has no transport, so a midi module
+outputs defaults there — a keyboard nobody is playing.
+
+There are deliberately **no** mono convenience outputs named `gate`/`voct`/
+`vel`: those bare spellings are reserved by the voice-group bank-resolution
+rule (`alloc`/`midi` expose only banks so `poly.voct` can resolve to
+`voct<i>` per instance and shadow nothing). A mono synth is `voices: 1` and
+`mid.gate1` — explicit, per design rule 4. Bind straight into a voice group:
+`keys = voice { notes: mid }`.
+
+- `voct<i>` = `(note − 57) / 12` (MIDI 57 / A3 = 0.0 at 220 Hz); `vel<i>` is
+  velocity `0..1`. Both hold after note-off so release tails keep pitch.
+- Pitch bend (scaled by `bend` semitones, default 2, clamp `0..24`) is added
+  into every `voct` output; the `bend` output carries that same bipolar value
+  in v/oct units (`bend / 12` at full deflection) for routing elsewhere.
+- `voices` `1..8`: each note-on claims a free voice round-robin; at capacity
+  it steals the **oldest** sounding voice, inserting a one-sample gate gap so
+  envelopes retrigger. Note identity is tracked, so note-off drops the right
+  voice.
+- `mode` applies only at `voices: 1`: `last` = newest key wins and previous
+  held keys restore on release (legato — the restore does **not** re-gap or
+  retrigger); `lowest` = the lowest held key sounds (bass-pedal style).
+- `cc: [74, 1]` maps `cc1` to controller 74, `cc2` to the mod wheel, etc.
+  (≤ 4 entries, each clamped `0..127`, only the first four read); each `cc<k>`
+  is `0..1`, smoothed by a fixed ~3 ms one-pole. Unmapped slots output 0.
+- `at` is channel pressure `0..1`. Sustain (CC 64) defers note-offs until the
+  pedal releases. `channel` `0` = omni (default), else `1..16`; velocity-0
+  note-ons are note-offs. All tracker state survives hot reload.
 
 ## Recipes
 

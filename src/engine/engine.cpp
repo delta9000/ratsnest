@@ -6,10 +6,12 @@ namespace ms::engine {
 
 Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
   size_t total = 0, max_ins = 1;
-  for (const auto& n : g_->nodes) {
+  for (size_t ni = 0; ni < g_->nodes.size(); ++ni) {
+    const graph::Node& n = g_->nodes[ni];
     out_offset_.push_back(total);
     total += n.info->outputs.size();
     max_ins = std::max(max_ins, n.info->inputs.size());
+    if (n.info->wants_midi) g_->midi_nodes.push_back(static_cast<int>(ni));
   }
   outs_.assign(total, 0.0f);
   ins_.assign(max_ins, 0.0f);
@@ -72,6 +74,11 @@ float Engine::output_value(size_t node, size_t slot) const {
   if (node >= g_->nodes.size()) return 0.0f;
   if (slot >= g_->nodes[node].info->outputs.size()) return 0.0f;
   return outs_[out_offset_[node] + slot];
+}
+
+void Engine::deliver_midi_event(const dsp::MidiEvent& e) {
+  for (int ni : g_->midi_nodes)
+    g_->nodes[static_cast<size_t>(ni)].instance->on_midi(e.data, e.len);
 }
 
 void Engine::migrate_from(const Engine& old) {
