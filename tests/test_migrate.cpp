@@ -305,6 +305,28 @@ TEST_CASE("sh migrates held value and prev_trig_ edge memory") {
   }
 }
 
+TEST_CASE("ladder migrates all four stage states") {
+  const ModuleInfo* info = find_module("ladder");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, {});
+  b->init(48000.0, {});
+  float ins[4] = {0.0f, 800.0f, 0.6f, 0.0f};
+  float out_a[1] = {0}, out_b[1] = {0};
+  for (int i = 0; i < 1000; ++i) {
+    ins[0] = (i / 24) % 2 == 0 ? 0.7f : -0.7f;
+    a->process(ins, out_a);
+  }
+  b->copy_state_from(*a);
+  for (int i = 1000; i < 1032; ++i) {
+    ins[0] = (i / 24) % 2 == 0 ? 0.7f : -0.7f;
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+  }
+}
+
 TEST_CASE("noise migrates rng and pink filter state") {
   const ModuleInfo* info = find_module("noise");
   REQUIRE(info != nullptr);
