@@ -1,0 +1,130 @@
+# dub techno -- generative D-dorian chord fog at 122 BPM.
+#
+# Harmony changes every two bars, but a short chord stab lands once per bar.
+# Seeded random makes the piece repeatable. The dry chord is deliberately
+# quiet: two dark tempo echoes and a long plate become the real instrument.
+
+# ---- clock tree: master runs eighth notes at 122 BPM ----
+master  = clock { bpm: 244 }
+quarter = div { by: 2 }
+half    = div { by: 2 }
+bar     = div { by: 2 }
+two_bar = div { by: 2 }
+master -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> two_bar.in
+
+# ---- slow, repeatable harmonic drift in a narrow D-dorian neighborhood ----
+# A slowly mutating eight-bit loop replaces unstructured random wandering.
+memory = turing { len: 8, prob: 0.14, seed: 303 }
+two_bar -> memory.clock
+harmony = quant { scale: [0, 2, 3, 5, 7, 9, 10] }
+memory.out -> harmony.in : 0.22
+
+# ---- minor chord: D2 root, F2 third, A2 fifth, slightly detuned ----
+root_osc  = vco { freq: 73.42hz, wave: saw }
+third_osc = vco { freq: 73.18hz, wave: saw }
+fifth_osc = vco { freq: 73.67hz, wave: tri }
+harmony -> root_osc.v_oct
+harmony -> third_osc.v_oct
+harmony -> fifth_osc.v_oct
+0.25 -> third_osc.v_oct
+0.58333 -> fifth_osc.v_oct
+
+stab_env = func { rise: 0.004, fall: 0.34, curve: exp }
+bar -> stab_env.trig
+stab_amp = vca { gain: 0, response: exp }
+root_osc -> stab_amp.in : 0.34
+third_osc -> stab_amp.in : 0.27
+fifth_osc -> stab_amp.in : 0.3
+stab_env -> stab_amp.cv : 0.86
+
+# The filter envelope supplies the attack; two irrational slow cycles move
+# the darkness and resonance over roughly 19 and 43 seconds.
+filter_breath = lfo { wave: sine, freq: 0.023hz }
+filter_wander = lfo { wave: tri, freq: 0.053hz }
+stab_filter = ladder { cutoff: 240, res: 0.48, drive: 0.72 }
+stab_amp -> stab_filter.in
+stab_env -> stab_filter.cutoff : 1800
+filter_breath -> stab_filter.cutoff : 190
+filter_wander -> stab_filter.cutoff : 95
+filter_breath -> stab_filter.res : 0.08
+
+warm = drive { amount: 0.28, mode: soft }
+stab_filter -> warm.in
+
+# ---- dub space ----
+# 369 ms is a dotted eighth at 122 BPM; 738 ms is three eighth notes.
+# Very slow time motion stays small and slewed, so repeats smear rather than
+# lurch. Feedback remains safely below runaway.
+echo_motion = lfo { wave: sine, freq: 0.017hz }
+echo_tone = lfo { wave: tri, freq: 0.031hz }
+echo_a = delay { time: 369ms, feedback: 0.68, tone: 1900, mix: 1, slew: 2.5 }
+echo_b = delay { time: 738ms, feedback: 0.57, tone: 1250, mix: 1, slew: 3.5 }
+warm -> echo_a.in : 0.82
+warm -> echo_b.in : 0.58
+echo_motion -> echo_a.time : 0.006
+echo_motion -> echo_b.time : -0.009
+echo_tone -> echo_a.tone : 420
+echo_tone -> echo_b.tone : 260
+echo_motion -> echo_a.feedback : 0.055
+echo_motion -> echo_b.feedback : -0.04
+
+verb_life = lfo { wave: sine, freq: 0.011hz }
+space = reverb { decay: 0.84, damp: 0.48, mix: 0.72,
+                 predelay: 0.038, bandwidth: 0.82,
+                 mod_rate: 0.37, mod_depth: 42 }
+echo_a -> space.in_l : 0.72
+echo_a -> space.in_r : 0.34
+echo_b -> space.in_l : 0.32
+echo_b -> space.in_r : 0.7
+warm -> space.in_l : 0.16
+warm -> space.in_r : 0.16
+verb_life -> space.decay : 0.07
+filter_breath -> space.damp : 0.08
+
+# ---- restrained rhythm ----
+kick_env = func { rise: 0.001, fall: 0.22, curve: log }
+quarter -> kick_env.trig
+kick_osc = vco { freq: 45hz, wave: sine }
+quarter -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.45
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : 0.9
+kick_drive = drive { amount: 0.2, mode: soft }
+kick_amp -> kick_drive.in
+
+hat_env = func { rise: 0.001, fall: 0.038, curve: exp }
+# Five hits over sixteen eighth-note steps, rotated away from the downbeat.
+hat_pattern = euclid { steps: 16, hits: 5, rot: 3 }
+master -> hat_pattern.clock
+# Bernoulli holes keep each two-bar cycle from becoming mechanical.
+hat_coin = bern { prob: 0.78, seed: 91 }
+hat_pattern.trig -> hat_coin.gate
+hat_coin.a -> hat_env.trig
+hat_noise = noise { color: white, seed: 19 }
+hat_filter = svf { cutoff: 9200, res: 0.25 }
+hat_noise -> hat_filter.in
+hat_amp = vca { gain: 0 }
+hat_filter.hp -> hat_amp.in
+hat_env -> hat_amp.cv : 0.34
+quarter -> hat_amp.cv : -0.12
+
+# ---- mix: the kick subtly ducks the entire wet field ----
+mixer = mix { levels: [0.8, 0.18, 0.22, 0.36, 0.68, 0.68],
+              pans: [0, 0.28, -0.12, 0.28, -0.42, 0.42] }
+kick_drive -> mixer.in1
+hat_amp -> mixer.in2
+warm -> mixer.in3
+echo_a -> mixer.in4
+space.out_l -> mixer.in5
+space.out_r -> mixer.in6
+kick_env -> mixer.lvl4 : -0.12
+kick_env -> mixer.lvl5 : -0.19
+kick_env -> mixer.lvl6 : -0.19
+
+mixer.out_l -> out.left
+mixer.out_r -> out.right
+-0.42 -> out.level
