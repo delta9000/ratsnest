@@ -70,6 +70,7 @@ void RtRunner::render_block(float* l, float* r, size_t frames) {
     return;
   }
 
+  current_->deliver_midi();  // block-start: quantize queued MIDI to this block
   current_->process(l, r, frames);
 
   if (old_) {
