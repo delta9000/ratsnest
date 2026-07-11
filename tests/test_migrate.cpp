@@ -372,3 +372,25 @@ TEST_CASE("noise migrates rng and pink filter state") {
     CHECK(out_a[0] == doctest::Approx(out_b[0]));
   }
 }
+
+TEST_CASE("random migrates rng, phase, and segment endpoints") {
+  const ModuleInfo* info = find_module("random");
+  REQUIRE(info != nullptr);
+  auto a = info->create();
+  auto b = info->create();
+  Config cfg;
+  ConfigValue s; s.num = 4.0; s.is_num = true;
+  cfg.push_back({"seed", s});
+  a->init(48000.0, cfg);
+  b->init(48000.0, cfg);
+  const float ins[2] = {200.0f, 1.0f};  // 240-sample segments, smoothing on
+  float out_a[2], out_b[2];
+  for (int i = 0; i < 500; ++i) a->process(ins, out_a);  // mid-segment
+  b->copy_state_from(*a);
+  for (int i = 0; i < 480; ++i) {  // crosses at least one clock tick
+    a->process(ins, out_a);
+    b->process(ins, out_b);
+    CHECK(out_a[0] == doctest::Approx(out_b[0]));
+    CHECK(out_a[1] == doctest::Approx(out_b[1]));
+  }
+}
