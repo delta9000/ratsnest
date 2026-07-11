@@ -117,7 +117,11 @@ CompileResult compile(const dsl::PatchAst& ast, double sample_rate) {
     if (it == index_of.end()) { err(c.src.line, c.src.col, "unknown module '" + c.src.module + "'"); continue; }
     int src = it->second;
     const Node& sn = g->nodes[static_cast<size_t>(src)];
-    std::string sport = c.src.port.empty() ? sn.info->outputs.empty() ? "" : "out" : c.src.port;
+    // A bare module name means its first output (spec §DSL; e.g. `seq -> ...`
+    // reads stepseq's cv, not a port literally named "out").
+    std::string sport = c.src.port.empty()
+        ? (sn.info->outputs.empty() ? "" : sn.info->outputs[0].name)
+        : c.src.port;
     int sslot = sn.info->output_index(sport);
     if (sslot < 0) {
       err(c.src.line, c.src.col, "module '" + sn.name + "' has no output '" + sport +

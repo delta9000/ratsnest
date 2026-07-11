@@ -53,6 +53,14 @@ TEST_CASE("literal source folds into base") {
   for (auto& per_node : r.graph->in_cables) CHECK(per_node.empty());
 }
 
+TEST_CASE("bare source resolves to first output, whatever its name") {
+  // stepseq's first output is cv, not out; svf's is lp.
+  auto r = go("s = stepseq { steps: [0.5] }\nf = svf\na = vca\ns -> a.cv\nf -> a\n");
+  REQUIRE(r.ok());
+  for (auto& per_node : r.graph->in_cables)
+    for (auto& c : per_node) CHECK(c.src_out == 0);
+}
+
 TEST_CASE("cycles compile (feedback allowed)") {
   auto r = go("a = vca\nb = vca\na -> b\nb -> a.cv\n");
   CHECK(r.ok());

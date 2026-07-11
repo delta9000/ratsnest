@@ -24,8 +24,9 @@ filter.lp -> amp.in : 0.5       # cable gain
 seq = stepseq { steps: [0, 0.25, 0.58333], gates: [1, 0, 1] }
 ```
 
-Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output.
-Validate with `modsynth check patch.patch`.
+Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output
+(a bare `stepseq` name reads its `cv`, a bare `svf` its `lp`). Validate with
+`modsynth check patch.patch`.
 
 ## Quick palette
 
