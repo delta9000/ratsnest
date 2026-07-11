@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -27,7 +28,7 @@ int usage() {
   std::fprintf(stderr,
       "usage:\n"
       "  modsynth check  <patch>\n"
-      "  modsynth render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>]\n"
+      "  modsynth render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>] [--stats [Ns]]\n"
       "  modsynth play   <patch> [--latency <N/RATE>] [--rate <hz>] [--watch <mod[.port]>]\n");
   return 2;
 }
@@ -224,10 +225,16 @@ int main(int argc, char** argv) {
   if (cmd == "render") {
     double seconds = 10.0, rate = 48000.0;
     std::string out_path = "out.wav";
+    double stats_window = 0.0;  // 0 = no stats
     for (int i = 3; i < argc; ++i) {
       if (!std::strcmp(argv[i], "-d") && i + 1 < argc) seconds = parse_duration(argv[++i]);
       else if (!std::strcmp(argv[i], "-o") && i + 1 < argc) out_path = argv[++i];
       else if (!std::strcmp(argv[i], "--rate") && i + 1 < argc) rate = std::atof(argv[++i]);
+      else if (!std::strcmp(argv[i], "--stats")) {
+        stats_window = 10.0;
+        if (i + 1 < argc && parse_duration(argv[i + 1]) > 0.0)
+          stats_window = parse_duration(argv[++i]);
+      }
       else return usage();
     }
     if (seconds <= 0.0) { std::fprintf(stderr, "error: duration must be positive\n"); return 2; }
@@ -251,6 +258,36 @@ int main(int argc, char** argv) {
       return 1;
     }
     std::printf("rendered %.1fs -> %s\n", seconds, out_path.c_str());
+
+    if (stats_window > 0.0) {
+      auto db = [](double v) { return 20.0 * std::log10(std::max(v, 1e-12)); };
+      double peak = 0.0, sumsq = 0.0, dc = 0.0;
+      for (size_t i = 0; i < frames; ++i) {
+        const double a = l[i], b = r[i];
+        peak = std::max({peak, std::abs(a), std::abs(b)});
+        sumsq += a * a + b * b;
+        dc += a + b;
+      }
+      std::printf("peak %6.1f dBFS   rms %6.1f dBFS   dc %+.5f\n",
+                  db(peak), db(std::sqrt(sumsq / (2.0 * static_cast<double>(frames)))),
+                  dc / (2.0 * static_cast<double>(frames)));
+      const size_t win = static_cast<size_t>(stats_window * rate);
+      for (size_t start = 0; start < frames; start += win) {
+        const size_t end = std::min(frames, start + win);
+        double wpeak = 0.0, wsum = 0.0;
+        for (size_t i = start; i < end; ++i) {
+          const double a = l[i], b = r[i];
+          wpeak = std::max({wpeak, std::abs(a), std::abs(b)});
+          wsum += a * a + b * b;
+        }
+        const double wrms = db(std::sqrt(wsum / (2.0 * static_cast<double>(end - start))));
+        std::string bar(20, '-');
+        const int fill = static_cast<int>(std::clamp((wrms + 60.0) / 60.0, 0.0, 1.0) * 20.0);
+        for (int i = 0; i < fill; ++i) bar[static_cast<size_t>(i)] = '#';
+        std::printf("%7.1fs  rms %6.1f  peak %6.1f  |%s|\n",
+                    static_cast<double>(start) / rate, wrms, db(wpeak), bar.c_str());
+      }
+    }
     return 0;
   }
 

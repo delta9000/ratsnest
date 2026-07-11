@@ -26,7 +26,8 @@ seq = stepseq { steps: [0, 0.25, 0.58333], gates: [1, 0, 1] }
 
 Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output
 (a bare `stepseq` name reads its `cv`, a bare `svf` its `lp`). Validate with
-`modsynth check patch.patch`.
+`modsynth check patch.patch`; `modsynth render ... --stats [Ns]` prints
+overall peak/RMS/DC plus a per-window level timeline for mix work.
 
 ## Quick palette
 

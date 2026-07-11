@@ -261,6 +261,7 @@ swap; old graph freed on the main thread.
 ```
 modsynth play   drone.patch          # watch + play + meters
 modsynth render drone.patch -d 30s -o take.wav   # offline, faster than RT
+modsynth render drone.patch -d 300s --stats 8s   # + peak/RMS/DC level timeline
 modsynth check  drone.patch          # parse/validate — editor lint
 ```
 
