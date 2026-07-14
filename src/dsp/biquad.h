@@ -69,6 +69,21 @@ inline BiquadCoeffs make_hpf(float freq, float sample_rate) {
   return c;
 }
 
+inline BiquadCoeffs make_lpf(float freq, float sample_rate) {
+  float w0 = 2.0f * std::numbers::pi_v<float> * freq / sample_rate;
+  float cos_w0 = std::cos(w0);
+  float alpha = std::sin(w0) / (2.0f * 0.70710678f); // Q = 0.7071 (Butterworth)
+
+  float a0 = 1.0f + alpha;
+  BiquadCoeffs c;
+  c.b0 = ((1.0f - cos_w0) / 2.0f) / a0;
+  c.b1 = (1.0f - cos_w0) / a0;
+  c.b2 = ((1.0f - cos_w0) / 2.0f) / a0;
+  c.a1 = (-2.0f * cos_w0) / a0;
+  c.a2 = (1.0f - alpha) / a0;
+  return c;
+}
+
 inline BiquadCoeffs make_low_shelf(float freq, float gain_db, float sample_rate) {
   if (std::abs(gain_db) < 1e-4f) {
     return make_bypass();
