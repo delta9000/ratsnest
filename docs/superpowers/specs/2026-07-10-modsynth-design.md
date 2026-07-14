@@ -191,6 +191,11 @@ Drums need no module: trigger → `lpg.strike` (kick), `noise`+`svf.hp`+fast
 
 ### Phase 4 — sound design (+4)
 
+(implemented 2026-07-14; design `2026-07-14-phase4-io-modules-design.md`. The
+three I/O members share a hand-written WAV codec in `ms::io` — no new
+dependency — and `extin` adds a `wants_audio_in` engine hook mirroring the MIDI
+bridge. See `docs/modules.md` for behavior.)
+
 | Module | Role | Notes |
 |---|---|---|
 | `sampler` | file playback | `file` (string), `pitch`, `loop`; outs `out` `eos` |
