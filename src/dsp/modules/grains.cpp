@@ -142,6 +142,34 @@ class Grains final : public Module {
     outs[2] = seeded ? 1.0f : 0.0f;
   }
 
+  void copy_state_from(const Module& other) override {
+    const auto& o = static_cast<const Grains&>(other);
+    // RT-called: bounded copy, no allocation (delay precedent; ~1 MB at the
+    // default 4 s ring). Sizes match unless a secs edit resized the ring.
+    const std::size_t n = std::min(buf_.size(), o.buf_.size());
+    std::copy_n(o.buf_.begin(), n, buf_.begin());
+    write_abs_ = o.write_abs_;
+    prev_trig_ = o.prev_trig_;
+    was_frozen_ = o.was_frozen_;
+    tail_ = o.tail_;
+    tail_len_ = o.tail_len_;
+    xfade_pos_ = o.xfade_pos_;
+    rng_ = o.rng_;
+    countdown_ = o.countdown_;
+    norm_ = o.norm_;
+    grains_ = o.grains_;
+    // A resize may have shrunk the ring: kill grains that no longer fit.
+    for (Grain& g : grains_) {
+      if (!g.active) continue;
+      if (file_mode_) {
+        if (g.phase >= static_cast<double>(len_)) g.active = false;
+      } else if (static_cast<double>(write_abs_) - g.phase >
+                 static_cast<double>(len_) - 8.0) {
+        g.active = false;
+      }
+    }
+  }
+
  private:
   // Advance the record head. While frozen, capture the first kTail inputs
   // (continuous with the frozen content's edge); on unfreeze, crossfade the

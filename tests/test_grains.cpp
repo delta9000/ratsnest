@@ -475,3 +475,55 @@ TEST_CASE("grains: missing file yields silence, not death") {
     CHECK(std::isfinite(outs[1]));
   }
 }
+
+TEST_CASE("grains: state migrates across hot reload") {
+  auto a = make_grains();
+  auto b = make_grains();
+  Ins ins;
+  float oa[3] = {0.f, 0.f, 0.f};
+  float ob[3] = {0.f, 0.f, 0.f};
+  for (int i = 0; i < 48000; ++i) {
+    ins.v[0] = static_cast<float>(
+        std::sin(2.0 * std::numbers::pi * 150.0 * i / 48000.0) * 0.7);
+    a->process(ins.v, oa);
+  }
+  ins.v[0] = 0.0f;
+  ins.v[1] = 1.0f;
+  ins.v[2] = 1.0f;
+  a->process(ins.v, oa);  // a has a sounding grain
+  ins.v[2] = 0.0f;
+  for (int i = 0; i < 100; ++i) a->process(ins.v, oa);
+
+  b->copy_state_from(*a);  // hot reload: fresh instance adopts state
+  for (int i = 0; i < 4800; ++i) {
+    a->process(ins.v, oa);
+    b->process(ins.v, ob);
+    CHECK(oa[0] == ob[0]);
+    CHECK(oa[1] == ob[1]);
+  }
+}
+
+TEST_CASE("grains: migration into a smaller ring kills only unfit grains") {
+  auto a = make_grains(48000.0, 1.0);
+  auto b = make_grains(48000.0, 0.25);  // 16384-sample ring
+  Ins ins;
+  float oa[3] = {0.f, 0.f, 0.f};
+  float ob[3] = {0.f, 0.f, 0.f};
+  for (int i = 0; i < 48000; ++i) {
+    ins.v[0] = static_cast<float>(
+        std::sin(2.0 * std::numbers::pi * 150.0 * i / 48000.0) * 0.7);
+    a->process(ins.v, oa);
+  }
+  ins.v[0] = 0.0f;
+  ins.v[1] = 1.0f;
+  ins.v[2] = 1.0f;
+  ins.v[3] = 1.0f;  // oldest position: cannot fit a 16384-sample ring
+  a->process(ins.v, oa);
+  ins.v[2] = 0.0f;
+  b->copy_state_from(*a);
+  for (int i = 0; i < 2000; ++i) {
+    b->process(ins.v, ob);
+    CHECK(std::isfinite(ob[0]));
+    CHECK(std::isfinite(ob[1]));
+  }
+}
