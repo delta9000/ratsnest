@@ -44,15 +44,51 @@ class Grains final : public Module {
     const double secs = std::clamp(cfg_num(cfg, "secs", 4.0), 0.25, 60.0);
     const auto seed = static_cast<uint32_t>(cfg_num(cfg, "seed", 1.0));
     rng_ = seed ? seed : 1u;  // xorshift must never hold zero
-    file_mode_ = false;       // the file task replaces this init
 
-    const auto need = static_cast<std::size_t>(secs * rate);
-    std::size_t size = 1;
-    while (size < need) size <<= 1;
-    buf_.assign(size, 0.0f);  // control thread: allocation is legal here
-    mask_ = size - 1;
-    len_ = size;
-    write_abs_ = size;  // start one ring in: read math never goes negative
+    const std::string file = cfg_str(cfg, "file", "");
+    file_mode_ = !file.empty();
+    if (file_mode_) {
+      // Static sample material: mono mixdown, linear resample to the engine
+      // rate, 60 s cap. A missing/unreadable file stays a silent buffer
+      // (design rule 6: errors never kill the session).
+      std::vector<float> mono;
+      io::WavData w;
+      if (io::read_wav_f32(file, w) && w.frames > 0 && w.channels > 0) {
+        const auto ch = static_cast<std::size_t>(w.channels);
+        std::vector<float> mixed(w.frames);
+        for (std::size_t fr = 0; fr < w.frames; ++fr) {
+          float acc = 0.0f;
+          for (std::size_t c = 0; c < ch; ++c) acc += w.samples[fr * ch + c];
+          mixed[fr] = acc / static_cast<float>(ch);
+        }
+        const double step = static_cast<double>(w.sample_rate) / rate;
+        const auto out_n = std::min(
+            static_cast<std::size_t>(static_cast<double>(w.frames) / step),
+            static_cast<std::size_t>(60.0 * rate));
+        mono.resize(out_n);
+        for (std::size_t i = 0; i < out_n; ++i) {
+          const double p = static_cast<double>(i) * step;
+          const auto i0 = static_cast<std::size_t>(p);
+          const float f = static_cast<float>(p - static_cast<double>(i0));
+          const float a = mixed[i0];
+          const float b = (i0 + 1 < w.frames) ? mixed[i0 + 1] : a;
+          mono[i] = a + (b - a) * f;
+        }
+      }
+      if (mono.size() < 4096) mono.resize(4096, 0.0f);  // silent floor
+      len_ = mono.size();
+      buf_ = std::move(mono);
+      mask_ = 0;       // unused: file reads clamp instead of wrapping
+      write_abs_ = 0;  // no record head
+    } else {
+      const auto need = static_cast<std::size_t>(secs * rate);
+      std::size_t size = 1;
+      while (size < need) size <<= 1;
+      buf_.assign(size, 0.0f);  // control thread: allocation is legal here
+      mask_ = size - 1;
+      len_ = size;
+      write_abs_ = size;  // one ring in: read math never goes negative
+    }
 
     grains_ = {};
     tail_.fill(0.0f);
@@ -228,9 +264,16 @@ class Grains final : public Module {
     return tri + (2.0f * shape - 1.0f) * (rc - tri);
   }
 
-  // 4-point cubic Hermite read; masked ring indexing makes wrap branch-free
-  // (the file task adds a clamped branch for the non-ring buffer).
+  // 4-point cubic Hermite read. Live: masked ring indexing (branch-free
+  // wrap). File: clamped so the stencil stays inside [0, len).
   float read(double idx) const {
+    if (file_mode_) {
+      const double c =
+          std::clamp(idx, 1.0, static_cast<double>(len_) - 3.0);
+      const auto i1 = static_cast<std::size_t>(c);
+      const float f = static_cast<float>(c - static_cast<double>(i1));
+      return hermite(buf_[i1 - 1], buf_[i1], buf_[i1 + 1], buf_[i1 + 2], f);
+    }
     const auto i1 = static_cast<uint64_t>(idx);
     const float f = static_cast<float>(idx - static_cast<double>(i1));
     const float x0 = buf_[static_cast<std::size_t>(i1 - 1) & mask_];

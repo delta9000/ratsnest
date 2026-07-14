@@ -400,3 +400,78 @@ TEST_CASE("grains: unfreeze crossfades from frozen content into live input") {
   CHECK(x30 == doctest::Approx(0.6f + 0.2f * (86.0f / 256.0f)).epsilon(0.05));
   CHECK(x230 == doctest::Approx(0.8f).epsilon(0.02));
 }
+
+namespace {
+std::string write_ramp_wav(const char* name, int frames, int rate) {
+  auto path = std::filesystem::temp_directory_path() / name;
+  std::vector<float> data(static_cast<std::size_t>(frames));
+  for (int i = 0; i < frames; ++i)
+    data[static_cast<std::size_t>(i)] = static_cast<float>(i) * 1e-4f;
+  REQUIRE(ms::io::write_wav_f32(path.string(), data.data(),
+                                static_cast<std::size_t>(frames), 1, rate));
+  return path.string();
+}
+}  // namespace
+
+TEST_CASE("grains: file mode granulates the file; live input is inert") {
+  const std::string path = write_ramp_wav("modsynth_grains_ramp.wav", 9600, 48000);
+  auto m = make_grains(48000.0, 1.0, 1.0, path.c_str());
+  Ins ins;
+  float outs[3] = {0.f, 0.f, 0.f};
+  ins.v[0] = 1.0f;  // slam the live input: file mode must ignore it
+  for (int i = 0; i < 5000; ++i) {
+    m->process(ins.v, outs);
+    CHECK(outs[0] == 0.0f);  // nothing recorded, no grains seeded
+  }
+  ins.v[0] = 0.0f;
+  ins.v[2] = 1.0f;
+  ins.v[3] = 0.0f;  // file start
+  m->process(ins.v, outs);
+  CHECK(outs[2] == 1.0f);
+  ins.v[2] = 0.0f;
+  // len 9600; size 0.1 -> dur 4800, span 4800 > len/4 = 2400 -> dur scaled
+  // to 2400; start = 4. At t = 1200 (boxcar plateau): sample = file[1204].
+  for (int t = 1; t < 2400; ++t) {
+    m->process(ins.v, outs);
+    if (t == 1200) {
+      const float expect =
+          1204.0f * 1e-4f * std::cos(std::numbers::pi_v<float> / 4.0f);
+      CHECK(outs[0] == doctest::Approx(expect).epsilon(0.002));
+    }
+  }
+}
+
+TEST_CASE("grains: file at a different rate is resampled to engine rate") {
+  const std::string path = write_ramp_wav("modsynth_grains_ramp24.wav", 4800, 24000);
+  auto m = make_grains(48000.0, 1.0, 1.0, path.c_str());
+  Ins ins;
+  float outs[3] = {0.f, 0.f, 0.f};
+  ins.v[2] = 1.0f;
+  ins.v[3] = 0.0f;
+  m->process(ins.v, outs);
+  ins.v[2] = 0.0f;
+  // Resampled length 9600 (same geometry as above); engine index i holds
+  // file[i/2], so index 1204 holds file[602] = 0.0602.
+  for (int t = 1; t < 2400; ++t) {
+    m->process(ins.v, outs);
+    if (t == 1200) {
+      const float expect =
+          602.0f * 1e-4f * std::cos(std::numbers::pi_v<float> / 4.0f);
+      CHECK(outs[0] == doctest::Approx(expect).epsilon(0.005));
+    }
+  }
+}
+
+TEST_CASE("grains: missing file yields silence, not death") {
+  auto m = make_grains(48000.0, 1.0, 1.0, "/nonexistent/definitely_missing.wav");
+  Ins ins;
+  float outs[3] = {0.f, 0.f, 0.f};
+  ins.v[2] = 1.0f;
+  m->process(ins.v, outs);
+  ins.v[2] = 0.0f;
+  for (int t = 0; t < 2000; ++t) {
+    m->process(ins.v, outs);
+    CHECK(outs[0] == 0.0f);
+    CHECK(std::isfinite(outs[1]));
+  }
+}
