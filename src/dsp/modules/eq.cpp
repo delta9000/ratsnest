@@ -65,6 +65,13 @@ class Eq final : public Module {
     state_mid1_l_.clear(); state_mid1_r_.clear();
     state_mid2_l_.clear(); state_mid2_r_.clear();
     state_high_l_.clear(); state_high_r_.clear();
+
+    // Invalidate coefficient cache — recomputed on first process() call.
+    prev_hp_freq_   = -999.0f;
+    prev_low_freq_  = prev_low_gain_  = -999.0f;
+    prev_mid1_freq_ = prev_mid1_gain_ = prev_mid1_q_ = -999.0f;
+    prev_mid2_freq_ = prev_mid2_gain_ = prev_mid2_q_ = -999.0f;
+    prev_high_freq_ = prev_high_gain_ = -999.0f;
   }
 
   void process(const float* ins, float* outs) override {
@@ -97,29 +104,45 @@ class Eq final : public Module {
     const float high_freq = high_freq_smooth_.process(raw_high_freq);
     const float high_gain = high_gain_smooth_.process(raw_high_gain);
     
-    // Compute shared coefficients
-    const BiquadCoeffs c_hp = make_hpf(hp_freq, rate_);
-    const BiquadCoeffs c_low = make_low_shelf(low_freq, low_gain, rate_);
-    const BiquadCoeffs c_mid1 = make_peaking_eq(mid1_freq, mid1_gain, mid1_q, rate_);
-    const BiquadCoeffs c_mid2 = make_peaking_eq(mid2_freq, mid2_gain, mid2_q, rate_);
-    const BiquadCoeffs c_high = make_high_shelf(high_freq, high_gain, rate_);
-    
+    // Recompute biquad coefficients only when smoothed params have changed.
+    // Settled patches avoid all cos/sin/pow calls on the hot path.
+    if (hp_freq != prev_hp_freq_) {
+      c_hp_ = make_hpf(hp_freq, rate_);
+      prev_hp_freq_ = hp_freq;
+    }
+    if (low_freq != prev_low_freq_ || low_gain != prev_low_gain_) {
+      c_low_ = make_low_shelf(low_freq, low_gain, rate_);
+      prev_low_freq_ = low_freq;  prev_low_gain_ = low_gain;
+    }
+    if (mid1_freq != prev_mid1_freq_ || mid1_gain != prev_mid1_gain_ || mid1_q != prev_mid1_q_) {
+      c_mid1_ = make_peaking_eq(mid1_freq, mid1_gain, mid1_q, rate_);
+      prev_mid1_freq_ = mid1_freq;  prev_mid1_gain_ = mid1_gain;  prev_mid1_q_ = mid1_q;
+    }
+    if (mid2_freq != prev_mid2_freq_ || mid2_gain != prev_mid2_gain_ || mid2_q != prev_mid2_q_) {
+      c_mid2_ = make_peaking_eq(mid2_freq, mid2_gain, mid2_q, rate_);
+      prev_mid2_freq_ = mid2_freq;  prev_mid2_gain_ = mid2_gain;  prev_mid2_q_ = mid2_q;
+    }
+    if (high_freq != prev_high_freq_ || high_gain != prev_high_gain_) {
+      c_high_ = make_high_shelf(high_freq, high_gain, rate_);
+      prev_high_freq_ = high_freq;  prev_high_gain_ = high_gain;
+    }
+
     // Left channel cascade processing
     float x_l = sanitize(ins[0], 0.0f);
-    x_l = Biquad::process(x_l, c_hp, state_hp_l_);
-    x_l = Biquad::process(x_l, c_low, state_low_l_);
-    x_l = Biquad::process(x_l, c_mid1, state_mid1_l_);
-    x_l = Biquad::process(x_l, c_mid2, state_mid2_l_);
-    x_l = Biquad::process(x_l, c_high, state_high_l_);
+    x_l = Biquad::process(x_l, c_hp_,   state_hp_l_);
+    x_l = Biquad::process(x_l, c_low_,  state_low_l_);
+    x_l = Biquad::process(x_l, c_mid1_, state_mid1_l_);
+    x_l = Biquad::process(x_l, c_mid2_, state_mid2_l_);
+    x_l = Biquad::process(x_l, c_high_, state_high_l_);
     outs[0] = x_l;
-    
+
     // Right channel cascade processing
     float x_r = sanitize(ins[1], 0.0f);
-    x_r = Biquad::process(x_r, c_hp, state_hp_r_);
-    x_r = Biquad::process(x_r, c_low, state_low_r_);
-    x_r = Biquad::process(x_r, c_mid1, state_mid1_r_);
-    x_r = Biquad::process(x_r, c_mid2, state_mid2_r_);
-    x_r = Biquad::process(x_r, c_high, state_high_r_);
+    x_r = Biquad::process(x_r, c_hp_,   state_hp_r_);
+    x_r = Biquad::process(x_r, c_low_,  state_low_r_);
+    x_r = Biquad::process(x_r, c_mid1_, state_mid1_r_);
+    x_r = Biquad::process(x_r, c_mid2_, state_mid2_r_);
+    x_r = Biquad::process(x_r, c_high_, state_high_r_);
     outs[1] = x_r;
   }
 
@@ -146,7 +169,22 @@ class Eq final : public Module {
 
  private:
   float rate_ = 48000.0f;
-  
+
+  // Coefficient cache — recomputed only when the corresponding smoothed param changes.
+  // Exact float comparison works: OnePole flushes denormals and converges to
+  // target exactly, so prev_ == current once the patch is settled (~0.8 s at 48 kHz).
+  BiquadCoeffs c_hp_;   float prev_hp_freq_   = -999.0f;
+  BiquadCoeffs c_low_;  float prev_low_freq_   = -999.0f;
+                        float prev_low_gain_   = -999.0f;
+  BiquadCoeffs c_mid1_; float prev_mid1_freq_  = -999.0f;
+                        float prev_mid1_gain_  = -999.0f;
+                        float prev_mid1_q_     = -999.0f;
+  BiquadCoeffs c_mid2_; float prev_mid2_freq_  = -999.0f;
+                        float prev_mid2_gain_  = -999.0f;
+                        float prev_mid2_q_     = -999.0f;
+  BiquadCoeffs c_high_; float prev_high_freq_  = -999.0f;
+                        float prev_high_gain_  = -999.0f;
+
   // Parameter smoothing states
   OnePole hp_freq_smooth_;
   OnePole low_freq_smooth_;
