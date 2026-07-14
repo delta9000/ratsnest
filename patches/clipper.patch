@@ -1,0 +1,26 @@
+# clipper demo -- Warm analog-style saturation of mixed oscillators
+#
+# It mixes a deep triangle wave bass and a sawtooth wave lead,
+# and drives them (+18 dB) into a 4x oversampled soft-mode clipper.
+
+bass = vco { freq: 55hz, wave: tri }
+lead = vco { freq: 220hz, wave: saw }
+
+sig = mix { levels: [0.6, 0.4] }
+bass -> sig.in1
+lead -> sig.in2
+
+sat = clipper {
+  mode: soft,
+  threshold: -3.0,
+  drive: 18.0,
+  mix: 1.0
+}
+
+# Connect to clipper inputs
+sig.out_l -> sat.in_l
+sig.out_r -> sat.in_r
+
+# Connect to master output
+sat.out_l -> out.left
+sat.out_r -> out.right

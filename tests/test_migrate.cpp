@@ -671,6 +671,13 @@ TEST_CASE("eq migrates cascade filter states") {
   check_continuity("eq", ins, 1000);
 }
 
+TEST_CASE("clipper migrates oversampling and delay states") {
+  // clipper inputs: in_l, in_r, threshold, drive, mix
+  const float ins[5] = {0.8f, -0.5f, -3.0f, 6.0f, 1.0f};
+  check_continuity("clipper", ins, 1000);
+}
+
+
 
 
 

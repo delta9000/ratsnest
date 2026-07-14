@@ -88,7 +88,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `compressor`, `dcblock`, `delay`, `eq`, `reverb`, `scope`, `stereo`, `out` |
+| Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `reverb`, `scope`, `stereo`, `out` |
 
 ## `vca`
 
@@ -381,6 +381,19 @@ Consists of five cascaded biquad sections per channel:
 5.  **High Shelf**: High shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. Slope fixed to `1.0`.
 
 Zero-gain sections are optimized with exact bypass coefficients.
+
+## `clipper`
+
+`clipper { mode: hard }` — inputs `in_l` 0, `in_r` 0, `threshold` -1, `drive` 0,
+`mix` 1; outputs `out_l`, `out_r`. An oversampled stereo mastering clipper.
+*   `mode`: Config. Can be `hard` (hard digital clipping at threshold) or `soft`
+    (normalized tanh soft clipping at threshold).
+*   `threshold` (clamped `-120..0`, default -1): Output ceiling threshold in dBFS.
+*   `drive` (clamped `-40..40`, default 0): Input gain boost applied before clipping in dB.
+*   `mix` (clamped `0..1`, default 1): Equal-power dry/wet crossfade mix.
+
+Internally oversampled at 4x using a cascade of highly optimized 2-path polyphase allpass IIR half-band filters.
+The dry branch is delay-aligned by exactly 1 sample to match the filter's peak latency.
 
 ## Recipes
 
