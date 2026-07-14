@@ -39,15 +39,20 @@ Rings, all modulatable inputs (cables sum onto bases):
 |---|---|---|---|
 | `freq` | 220 Hz | see per-module | fundamental (base for `v_oct`) |
 | `v_oct` | 0 | — | pitch offset, +1 doubles |
-| `structure` | 0.5 | 0..0.9995 | inharmonicity: modal = stiffness curve; string = dispersion |
+| `structure` | 0.25 | 0..0.9995 | inharmonicity: modal = stiffness curve; string = dispersion |
 | `brightness` | 0.5 | 0..1 | spectral tilt of excitation and decay |
 | `damping` | 0.5 | 0..1 | decay time (exponential mapping) |
 | `position` | 0.25 | 0..1 | strike/pickup position comb |
 | `in` | 0 | — | external excitation audio, always summed |
 | `strike` | 0 | edge | fires the internal pitch-aware exciter |
 
-Default `position` is 0.25, not 0.5: at 0.5 the cosine comb zeroes every odd
-mode including the fundamental (struck-at-center hollowness) — a bad default.
+Default `structure` is 0.25: that value sits on the modal stiffness curve's
+harmonic plateau (0.25..0.3 → stiffness 0) *and* in the string dispersion
+dead zone (0.24..0.26 → pure KS), so both modules default to perfectly
+harmonic. Default `position` 0.25 is the classic quarter-pluck: the comb
+weight of partial k is `w = 0.5 + 0.5*cos(2*pi*(k-1)*position)` — the
+fundamental (k = 1) always has weight 1, position 0.5 nulls the even
+partials (struck-at-center hollowness), 0.25 nulls every fourth.
 
 Effective fundamental `f0 = clamp(freq, lo, hi) * 2^v_oct` (clamped again after
 scaling), normalized to `f = f0 / rate` for all internal math. Frequency-domain
@@ -84,15 +89,19 @@ poison persistent state (delay-module precedent: `!(x >= lo)` clamps).
   and per mode `q_loss += structure*(2-structure)*0.1 * (1 - q_loss)`.
   Brightness is squared at the top (`b = knob^2`) then attenuated
   `b *= 1 - 0.2*(1-structure)^8` (anti-clip guard), both as in Rings.
-- **Position**: per sample, a 2-multiply cosine-series recurrence yields
-  `w_n = 0.5 + 0.5*cos(2*pi*n*position)`; mode n's bandpass output is weighted
-  by `w_n`. Odd-indexed modes sum to `odd`, even-indexed to `even`,
-  `out = odd + even`.
+- **Position**: per sample, a 2-multiply cosine-series recurrence (Rings'
+  approximate CosineOscillator) yields `w_n = 0.5 + 0.5*cos(2*pi*n*position)`
+  for mode index n = 0, 1, 2, … — the first mode (fundamental) always gets
+  weight 1. Modes with even index n (partials 1, 3, 5, …) sum to `odd`
+  (odd *partials*), odd-index modes to `even`; `out = odd + even`.
 - **Excitation path**: `(in + strike_impulse)` through a lowpass SVF whose
-  cutoff follows brightness: `cutoff_knob = b*(2-b)`,
-  `fc = f * 2^((cutoff_knob - 0.5) * 8)` (Rings' ±48-semitone span), Q = 1.5.
-  `strike` rising edge injects a single-sample impulse of amplitude
-  `0.25 * 2^(cutoff_knob^2 * 2) / fc` (energy-normalized against the filter).
+  cutoff follows brightness: `c = b*(2-b)` from the *unsquared* knob,
+  `fc = min(f * 2^((c - 0.5) * 8), 0.499)` (Rings' ±48-semitone span),
+  Q = 1.5. `strike` rising edge injects a single-sample impulse of amplitude
+  `0.25 * 2^(fc^2 * 2) / fc` (fc the normalized cutoff frequency —
+  energy-normalized against the filter; floor fc at 1e-5 for the division).
+  The resonator-side brightness is the knob squared before the §3 q_loss
+  mapping (Rings squares at the part level).
 
 ## 4. `string`
 
@@ -110,7 +119,8 @@ poison persistent state (delay-module precedent: `!(x >= lo)` clamps).
   `rt60 = 0.07 * 2^(8*lf)` seconds (0.07 s → ~18 s);
   `g_loop = 2^(-120 * delay_samples / (rt60 * rate) / 12)` (floored at
   2^(-127/12)). `damping >= 0.95` crossfades `g_loop -> 1`, `b -> 1`,
-  SVF cutoff → 0.4999 (lossless drone), factor `20*(damping-0.95)`.
+  SVF cutoff → 0.4999 and the compensation cutoff value → 128 semitones
+  (lossless drone), factor `20*(damping-0.95)`.
 - **IIR damping cutoff**: `f * 2^(min(24 + 48*damping^2 + 24*brightness^2, 84)
   / 12)`, clamped at 0.499.
 - **Structure → dispersion** (bipolar with dead zone):
@@ -125,16 +135,26 @@ poison persistent state (delay-module precedent: `!(x >= lo)` clamps).
     (`±0.025` dead zone, negative side ×1.5) FMs the delay by
     `d^2 * 0.01`, with DC-blocked loop crossfaded in by `-d`.
 - **Position**: folded `p = 0.5 - 0.98*|position - 0.5|`. `aux` taps the delay
-  line at `delay * p` (second pickup); `out` is the loop filter output minus
-  that tap — the pluck-position comb Rings applies at its poly mix. Patches
-  recover the raw loop as `out + aux`.
-- **Excitation path**: `(in + pluck_burst)` through a lowpass SVF at
-  `fc = 0.4 * 2^((b*(2-b) - 1) * 9)`, Q = 0.8, then a DC blocker
-  (pole `1 - 2*pi*10/rate`), summed into the loop after the delay read.
+  line at `delay_raw * p` (the *uncompensated* `1/f` delay, per Rings);
+  `out` is the loop filter output minus that tap — the pluck-position comb
+  Rings applies at its poly mix. Patches recover the raw loop as `out + aux`.
+  Ordering in the loop, per Rings: read delay = `1/f`, then `* (1 -
+  svf_shift(damping_cutoff))` IIR compensation where `svf_shift(n) =
+  2*atan(2^(-n/12)) / (2*pi)`, then `- 1` for the FIR, and only then the
+  dispersion/bridge delay-FM multiplies.
+- **Excitation path**: `in` scaled by `1/sqrt(2)` (Rings' string headroom
+  scaling at one string), through a lowpass SVF with the same f-tracking
+  brightness mapping as `modal` (`c = b*(2-b)`,
+  `fc = min(f * 2^((c-0.5)*8), 0.499)`, Q = 1.5), then `+ pluck_burst`, then
+  a one-pole DC blocker (`y = x - x_prev + p*y_prev`, pole `1 - 10/rate`),
+  summed into the loop after the delay read. (The bridge nonlinearity path
+  has its own DC blocker at pole `1 - 20/rate`.)
 - **Plucker** (`strike` rising edge, seeded PRNG — config `seed`, equal seeds
   repeat): white-noise burst of `(1/f) * (position*0.9 + 0.05)` samples fed
   through a feedback comb (`gain = (1-position)*0.8`, period = burst length,
-  halved until < 256) and a lowpass SVF at `min(8*fc_exciter, 0.499)`, Q = 1.
+  halved until < 255) and a lowpass SVF at `min(8*fc_exciter, 0.499)`, Q = 1.
+  Uses the delay-clamped effective f0, so hostile `freq` cannot request a
+  multi-minute burst.
 
 ## 5. C++ composable core
 
@@ -167,7 +187,12 @@ there), `process()` and `copy_state_from()` never allocate.
   block-rate counters, delay-module style. Changing `modes:` migrates the
   overlapping prefix.
 - Denormals: offline render has no FTZ — flush decaying states (mode SVF
-  integrators, loop filters, DC blockers) below 1e-20 as in `delay.cpp`.
+  integrators, loop filters, DC blockers) below 1e-20 as in `delay.cpp`
+  (mode-bank states may flush at block rate; exact silence only needs
+  eventual flush).
+- Hostile audio: both modules run a feedback structure that a single NaN/inf
+  input sample would poison forever — sanitize the excitation sample and the
+  string's loop write (`!(|x| < 1e6) -> 0`), so the session always recovers.
 - Errors: config out of range clamps (session never dies); `modes` rounds to
   the nearest even value in range.
 
@@ -204,8 +229,9 @@ Detune shimmer: duplicate a string with `0.001 -> dup.v_oct`. Chord ladders
 - `string` at `damping: 1` sustains (RMS at t+5 s within 1 dB of t+1 s).
 - Pitch: strike `string` at 220 Hz, autocorrelation peak at `rate/220` ± 1
   sample; `+1 v_oct` halves the lag. `modal` bp peak near f0 (goertzel).
-- Position comb: `position: 0.5` vs `0.25` differ; `modal` fundamental weight
-  at 0.5 ≈ 0 (odd/even outputs verify the split).
+- Position comb: `position: 0.5` vs `0.25` differ; `modal` partial 2 (weight
+  index n = 1) is nulled at position 0.5 while the fundamental survives
+  (odd/even outputs verify the split, `out = odd + even`).
 - Structure: `modal` structure 0.27 (plateau) yields harmonic mode 2 at 2*f0;
   structure 0.95 stretches it measurably. `string` dead zone: structure 0.25
   equals plain KS output bit-for-bit with dispersion path disabled.
