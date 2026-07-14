@@ -85,7 +85,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Area | Modules |
 |---|---|
 | Sources | `vco`, `lfo`, `noise`, `random`, `sampler`, `modal`, `string` |
-| Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
+| Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
 | Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `scope`, `stereo`, `out` |
@@ -545,6 +545,22 @@ a curved-bridge nonlinearity — gongs, sitars; 0.24..0.26 pure string; above
 `position` 0.25 (pluck point and pickup comb). Outputs `out` (pickup-combed
 voice, Rings' mix) and `aux` (raw pickup tap; `out + aux` is the bare loop).
 Config `seed`: equal seeds repeat plucks exactly. Reaches ~5.9 Hz at 48 kHz.
+
+## `overdrive`
+
+`overdrive { model: tubescreamer }` — voiced guitar overdrive/distortion.
+A pre-emphasis filter → anti-aliased waveshaper → tone stack, with a clean⇄
+shaped blend. Inputs `in` 0 (mono), `drive` 0.5 (pre-gain into the curve, up to
+~2^11× on `rat`), `tone` 0.5 (sweeps the tone lowpass), `level` 0.5 (±2-octave
+makeup), `mix` 1 (dry/wet; lower it for the transparent "clean blend" of the
+`tubescreamer`/`klon` voicings — ~0.5). Output `out`. Config `model`:
+`tubescreamer` (default, mid-hump soft clip), `klon` (transparent, more
+headroom), `rat` (hard clip, huge gain, dark), `ds1` (mid-scooped), `mxr`
+(bright soft clip), `muff` (two cascaded stages — fuzz), `clean` (flat-voiced
+soft clipper). Anti-aliased by antiderivative anti-aliasing + 4× oversampling
+(reuses the clipper's oversampler), so even the hard-clip `rat` stays clean.
+Recommended `mix`: 0.5 for `tubescreamer`/`klon`, 1.0 for the rest. Cascade two
+for extra saturation, or use `model: muff`.
 
 ## Recipes
 

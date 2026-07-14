@@ -58,8 +58,9 @@ Per sample (mono), all state fixed-size (rule 3):
 x0  = sanitize(in)                       # mastering.h sanitize -> 0 on NaN/inf
 x   = x0 * drive_gain
 xf  = pre_.process(x)                    # model pre-emphasis biquad
-# --- clean tap, delay-aligned by the decimator latency (1 sample) ---
-clean = align(xf)
+# --- clean tap at INPUT level (pre-drive), delay-aligned by decimator (1) ---
+clean = align(x0)                        # so mix is a true dry/wet crossfade,
+                                         # not a volume control at high drive
 # --- shaped path, anti-aliased ---
 up[4] = oversampler_.upsample(xf)        # 4x, reuse Oversampler4x
 for i in 0..3: sh[i] = shape_adaa(up[i]) # ADAA waveshaper at 4x
@@ -74,8 +75,9 @@ out = yt * level_gain
 
 The clean⇄shaped crossfade is the first-class "clean blend" that makes a Tube
 Screamer/Klon read as themselves (op-amp clip-in-feedback = clean + clipped)
-rather than a raw waveshaper to ground. The clean is tapped post-drive,
-post-pre-emphasis so a blended pedal stays musical.
+rather than a raw waveshaper to ground. The clean is tapped at input level
+(pre-drive), so `mix` is a true dry/wet crossfade rather than a volume control
+at high drive — the way a Klon/TS sums roughly-unity clean with the clipped leg.
 
 Coefficients (filters, gains, model constants) recompute at **block rate**
 (every 32 samples, Rings/`modal` precedent) driven by `drive`/`tone`; the
