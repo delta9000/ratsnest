@@ -1,19 +1,19 @@
 # strum -- three overlapping plucked voices from one mono sequencer line.
-clk = clock { bpm: 180 }
-wander = random { rate: 2.1, smooth: 0, seed: 14 }
+clk = clock { bpm: 280 }
+wander = random { rate: 3.3, smooth: 0, seed: 14 }
 notes = sh { mode: sample }
 wander -> notes.in
 clk -> notes.trig
 key = quant { scale: [0, 3, 5, 7, 10] }
-notes -> key.in : 0.4
+notes -> key.in : 1.0
 
-poly = alloc { n: 3 }
+poly = alloc { n: 5 }
 clk -> poly.gate
 key -> poly.voct
 
 harp = voice { notes: poly }
 harp.osc = vco { freq: 220hz, wave: tri }
-harp.pluck = lpg { damp: 0.5, decay: 0.9 }
+harp.pluck = lpg { damp: 0.01, decay: 5.9 }
 poly.voct -> harp.osc.v_oct
 poly.spread -> harp.osc.v_oct : 0.004
 harp.osc -> harp.pluck.in
