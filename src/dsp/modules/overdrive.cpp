@@ -41,21 +41,23 @@ struct Voice {
 };
 
 Voice voice_for(const std::string& m) {
+  // drive_span in octaves of pre-gain across drive 0..1 (drive 0.5 -> 2^(span/2)).
+  // Ranges run hot so a decaying source keeps grinding, not just the attack.
   //          pre_hp curve         asym  span  tlo    thi     scpF   scpDB  2st   inter  post
   if (m == "klon")
-    return {340.f, Curve::Soft, 0.05f, 6.f, 3000.f, 8000.f, 0.f, 0.f, false, 0.f, 0.f};
+    return {340.f, Curve::Soft, 0.05f, 9.f, 3000.f, 8000.f, 0.f, 0.f, false, 0.f, 0.f};
   if (m == "rat")
-    return {90.f, Curve::Hard, 0.0f, 11.f, 500.f, 6000.f, 0.f, 0.f, false, 0.f, 6000.f};
+    return {90.f, Curve::Hard, 0.05f, 14.f, 500.f, 6000.f, 0.f, 0.f, false, 0.f, 6000.f};
   if (m == "ds1")
-    return {1100.f, Curve::Soft, 0.15f, 8.f, 800.f, 3000.f, 500.f, -8.f, false, 0.f, 0.f};
+    return {1100.f, Curve::Soft, 0.15f, 12.f, 800.f, 3000.f, 500.f, -8.f, false, 0.f, 0.f};
   if (m == "mxr")
-    return {160.f, Curve::Soft, 0.10f, 7.f, 5000.f, 16000.f, 0.f, 0.f, false, 0.f, 0.f};
+    return {160.f, Curve::Soft, 0.12f, 11.f, 5000.f, 16000.f, 0.f, 0.f, false, 0.f, 0.f};
   if (m == "muff")
-    return {120.f, Curve::Soft, 0.0f, 9.f, 1500.f, 4000.f, 800.f, -6.f, true, 1200.f, 0.f};
+    return {120.f, Curve::Soft, 0.0f, 13.f, 1500.f, 4000.f, 800.f, -6.f, true, 1200.f, 0.f};
   if (m == "clean")
-    return {0.f, Curve::Soft, 0.0f, 5.f, 2000.f, 12000.f, 0.f, 0.f, false, 0.f, 0.f};
+    return {0.f, Curve::Soft, 0.0f, 7.f, 2000.f, 12000.f, 0.f, 0.f, false, 0.f, 0.f};
   // tubescreamer (default / unknown model)
-  return {720.f, Curve::Soft, 0.10f, 6.f, 2000.f, 6000.f, 0.f, 0.f, false, 0.f, 0.f};
+  return {720.f, Curve::Soft, 0.12f, 10.f, 2000.f, 6000.f, 0.f, 0.f, false, 0.f, 0.f};
 }
 
 // NaN-proof clamp for unipolar control inputs.

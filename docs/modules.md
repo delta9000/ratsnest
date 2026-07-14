@@ -551,7 +551,8 @@ Config `seed`: equal seeds repeat plucks exactly. Reaches ~5.9 Hz at 48 kHz.
 `overdrive { model: tubescreamer }` — voiced guitar overdrive/distortion.
 A pre-emphasis filter → anti-aliased waveshaper → tone stack, with a clean⇄
 shaped blend. Inputs `in` 0 (mono), `drive` 0.5 (pre-gain into the curve, up to
-~2^11× on `rat`), `tone` 0.5 (sweeps the tone lowpass), `level` 0.5 (±2-octave
+~2^14× on `rat`; ranges run hot so the sustain keeps grinding, not just the
+attack), `tone` 0.5 (sweeps the tone lowpass), `level` 0.5 (±2-octave
 makeup), `mix` 1 (dry/wet; lower it for the transparent "clean blend" of the
 `tubescreamer`/`klon` voicings — ~0.5). Output `out`. Config `model`:
 `tubescreamer` (default, mid-hump soft clip), `klon` (transparent, more

@@ -127,14 +127,17 @@ the resonator plan did). `drive_span` in octaves of pre-gain across `drive`
 setting, not a code default — see §2). Mid-scoop tones are a peaking-EQ cut in
 the tone stack.
 
+Drive ranges run hot (drive 0.5 → 2^(span/2)×) so a decaying source keeps
+grinding on the sustain, not only the attack transient.
+
 | model | pre-emphasis | curve | asym `b` | drive_span | rec. mix | tone lo→hi |
 |---|---|---|---|---|---|---|
-| `tubescreamer` | HP ~720 Hz | soft | 0.1 | 6 | 0.5 | 2 k → 6 kHz LP |
-| `klon` | HP ~340 Hz | soft (×0.5 thresh, more headroom) | 0.05 | 6 | 0.5 | 3 k → 8 kHz LP |
-| `rat` | HP ~90 Hz | hard | 0.0 | 11 | 1.0 | 500 → 6 kHz LP + slew one-pole |
-| `ds1` | BP boost (HP 1.1 k) | soft | 0.15 | 8 | 1.0 | mid-scoop (HP 320 / LP 3 k) |
-| `mxr` | HP ~160 Hz | soft | 0.1 | 7 | 1.0 | 5 k → 16 kHz LP |
-| `muff` | HP ~120 Hz | soft ×2 stages, ~1.2 kHz inter-stage LP | 0.0 | 9 | 1.0 | mid-scoop |
+| `tubescreamer` | HP ~720 Hz | soft | 0.12 | 10 | 0.5 | 2 k → 6 kHz LP |
+| `klon` | HP ~340 Hz | soft (×0.5 thresh, more headroom) | 0.05 | 9 | 0.5 | 3 k → 8 kHz LP |
+| `rat` | HP ~90 Hz | hard | 0.05 | 14 | 1.0 | 500 → 6 kHz LP + slew one-pole |
+| `ds1` | BP boost (HP 1.1 k) | soft | 0.15 | 12 | 1.0 | mid-scoop (HP 320 / LP 3 k) |
+| `mxr` | HP ~160 Hz | soft | 0.12 | 11 | 1.0 | 5 k → 16 kHz LP |
+| `muff` | HP ~120 Hz | soft ×2 stages, ~1.2 kHz inter-stage LP | 0.0 | 13 | 1.0 | mid-scoop |
 | `clean` | flat (bypass) | soft | 0.0 | 5 | 1.0 | 2 k → 12 kHz LP |
 
 `muff` is the only model with an internal variation: **two** soft-clip stages
