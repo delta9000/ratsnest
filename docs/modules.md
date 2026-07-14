@@ -88,7 +88,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `dcblock`, `delay`, `reverb`, `scope`, `stereo`, `out` |
+| Effects/I/O | `compressor`, `dcblock`, `delay`, `reverb`, `scope`, `stereo`, `out` |
 
 ## `vca`
 
@@ -349,6 +349,23 @@ outputs `out_l`, `out_r`, `mid`, `side`, `corr`. A stereo field utility.
 *   `mid` / `side`: Outputs the mid and side components of the balanced output signal.
 *   `corr`: Output. Real-time stereo correlation value between `-1.0` (fully out
     of phase) and `1.0` (identical in phase), accumulated using a 300 ms exponential window.
+
+## `compressor`
+
+`compressor { sidechain: internal }` — inputs `in_l` 0, `in_r` 0, `side_l` 0,
+`side_r` 0, `threshold` -18, `ratio` 4, `knee` 6, `attack` 0.01, `release` 0.1,
+`makeup` 0, `mix` 1; outputs `out_l`, `out_r`, `gain`, `gr`. A stereo-linked,
+feed-forward log-domain compressor.
+*   `sidechain`: Config. Can be `internal` (uses audio inputs `in_l`/`in_r` as the detector level)
+    or `external` (uses sidechain inputs `side_l`/`side_r`).
+*   `threshold` (clamped `-120..0`, default -18): Target threshold in dBFS.
+*   `ratio` (clamped `1..1000`, default 4): Compression ratio.
+*   `knee` (clamped `0..40`, default 6): Soft-knee width in dB. `0` = hard knee.
+*   `attack` / `release` (clamped `0.0001..10`, default 0.01 / 0.1): Time constants in seconds.
+*   `makeup` (clamped `-40..40`, default 0): Output gain makeup in dB.
+*   `mix` (clamped `0..1`, default 1): Equal-power dry/wet crossfade mix.
+*   `gain`: Output. Linear gain reduction factor (excluding makeup).
+*   `gr`: Output. Current gain reduction in positive dB.
 
 ## Recipes
 

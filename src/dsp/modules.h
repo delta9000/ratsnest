@@ -36,4 +36,5 @@ extern const ModuleInfo alloc_info;
 extern const ModuleInfo midi_info;
 extern const ModuleInfo dcblock_info;
 extern const ModuleInfo stereo_info;
+extern const ModuleInfo compressor_info;
 }  // namespace ms::dsp

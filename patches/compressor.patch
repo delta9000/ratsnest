@@ -1,0 +1,48 @@
+# compressor demo -- Sidechain ducking a pad with a kick drum
+#
+# A kick drum (VCO pitch sweep + LPG strike) is fed into the sidechain input
+# of a compressor in external mode, ducking a stereo triangle pad.
+
+# 1. Kick Drum Generator
+kick_trig = clock { bpm: 120 }
+kick_env  = func { rise: 0.005s, fall: 0.12s }
+kick_trig -> kick_env.trig
+
+kick_osc = vco { wave: sine }
+# Sweep frequency from 150Hz downwards
+150.0    -> kick_osc.freq
+kick_env -> kick_osc.v_oct : -2.0
+
+kick_amp = lpg { damp: 0.1, decay: 0.15 }
+kick_osc  -> kick_amp.in
+kick_trig -> kick_amp.strike
+
+# 2. Pad Generator
+pad_osc1 = vco { freq: 110hz, wave: tri }
+pad_osc2 = vco { freq: 110.5hz, wave: tri }
+pad_mix  = mix { levels: [0.5, 0.5] }
+pad_osc1 -> pad_mix.in1
+pad_osc2 -> pad_mix.in2
+
+# 3. Sidechain Compressor
+duck = compressor {
+  sidechain: external,
+  threshold: -24.0,
+  ratio: 8.0,
+  knee: 4.0,
+  attack: 0.005s,
+  release: 0.12s,
+  makeup: 0.0
+}
+pad_mix.out_l -> duck.in_l
+pad_mix.out_r -> duck.in_r
+kick_amp      -> duck.side_l
+kick_amp      -> duck.side_r
+
+# 4. Final Output Mix
+final = mix { levels: [0.6, 0.5] }
+kick_amp   -> final.in1
+duck.out_l -> final.in2
+
+final.out_l -> out.left
+final.out_r -> out.right

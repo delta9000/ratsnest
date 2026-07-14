@@ -659,4 +659,11 @@ TEST_CASE("stereo migrates states and smoothed parameters") {
   check_continuity("stereo", ins, 1000);
 }
 
+TEST_CASE("compressor migrates gain reduction state") {
+  // compressor inputs: in_l, in_r, side_l, side_r, threshold, ratio, knee, attack, release, makeup, mix
+  const float ins[11] = {0.9f, 0.4f, 0.0f, 0.0f, -12.0f, 4.0f, 4.0f, 0.01f, 0.1f, 0.0f, 1.0f};
+  check_continuity("compressor", ins, 1000);
+}
+
+
 
