@@ -1,183 +1,488 @@
-# sausage patch -- Generative techno-groove with a high-end 5-stage mastering chain
+# sausage -- an arranged progressive house song, 120 BPM, F major / A minor, ~4:16.
+#
+# This song is arranged using an 8-lane tracker-style arrangement grid
+# clocked once per four bars (8.0 seconds per block at 120 BPM):
+#
+#   block  0  0:00  intro -- chords pad and sub-bass enter softly
+#   block  4  0:32  rhythmic plucks and rolling hi-hats fade in
+#   block  6  0:48  white noise riser begins to sweep up
+#   block  8  1:04  DROP 1 -- kick slams in, lead melody takes off
+#   block 16  2:08  breakdown -- kick/bass/hats cut; reverb sweeps to saturation
+#   block 18  2:24  long riser builds energy
+#   block 20  2:40  DROP 2 -- full climax (all elements active)
+#   block 28  3:44  outro -- lead and kick cut, pads/bass fade out
+#   block 31  4:08  fade to silence
 #
 # Master clock at 480 BPM (16th notes at 120 BPM)
 main_clk = clock { bpm: 480 }
 
-# ----------------- 1. Kick Drum (Quarter Notes) -----------------
+# 60s slow evolving LFO (1/60 Hz = 0.0167 Hz)
+slow_lfo = lfo { wave: tri, freq: 0.0167hz }
+
+# ----------------- 1. Clock Dividers & Arrangement Grid -----------------
+bar_clk = div { by: 16 }
+main_clk -> bar_clk
+
+four_bar = div { by: 4 }
+bar_clk -> four_bar
+
+# Tracker-style arrangement lanes (32 blocks of 4 bars each, 8 seconds per block)
+arr_kick = stepseq { steps: [0,0,0,0, 0,0,0,0, 1,1,1,1, 1,1,1,1, 0,0,0,0, 1,1,1,1, 1,1,1,1, 0,0,0,0] }
+arr_bass = stepseq { steps: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 0,0,0,0, 1,1,1,1, 1,1,1,1, 1,1,0,0] }
+arr_hats = stepseq { steps: [0,0,0,0, 1,1,1,1, 1,1,1,1, 1,1,1,1, 0,0,0,0, 1,1,1,1, 1,1,1,1, 0,0,0,0] }
+arr_pluck = stepseq { steps: [0,0,0,0, 1,1,1,1, 1,1,1,1, 1,1,1,1, 0,0,0,0, 1,1,1,1, 1,1,1,1, 0,0,0,0] }
+arr_chord = stepseq { steps: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,0,0] }
+arr_lead = stepseq { steps: [0,0,0,0, 0,0,0,0, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 0,0,0,0] }
+arr_riser = stepseq { steps: [0,0,0,0, 0,0,1,1, 0,0,0,0, 0,0,0,0, 0,0,1,1, 0,0,0,0, 0,0,0,0, 0,0,0,0] }
+arr_main = stepseq { steps: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,0,0,0] }
+
+four_bar -> arr_kick.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_hats.clock
+four_bar -> arr_pluck.clock
+four_bar -> arr_chord.clock
+four_bar -> arr_lead.clock
+four_bar -> arr_riser.clock
+four_bar -> arr_main.clock
+
+# Slew limiters to turn steps into smooth volume fades/sweeps
+kick_lvl   = func { rise: 0.1, fall: 0.1 }
+bass_lvl   = func { rise: 2.0, fall: 2.0 }
+hats_lvl   = func { rise: 2.0, fall: 2.0 }
+pluck_lvl  = func { rise: 2.0, fall: 2.0 }
+chord_lvl  = func { rise: 3.0, fall: 3.0 }
+lead_lvl   = func { rise: 2.0, fall: 2.0 }
+riser_lvl  = func { rise: 8.0, fall: 1.0 } # slow build, instant release
+main_lvl   = func { rise: 1.0, fall: 8.0 } # slow final master fade-out
+
+arr_kick.cv   -> kick_lvl.in
+arr_bass.cv   -> bass_lvl.in
+arr_hats.cv   -> hats_lvl.in
+arr_pluck.cv  -> pluck_lvl.in
+arr_chord.cv  -> chord_lvl.in
+arr_lead.cv   -> lead_lvl.in
+arr_riser.cv  -> riser_lvl.in
+arr_main.cv   -> main_lvl.in
+
+# ----------------- 2. 8-Bar Chord Progression Sequencers -----------------
+# 8-bar progression: F major -> C major -> G major -> A minor -> F major -> C major -> G major -> E minor
+chord_seq = stepseq { steps: [0.4167, 0.3333, 0.1667, 0.3333, 0.4167, 0.3333, 0.1667, 0.3333] }
+bar_clk -> chord_seq.clock
+
+third_seq = stepseq { steps: [0.7500, 0.5833, 0.5833, 0.7500, 0.7500, 0.5833, 0.5833, 0.5833] }
+bar_clk -> third_seq.clock
+
+fifth_seq = stepseq { steps: [1.0000, 1.0000, 0.9167, 1.0000, 1.0000, 1.0000, 0.9167, 0.9167] }
+bar_clk -> fifth_seq.clock
+
+# Actual chord roots for bass alignment
+root_seq = stepseq { steps: [0.4167, 0.0000, 0.5833, 0.7500, 0.4167, 0.0000, 0.5833, 0.3333] }
+bar_clk -> root_seq.clock
+
+# ----------------- 3. Lead & Drum Sequencers -----------------
+# Syncopated 32-step lead melody (climbs to C5 in second bar)
+mel_seq = stepseq {
+  steps: [2.0, 2.3333, 2.5833, 2.3333, 2.1667, 1.9167, 2.1667, 1.9167,
+          2.0, 2.3333, 2.7500, 2.5833, 2.4167, 2.3333, 2.1667, 2.0000,
+          2.0, 2.3333, 2.5833, 2.3333, 2.1667, 1.9167, 2.1667, 1.9167,
+          2.0, 2.3333, 2.7500, 2.5833, 3.0000, 2.7500, 2.5833, 2.3333],
+  gates: [1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1,
+          1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1]
+}
+main_clk -> mel_seq.clock
+
+# Off-beat open hats
+o_hat_seq = stepseq {
+  gates: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]
+}
+main_clk -> o_hat_seq.clock
+
+# Rolling closed hats
+c_hat_seq = stepseq {
+  steps: [0.8, 1.0, 0.0, 0.7, 0.9, 1.0, 0.0, 0.8, 0.8, 1.0, 0.0, 0.7, 0.9, 1.0, 0.0, 0.8],
+  gates: [1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1]
+}
+main_clk -> c_hat_seq.clock
+
+# Rhythmic pluck chords gate (32-step velocity and gate pattern for variation)
+pluck_seq = stepseq {
+  steps: [0.9, 0.0, 0.0, 0.6, 0.0, 0.0, 0.8, 0.0, 0.9, 0.0, 0.0, 0.6, 0.0, 0.0, 0.7, 0.0,
+          0.9, 0.0, 0.0, 0.6, 0.0, 0.0, 0.8, 0.0, 0.5, 0.8, 0.0, 0.6, 0.0, 0.7, 0.0, 0.0],
+  gates: [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0,
+          1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0]
+}
+main_clk -> pluck_seq.clock
+
+# ----------------- 4. Kick Drum (Quarter Notes) -----------------
 kick_div = div { by: 4 }
 main_clk -> kick_div
 
-kick_env = func { rise: 0.003s, fall: 0.08s }
+kick_env = func { rise: 0.002s, fall: 0.10s }
 kick_div -> kick_env.trig
 
-kick_osc = vco { wave: sine }
-50.0 -> kick_osc.freq # C1 sub base
-kick_env -> kick_osc.v_oct : 2.5 # sweeps DOWN from 283Hz to 50Hz for punch
+kick_osc = vco { freq: 52, wave: sine }
+kick_env -> kick_osc.v_oct : 1.2 # sweeps down from 120Hz to 52Hz for punch
 
-kick_amp = lpg { decay: 0.12, damp: 0.1 }
+kick_amp = lpg { decay: 0.14, damp: 0.1 }
 kick_osc -> kick_amp.in
 kick_div -> kick_amp.strike
 
-# ----------------- 2. Hi-Hats (Off-beat 8th Notes) -----------------
-hat_div = div { by: 2 }
-main_clk -> hat_div
+# Gate the kick drum based on arrangement grid
+kick_vca = vca { gain: 0.0 }
+kick_amp -> kick_vca.in
+kick_lvl -> kick_vca.cv : 1.0
 
-hat_env = func { rise: 0.001s, fall: 0.03s } # very short decay
-hat_div -> hat_env.trig
-
+# ----------------- 5. Hi-Hat Group & White Noise Riser -----------------
 hat_noise = noise { color: white }
-hat_hp = svf { cutoff: 10000, res: 0.1 } # higher cutoff for clean air
-hat_noise -> hat_hp.in
 
-hat_amp = vca { gain: 0.0 }
-hat_hp.hp -> hat_amp.in
-hat_env  -> hat_amp.cv : 0.25 # lower level to sit back in the mix
+o_hat_env = func { rise: 0.001s, fall: 0.12s } # longer open decay
+o_hat_seq.gate -> o_hat_env.trig
+o_hat_hp = svf { cutoff: 8000, res: 0.2 }
+hat_noise -> o_hat_hp.in
+o_hat_amp = vca { gain: 0.0 }
+o_hat_hp.hp -> o_hat_amp.in
+o_hat_env -> o_hat_amp.cv : 0.3
 
-# ----------------- 3. Driving Bassline (8th Notes) -----------------
-bass_div = div { by: 2 }
-main_clk -> bass_div
+# Gate open hats by arrangement grid
+o_hat_gate = vca { gain: 0.0 }
+o_hat_amp -> o_hat_gate.in
+hats_lvl -> o_hat_gate.cv : 1.0
 
-turing_bass = turing { len: 8, prob: 0.25, seed: 13 }
-bass_div -> turing_bass.clock
+c_hat_env = func { rise: 0.001s, fall: 0.04s } # short closed decay
+c_hat_seq.gate -> c_hat_env.trig
+c_hat_hp = svf { cutoff: 10000, res: 0.1 }
+hat_noise -> c_hat_hp.in
+c_hat_amp = vca { gain: 0.0 }
+c_hat_hp.hp -> c_hat_amp.in
+c_hat_env -> c_hat_amp.cv : 0.15
+c_hat_seq -> c_hat_hp.cutoff : 1000.0 # velocity-cutoff sizzle
 
-bass_quant = quant { scale: [0, 7] } # Root and Fifth
-turing_bass.out -> bass_quant.in
+# Gate closed hats by arrangement grid
+c_hat_gate = vca { gain: 0.0 }
+c_hat_amp -> c_hat_gate.in
+hats_lvl -> c_hat_gate.cv : 1.0
 
-bass_osc = vco { wave: saw }
-bass_quant -> bass_osc.v_oct
-65.41 -> bass_osc.freq # C2 base
+# Rising noise sweep sweep (swept by arrangement CV riser_lvl)
+riser_hp = svf { cutoff: 200, res: 0.1 }
+hat_noise -> riser_hp.in
+riser_amp = vca { gain: 0.0 }
+riser_hp.hp -> riser_amp.in
+riser_lvl -> riser_hp.cutoff : 6000.0 # sweeps up to 6.2kHz
+riser_lvl -> riser_amp.cv : 0.25      # sweeps up volume
 
-bass_env = adsr { attack: 0.005s, decay: 0.1s, sustain: 0.1, release: 0.05s }
-bass_div -> bass_env.gate
+# Mix open hats, closed hats, and noise sweep riser into a stereo bus
+hat_mix = mix {
+  levels: [1.0, 1.0, 0.85],
+  pans: [-0.2, 0.2, 0.0]
+}
+o_hat_gate -> hat_mix.in1
+c_hat_gate -> hat_mix.in2
+riser_amp -> hat_mix.in3
 
-bass_vcf = ladder { cutoff: 150, res: 0.5, drive: 2.0 }
+# ----------------- 6. Bass Section (Mid-Bass + Sub-Bass) -----------------
+# Layer 1: Squelchy mid saw bass
+bass_osc = vco { freq: 55, wave: saw }
+root_seq.cv -> bass_osc.v_oct
+bass_env = adsr { attack: 0.005s, decay: 0.08s, sustain: 0.0, release: 0.05s }
+main_clk -> bass_env.gate
+bass_vcf = ladder { cutoff: 200, res: 0.4, drive: 2.0 }
 bass_osc -> bass_vcf.in
-bass_env -> bass_vcf.cutoff : 1800.0 # squelchy sweep
-
+bass_env -> bass_vcf.cutoff : 1000.0
 bass_amp = vca { gain: 0.0 }
 bass_vcf.out -> bass_amp.in
 bass_env -> bass_amp.cv : 1.0
 
-# ----------------- 4. Warm Stereo Pad Cushion -----------------
-# Root note C3 (130.81Hz) to anchor the harmony
-pad_osc1 = vco { freq: 130.81hz, wave: tri }
-pad_osc2 = vco { freq: 131.00hz, wave: tri }
+# Layer 2: Deep sine sub-bass (follows chord root)
+sub_bass_osc = vco { freq: 55, wave: sine }
+root_seq.cv -> sub_bass_osc.v_oct
+sub_bass_amp = vca { gain: 0.8 }
+sub_bass_osc -> sub_bass_amp.in
 
-pad_lfo = lfo { wave: sine, freq: 0.08hz }
-
-pad_vcf_l = svf { cutoff: 250, res: 0.1 } # low cutoff to avoid mid-range drone
-pad_vcf_r = svf { cutoff: 250, res: 0.1 }
-
-pad_osc1 -> pad_vcf_l.in
-pad_osc2 -> pad_vcf_r.in
-
-# Gentle opposite phase sweeps for wide, subtle stereo background warmth
-pad_lfo -> pad_vcf_l.cutoff : 80.0
-pad_lfo -> pad_vcf_r.cutoff : -80.0
-
-# ----------------- 5. Generative Melody (Warm lowpass plucks) -----------------
-mel_div = div { by: 3 }
-main_clk -> mel_div
-
-turing_mel = turing { len: 12, prob: 0.4, seed: 42 }
-mel_div -> turing_mel.clock
-
-mel_quant = quant { scale: [0, 2, 3, 5, 7, 8, 10] } # C minor scale
-turing_mel.out -> mel_quant.in
-
-mel_osc = vco { wave: tri }
-mel_quant -> mel_osc.v_oct
-130.81 -> mel_osc.freq # C3 base
-
-# SVF low-pass filter to dampen high frequencies of the plucks
-mel_vcf = svf { cutoff: 800.0, res: 0.1 }
-mel_osc -> mel_vcf.in
-
-mel_env = adsr { attack: 0.01s, decay: 0.15s, sustain: 0.0, release: 0.2s }
-mel_div -> mel_env.gate
-
-mel_vca = vca { gain: 0.0 }
-mel_vcf.lp -> mel_vca.in
-mel_env -> mel_vca.cv : 1.0
-
-mel_delay = delay { time: 0.375s, feedback: 0.5, mix: 0.4 } # syncopated dotted-8th
-mel_vca -> mel_delay.in
-
-# ----------------- 6. Sub-Mix & Sidechain -----------------
-# Mix hats, bassline, pad L/R, and melody delay into a stereo sub-group
-sub_mix = mix {
-  levels: [0.35, 0.65, 0.15, 0.15, 0.45], # balanced levels, pad lowered to 0.15
-  pans: [0.0, 0.0, -1.0, 1.0, 0.2]
+# Combine bass layers
+full_bass = mix {
+  levels: [0.65, 0.45],
+  pans: [0.0, 0.0]
 }
-hat_amp   -> sub_mix.in1
-bass_amp  -> sub_mix.in2
-pad_vcf_l.lp -> sub_mix.in3
-pad_vcf_r.lp -> sub_mix.in4
-mel_delay -> sub_mix.in5
+bass_amp     -> full_bass.in1
+sub_bass_amp -> full_bass.in2
 
-# Duck the entire stereo sub-mix using Kick LPG output as sidechain
+# Gate the full bass bus based on arrangement level
+master_bass_vca = vca { gain: 0.0 }
+full_bass.out_l -> master_bass_vca.in
+bass_lvl -> master_bass_vca.cv : 1.0
+
+# ----------------- 7. Rhythmic Plucked Chords -----------------
+pluck1 = vco { freq: 130.81hz, wave: saw }
+pluck2 = vco { freq: 130.81hz, wave: saw }
+pluck3 = vco { freq: 130.81hz, wave: saw }
+chord_seq.cv -> pluck1.v_oct
+third_seq.cv -> pluck2.v_oct
+fifth_seq.cv -> pluck3.v_oct
+
+pluck_mix = mix { levels: [0.35, 0.35, 0.35] }
+pluck1 -> pluck_mix.in1
+pluck2 -> pluck_mix.in2
+pluck3 -> pluck_mix.in3
+
+pluck_vcf = svf { cutoff: 1400, res: 0.3 }
+pluck_mix.out_l -> pluck_vcf.in
+chord_lfo -> pluck_vcf.cutoff : 600.0 # filter sweep plucks
+pluck_seq -> pluck_vcf.cutoff : 300.0
+slow_lfo -> pluck_vcf.cutoff : 300.0  # slow 60s evolution
+
+pluck_env = adsr { attack: 0.002s, decay: 0.14s, sustain: 0.0, release: 0.1s }
+pluck_seq.gate -> pluck_env.gate
+
+pluck_amp = vca { gain: 0.0 }
+pluck_vcf.lp -> pluck_amp.in
+pluck_env -> pluck_amp.cv : 0.4
+
+# Gate the plucks by arrangement level
+pluck_gate = vca { gain: 0.0 }
+pluck_amp -> pluck_gate.in
+pluck_lvl -> pluck_gate.cv : 1.0
+
+# ----------------- 8. Massive 12-Oscillator Supersaw Chords -----------------
+# Grace note generator (Bernoulli random trigger + snappy glide envelope)
+grace_trig = bern { prob: 0.12, seed: 90210 }
+main_clk -> grace_trig.gate
+grace_env = func { rise: 0.002s, fall: 0.04s }
+grace_trig.a -> grace_env.trig
+
+# Voice 1: Root
+saw1_al = vco { freq: 130.81hz, wave: saw }
+saw1_bl = vco { freq: 130.60hz, wave: saw }
+saw1_ar = vco { freq: 131.02hz, wave: saw }
+saw1_br = vco { freq: 131.25hz, wave: saw }
+chord_seq.cv -> saw1_al.v_oct
+chord_seq.cv -> saw1_bl.v_oct
+chord_seq.cv -> saw1_ar.v_oct
+chord_seq.cv -> saw1_br.v_oct
+# Apply random grace notes (+2 semitones = 0.1667 V)
+grace_env -> saw1_al.v_oct : 0.1667
+grace_env -> saw1_bl.v_oct : 0.1667
+grace_env -> saw1_ar.v_oct : 0.1667
+grace_env -> saw1_br.v_oct : 0.1667
+
+# Voice 2: Third
+saw2_al = vco { freq: 130.81hz, wave: saw }
+saw2_bl = vco { freq: 130.60hz, wave: saw }
+saw2_ar = vco { freq: 131.02hz, wave: saw }
+saw2_br = vco { freq: 131.25hz, wave: saw }
+third_seq.cv -> saw2_al.v_oct
+third_seq.cv -> saw2_bl.v_oct
+third_seq.cv -> saw2_ar.v_oct
+third_seq.cv -> saw2_br.v_oct
+# Apply random grace notes (+2 semitones = 0.1667 V)
+grace_env -> saw2_al.v_oct : 0.1667
+grace_env -> saw2_bl.v_oct : 0.1667
+grace_env -> saw2_ar.v_oct : 0.1667
+grace_env -> saw2_br.v_oct : 0.1667
+
+# Voice 3: Fifth
+saw3_al = vco { freq: 130.81hz, wave: saw }
+saw3_bl = vco { freq: 130.60hz, wave: saw }
+saw3_ar = vco { freq: 131.02hz, wave: saw }
+saw3_br = vco { freq: 131.25hz, wave: saw }
+fifth_seq.cv -> saw3_al.v_oct
+fifth_seq.cv -> saw3_bl.v_oct
+fifth_seq.cv -> saw3_ar.v_oct
+fifth_seq.cv -> saw3_br.v_oct
+
+# Left & Right Chord Mixers (including Pluck layer mixed in for extra punch)
+chord_mix_l = mix { levels: [0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20] }
+saw1_al -> chord_mix_l.in1
+saw1_bl -> chord_mix_l.in2
+saw2_al -> chord_mix_l.in3
+saw2_bl -> chord_mix_l.in4
+saw3_al -> chord_mix_l.in5
+saw3_bl -> chord_mix_l.in6
+pluck_gate -> chord_mix_l.in7
+
+chord_mix_r = mix { levels: [0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20] }
+saw1_ar -> chord_mix_r.in1
+saw1_br -> chord_mix_r.in2
+saw2_ar -> chord_mix_r.in3
+saw2_br -> chord_mix_r.in4
+saw3_ar -> chord_mix_r.in5
+saw3_br -> chord_mix_r.in6
+pluck_gate -> chord_mix_r.in7
+
+# Chord Filters & slow sweep LFO
+chord_lfo = lfo { wave: tri, freq: 0.20hz }
+
+chord_vcf_l = svf { cutoff: 1600, res: 0.2 }
+chord_vcf_r = svf { cutoff: 1600, res: 0.2 }
+chord_mix_l.out_l -> chord_vcf_l.in
+chord_mix_r.out_l -> chord_vcf_r.in
+chord_lfo -> chord_vcf_l.cutoff : 1000.0
+chord_lfo -> chord_vcf_r.cutoff : 1000.0
+slow_lfo -> chord_vcf_l.cutoff : 500.0  # slow 60s evolution
+slow_lfo -> chord_vcf_r.cutoff : 500.0
+
+# Gate chords by arrangement level
+chord_gate_l = vca { gain: 0.0 }
+chord_gate_r = vca { gain: 0.0 }
+chord_vcf_l.lp -> chord_gate_l.in
+chord_vcf_r.lp -> chord_gate_r.in
+chord_lvl -> chord_gate_l.cv : 1.0
+chord_lvl -> chord_gate_r.cv : 1.0
+
+# ----------------- 9. True Stereo Supersaw Lead -----------------
+lead_al = vco { freq: 130.81hz, wave: saw }
+lead_bl = vco { freq: 130.60hz, wave: saw }
+lead_ar = vco { freq: 131.02hz, wave: saw }
+lead_br = vco { freq: 131.25hz, wave: saw }
+mel_seq.cv -> lead_al.v_oct
+mel_seq.cv -> lead_bl.v_oct
+mel_seq.cv -> lead_ar.v_oct
+mel_seq.cv -> lead_br.v_oct
+
+lead_mix_l = mix { levels: [0.35, 0.35] }
+lead_al -> lead_mix_l.in1
+lead_bl -> lead_mix_l.in2
+
+lead_mix_r = mix { levels: [0.35, 0.35] }
+lead_ar -> lead_mix_r.in1
+lead_br -> lead_mix_r.in2
+
+# Lead filters & LFO
+lead_lfo = lfo { wave: sine, freq: 0.35hz }
+lead_vcf_l = ladder { cutoff: 2600, res: 0.25 }
+lead_vcf_r = ladder { cutoff: 2600, res: 0.25 }
+lead_mix_l.out_l -> lead_vcf_l.in
+lead_mix_r.out_l -> lead_vcf_r.in
+lead_lfo -> lead_vcf_l.cutoff : 800.0
+lead_lfo -> lead_vcf_r.cutoff : 800.0
+
+# Lead VCAs
+lead_env = adsr { attack: 0.005s, decay: 0.12s, sustain: 0.3, release: 0.15s }
+mel_seq.gate -> lead_env.gate
+
+lead_amp_l = vca { gain: 0.0 }
+lead_amp_r = vca { gain: 0.0 }
+lead_vcf_l.out -> lead_amp_l.in
+lead_vcf_r.out -> lead_amp_r.in
+lead_env -> lead_amp_l.cv : 1.0
+lead_env -> lead_amp_r.cv : 1.0
+
+# Delay & Reverb
+lead_delay_l = delay { time: 0.375s, feedback: 0.45, mix: 0.3 }
+lead_delay_r = delay { time: 0.375s, feedback: 0.45, mix: 0.3 }
+lead_amp_l -> lead_delay_l.in
+lead_amp_r -> lead_delay_r.in
+
+lead_reverb = reverb { decay: 0.65, damp: 0.2, mix: 0.25 }
+lead_delay_l -> lead_reverb.in_l
+lead_delay_r -> lead_reverb.in_r
+slow_lfo -> lead_reverb.decay : 0.15     # slow 60s evolution
+
+# Inject a tiny bit of white noise directly into the reverb input to sit on the long tail
+hat_noise -> lead_reverb.in_l : 0.015
+hat_noise -> lead_reverb.in_r : 0.015
+
+# Reverb saturation clipper driven by LFO
+rev_clip = clipper { mode: soft, threshold: -6.0, mix: 1.0 }
+lead_reverb.out_l -> rev_clip.in_l
+lead_reverb.out_r -> rev_clip.in_r
+
+# LFO sweeps reverb drive from 0dB to 12dB (to saturation)
+rev_clip_lfo = lfo { wave: sine, freq: 0.25hz }
+6.0 -> rev_clip.drive
+rev_clip_lfo -> rev_clip.drive : 6.0
+
+# Gate lead by arrangement level
+lead_gate_l = vca { gain: 0.0 }
+lead_gate_r = vca { gain: 0.0 }
+rev_clip.out_l -> lead_gate_l.in
+rev_clip.out_r -> lead_gate_r.in
+lead_lvl -> lead_gate_l.cv : 1.0
+lead_lvl -> lead_gate_r.cv : 1.0
+
+# ----------------- 10. Sub-Mix & Sidechain Compression -----------------
+# 7-channel stereo sub-mix (lead boosted to 0.90)
+sub_mix = mix {
+  levels: [0.40, 0.40, 0.75, 0.55, 0.55, 0.90, 0.90],
+  pans: [-0.15, 0.15, 0.0, -1.0, 1.0, -0.3, 0.3]
+}
+hat_mix.out_l      -> sub_mix.in1
+hat_mix.out_r      -> sub_mix.in2
+master_bass_vca.out -> sub_mix.in3
+chord_gate_l.out   -> sub_mix.in4
+chord_gate_r.out   -> sub_mix.in5
+lead_gate_l.out    -> sub_mix.in6
+lead_gate_r.out    -> sub_mix.in7
+
+# Duck the entire stereo sub-mix using gated Kick LPG output as sidechain
 sub_comp = compressor {
   sidechain: external,
-  threshold: -20.0,
+  threshold: -22.0,
   ratio: 6.0,
   knee: 4.0,
   attack: 0.005s,
-  release: 0.12s
+  release: 0.10s
 }
 sub_mix.out_l -> sub_comp.in_l
 sub_mix.out_r -> sub_comp.in_r
-kick_amp      -> sub_comp.side_l
-kick_amp      -> sub_comp.side_r
+kick_vca.out  -> sub_comp.side_l
+kick_vca.out  -> sub_comp.side_r
 
-# ----------------- 7. Master Stereo Sum -----------------
-# Combine dry Kick Drum and ducked stereo Sub-Mix
+# ----------------- 11. Master Stereo Sum -----------------
 master_mix = mix {
   levels: [0.8, 1.0, 1.0],
   pans: [0.0, -1.0, 1.0]
 }
-kick_amp       -> master_mix.in1
+kick_vca.out   -> master_mix.in1
 sub_comp.out_l -> master_mix.in2
 sub_comp.out_r -> master_mix.in3
 
-# ----------------- 8. High-End 5-Stage Mastering Chain -----------------
+# ----------------- 12. High-End 5-Stage Mastering Chain -----------------
 
-# Stage 1: DC Blocker (removes low-end offset from oscillators/LPG)
+# Stage 1: DC Blocker
 master_dc = dcblock {}
 master_mix.out_l -> master_dc.in_l
 master_mix.out_r -> master_dc.in_r
 
-# Stage 2: 5-Band Parametric EQ (tightens sub-bass, scoops mud, boosts air sheen)
+# Stage 2: 5-Band Parametric EQ
 master_eq = eq {
-  hp_freq: 25.0,      # Cut sub mud
+  hp_freq: 25.0,
   low_freq: 120.0,
-  low_gain: 2.0,      # Warm low boost
+  low_gain: 2.0,
   mid1_freq: 400.0,
-  mid1_gain: -1.5,    # Clean boxy mid-clutter
+  mid1_gain: -1.5,
   mid1_q: 1.0,
   mid2_freq: 3200.0,
-  mid2_gain: 1.0,     # Presence lift
+  mid2_gain: 1.0,
   mid2_q: 0.8,
   high_freq: 12000.0,
-  high_gain: 2.5      # Air treble boost
+  high_gain: 2.5
 }
 master_dc.out_l -> master_eq.in_l
 master_dc.out_r -> master_eq.in_r
 
-# Stage 3: Stereo Width Utility (widens stereo image)
+# Stage 3: Stereo Width Utility
 master_width = stereo { width: 1.35, balance: 0.0 }
 master_eq.out_l -> master_width.in_l
 master_eq.out_r -> master_width.in_r
 
-# Stage 4: 4x Oversampled Clipper (soft saturation for warmth and glue)
+# Stage 4: 4x Oversampled Clipper
 master_clip = clipper { mode: soft, threshold: -2.0, drive: 4.0, mix: 0.6 }
 master_width.out_l -> master_clip.in_l
 master_width.out_r -> master_clip.in_r
 
-# Stage 5: Lookahead Limiter (maximizes final output level to -0.2 dBFS ceiling)
+# Stage 5: Lookahead Limiter
 master_limit = limiter { threshold: -0.2, release: 0.06 }
 master_clip.out_l -> master_limit.in_l
 master_clip.out_r -> master_limit.in_r
 
+# Master Fade Out
+master_fade_l = vca { gain: 0.0 }
+master_fade_r = vca { gain: 0.0 }
+master_limit.out_l -> master_fade_l.in
+master_limit.out_r -> master_fade_r.in
+main_lvl -> master_fade_l.cv : 1.0
+main_lvl -> master_fade_r.cv : 1.0
+
 # Connect final outputs
-master_limit.out_l -> out.left
-master_limit.out_r -> out.right
+master_fade_l.out -> out.left
+master_fade_r.out -> out.right
