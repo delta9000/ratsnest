@@ -86,7 +86,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 |---|---|
 | Sources | `vco`, `lfo`, `noise`, `random` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
-| Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
+| Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
 | Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `limiter`, `reverb`, `scope`, `stereo`, `out` |
 
@@ -405,6 +405,26 @@ A stereo-linked peak limiter with a fixed 2.0 ms lookahead.
 *   `gr`: Output. Current gain reduction in positive dB.
 
 Guarantees a true hard ceiling at the target threshold by looking ahead 2.0 ms (96 samples at 48 kHz) to detect peak amplitude, applying a fast 0.1 ms attack curve before the peak arrives.
+
+## `follow`
+
+`follow { mode: peak }` — envelope follower / audio→CV bridge. Inputs `in` 0,
+`attack` 0.01 s, `release` 0.1 s, `thresh` 0.1; outputs unipolar `env` and
+`gate`. It rectifies `in` (peak: `|in|`; rms: `in²`), smooths it with an
+asymmetric one-pole attack/release detector, and emits the linear amplitude as
+`env` (`≥ 0`, `0..1` for input within ±1, unclamped above — a hot signal reads
+honestly). `gate` rises when `env` exceeds `thresh` and falls at `0.75 · thresh`
+(fixed hysteresis, so it does not chatter near the threshold). Config `mode`:
+`peak` (transient-reactive, for ducking off a kick) or `rms` (energy/loudness,
+for following a sustained part). No sensitivity knob — scale a weak source at
+the cable. Example — audio-derived sidechain duck:
+
+```text
+f = follow { mode: peak, attack: 5ms, release: 120ms }
+kick -> f.in
+pad  -> m.in2
+f.env -> m.lvl2 : -0.4
+```
 
 ## Recipes
 
