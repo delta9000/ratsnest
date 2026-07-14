@@ -8,7 +8,7 @@ const ModuleInfo* const kRegistry[] = {
     &sh_info, &ladder_info, &lpg_info, &random_info, &quant_info, &mix_info,
     &scope_info, &delay_info, &adsr_info, &reverb_info, &euclid_info,
     &bern_info, &logic_info, &switch_info, &turing_info, &stepseq_info,
-    &tempo_info, &alloc_info, &midi_info, &dcblock_info, &stereo_info, &compressor_info, &eq_info, &clipper_info, &limiter_info, &follow_info, &sampler_info};
+    &tempo_info, &alloc_info, &midi_info, &dcblock_info, &stereo_info, &compressor_info, &eq_info, &clipper_info, &limiter_info, &follow_info, &sampler_info, &rec_info};
 }
 
 const ModuleInfo* find_module(std::string_view type) {

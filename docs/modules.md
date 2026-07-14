@@ -447,6 +447,25 @@ clk -> s.trig
 s.out -> amp.in
 ```
 
+## `rec`
+
+`rec { file: "take.wav", secs: 30 }` — records a signal to a WAV file. Inputs
+`in_l` 0, `in_r` 0, `gate` 1; no outputs (a sink, like `scope`). While `gate`
+is high it captures the stereo input into a preallocated buffer (`secs` seconds,
+clamped `1..600`), and writes a 32-bit float stereo WAV to `file` when the graph
+is torn down (session end or hot reload). With `gate` unpatched it records
+continuously until the cap. For an offline `render`, this drops one clean take
+alongside the main mix. Editing the patch while recording restarts the take
+(the buffer is not migrated across reload — the outgoing take is written, the
+new one overwrites on teardown). The `file:` string must be quoted; paths are
+working-directory-relative.
+
+```text
+r = rec { file: "take.wav", secs: 20 }
+mix.out_l -> r.in_l
+mix.out_r -> r.in_r
+```
+
 ## Recipes
 
 ### Euclidean variation
