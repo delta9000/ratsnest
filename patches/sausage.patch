@@ -1,0 +1,178 @@
+# sausage patch -- Generative techno-groove with a high-end 5-stage mastering chain
+#
+# Master clock at 480 BPM (16th notes at 120 BPM)
+main_clk = clock { bpm: 480 }
+
+# ----------------- 1. Kick Drum (Quarter Notes) -----------------
+kick_div = div { by: 4 }
+main_clk -> kick_div
+
+kick_env = func { rise: 0.003s, fall: 0.12s }
+kick_div -> kick_env.trig
+
+kick_osc = vco { wave: sine }
+120.0 -> kick_osc.freq
+kick_env -> kick_osc.v_oct : -2.2 # fast pitch sweep down
+
+kick_amp = lpg { decay: 0.15, damp: 0.2 }
+kick_osc -> kick_amp.in
+kick_div -> kick_amp.strike
+
+# ----------------- 2. Hi-Hats (Off-beat 8th Notes) -----------------
+hat_div = div { by: 2 }
+main_clk -> hat_div
+
+hat_env = func { rise: 0.001s, fall: 0.04s }
+hat_div -> hat_env.trig
+
+hat_noise = noise { color: white }
+hat_hp = svf { cutoff: 8500, res: 0.2 }
+hat_noise -> hat_hp.in
+
+hat_amp = vca { gain: 0.0 }
+hat_hp.hp -> hat_amp.in
+hat_env  -> hat_amp.cv : 0.6
+
+# ----------------- 3. Driving Bassline (8th Notes) -----------------
+bass_div = div { by: 2 }
+main_clk -> bass_div
+
+turing_bass = turing { len: 8, prob: 0.25, seed: 13 }
+bass_div -> turing_bass.clock
+
+bass_quant = quant { scale: [0, 7] } # Root and Fifth
+turing_bass.out -> bass_quant.in
+
+bass_osc = vco { wave: saw }
+bass_quant -> bass_osc.v_oct
+65.41 -> bass_osc.freq # C2 base
+
+bass_env = adsr { attack: 0.005s, decay: 0.1s, sustain: 0.1, release: 0.05s }
+bass_div -> bass_env.gate
+
+bass_vcf = ladder { cutoff: 300, res: 0.4, drive: 1.5 }
+bass_osc -> bass_vcf.in
+bass_env -> bass_vcf.cutoff : 2.0
+
+bass_amp = vca { gain: 0.0 }
+bass_vcf.out -> bass_amp.in
+bass_env -> bass_amp.cv : 1.0
+
+# ----------------- 4. Detuned Stereo Pad -----------------
+pad_osc1 = vco { freq: 196.00hz, wave: tri } # G3
+pad_osc2 = vco { freq: 196.40hz, wave: tri }
+
+pad_lfo = lfo { wave: sine, freq: 0.08hz }
+
+pad_vcf_l = svf { cutoff: 800, res: 0.3 }
+pad_vcf_r = svf { cutoff: 800, res: 0.3 }
+
+pad_osc1 -> pad_vcf_l.in
+pad_osc2 -> pad_vcf_r.in
+
+# Slow opposite phase sweeps for wide stereo pad movement
+pad_lfo -> pad_vcf_l.cutoff : 400.0
+pad_lfo -> pad_vcf_r.cutoff : -400.0
+
+# ----------------- 5. Generative Melody (Dotted-8th Polyrhythm) -----------------
+mel_div = div { by: 3 }
+main_clk -> mel_div
+
+turing_mel = turing { len: 12, prob: 0.4, seed: 42 }
+mel_div -> turing_mel.clock
+
+mel_quant = quant { scale: [0, 2, 3, 5, 7, 8, 10] } # C minor scale
+turing_mel.out -> mel_quant.in
+
+mel_osc = vco { wave: tri }
+mel_quant -> mel_osc.v_oct
+130.81 -> mel_osc.freq # C3
+
+mel_env = adsr { attack: 0.01s, decay: 0.15s, sustain: 0.0, release: 0.2s }
+mel_div -> mel_env.gate
+
+mel_vca = vca { gain: 0.0 }
+mel_osc -> mel_vca.in
+mel_env -> mel_vca.cv : 1.0
+
+mel_delay = delay { time: 0.375s, feedback: 0.5, mix: 0.4 } # syncopated dotted-8th
+mel_vca -> mel_delay.in
+
+# ----------------- 6. Sub-Mix & Sidechain -----------------
+# Mix hats, bassline, pad L/R, and melody delay into a stereo sub-group
+sub_mix = mix {
+  levels: [0.6, 0.6, 0.5, 0.5, 0.4],
+  pans: [0.0, 0.0, -1.0, 1.0, 0.3]
+}
+hat_amp   -> sub_mix.in1
+bass_amp  -> sub_mix.in2
+pad_vcf_l.lp -> sub_mix.in3
+pad_vcf_r.lp -> sub_mix.in4
+mel_delay -> sub_mix.in5
+
+# Duck the entire stereo sub-mix using Kick LPG output as sidechain
+sub_comp = compressor {
+  sidechain: external,
+  threshold: -20.0,
+  ratio: 6.0,
+  knee: 4.0,
+  attack: 0.005s,
+  release: 0.12s
+}
+sub_mix.out_l -> sub_comp.in_l
+sub_mix.out_r -> sub_comp.in_r
+kick_amp      -> sub_comp.side_l
+kick_amp      -> sub_comp.side_r
+
+# ----------------- 7. Master Stereo Sum -----------------
+# Combine dry Kick Drum and ducked stereo Sub-Mix
+master_mix = mix {
+  levels: [0.8, 1.0, 1.0],
+  pans: [0.0, -1.0, 1.0]
+}
+kick_amp       -> master_mix.in1
+sub_comp.out_l -> master_mix.in2
+sub_comp.out_r -> master_mix.in3
+
+# ----------------- 8. High-End 5-Stage Mastering Chain -----------------
+
+# Stage 1: DC Blocker (removes low-end offset from oscillators/LPG)
+master_dc = dcblock {}
+master_mix.out_l -> master_dc.in_l
+master_mix.out_r -> master_dc.in_r
+
+# Stage 2: 5-Band Parametric EQ (tightens sub-bass, scoops mud, boosts air sheen)
+master_eq = eq {
+  hp_freq: 25.0,      # Cut sub mud
+  low_freq: 120.0,
+  low_gain: 2.0,      # Warm low boost
+  mid1_freq: 400.0,
+  mid1_gain: -1.5,    # Clean boxy mid-clutter
+  mid1_q: 1.0,
+  mid2_freq: 3200.0,
+  mid2_gain: 1.0,     # Presence lift
+  mid2_q: 0.8,
+  high_freq: 12000.0,
+  high_gain: 2.5      # Air treble boost
+}
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+# Stage 3: Stereo Image Utility (widens stereo image)
+master_width = stereo { width: 1.35, balance: 0.0 }
+master_eq.out_l -> master_width.in_l
+master_eq.out_r -> master_width.in_r
+
+# Stage 4: 4x Oversampled Clipper (soft saturation for warmth and glue)
+master_clip = clipper { mode: soft, threshold: -2.0, drive: 4.0, mix: 0.6 }
+master_width.out_l -> master_clip.in_l
+master_width.out_r -> master_clip.in_r
+
+# Stage 5: Lookahead Limiter (maximizes final output level to -0.2 dBFS ceiling)
+master_limit = limiter { threshold: -0.2, release: 0.06 }
+master_clip.out_l -> master_limit.in_l
+master_clip.out_r -> master_limit.in_r
+
+# Connect final outputs
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
