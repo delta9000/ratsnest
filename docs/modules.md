@@ -88,7 +88,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `dcblock`, `delay`, `reverb`, `scope`, `out` |
+| Effects/I/O | `dcblock`, `delay`, `reverb`, `scope`, `stereo`, `out` |
 
 ## `vca`
 
@@ -335,6 +335,20 @@ rule (`alloc`/`midi` expose only banks so `poly.voct` can resolve to
 cutoff frequency (clamped `1..40` Hz, smoothed around 20 ms). Protects speakers
 and downstream dynamics processors from sub-bass drift. Silence is exact, and
 all internal filter states migrate during hot reload.
+
+## `stereo`
+
+`stereo` — inputs `in_l` 0, `in_r` 0, `width` 1, `balance` 0, `mono` 0, `swap` 0;
+outputs `out_l`, `out_r`, `mid`, `side`, `corr`. A stereo field utility.
+*   `width` (clamped `0..2`, default 1): Adjusts Mid/Side width. `0` = mono, `1` = identity,
+    `2` = doubled side (and zero mid). Smoothed around 20 ms.
+*   `balance` (clamped `-1..1`, default 0): Equal-power balance panner. `-1` = hard left,
+    `1` = hard right, `0` = center (which attenuates each side by -3 dB). Smoothed around 20 ms.
+*   `mono` (default 0): Gate. If `>0.5`, sums outputs to mono. Level-sensed.
+*   `swap` (default 0): Gate. If `>0.5`, swaps left and right output channels. Level-sensed.
+*   `mid` / `side`: Outputs the mid and side components of the balanced output signal.
+*   `corr`: Output. Real-time stereo correlation value between `-1.0` (fully out
+    of phase) and `1.0` (identical in phase), accumulated using a 300 ms exponential window.
 
 ## Recipes
 

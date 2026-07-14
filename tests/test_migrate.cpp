@@ -12,7 +12,7 @@ static void check_continuity(const char* type, const float* ins, size_t warmup) 
   auto b = info->create();
   a->init(48000.0, {});
   b->init(48000.0, {});
-  float out_a[3] = {0, 0, 0}, out_b[3] = {0, 0, 0};
+  float out_a[16] = {}, out_b[16] = {};
   for (size_t i = 0; i < warmup; ++i) a->process(ins, out_a);
   b->copy_state_from(*a);
   for (int i = 0; i < 8; ++i) {
@@ -652,4 +652,11 @@ TEST_CASE("dcblock migrates state and smoothed cutoff") {
   const float ins[3] = {0.8f, -0.5f, 25.0f};
   check_continuity("dcblock", ins, 1000);
 }
+
+TEST_CASE("stereo migrates states and smoothed parameters") {
+  // stereo inputs: in_l, in_r, width, balance, mono, swap
+  const float ins[6] = {0.8f, -0.5f, 1.4f, -0.2f, 0.0f, 0.0f};
+  check_continuity("stereo", ins, 1000);
+}
+
 

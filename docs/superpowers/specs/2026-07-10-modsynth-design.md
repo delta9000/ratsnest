@@ -203,6 +203,7 @@ Drums need no module: trigger → `lpg.strike` (kick), `noise`+`svf.hp`+fast
 | Module | Role | Notes |
 |---|---|---|
 | `dcblock` | stereo DC blocker | first-order high-pass filter, parameter smoothing around 20 ms, denormal flushing |
+| `stereo` | stereo utility | normalized M/S width, equal-power balance, level-sensed mono/swap, 300 ms correlation meter |
 
 ### Explicitly out of scope (Phase 5+ candidates)
 
