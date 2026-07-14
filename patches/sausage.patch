@@ -7,14 +7,14 @@ main_clk = clock { bpm: 480 }
 kick_div = div { by: 4 }
 main_clk -> kick_div
 
-kick_env = func { rise: 0.003s, fall: 0.12s }
+kick_env = func { rise: 0.003s, fall: 0.08s }
 kick_div -> kick_env.trig
 
 kick_osc = vco { wave: sine }
-120.0 -> kick_osc.freq
-kick_env -> kick_osc.v_oct : -2.2 # fast pitch sweep down
+50.0 -> kick_osc.freq # C1 sub base
+kick_env -> kick_osc.v_oct : 2.5 # sweeps DOWN from 283Hz to 50Hz for punch
 
-kick_amp = lpg { decay: 0.15, damp: 0.2 }
+kick_amp = lpg { decay: 0.12, damp: 0.1 }
 kick_osc -> kick_amp.in
 kick_div -> kick_amp.strike
 
@@ -22,16 +22,16 @@ kick_div -> kick_amp.strike
 hat_div = div { by: 2 }
 main_clk -> hat_div
 
-hat_env = func { rise: 0.001s, fall: 0.04s }
+hat_env = func { rise: 0.001s, fall: 0.03s } # very short decay
 hat_div -> hat_env.trig
 
 hat_noise = noise { color: white }
-hat_hp = svf { cutoff: 8500, res: 0.2 }
+hat_hp = svf { cutoff: 10000, res: 0.1 } # higher cutoff for clean air
 hat_noise -> hat_hp.in
 
 hat_amp = vca { gain: 0.0 }
 hat_hp.hp -> hat_amp.in
-hat_env  -> hat_amp.cv : 0.6
+hat_env  -> hat_amp.cv : 0.25 # lower level to sit back in the mix
 
 # ----------------- 3. Driving Bassline (8th Notes) -----------------
 bass_div = div { by: 2 }
@@ -50,31 +50,32 @@ bass_quant -> bass_osc.v_oct
 bass_env = adsr { attack: 0.005s, decay: 0.1s, sustain: 0.1, release: 0.05s }
 bass_div -> bass_env.gate
 
-bass_vcf = ladder { cutoff: 300, res: 0.4, drive: 1.5 }
+bass_vcf = ladder { cutoff: 150, res: 0.5, drive: 2.0 }
 bass_osc -> bass_vcf.in
-bass_env -> bass_vcf.cutoff : 2.0
+bass_env -> bass_vcf.cutoff : 1800.0 # squelchy sweep
 
 bass_amp = vca { gain: 0.0 }
 bass_vcf.out -> bass_amp.in
 bass_env -> bass_amp.cv : 1.0
 
-# ----------------- 4. Detuned Stereo Pad -----------------
-pad_osc1 = vco { freq: 196.00hz, wave: tri } # G3
-pad_osc2 = vco { freq: 196.40hz, wave: tri }
+# ----------------- 4. Warm Stereo Pad Cushion -----------------
+# Root note C3 (130.81Hz) to anchor the harmony
+pad_osc1 = vco { freq: 130.81hz, wave: tri }
+pad_osc2 = vco { freq: 131.00hz, wave: tri }
 
 pad_lfo = lfo { wave: sine, freq: 0.08hz }
 
-pad_vcf_l = svf { cutoff: 800, res: 0.3 }
-pad_vcf_r = svf { cutoff: 800, res: 0.3 }
+pad_vcf_l = svf { cutoff: 250, res: 0.1 } # low cutoff to avoid mid-range drone
+pad_vcf_r = svf { cutoff: 250, res: 0.1 }
 
 pad_osc1 -> pad_vcf_l.in
 pad_osc2 -> pad_vcf_r.in
 
-# Slow opposite phase sweeps for wide stereo pad movement
-pad_lfo -> pad_vcf_l.cutoff : 400.0
-pad_lfo -> pad_vcf_r.cutoff : -400.0
+# Gentle opposite phase sweeps for wide, subtle stereo background warmth
+pad_lfo -> pad_vcf_l.cutoff : 80.0
+pad_lfo -> pad_vcf_r.cutoff : -80.0
 
-# ----------------- 5. Generative Melody (Dotted-8th Polyrhythm) -----------------
+# ----------------- 5. Generative Melody (Warm lowpass plucks) -----------------
 mel_div = div { by: 3 }
 main_clk -> mel_div
 
@@ -86,13 +87,17 @@ turing_mel.out -> mel_quant.in
 
 mel_osc = vco { wave: tri }
 mel_quant -> mel_osc.v_oct
-130.81 -> mel_osc.freq # C3
+130.81 -> mel_osc.freq # C3 base
+
+# SVF low-pass filter to dampen high frequencies of the plucks
+mel_vcf = svf { cutoff: 800.0, res: 0.1 }
+mel_osc -> mel_vcf.in
 
 mel_env = adsr { attack: 0.01s, decay: 0.15s, sustain: 0.0, release: 0.2s }
 mel_div -> mel_env.gate
 
 mel_vca = vca { gain: 0.0 }
-mel_osc -> mel_vca.in
+mel_vcf.lp -> mel_vca.in
 mel_env -> mel_vca.cv : 1.0
 
 mel_delay = delay { time: 0.375s, feedback: 0.5, mix: 0.4 } # syncopated dotted-8th
@@ -101,8 +106,8 @@ mel_vca -> mel_delay.in
 # ----------------- 6. Sub-Mix & Sidechain -----------------
 # Mix hats, bassline, pad L/R, and melody delay into a stereo sub-group
 sub_mix = mix {
-  levels: [0.6, 0.6, 0.5, 0.5, 0.4],
-  pans: [0.0, 0.0, -1.0, 1.0, 0.3]
+  levels: [0.35, 0.65, 0.15, 0.15, 0.45], # balanced levels, pad lowered to 0.15
+  pans: [0.0, 0.0, -1.0, 1.0, 0.2]
 }
 hat_amp   -> sub_mix.in1
 bass_amp  -> sub_mix.in2
@@ -158,7 +163,7 @@ master_eq = eq {
 master_dc.out_l -> master_eq.in_l
 master_dc.out_r -> master_eq.in_r
 
-# Stage 3: Stereo Image Utility (widens stereo image)
+# Stage 3: Stereo Width Utility (widens stereo image)
 master_width = stereo { width: 1.35, balance: 0.0 }
 master_eq.out_l -> master_width.in_l
 master_eq.out_r -> master_width.in_r
