@@ -84,7 +84,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 
 | Area | Modules |
 |---|---|
-| Sources | `vco`, `lfo`, `noise`, `random` |
+| Sources | `vco`, `lfo`, `noise`, `random`, `sampler` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
@@ -424,6 +424,27 @@ f = follow { mode: peak, attack: 5ms, release: 120ms }
 kick -> f.in
 pad  -> m.in2
 f.env -> m.lvl2 : -0.4
+```
+
+## `sampler`
+
+`sampler { file: "kick.wav", loop: off }` — WAV file playback. Inputs `trig` 0,
+`pitch` 0 (v/oct), `level` 1; outputs `out`, `eos`. Loads the file at graph
+build (mixing any channel count to mono) and plays it back with linear
+interpolation. Playback rate is `(file_rate / engine_rate) * 2^pitch`, so a file
+recorded at any rate plays at correct pitch and `+1 v/oct` doubles it. A rising
+edge on `trig` restarts from the beginning; with nothing patched to `trig` it
+plays once at load. Config `loop`: `off` stops at the end and emits a one-sample
+`eos` pulse; `on` wraps seamlessly. A missing or unreadable file yields silence
+(the session never dies). The `file:` string **must be quoted** and resolves
+against the process working directory (mise runs from the repo root); absolute
+paths always work. Reads PCM 16/24/32-bit and 32-bit float WAVs.
+
+```text
+s = sampler { file: "samples/loop.wav", loop: on }
+clk -> s.trig
+0.083333 -> s.pitch     # +1 semitone
+s.out -> amp.in
 ```
 
 ## Recipes
