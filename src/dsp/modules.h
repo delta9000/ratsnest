@@ -46,4 +46,5 @@ extern const ModuleInfo rec_info;
 extern const ModuleInfo extin_info;
 extern const ModuleInfo grains_info;
 extern const ModuleInfo modal_info;
+extern const ModuleInfo string_info;
 }  // namespace ms::dsp

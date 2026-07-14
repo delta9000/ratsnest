@@ -532,6 +532,20 @@ sounds). Outputs `out` plus `odd`/`even` partial groups (`out = odd + even`).
 Config `modes` 2..128, rounded to even — the voice-quality/CPU knob. Bowed
 and blown textures come from `noise -> vca -> m.in` with slow `vca.cv`.
 
+## `string`
+
+`string { seed: 1 }` — extended Karplus-Strong string (Rings' string models).
+Inputs `in` 0 (excitation audio, brightness-tracked lowpass + DC blocker),
+`freq` 220 Hz, `v_oct`, rising-edge `strike` (seeded noise-burst pluck shaped
+by position and brightness), `structure` 0.25 (bipolar dispersion: below 0.24
+a curved-bridge nonlinearity — gongs, sitars; 0.24..0.26 pure string; above
+0.26 stiff piano-like stretched partials; above ~0.9 adds rattle noise),
+`brightness` 0.5 (loop FIR tone and exciter color), `damping` 0.5 (decay
+0.07 s..~18 s, exponential; ≥ 0.95 crossfades to infinite sustain — a drone),
+`position` 0.25 (pluck point and pickup comb). Outputs `out` (pickup-combed
+voice, Rings' mix) and `aux` (raw pickup tap; `out + aux` is the bare loop).
+Config `seed`: equal seeds repeat plucks exactly. Reaches ~5.9 Hz at 48 kHz.
+
 ## Recipes
 
 ### Euclidean variation
