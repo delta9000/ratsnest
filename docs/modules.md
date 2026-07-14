@@ -466,6 +466,22 @@ mix.out_l -> r.in_l
 mix.out_r -> r.in_r
 ```
 
+## `extin`
+
+`extin` — external audio capture from PipeWire. No inputs; output `out` (mono,
+±1). Live only: under `play` it captures from a PipeWire input port (wire it to
+a source in your patchbay); under offline `render` there is no capture
+transport, so it outputs silence (exactly like `midi`). Latency is about one
+audio block plus a small internal buffer whose slack absorbs capture/playback
+clock drift — underruns emit silence, overruns drop the oldest samples. Route it
+like any source:
+
+```text
+ext = extin
+ext.out -> filter.in
+filter.lp -> out.left
+```
+
 ## Recipes
 
 ### Euclidean variation

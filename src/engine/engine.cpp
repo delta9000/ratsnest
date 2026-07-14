@@ -12,6 +12,7 @@ Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
     total += n.info->outputs.size();
     max_ins = std::max(max_ins, n.info->inputs.size());
     if (n.info->wants_midi) g_->midi_nodes.push_back(static_cast<int>(ni));
+    if (n.info->wants_audio_in) g_->audio_in_nodes.push_back(static_cast<int>(ni));
   }
   outs_.assign(total, 0.0f);
   ins_.assign(max_ins, 0.0f);
@@ -79,6 +80,11 @@ float Engine::output_value(size_t node, size_t slot) const {
 void Engine::deliver_midi_event(const dsp::MidiEvent& e) {
   for (int ni : g_->midi_nodes)
     g_->nodes[static_cast<size_t>(ni)].instance->on_midi(e.data, e.len);
+}
+
+void Engine::deliver_audio(const float* samples, size_t n) {
+  for (int ni : g_->audio_in_nodes)
+    g_->nodes[static_cast<size_t>(ni)].instance->on_audio_in(samples, n);
 }
 
 void Engine::migrate_from(const Engine& old) {

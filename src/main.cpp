@@ -15,6 +15,7 @@
 #include "dsl/parser.h"
 #include "engine/controller.h"
 #include "engine/engine.h"
+#include "engine/audio_in.h"
 #include "engine/midi_in.h"
 #include "engine/pipewire_out.h"
 #include "engine/rt_runner.h"
@@ -142,6 +143,15 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
     std::fprintf(stderr,
         "warning: MIDI input unavailable (%s); continuing audio-only\n",
         midi_in.error().c_str());
+  }
+
+  // Audio capture for `extin`, same lifecycle and non-fatal contract as MidiIn.
+  ms::engine::AudioIn audio_in("modsynth-capture", runner,
+                               static_cast<uint32_t>(rate));
+  if (!audio_in.error().empty()) {
+    std::fprintf(stderr,
+        "warning: audio capture unavailable (%s); extin will be silent\n",
+        audio_in.error().c_str());
   }
 
   ms::io::PatchWatcher watcher(patch);

@@ -43,4 +43,5 @@ extern const ModuleInfo limiter_info;
 extern const ModuleInfo follow_info;
 extern const ModuleInfo sampler_info;
 extern const ModuleInfo rec_info;
+extern const ModuleInfo extin_info;
 }  // namespace ms::dsp

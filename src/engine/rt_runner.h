@@ -18,6 +18,15 @@ struct Command {
 };
 static_assert(std::is_trivially_copyable_v<Command>);
 
+// A fixed-size chunk of captured external audio, trivially copyable so it can
+// live in an rt::SpscQueue. The PipeWire capture thread fills these and pushes
+// them via RtRunner::push_audio; the audio thread drains them into the live
+// engine at block start. `len` is the number of valid samples in `s`.
+struct AudioChunk {
+  float s[64];
+  uint32_t len;
+};
+
 // RT-side state machine. render() is the only method the audio thread calls;
 // everything it does is allocation-, lock-, and I/O-free. Engines enter via
 // Swap commands and leave via the retire queue (deleted by the non-RT side).
@@ -51,6 +60,12 @@ class RtRunner {
   // swap are never silently dropped (midi spec §4).
   bool push_midi(const dsp::MidiEvent& e) { return midi_ring_.try_push(e); }
 
+  // Producer side of the audio-capture ring, mirroring push_midi: called from
+  // the PipeWire capture thread (a distinct thread from the audio thread that
+  // calls render(), satisfying the SPSC one-producer/one-consumer contract).
+  // Drop-on-full; never blocks. Lives on RtRunner so it survives engine swaps.
+  bool push_audio(const AudioChunk& c) { return audio_ring_.try_push(c); }
+
   // --- RT side ---
   void render(float* l, float* r, size_t frames);
 
@@ -65,6 +80,7 @@ class RtRunner {
   rt::SpscQueue<Engine*, 8> retired_;
   rt::SpscQueue<float, 4096> watch_;
   rt::SpscQueue<dsp::MidiEvent, 256> midi_ring_;
+  rt::SpscQueue<AudioChunk, 128> audio_ring_;
   Engine* current_ = nullptr;
   Engine* old_ = nullptr;  // non-null while crossfading
   size_t fade_pos_ = 0;

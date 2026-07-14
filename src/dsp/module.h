@@ -49,6 +49,11 @@ class Module {
   // block's process() calls: no alloc, no locks, no I/O. `data` points into
   // caller-owned storage valid only for the duration of the call.
   virtual void on_midi(const uint8_t* data, size_t len) { (void)data; (void)len; }
+  // Delivered at block start, before that block's process() calls, carrying the
+  // audio samples captured since the previous block. Only called on modules
+  // whose ModuleInfo::wants_audio_in is set. RT-called: no alloc, no locks, no
+  // I/O. `samples` points into caller-owned storage valid only for this call.
+  virtual void on_audio_in(const float* samples, size_t n) { (void)samples; (void)n; }
 };
 
 struct ModuleInfo {
@@ -60,6 +65,9 @@ struct ModuleInfo {
   // Opts into on_midi delivery; the runner fans queued MIDI events to every
   // node with wants_midi set, at block start, before that block is processed.
   bool wants_midi = false;
+  // Opts into on_audio_in delivery; the runner fans captured external audio to
+  // every node with wants_audio_in set, at block start, before processing.
+  bool wants_audio_in = false;
 
   int input_index(std::string_view name) const;
   int output_index(std::string_view name) const;

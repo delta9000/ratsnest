@@ -75,6 +75,10 @@ void RtRunner::render_block(float* l, float* r, size_t frames) {
   // block boundary. current_ is guaranteed non-null here (checked above).
   dsp::MidiEvent midi_e;
   while (midi_ring_.try_pop(midi_e)) current_->deliver_midi_event(midi_e);
+  // Same for captured external audio: hand each queued chunk to the live
+  // engine's extin nodes before processing this block.
+  AudioChunk audio_c;
+  while (audio_ring_.try_pop(audio_c)) current_->deliver_audio(audio_c.s, audio_c.len);
   current_->process(l, r, frames);
 
   if (old_) {

@@ -33,6 +33,9 @@ struct Graph {
   // through the pointer swap instead of living in a separate engine-side
   // vector that could go stale relative to whichever graph is current.
   std::vector<int> midi_nodes;
+  // Indices of nodes whose ModuleInfo::wants_audio_in is set. Populated once by
+  // Engine's constructor, alongside midi_nodes, for the same reason.
+  std::vector<int> audio_in_nodes;
 };
 
 struct CompileResult {

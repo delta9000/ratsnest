@@ -35,6 +35,12 @@ class Engine {
   // RtRunner outlives every Engine, so its ring does too.
   void deliver_midi_event(const dsp::MidiEvent& e);
 
+  // RT-called by RtRunner at block start (before that block's process()),
+  // fanning captured external audio to every node with
+  // ModuleInfo::wants_audio_in via Module::on_audio_in. No alloc, no locks,
+  // no I/O. The ring this drains lives on RtRunner (see deliver_midi_event).
+  void deliver_audio(const float* samples, size_t n);
+
  private:
   void step_glides();
 
