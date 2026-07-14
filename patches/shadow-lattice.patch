@@ -1,0 +1,478 @@
+# shadow lattice -- Meridian album, track 2. Dark hypnotic techno at 122 BPM,
+# D minor, ~5:15 including tail. Fixed seeds make every offline render repeat.
+#
+# This track exposes three engine ideas as composition:
+#   polyphony -- a four-voice alloc/voice lattice; the spread bank pans each
+#                claimed voice to its own place, so the round-robin walks the
+#                stereo field while tails overlap
+#   turing    -- ONE pitch register (16 steps of eighths = a 2-bar loop)
+#                feeds lead, shadow, and metal. Mutation is arranged --
+#                drifting in the intro, unstable in the breakdown, base prob
+#                0 so returns are truly locked
+#   euclid    -- interlocked 16 / 13 / 11 step cycles conduct the rhythm
+#
+# THE RIFF IS A LOOP, NOT A STREAM. Every strike cycle is reset on a musical
+# boundary (the 11-step lanes every 2 bars, the 13-step metal every bar), so
+# the same register positions are sampled in the same order each cycle: a
+# repeating melodic shape the ear can hold, which mutation then edits one bit
+# at a time. Pitch set is D minor PENTATONIC over a narrow range -- no
+# semitone collisions -- and a 2-bar accent cycle rides alloc's vel bank so
+# strikes breathe instead of hammering.
+#
+# Harmony: a bar-clocked walk (D | D | Bb | C) enters through quant.transpose
+# when the arrangement enables it, and the SUB states those roots directly --
+# a real bassline under the generative upper voices. The drone never
+# transposes: a D pedal the walk pulls against.
+#
+# Forty four-bar blocks form the arrangement grid (about 7.87 seconds each):
+#   0  0:00  drone and isolated metal pings
+#   4  0:31  turing sub emerges
+#   7  0:55  riser
+#   8  1:03  grounded drum cycle, offbeat breath, harmony starts to walk
+#  12  1:34  first full polyphonic lattice
+#  16  2:06  pressure drop -- kick out, reverb FREEZES, voices lengthen+mutate
+#  20  2:37  main descent: denser euclidean overlap, walk at its darkest
+#  28  3:40  unstable breakdown, mutation at maximum
+#  30  3:56  two-block riser
+#  32  4:12  final lattice -- register locked, rotations converged, D pedal
+#  36  4:43  rhythms peel away
+#  38  4:59  master fade and silent tail
+
+# ---- clock tree: sixteenths at 122 BPM ----
+master   = clock { bpm: 488 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+two_bar  = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> two_bar.in
+bar -> four_bar.in
+
+# ---- forty-block tracker arrangement ----
+arr_kick = stepseq { steps: [0,0,0,0, 0,0,0,0,
+                             1,1,1,1, 1,1,1,1,
+                             0,0,0,0, 1,1,1,1,
+                             1,1,1,1, 0,0,0,0,
+                             1,1,1,1, 0,0,0,0] }
+arr_sub = stepseq { steps: [0,0,0,0, .35,.35,.5,.5,
+                            .65,.65,.65,.65, .7,.7,.7,.7,
+                            .25,.25,.35,.35, .75,.75,.8,.8,
+                            .8,.8,.8,.8, .2,.2,.3,.3,
+                            .85,.85,.85,.85, .4,.2,0,0] }
+arr_perc = stepseq { steps: [.3,.3,.35,.35, .38,.38,.42,.42,
+                             .45,.45,.5,.5, .55,.55,.6,.6,
+                             .3,.3,.35,.35, .65,.65,.72,.72,
+                             .78,.8,.85,.85, .25,.25,.3,.3,
+                             .9,.9,1,1, .5,.25,0,0] }
+arr_lattice = stepseq { steps: [0,0,0,0, 0,0,.12,.12,
+                                .2,.2,.3,.3, .65,.65,.72,.72,
+                                .3,.3,.38,.38, .78,.78,.85,.85,
+                                .9,.9,.95,.95, .32,.32,.42,.42,
+                                1,1,1,1, .45,.25,0,0] }
+arr_shadow = stepseq { steps: [0,0,0,0, 0,0,0,0,
+                               .2,.2,.3,.3, .45,.45,.5,.5,
+                               .55,.55,.6,.6, .8,.8,.8,.8,
+                               .85,.85,.85,.85, .3,.3,.45,.45,
+                               1,1,1,1, .5,.3,0,0] }
+arr_drone = stepseq { steps: [.78,.78,.75,.75, .6,.6,.5,.5,
+                              .35,.35,.3,.3, .28,.28,.25,.25,
+                              .75,.75,.82,.82, .3,.3,.25,.25,
+                              .22,.22,.2,.2, .85,.85,.9,.9,
+                              .32,.32,.28,.28, .7,.7,.45,0] }
+arr_mut = stepseq { steps: [.08,.08,.08,.08, .06,.06,.04,.04,
+                            .02,.02,0,0, 0,0,0,0,
+                            .3,.3,.4,.4, .03,.03,.01,.01,
+                            0,0,0,0, .55,.55,.42,.32,
+                            0,0,0,0, .08,.08,.04,0] }
+arr_rota = stepseq { steps: [0,0,0,0, 0,0,0,0,
+                             0,0,0,0, 0,0,0,0,
+                             2,2,2,2, 4,4,4,4,
+                             4,4,4,4, 7,7,7,7,
+                             3,3,3,3, 3,3,0,0] }
+arr_rotb = stepseq { steps: [5,5,5,5, 5,5,5,5,
+                             6,6,6,6, 6,6,6,6,
+                             2,2,2,2, 8,8,8,8,
+                             8,8,8,8, 11,11,11,11,
+                             3,3,3,3, 3,3,0,0] }
+arr_harm = stepseq { steps: [0,0,0,0, 0,0,0,0,
+                             1,1,1,1, 1,1,1,1,
+                             0,0,0,0, 1,1,1,1,
+                             1,1,1,1, 1,1,0,0,
+                             0,0,0,0, 0,0,0,0] }
+arr_rise = stepseq { steps: [0,0,0,0, 0,0,0,1,
+                             0,0,0,0, 0,0,0,0,
+                             0,0,0,1, 0,0,0,0,
+                             0,0,0,0, 0,0,1,1,
+                             0,0,0,0, 0,0,0,0] }
+arr_freeze = stepseq { steps: [0,0,0,0, 0,0,0,0,
+                               0,0,0,0, 0,0,0,0,
+                               1,1,1,1, 0,0,0,0,
+                               0,0,0,0, 0,0,0,0,
+                               0,0,0,0, 0,0,0,0] }
+arr_fx = stepseq { steps: [.5,.5,.5,.5, .4,.4,.4,.4,
+                           .35,.35,.35,.35, .4,.4,.42,.42,
+                           .7,.7,.75,.75, .38,.38,.4,.4,
+                           .42,.42,.45,.45, .85,.85,.9,.9,
+                           .45,.45,.5,.5, .65,.65,.5,0] }
+arr_main = stepseq { steps: [1,1,1,1, 1,1,1,1,
+                             1,1,1,1, 1,1,1,1,
+                             1,1,1,1, 1,1,1,1,
+                             1,1,1,1, 1,1,1,1,
+                             1,1,1,1, 1,.8,.25,0] }
+four_bar -> arr_kick.clock
+four_bar -> arr_sub.clock
+four_bar -> arr_perc.clock
+four_bar -> arr_lattice.clock
+four_bar -> arr_shadow.clock
+four_bar -> arr_drone.clock
+four_bar -> arr_mut.clock
+four_bar -> arr_rota.clock
+four_bar -> arr_rotb.clock
+four_bar -> arr_harm.clock
+four_bar -> arr_rise.clock
+four_bar -> arr_freeze.clock
+four_bar -> arr_fx.clock
+four_bar -> arr_main.clock
+
+# Smooth amplitude changes; euclid counts, rotations, mutation, harmony
+# enables, and freeze stay stepped so sections snap on the bar line.
+sub_lvl = func { rise: 3, fall: 3 }
+perc_lvl = func { rise: 2, fall: 2 }
+lattice_lvl = func { rise: 4, fall: 4 }
+shadow_lvl = func { rise: 4, fall: 4 }
+drone_lvl = func { rise: 5, fall: 5 }
+fx_lvl = func { rise: 4, fall: 4 }
+rise_cv = func { rise: 7, fall: 0.45 }
+main_lvl = func { rise: 2, fall: 8 }
+arr_sub.cv -> sub_lvl.in
+arr_perc.cv -> perc_lvl.in
+arr_lattice.cv -> lattice_lvl.in
+arr_shadow.cv -> shadow_lvl.in
+arr_drone.cv -> drone_lvl.in
+arr_fx.cv -> fx_lvl.in
+arr_rise.cv -> rise_cv.in
+arr_main.cv -> main_lvl.in
+
+# ---- harmony: bar-clocked D | D | Bb | C walk, gated by the arrangement.
+# arr_harm is strictly 0 or 1 -- scaling a v/oct walk would land between
+# roots -- and blocks align with bars, so the pedal/walk handoff is clean.
+prog = stepseq { steps: [0, 0, -0.33333, -0.16667] }
+bar -> prog.clock
+harm = vca { gain: 0 }
+prog.cv -> harm.in
+arr_harm.cv -> harm.cv
+
+# ---- seeded Turing pitch source, D natural minor. Base prob 0: only the
+# mutation lane can unlock the register, so every return truly repeats.
+pitch_register = turing { len: 16, prob: 0, seed: 73 }
+eighth -> pitch_register.clock
+arr_mut.cv -> pitch_register.prob : 0.42
+minor_notes = quant { scale: [0, 3, 5, 7, 10] }
+pitch_register.out -> minor_notes.in : 0.55
+harm -> minor_notes.transpose
+
+# Eleven-step strike cycle, RESET every two bars so it samples the same
+# register positions each pass -- the riff repeats instead of drifting.
+lattice_euclid = euclid { steps: 11, hits: 2, rot: 0 }
+eighth -> lattice_euclid.clock
+two_bar -> lattice_euclid.reset
+arr_lattice.cv -> lattice_euclid.hits : 3
+arr_rota.cv -> lattice_euclid.rot
+lattice_note = sh { mode: sample }
+minor_notes -> lattice_note.in
+lattice_euclid.trig -> lattice_note.trig
+
+# Two-bar accent cycle rides the vel bank: accented strikes open the filter.
+accent = stepseq { steps: [1,.35,.6,.35, .85,.35,.5,.7,
+                           1,.35,.55,.35, .8,.4,.65,.5] }
+eighth -> accent.clock
+two_bar -> accent.reset
+-1 -> lattice_alloc.vel
+accent.cv -> lattice_alloc.vel
+
+# Four overlapping allocations turn the mono generative line into polyphony.
+# Each voice gets its own filter envelope (the gate bank is trig-width, so it
+# can fire an edge but never hold a modulation open), and the spread bank
+# places the four voices across the stereo field via paired VCAs.
+lattice_alloc = alloc { n: 4 }
+lattice_euclid.trig -> lattice_alloc.gate
+lattice_note -> lattice_alloc.voct
+lattice = voice { notes: lattice_alloc }
+lattice.osc = vco { freq: 293.66hz, wave: saw }
+lattice_alloc.voct -> lattice.osc.v_oct
+lattice_alloc.spread -> lattice.osc.v_oct : 0.007
+lattice.fenv = func { rise: 0.002, fall: 0.5, curve: exp }
+lattice_alloc.gate -> lattice.fenv.trig
+lattice.filt = svf { cutoff: 380, res: 0.32 }
+lattice.osc -> lattice.filt.in
+lattice.fenv -> lattice.filt.cutoff : 1500
+lattice_alloc.vel -> lattice.filt.cutoff : 900
+lattice_lvl -> lattice.filt.cutoff : 700
+lattice.pluck = lpg { damp: 0.7, decay: 1.4 }
+lattice.filt.lp -> lattice.pluck.in
+lattice_alloc.gate -> lattice.pluck.strike
+fx_lvl -> lattice.pluck.decay : 1.5
+lattice.left = vca { gain: 0.5 }
+lattice.right = vca { gain: 0.5 }
+lattice.pluck -> lattice.left.in
+lattice.pluck -> lattice.right.in
+lattice_alloc.spread -> lattice.left.cv : -0.5
+lattice_alloc.spread -> lattice.right.cv : 0.5
+lattice_l = vca { gain: 0 }
+lattice_r = vca { gain: 0 }
+lattice.left -> lattice_l.in : 0.16
+lattice.right -> lattice_r.in : 0.16
+lattice_lvl -> lattice_l.cv : 0.9
+lattice_lvl -> lattice_r.cv : 0.9
+
+# ---- sub bass: states the walk roots directly (D | D | Bb | C) on its own
+# 16-step cycle -- the harmonic floor the generative voices hang from ----
+sub_euclid = euclid { steps: 16, hits: 3, rot: 2 }
+eighth -> sub_euclid.clock
+arr_sub.cv -> sub_euclid.hits : 2
+sub_osc = vco { freq: 73.416hz, wave: tri }
+harm -> sub_osc.v_oct
+sub_env = func { rise: 0.004, fall: 0.32, curve: exp }
+sub_euclid.trig -> sub_env.trig
+sub_filter = ladder { cutoff: 170, res: 0.12, drive: 0.35 }
+sub_osc -> sub_filter.in
+sub_env -> sub_filter.cutoff : 360
+sub_amp = vca { gain: 0 }
+sub_filter -> sub_amp.in
+sub_env -> sub_amp.cv : 0.75
+sub_post = vca { gain: 0 }
+sub_amp -> sub_post.in
+sub_lvl -> sub_post.cv : 0.72
+
+# ---- saw shadow: the low-mid harmonic core, one octave under the lattice,
+# striking an 11-step cycle rotated by the OTHER lane so it circles the
+# lattice until the final section pulls both onto the same rotation ----
+shadow_euclid = euclid { steps: 11, hits: 3, rot: 0 }
+eighth -> shadow_euclid.clock
+two_bar -> shadow_euclid.reset
+arr_rotb.cv -> shadow_euclid.rot
+shadow_note = sh { mode: sample }
+minor_notes -> shadow_note.in
+shadow_euclid.trig -> shadow_note.trig
+shadow_osc = vco { freq: 146.83hz, wave: saw }
+shadow_note -> shadow_osc.v_oct
+shadow_env = func { rise: 0.003, fall: 0.42, curve: exp }
+shadow_euclid.trig -> shadow_env.trig
+shadow_filter = ladder { cutoff: 220, res: 0.3, drive: 0.6 }
+shadow_osc -> shadow_filter.in
+shadow_env -> shadow_filter.cutoff : 780
+shadow_lvl -> shadow_filter.cutoff : 200
+shadow_amp = vca { gain: 0 }
+shadow_filter -> shadow_amp.in
+shadow_env -> shadow_amp.cv : 0.8
+shadow_post = vca { gain: 0 }
+shadow_amp -> shadow_post.in
+shadow_lvl -> shadow_post.cv : 0.75
+
+# ---- grounded 16-step kick cycle ----
+kick_pattern = euclid { steps: 16, hits: 4, rot: 0 }
+master -> kick_pattern.clock
+kick_gate = logic { op: and }
+kick_pattern.trig -> kick_gate.a
+arr_kick.cv -> kick_gate.b
+kick_env = func { rise: 0.0007, fall: 0.2, curve: log }
+kick_gate -> kick_env.trig
+kick_osc = vco { freq: 45hz, wave: sine }
+kick_gate -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.75
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : 0.92
+kick_drive = drive { amount: 0.18, mode: soft }
+kick_amp -> kick_drive.in
+
+# ---- offbeat breath: dark band-passed noise on the anti-kick eighths.
+# Offbeat = eighth AND NOT quarter, phase-locked off the same div chain.
+beat_not = logic { op: not }
+quarter -> beat_not.a
+offbeat = logic { op: and }
+eighth -> offbeat.a
+beat_not -> offbeat.b
+off_gate = logic { op: and }
+offbeat -> off_gate.a
+arr_kick.cv -> off_gate.b
+off_env = func { rise: 0.001, fall: 0.07, curve: exp }
+off_gate -> off_env.trig
+off_noise = noise { color: pink, seed: 23 }
+off_filter = svf { cutoff: 3400, res: 0.4 }
+off_noise -> off_filter.in
+off_amp = vca { gain: 0 }
+off_filter.bp -> off_amp.in
+off_env -> off_amp.cv : 0.4
+off_post = vca { gain: 0 }
+off_amp -> off_post.in
+perc_lvl -> off_post.cv : 0.8
+
+# ---- asymmetric 13-step resonant metal, pitched from the shared register
+# so it blurs rhythm into harmony ----
+metal_pattern = euclid { steps: 13, hits: 2, rot: 0 }
+master -> metal_pattern.clock
+bar -> metal_pattern.reset
+arr_perc.cv -> metal_pattern.hits : 4
+arr_rotb.cv -> metal_pattern.rot
+metal_note = sh { mode: sample }
+minor_notes -> metal_note.in
+metal_pattern.trig -> metal_note.trig
+metal_env = func { rise: 0.0005, fall: 0.09, curve: exp }
+metal_pattern.trig -> metal_env.trig
+metal_noise = noise { color: white, seed: 31 }
+metal_tone = vco { freq: 1174.66hz, wave: pulse, pw: 0.5 }
+metal_note -> metal_tone.v_oct
+metal_ring = math { op: mult }
+metal_noise -> metal_ring.a : 0.65
+metal_tone -> metal_ring.b : 0.5
+metal_filter = svf { cutoff: 2900, res: 0.74 }
+metal_ring -> metal_filter.in
+metal_env -> metal_filter.cutoff : 2400
+metal_amp = vca { gain: 0 }
+metal_filter.bp -> metal_amp.in
+metal_env -> metal_amp.cv : 0.48
+metal_post = vca { gain: 0 }
+metal_amp -> metal_post.in
+perc_lvl -> metal_post.cv : 0.75
+
+# ---- rotated 16-step high ticks, bern-thinned so the top never becomes a
+# straight wash, and gated to the drum sections ----
+tick_pattern = euclid { steps: 16, hits: 1, rot: 5 }
+master -> tick_pattern.clock
+arr_perc.cv -> tick_pattern.hits : 7
+tick_coin = bern { prob: 0.7, seed: 41 }
+tick_pattern.trig -> tick_coin.gate
+tick_gate = logic { op: and }
+tick_coin.a -> tick_gate.a
+arr_kick.cv -> tick_gate.b
+tick_env = func { rise: 0.0004, fall: 0.035, curve: exp }
+tick_gate -> tick_env.trig
+tick_noise = noise { color: white, seed: 17 }
+tick_filter = svf { cutoff: 9200, res: 0.25 }
+tick_noise -> tick_filter.in
+tick_amp = vca { gain: 0 }
+tick_filter.hp -> tick_amp.in
+tick_env -> tick_amp.cv : 0.36
+tick_post = vca { gain: 0 }
+tick_amp -> tick_post.in
+perc_lvl -> tick_post.cv : 0.7
+
+# ---- four-note D-minor drone: D2 A2 D3 F3. Never transposes -- the pedal
+# the walk pulls against. Its own level lane opens the filters, so the drone
+# BLOOMS when it swells (pressure drop, breakdown, outro). ----
+drone_lfo = lfo { wave: sine, freq: 0.031hz }
+drone1 = vco { freq: 73.416hz, wave: sine }
+drone2 = vco { freq: 110hz, wave: saw }
+drone3 = vco { freq: 146.83hz, wave: tri }
+drone4 = vco { freq: 174.61hz, wave: saw }
+drone_filt_l = svf { cutoff: 330, res: 0.28 }
+drone_filt_r = svf { cutoff: 380, res: 0.3 }
+drone1 -> drone_filt_l.in : 0.45
+drone3 -> drone_filt_l.in : 0.25
+drone2 -> drone_filt_r.in : 0.24
+drone4 -> drone_filt_r.in : 0.2
+drone_lfo -> drone_filt_l.cutoff : 190
+drone_lfo -> drone_filt_r.cutoff : -170
+drone_lvl -> drone_filt_l.cutoff : 260
+drone_lvl -> drone_filt_r.cutoff : 260
+drone_amp_l = vca { gain: 0 }
+drone_amp_r = vca { gain: 0 }
+drone_filt_l.lp -> drone_amp_l.in
+drone_filt_r.lp -> drone_amp_r.in
+drone_lvl -> drone_amp_l.cv : 0.28
+drone_lvl -> drone_amp_r.cv : 0.28
+
+# ---- riser: dark pink-noise swell announcing the drums, the descent, and
+# (two blocks long) the final lattice ----
+riser_noise = noise { color: pink, seed: 11 }
+riser_filter = svf { cutoff: 240, res: 0.6 }
+riser_noise -> riser_filter.in
+rise_cv -> riser_filter.cutoff : 3800
+riser_amp = vca { gain: 0 }
+riser_filter.lp -> riser_amp.in
+rise_cv -> riser_amp.cv : 0.55
+
+# ---- dry stereo band and kick ducking ----
+band = mix { levels: [0.74, 0.7, 0.6, 0.92, 0.92, 0.5, 0.34, 0.34],
+             pans: [0, 0, -0.12, -0.7, 0.7, 0.5, -0.72, 0.72] }
+kick_drive -> band.in1
+sub_post -> band.in2
+shadow_post -> band.in3
+lattice_l -> band.in4
+lattice_r -> band.in5
+metal_post -> band.in6
+drone_amp_l -> band.in7
+drone_amp_r -> band.in8
+kick_env -> band.lvl2 : -0.2
+kick_env -> band.lvl3 : -0.16
+kick_env -> band.lvl4 : -0.14
+kick_env -> band.lvl5 : -0.14
+kick_env -> band.lvl7 : -0.12
+kick_env -> band.lvl8 : -0.12
+
+air = mix { levels: [0.34, 0.3, 0.3, 0.5], pans: [-0.38, 0.3, 0.55, 0] }
+tick_post -> air.in1
+off_post -> air.in2
+metal_post -> air.in3
+riser_amp -> air.in4
+kick_env -> air.lvl2 : -0.1
+
+# ---- dark tempo-synced delay and short murky room. Feedback breathes with
+# the fx lane, thickening the pressure drop and breakdown; the room freezes
+# solid for the four pressure-drop blocks. ----
+sync_l = tempo { bpm: 122, beats: 0.75 }
+sync_r = tempo { bpm: 122, beats: 0.5 }
+delay_l = delay { time: 0ms, feedback: 0.42, tone: 2400, mix: 1, slew: 0.2 }
+delay_r = delay { time: 0ms, feedback: 0.37, tone: 1900, mix: 1, slew: 0.2 }
+sync_l.seconds -> delay_l.time
+sync_r.seconds -> delay_r.time
+fx_lvl -> delay_l.feedback : 0.22
+fx_lvl -> delay_r.feedback : 0.2
+lattice_l -> delay_l.in : 0.42
+lattice_r -> delay_r.in : 0.36
+metal_post -> delay_l.in : 0.18
+shadow_post -> delay_r.in : 0.14
+
+room = reverb { decay: 0.62, damp: 0.62, mix: 1,
+                predelay: 0.015, bandwidth: 0.72,
+                mod_rate: 0.37, mod_depth: 13 }
+arr_freeze.cv -> room.freeze
+drone_amp_l -> room.in_l : 0.34
+drone_amp_r -> room.in_r : 0.34
+lattice_l -> room.in_l : 0.12
+lattice_r -> room.in_r : 0.14
+shadow_post -> room.in_l : 0.1
+metal_post -> room.in_r : 0.1
+riser_amp -> room.in_l : 0.18
+riser_amp -> room.in_r : 0.18
+
+# ---- returns and arranged master fade ----
+master_mix = mix { levels: [1,1,0.72,0.72,0.44,0.44,0.55,0.55],
+                   pans: [-1,1,-1,1,-0.82,0.82,-1,1] }
+band.out_l -> master_mix.in1
+band.out_r -> master_mix.in2
+air.out_l -> master_mix.in3
+air.out_r -> master_mix.in4
+delay_l -> master_mix.in5
+delay_r -> master_mix.in6
+room.out_l -> master_mix.in7
+room.out_r -> master_mix.in8
+fx_lvl -> master_mix.lvl5 : 0.24
+fx_lvl -> master_mix.lvl6 : 0.24
+fx_lvl -> master_mix.lvl7 : 0.18
+fx_lvl -> master_mix.lvl8 : 0.18
+kick_env -> master_mix.lvl5 : -0.12
+kick_env -> master_mix.lvl6 : -0.12
+kick_env -> master_mix.lvl7 : -0.15
+kick_env -> master_mix.lvl8 : -0.15
+
+master_mix.out_l -> out.left
+master_mix.out_r -> out.right
+-1 -> out.level
+main_lvl -> out.level : 0.85
