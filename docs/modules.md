@@ -88,7 +88,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `compressor`, `dcblock`, `delay`, `reverb`, `scope`, `stereo`, `out` |
+| Effects/I/O | `compressor`, `dcblock`, `delay`, `eq`, `reverb`, `scope`, `stereo`, `out` |
 
 ## `vca`
 
@@ -366,6 +366,21 @@ feed-forward log-domain compressor.
 *   `mix` (clamped `0..1`, default 1): Equal-power dry/wet crossfade mix.
 *   `gain`: Output. Linear gain reduction factor (excluding makeup).
 *   `gr`: Output. Current gain reduction in positive dB.
+
+## `eq`
+
+`eq` — inputs `in_l` 0, `in_r` 0, `hp_freq` 20, `low_freq` 120, `low_gain` 0,
+`mid1_freq` 500, `mid1_gain` 0, `mid1_q` 0.707, `mid2_freq` 2500, `mid2_gain` 0,
+`mid2_q` 0.707, `high_freq` 10000, `high_gain` 0; outputs `out_l`, `out_r`.
+A stereo parametric mastering equalizer with 20 ms parameter smoothing.
+Consists of five cascaded biquad sections per channel:
+1.  **HPF**: Second-order high-pass filter. Frequency clamped `5..0.45*rate`, Q fixed to `0.707`.
+2.  **Low Shelf**: Low shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. Slope fixed to `1.0`.
+3.  **Mid1 Peaking**: Peaking/bell filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB, Q clamped `0.1..18`.
+4.  **Mid2 Peaking**: Peaking/bell filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB, Q clamped `0.1..18`.
+5.  **High Shelf**: High shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. Slope fixed to `1.0`.
+
+Zero-gain sections are optimized with exact bypass coefficients.
 
 ## Recipes
 

@@ -1,0 +1,35 @@
+# eq demo -- Sweeping a peaking band on detuned saw waves
+#
+# It applies a static +6dB low-shelf bass boost, a static +3dB high-shelf treble boost,
+# and modulates the center frequency of a sharp, +15dB peaking EQ band with a slow LFO.
+
+osc1 = vco { freq: 110hz, wave: saw }
+osc2 = vco { freq: 110.4hz, wave: saw }
+sig  = mix { levels: [0.5, 0.5] }
+osc1 -> sig.in1
+osc2 -> sig.in2
+
+# Sweeping LFO for peaking frequency modulation
+sweep = lfo { freq: 0.2hz }
+
+equalizer = eq {
+  hp_freq: 30.0,
+  low_freq: 150.0,
+  low_gain: 6.0,
+  mid1_freq: 1000.0,
+  mid1_gain: 15.0,
+  mid1_q: 4.0,
+  high_freq: 8000.0,
+  high_gain: 3.0
+}
+
+# Connect audio inputs
+sig.out_l -> equalizer.in_l
+sig.out_r -> equalizer.in_r
+
+# Modulate mid1 peaking center frequency: 1000 Hz center + LFO sweeping +/-800 Hz
+sweep -> equalizer.mid1_freq : 800.0
+
+# Connect to master output
+equalizer.out_l -> out.left
+equalizer.out_r -> out.right
