@@ -1,4 +1,10 @@
-# All-Modules A/B Song Design
+# Minor Machinery Song Design
+
+## Title
+
+The finished patch is titled **Minor Machinery**. The name reflects its A-minor
+center and clockwork modular arrangement without reading like a module-coverage
+demo.
 
 ## Goal
 
