@@ -154,7 +154,11 @@ class Grains final : public Module {
     const float shape = sanitize_clamp(ins[9], 0.0f, 1.0f, 0.5f);
     const float spread = sanitize_clamp(ins[10], 0.0f, 1.0f, 0.5f);
     const bool reverse = sanitize(ins[11]) > 0.5f;
-    const float pos = sanitize_clamp(ins[3], 0.0f, 1.0f, 0.5f);
+    float pos = sanitize_clamp(ins[3], 0.0f, 1.0f, 0.5f);
+    const float scatter = sanitize_clamp(ins[4], 0.0f, 1.0f);
+    if (scatter > 0.0f) {  // draw only when active: keeps prior seeds' RNG sequence
+      pos = std::clamp(pos + scatter * (frand() - 0.5f), 0.0f, 1.0f);
+    }
 
     const double len = static_cast<double>(len_);
     const double ratio = std::exp2(static_cast<double>(pitch));

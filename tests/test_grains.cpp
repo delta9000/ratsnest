@@ -262,3 +262,70 @@ TEST_CASE("grains: saturated pool stays bounded and finite") {
     CHECK(std::abs(outs[1]) < 6.0f);
   }
 }
+
+TEST_CASE("grains: scatter randomizes grain position") {
+  auto m = make_grains();
+  Ins ins;
+  float outs[3] = {0.f, 0.f, 0.f};
+  // Fill the ENTIRE ring (65536+) so every scattered position lands on
+  // recorded, strictly increasing content — never the zero-initialized region.
+  for (int i = 0; i < 70000; ++i) {
+    ins.v[0] = static_cast<float>(i) * 1e-5f;  // strictly increasing ramp
+    m->process(ins.v, outs);
+  }
+  ins.v[0] = 0.0f;
+  ins.v[1] = 1.0f;   // freeze
+  ins.v[4] = 1.0f;   // full scatter
+  ins.v[5] = 0.01f;  // short grains (480 samples)
+  auto grain_peak = [&]() {
+    ins.v[2] = 1.0f;
+    m->process(ins.v, outs);
+    ins.v[2] = 0.0f;
+    float peak = 0.0f;
+    for (int t = 0; t < 480; ++t) {
+      m->process(ins.v, outs);
+      peak = std::max(peak, std::abs(outs[0]));
+    }
+    return peak;
+  };
+  // Deterministic given the seed: two draws land on different ramp values.
+  const float p1 = grain_peak();
+  const float p2 = grain_peak();
+  CHECK(p1 != p2);
+}
+
+TEST_CASE("grains: hostile inputs never poison state") {
+  auto m = make_grains();
+  Ins ins;
+  float outs[3] = {0.f, 0.f, 0.f};
+  const float bad[3] = {std::numeric_limits<float>::quiet_NaN(),
+                        std::numeric_limits<float>::infinity(),
+                        -std::numeric_limits<float>::infinity()};
+  for (int k = 0; k < 3; ++k) {
+    for (int i = 0; i < 12; ++i) ins.v[i] = bad[k];
+    for (int i = 0; i < 500; ++i) {
+      m->process(ins.v, outs);
+      CHECK(std::isfinite(outs[0]));
+      CHECK(std::isfinite(outs[1]));
+    }
+  }
+  // Recovery: normal recording and a clean grain afterwards.
+  ins = Ins{};
+  float outs2[3] = {0.f, 0.f, 0.f};
+  for (int i = 0; i < 48000; ++i) {
+    ins.v[0] = static_cast<float>(i % 1000) * 0.001f;
+    m->process(ins.v, outs2);
+  }
+  ins.v[0] = 0.0f;
+  ins.v[1] = 1.0f;
+  ins.v[2] = 1.0f;
+  m->process(ins.v, outs2);
+  ins.v[2] = 0.0f;
+  bool nonzero = false;
+  for (int t = 1; t < 4800; ++t) {
+    m->process(ins.v, outs2);
+    CHECK(std::isfinite(outs2[0]));
+    if (outs2[0] != 0.0f) nonzero = true;
+  }
+  CHECK(nonzero);
+}
