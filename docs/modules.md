@@ -88,7 +88,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `limiter`, `reverb`, `scope`, `stereo`, `out` |
+| Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `scope`, `stereo`, `out` |
 
 ## `vca`
 
@@ -480,6 +480,41 @@ like any source:
 ext = extin
 ext.out -> filter.in
 filter.lp -> out.left
+```
+
+## `grains`
+
+`grains { secs: 4, seed: 1 }` — granular processor: the Clouds core (record/
+freeze buffer + grain scheduler + 64-voice grain player) with the blend
+section left to cables (`xfade`/`mix` for dry/wet, `delay` or a patched
+feedback loop, `reverb`, `stereo`). Mono `in`, stereo out. Inputs: `in` 0,
+`freeze` gate 0 (halts recording; grains keep reading; unfreeze crossfades
+back over ~5 ms), rising-edge `trig` (seeds exactly one grain), `position`
+0.5 (0 = newest audio / file start, 1 = oldest / file end — freezing never
+re-maps it), `scatter` 0 (per-grain random position offset), `size` 0.1 s
+(5 ms..2 s, capped at a quarter buffer), `pitch` 0 v/oct (±4 oct, plain
+resampling — upward shifts alias, like the hardware), `density` 10 grains/s
+(0..200; 0 = external `trig` only), `jitter` 0.5 (0 = periodic stream, 1 =
+Poisson cloud; the mean rate stays `density`), `shape` 0.5 (window morph:
+0 boxcar → 0.5 triangle → 1 Hann), `spread` 0.5 (random pan width; 0 =
+center), `reverse` gate (latched per grain; plays the window backward).
+Outputs `out_l`, `out_r`, and a one-sample `onset` pulse per seeded grain.
+Configs: `secs` buffer length 0.25..60 s; `file` (quoted WAV path) preloads
+the buffer, disables the record head, and makes `in`/`freeze` inert (missing
+file = silence); `seed` makes every random draw repeatable. All grain
+parameters latch at onset, so `sh`/`random` into `position`/`pitch` with a
+clocked `trig` gives per-grain modulation compositionally. Extra seeds beyond
+64 voices drop silently; output is loudness-normalized (`1/√N`). Determinism
+means two instances fed the same input and freeze gate hold identical
+buffers — multi-player-per-buffer patches for free.
+
+```text
+g = grains { secs: 4, seed: 7 }
+src -> g.in
+hold -> g.freeze
+drift -> g.position : 0.3
+g.out_l -> verb.in_l : 0.8
+g.out_r -> verb.in_r : 0.8
 ```
 
 ## Recipes
