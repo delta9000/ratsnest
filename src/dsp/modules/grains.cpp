@@ -68,10 +68,42 @@ class Grains final : public Module {
   void process(const float* ins, float* outs) override {
     const float in = sanitize(ins[0]);
     const bool frozen = sanitize(ins[1]) > 0.5f;
+    const float trig = sanitize(ins[2]);
+
     record(in, frozen);
-    outs[0] = 0.0f;
-    outs[1] = 0.0f;
-    outs[2] = 0.0f;
+
+    // External trig: exactly one grain per rising edge, any density.
+    bool seeded = false;
+    if (prev_trig_ <= 0.5f && trig > 0.5f) seeded = seed_grain(ins);
+    prev_trig_ = trig;
+    seeded = schedule(ins) || seeded;
+
+    float sum_l = 0.0f;
+    float sum_r = 0.0f;
+    int active = 0;
+    for (Grain& g : grains_) {
+      if (!g.active) continue;
+      ++active;
+      const float w = window(static_cast<float>(g.env_phase), g.shape);
+      const float s = read(g.phase) * w;
+      sum_l += s * g.gain_l;
+      sum_r += s * g.gain_r;
+      g.phase += g.inc;
+      g.env_phase += g.env_inc;
+      if (g.env_phase >= 1.0) g.active = false;
+    }
+
+    // Loudness normalization: grain count + window energy (Clouds), smoothed
+    // ~10 ms so births/deaths don't step the gain.
+    const float shape_now = sanitize_clamp(ins[9], 0.0f, 1.0f, 0.5f);
+    const float target = std::min(1.0f + 2.0f * shape_now, 2.0f) /
+                         std::sqrt(static_cast<float>(std::max(active, 1)));
+    norm_ += norm_a_ * (target - norm_);
+    norm_ = flush_denormal(norm_);
+
+    outs[0] = sum_l * norm_;
+    outs[1] = sum_r * norm_;
+    outs[2] = seeded ? 1.0f : 0.0f;
   }
 
  private:
@@ -81,6 +113,100 @@ class Grains final : public Module {
     if (file_mode_ || frozen) return;
     buf_[static_cast<std::size_t>(write_abs_) & mask_] = in;
     ++write_abs_;
+  }
+
+  // Internal density/jitter clock; the scheduler task fills this in.
+  bool schedule(const float* /*ins*/) { return false; }
+
+  // Latch one grain from the current input values. Returns false when the
+  // pool is saturated (seeds drop silently, like the hardware).
+  bool seed_grain(const float* ins) {
+    Grain* g = nullptr;
+    for (Grain& c : grains_) {
+      if (!c.active) {
+        g = &c;
+        break;
+      }
+    }
+    if (g == nullptr) return false;
+
+    const float size_s = sanitize_clamp(ins[5], 0.005f, 2.0f, 0.1f);
+    const float pitch = sanitize_clamp(ins[6], -4.0f, 4.0f);
+    const float shape = sanitize_clamp(ins[9], 0.0f, 1.0f, 0.5f);
+    const float spread = sanitize_clamp(ins[10], 0.0f, 1.0f, 0.5f);
+    const bool reverse = sanitize(ins[11]) > 0.5f;
+    const float pos = sanitize_clamp(ins[3], 0.0f, 1.0f, 0.5f);
+
+    const double len = static_cast<double>(len_);
+    const double ratio = std::exp2(static_cast<double>(pitch));
+    double dur = static_cast<double>(size_s) * static_cast<double>(rate_);
+    double span = dur * std::max(ratio, 1.0);  // buffer distance covered
+    if (span > len * 0.25) {  // keep every grain inside a quarter ring
+      dur *= (len * 0.25) / span;
+      span = len * 0.25;
+    }
+
+    // Placement (spec §3): margins guarantee the read head never crosses the
+    // moving record head nor out-runs the oldest sample.
+    double start;
+    if (file_mode_) {
+      start = 4.0 + static_cast<double>(pos) * std::max(len - span - 8.0, 0.0);
+    } else {
+      const double available = std::max(len - 2.0 * span - 8.0, 0.0);
+      const double delay = static_cast<double>(pos) * available + span + 4.0;
+      start = static_cast<double>(write_abs_) - delay;
+    }
+
+    g->active = true;
+    g->phase = reverse ? start + span : start;
+    g->inc = reverse ? -ratio : ratio;
+    g->env_phase = 0.0;
+    g->env_inc = 1.0 / std::max(dur, 1.0);
+    g->shape = shape;
+    const float pan = 0.5f + spread * (frand() - 0.5f);
+    const float angle = pan * (std::numbers::pi_v<float> / 2.0f);
+    g->gain_l = std::cos(angle);
+    g->gain_r = std::sin(angle);
+    return true;
+  }
+
+  // Window morph (Clouds Grain::RenderEnvelope): folded triangle; below 0.5
+  // the slopes steepen toward a boxcar, above 0.5 it blends toward a
+  // raised-cosine of the triangle -> Hann at 1.
+  static float window(float p, float shape) {
+    const float tri = 1.0f - std::abs(2.0f * p - 1.0f);
+    if (shape < 0.5f) {
+      return std::min(tri * (0.5f / (shape + 0.01f)), 1.0f);
+    }
+    const float rc = 0.5f - 0.5f * std::cos(std::numbers::pi_v<float> * tri);
+    return tri + (2.0f * shape - 1.0f) * (rc - tri);
+  }
+
+  // 4-point cubic Hermite read; masked ring indexing makes wrap branch-free
+  // (the file task adds a clamped branch for the non-ring buffer).
+  float read(double idx) const {
+    const auto i1 = static_cast<uint64_t>(idx);
+    const float f = static_cast<float>(idx - static_cast<double>(i1));
+    const float x0 = buf_[static_cast<std::size_t>(i1 - 1) & mask_];
+    const float x1 = buf_[static_cast<std::size_t>(i1) & mask_];
+    const float x2 = buf_[static_cast<std::size_t>(i1 + 1) & mask_];
+    const float x3 = buf_[static_cast<std::size_t>(i1 + 2) & mask_];
+    return hermite(x0, x1, x2, x3, f);
+  }
+
+  static float hermite(float x0, float x1, float x2, float x3, float f) {
+    const float c1 = 0.5f * (x2 - x0);
+    const float c2 = x0 - 2.5f * x1 + 2.0f * x2 - 0.5f * x3;
+    const float c3 = 0.5f * (x3 - x0) + 1.5f * (x1 - x2);
+    return ((c3 * f + c2) * f + c1) * f + x1;
+  }
+
+  // xorshift32 in [0, 1): deterministic per the seed config.
+  float frand() {
+    rng_ ^= rng_ << 13;
+    rng_ ^= rng_ >> 17;
+    rng_ ^= rng_ << 5;
+    return static_cast<float>(rng_ >> 8) * (1.0f / 16777216.0f);
   }
 
   float rate_ = 48000.0f;
