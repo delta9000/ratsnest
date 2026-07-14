@@ -114,3 +114,25 @@ TEST_CASE("follow: hostile inputs stay finite") {
     CHECK(std::isfinite(outs[1]));
   }
 }
+
+TEST_CASE("follow: copy_state_from migrates envelope and gate latch") {
+  auto a = make_follow(48000.0, "peak");
+  float ins[4] = {0.7f, 0.001f, 0.001f, 0.1f};  // fast ballistics, thresh 0.1
+  float outs[2] = {0.0f, 0.0f};
+  for (int i = 0; i < 5000; ++i) a->process(ins, outs);
+  const float env_a = outs[0];
+  CHECK(env_a > 0.6f);        // settled near 0.7
+  CHECK(outs[1] == 1.0f);     // env > thresh so gate latched high
+
+  // A fresh instance continues seamlessly after migration.
+  auto b = make_follow(48000.0, "peak");
+  b->copy_state_from(*a);
+  b->process(ins, outs);
+  CHECK(outs[0] == doctest::Approx(env_a).epsilon(0.02));
+  CHECK(outs[1] == 1.0f);
+
+  // Without migration it would start from silence (proves migration matters).
+  auto c = make_follow(48000.0, "peak");
+  c->process(ins, outs);
+  CHECK(outs[0] < 0.1f);      // one sample up from zero, far from 0.7
+}

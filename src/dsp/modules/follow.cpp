@@ -59,6 +59,12 @@ class Follow final : public Module {
     outs[1] = gate_high_ ? 1.0f : 0.0f;
   }
 
+  void copy_state_from(const Module& other) override {
+    const auto& o = static_cast<const Follow&>(other);
+    state_ = o.state_;
+    gate_high_ = o.gate_high_;
+  }
+
  private:
   float rate_ = 48000.0f;
   bool is_rms_ = false;
