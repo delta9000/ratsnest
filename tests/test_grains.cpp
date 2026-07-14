@@ -329,3 +329,74 @@ TEST_CASE("grains: hostile inputs never poison state") {
   }
   CHECK(nonzero);
 }
+
+TEST_CASE("grains: frozen buffer is immune to input (twin test)") {
+  auto a = make_grains();
+  auto b = make_grains();
+  Ins ia, ib;
+  float oa[3] = {0.f, 0.f, 0.f};
+  float ob[3] = {0.f, 0.f, 0.f};
+  for (int i = 0; i < 48000; ++i) {
+    const float x = static_cast<float>(
+        std::sin(2.0 * std::numbers::pi * 220.0 * i / 48000.0) * 0.5);
+    ia.v[0] = x;
+    ib.v[0] = x;
+    a->process(ia.v, oa);
+    b->process(ib.v, ob);
+  }
+  ia.v[1] = 1.0f;
+  ib.v[1] = 1.0f;
+  ia.v[0] = 1.0f;  // a gets slammed while frozen; b hears silence
+  ib.v[0] = 0.0f;
+  for (int i = 0; i < 2000; ++i) {
+    a->process(ia.v, oa);
+    b->process(ib.v, ob);
+  }
+  ia.v[0] = 0.0f;
+  ia.v[2] = 1.0f;
+  ib.v[2] = 1.0f;
+  a->process(ia.v, oa);
+  b->process(ib.v, ob);
+  ia.v[2] = 0.0f;
+  ib.v[2] = 0.0f;
+  CHECK(oa[0] == ob[0]);
+  for (int t = 1; t < 4800; ++t) {
+    a->process(ia.v, oa);
+    b->process(ib.v, ob);
+    CHECK(oa[0] == ob[0]);  // identical grains: the frozen ring never changed
+  }
+}
+
+TEST_CASE("grains: unfreeze crossfades from frozen content into live input") {
+  auto m = make_grains();
+  Ins ins;
+  float outs[3] = {0.f, 0.f, 0.f};
+  ins.v[0] = 0.6f;  // record DC 0.6
+  for (int i = 0; i < 10000; ++i) m->process(ins.v, outs);
+  ins.v[1] = 1.0f;  // freeze; tail captures 0.6
+  for (int i = 0; i < 500; ++i) m->process(ins.v, outs);
+  ins.v[1] = 0.0f;  // unfreeze into DC 0.8 — for only 300 samples, so the
+  ins.v[0] = 0.8f;  // grain below reads INSIDE the 256-sample crossfade
+  for (int i = 0; i < 300; ++i) m->process(ins.v, outs);
+  ins.v[1] = 1.0f;  // freeze again to hold the seam still
+  ins.v[0] = 0.0f;
+  ins.v[2] = 1.0f;
+  ins.v[3] = 0.0f;   // newest content
+  ins.v[5] = 0.005f;  // 240-sample grain: span 240, delay 244 -> start is
+                      // 75836 - 244, i.e. post-unfreeze write index 56; the
+                      // grain reads indices 56..295: crossfade (56..255)
+                      // then pure live (256..295).
+  m->process(ins.v, outs);
+  ins.v[2] = 0.0f;
+  const float mid = std::cos(std::numbers::pi_v<float> / 4.0f);
+  float x30 = 0.0f;
+  float x230 = 0.0f;
+  for (int t = 1; t < 240; ++t) {
+    m->process(ins.v, outs);
+    if (t == 30) x30 = outs[0] / mid;    // write index 86: a = 86/256
+    if (t == 230) x230 = outs[0] / mid;  // write index 286: pure live
+  }
+  // A hard cut would read 0.8 at both points; the crossfade reads the blend.
+  CHECK(x30 == doctest::Approx(0.6f + 0.2f * (86.0f / 256.0f)).epsilon(0.05));
+  CHECK(x230 == doctest::Approx(0.8f).epsilon(0.02));
+}

@@ -107,11 +107,34 @@ class Grains final : public Module {
   }
 
  private:
-  // Advance the record head by one sample. The freeze-tail crossfade task
-  // replaces this with the click-free version.
+  // Advance the record head. While frozen, capture the first kTail inputs
+  // (continuous with the frozen content's edge); on unfreeze, crossfade the
+  // written stream from that tail into live input — Clouds' click-free
+  // WriteFade resume (spec §3 "Freeze").
   void record(float in, bool frozen) {
-    if (file_mode_ || frozen) return;
-    buf_[static_cast<std::size_t>(write_abs_) & mask_] = in;
+    if (file_mode_) return;
+    if (frozen) {
+      if (!was_frozen_) {
+        tail_len_ = 0;
+        was_frozen_ = true;
+      }
+      if (tail_len_ < kTail) tail_[static_cast<std::size_t>(tail_len_++)] = in;
+      return;
+    }
+    if (was_frozen_) {
+      xfade_pos_ = 0;
+      was_frozen_ = false;
+    }
+    float x = in;
+    if (xfade_pos_ < kTail) {
+      if (tail_len_ > 0) {
+        const float a = static_cast<float>(xfade_pos_) / static_cast<float>(kTail);
+        const int ti = std::min(xfade_pos_, tail_len_ - 1);
+        x = tail_[static_cast<std::size_t>(ti)] * (1.0f - a) + in * a;
+      }
+      ++xfade_pos_;
+    }
+    buf_[static_cast<std::size_t>(write_abs_) & mask_] = x;
     ++write_abs_;
   }
 
