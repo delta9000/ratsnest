@@ -19,6 +19,22 @@ constexpr OutputInfo kOuts[] = {
     {"gr"}
 };
 
+// Fixed-capacity circular deque used for the O(1) sliding-window maximum.
+// Stores ring-buffer indices in monotonically decreasing order of maxbuf_ value.
+struct SlideMaxDeque {
+  int buf[512] = {};
+  int head_ = 0;
+  int tail_ = 0; // one past the last element
+
+  void clear() { head_ = 0; tail_ = 0; }
+  bool empty() const { return head_ == tail_; }
+  void push_back(int v) { buf[tail_] = v; tail_ = (tail_ + 1) % 512; }
+  void pop_back()  { tail_ = (tail_ + 511) % 512; }
+  void pop_front() { head_ = (head_ + 1)   % 512; }
+  int  front() const { return buf[head_]; }
+  int  back()  const { return buf[(tail_ + 511) % 512]; }
+};
+
 class Limiter final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
@@ -27,10 +43,12 @@ class Limiter final : public Module {
     
     g_smooth_ = 0.0f;
     
-    // Clear ring buffers
+    // Clear ring buffers and sliding-max state
     std::fill(std::begin(buffer_l_), std::end(buffer_l_), 0.0f);
     std::fill(std::begin(buffer_r_), std::end(buffer_r_), 0.0f);
+    std::fill(std::begin(maxbuf_),   std::end(maxbuf_),   0.0f);
     write_idx_ = 0;
+    deq_.clear();
   }
 
   void process(const float* ins, float* outs) override {
@@ -45,19 +63,30 @@ class Limiter final : public Module {
     const float threshold = sanitize_clamp(ins[2], -24.0f, 0.0f, -0.1f);
     const float release = sanitize_clamp(ins[3], 0.001f, 2.0f, 0.05f);
     
-    // 2. Calculate delay size (2.0 ms lookahead)
+    // 2. Calculate delay size (2.0 ms lookahead).
+    //    Cap at 511 so the leaving index can never alias the write index.
     const int delay_samples = std::clamp(
         static_cast<int>(std::round(rate_ * 0.002f)),
         1,
-        512
+        511
     );
-    
-    // 3. Scan the lookahead window in the ring buffer to find peak (including the read index sample)
-    float max_peak = 1e-12f;
-    for (int i = 0; i <= delay_samples; ++i) {
-      int idx = (write_idx_ - i + 512) % 512;
-      max_peak = std::max({max_peak, std::abs(buffer_l_[idx]), std::abs(buffer_r_[idx])});
+
+    // 3. Sliding-window peak via monotonic deque — O(1) amortised.
+    //    maxbuf_ caches max(|L|, |R|) at each ring-buffer position.
+    maxbuf_[write_idx_] = std::max({std::abs(in_l), std::abs(in_r), 1e-12f});
+
+    // Remove the position that just fell outside the window as write_idx_ advanced.
+    // When we move from T-1 to T the stale position is T-delay_samples-1.
+    const int leaving = (write_idx_ - delay_samples - 1 + 1024) % 512;
+    if (!deq_.empty() && deq_.front() == leaving) {
+      deq_.pop_front();
     }
+    // Maintain monotonically-decreasing order: drop smaller tail entries.
+    while (!deq_.empty() && maxbuf_[deq_.back()] <= maxbuf_[write_idx_]) {
+      deq_.pop_back();
+    }
+    deq_.push_back(write_idx_);
+    const float max_peak = maxbuf_[deq_.front()];
     
     // 4. Calculate gain reduction target in dB
     const float peak_db = 20.0f * std::log10(max_peak);
@@ -97,7 +126,9 @@ class Limiter final : public Module {
     g_smooth_ = o.g_smooth_;
     std::copy(std::begin(o.buffer_l_), std::end(o.buffer_l_), std::begin(buffer_l_));
     std::copy(std::begin(o.buffer_r_), std::end(o.buffer_r_), std::begin(buffer_r_));
+    std::copy(std::begin(o.maxbuf_),   std::end(o.maxbuf_),   std::begin(maxbuf_));
     write_idx_ = o.write_idx_;
+    deq_ = o.deq_;
   }
 
  private:
@@ -107,7 +138,9 @@ class Limiter final : public Module {
   // Ring buffers
   float buffer_l_[512] = {};
   float buffer_r_[512] = {};
+  float maxbuf_[512]   = {};  // max(|L|,|R|) at each position for sliding-window max
   int write_idx_ = 0;
+  SlideMaxDeque deq_;          // monotonic deque for O(1) lookahead peak extraction
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Limiter>(); }
