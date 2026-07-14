@@ -115,8 +115,27 @@ class Grains final : public Module {
     ++write_abs_;
   }
 
-  // Internal density/jitter clock; the scheduler task fills this in.
-  bool schedule(const float* /*ins*/) { return false; }
+  // Internal clock (spec §3 "Scheduling"): after each internal seed the next
+  // onset is drawn as dt = base * ((1 - jitter) + jitter * (-ln u)). Since
+  // E[-ln u] = 1, the mean rate is exactly `density` for every jitter;
+  // jitter 0 is a synchronous stream, jitter 1 a Poisson cloud.
+  bool schedule(const float* ins) {
+    const float density = sanitize_clamp(ins[7], 0.0f, 200.0f);
+    if (density <= 0.0f) return false;
+    bool seeded = false;
+    if (countdown_ <= 0.0) {
+      seeded = seed_grain(ins);
+      const float jitter = sanitize_clamp(ins[8], 0.0f, 1.0f, 0.5f);
+      const double base =
+          static_cast<double>(rate_) / static_cast<double>(density);
+      const double u = 1.0 - static_cast<double>(frand());  // (0, 1]
+      const double dt = base * ((1.0 - static_cast<double>(jitter)) +
+                                static_cast<double>(jitter) * -std::log(u));
+      countdown_ += std::max(dt, 1.0);
+    }
+    countdown_ -= 1.0;
+    return seeded;
+  }
 
   // Latch one grain from the current input values. Returns false when the
   // pool is saturated (seeds drop silently, like the hardware).

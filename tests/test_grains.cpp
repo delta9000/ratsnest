@@ -191,3 +191,74 @@ TEST_CASE("grains: freeze keeps loud input out of the buffer") {
     CHECK(outs[0] == 0.0f);  // the buffer only ever held silence
   }
 }
+
+TEST_CASE("grains: jitter 0 emits a perfectly periodic grain stream") {
+  auto m = make_grains();
+  Ins ins;
+  ins.v[7] = 100.0f;  // density: 480-sample base interval at 48 kHz
+  ins.v[8] = 0.0f;    // jitter 0: deterministic stream
+  float outs[3] = {0.f, 0.f, 0.f};
+  int last = -1;
+  std::vector<int> deltas;
+  for (int i = 0; i < 4800; ++i) {
+    m->process(ins.v, outs);
+    if (outs[2] == 1.0f) {
+      if (last >= 0) deltas.push_back(i - last);
+      last = i;
+    }
+  }
+  REQUIRE(deltas.size() == 9);  // onsets at 0, 480, ..., 4320
+  for (int d : deltas) CHECK(d == 480);
+}
+
+TEST_CASE("grains: equal seeds produce identical streams; different seeds differ") {
+  auto run = [](double seed, std::vector<float>& out) {
+    auto m = make_grains(48000.0, 1.0, seed);
+    Ins ins;
+    ins.v[7] = 40.0f;  // density
+    ins.v[8] = 1.0f;   // full jitter: Poisson cloud
+    ins.v[9] = 1.0f;   // Hann
+    ins.v[10] = 1.0f;  // full spread
+    float outs[3] = {0.f, 0.f, 0.f};
+    // Warm-up: fill the ring so position 0.5 reads recorded content, not the
+    // silent pre-roll (grains sit ~32768 samples behind the write head).
+    for (int i = 0; i < 65536; ++i) {
+      ins.v[0] = static_cast<float>(
+          std::sin(2.0 * std::numbers::pi * 220.0 * i / 48000.0) * 0.5);
+      m->process(ins.v, outs);
+    }
+    for (int i = 0; i < 20000; ++i) {
+      ins.v[0] = static_cast<float>(
+          std::sin(2.0 * std::numbers::pi * 220.0 * i / 48000.0) * 0.5);
+      m->process(ins.v, outs);
+      out.push_back(outs[0]);
+      out.push_back(outs[1]);
+    }
+  };
+  std::vector<float> a, b, c;
+  run(7.0, a);
+  run(7.0, b);
+  run(8.0, c);
+  CHECK(a == b);
+  CHECK(a != c);
+}
+
+TEST_CASE("grains: saturated pool stays bounded and finite") {
+  auto m = make_grains();
+  Ins ins;
+  ins.v[5] = 2.0f;    // 2 s grains (quarter-buffer cap applies)
+  ins.v[7] = 200.0f;  // max density: pool saturates, seeds drop
+  ins.v[8] = 1.0f;
+  ins.v[9] = 0.0f;    // boxcar: worst-case overlap energy
+  ins.v[10] = 1.0f;
+  float outs[3] = {0.f, 0.f, 0.f};
+  for (int i = 0; i < 30000; ++i) {
+    ins.v[0] = static_cast<float>(
+        std::sin(2.0 * std::numbers::pi * 220.0 * i / 48000.0));
+    m->process(ins.v, outs);
+    CHECK(std::isfinite(outs[0]));
+    CHECK(std::isfinite(outs[1]));
+    CHECK(std::abs(outs[0]) < 6.0f);
+    CHECK(std::abs(outs[1]) < 6.0f);
+  }
+}
