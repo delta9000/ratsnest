@@ -1,4 +1,4 @@
-# all-modules-song -- A minor pentatonic at 120 BPM, about 4:32.
+# minor-machinery -- A minor pentatonic at 120 BPM, about 4:32.
 #
 # Thirty-four musical four-bar blocks plus one silent guard make a complete
 # song. A states an
@@ -459,7 +459,7 @@ master_clip.out_r -> master_limit.in_r
 
 master_scope = scope { label: all_modules_master }
 master_limit.out_l -> master_scope.in
-capture = rec { file: "all-modules-song-take.wav", secs: 16 }
+capture = rec { file: "minor-machinery-take.wav", secs: 16 }
 master_limit.out_l -> capture.in_l
 master_limit.out_r -> capture.in_r
 arr_main.cv -> capture.gate

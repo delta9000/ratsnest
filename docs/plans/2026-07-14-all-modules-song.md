@@ -1,4 +1,4 @@
-# All-Modules A/B Song Implementation Plan
+# Minor Machinery Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -13,20 +13,20 @@
 ### Task 1: Establish a failing song fixture
 
 **Files:**
-- Create: `patches/all-modules-song.patch`
+- Create: `patches/minor-machinery.patch`
 
 **Step 1: Write the minimal failing fixture**
 
-Create `patches/all-modules-song.patch` with the title comment and one intentionally unknown declaration:
+Create `patches/minor-machinery.patch` with the title comment and one intentionally unknown declaration:
 
 ```text
-# all-modules-song -- 120 BPM, A minor pentatonic, 4:32
+# minor-machinery -- 120 BPM, A minor pentatonic, 4:32
 song = pending_all_modules_song
 ```
 
 **Step 2: Run validation to verify it fails**
 
-Run: `mise run check -- patches/all-modules-song.patch`
+Run: `mise run check -- patches/minor-machinery.patch`
 
 Expected: non-zero exit with an unknown-module diagnostic for `pending_all_modules_song`.
 
@@ -36,14 +36,14 @@ Add the 480 BPM sixteenth clock, divider tree through a four-bar pulse, and sect
 
 **Step 4: Run validation**
 
-Run: `mise run check -- patches/all-modules-song.patch`
+Run: `mise run check -- patches/minor-machinery.patch`
 
 Expected: `ok`.
 
 ### Task 2: Add harmony, A material, and derived B material
 
 **Files:**
-- Modify: `patches/all-modules-song.patch`
+- Modify: `patches/minor-machinery.patch`
 
 **Step 1: Add the shared progression**
 
@@ -59,14 +59,14 @@ Clock `turing`, `random`, `bern`, and `euclid` from the same tree. Quantize orna
 
 **Step 4: Run validation**
 
-Run: `mise run check -- patches/all-modules-song.patch`
+Run: `mise run check -- patches/minor-machinery.patch`
 
 Expected: `ok`.
 
 ### Task 3: Build the instrument and optional-input voices
 
 **Files:**
-- Modify: `patches/all-modules-song.patch`
+- Modify: `patches/minor-machinery.patch`
 
 **Step 1: Add rhythm voices**
 
@@ -86,14 +86,14 @@ Instantiate `midi`, `extin`, and `sampler` in low-level parallel branches. Missi
 
 **Step 5: Run validation**
 
-Run: `mise run check -- patches/all-modules-song.patch`
+Run: `mise run check -- patches/minor-machinery.patch`
 
 Expected: `ok`.
 
 ### Task 4: Add texture, effects, mastering, and sinks
 
 **Files:**
-- Modify: `patches/all-modules-song.patch`
+- Modify: `patches/minor-machinery.patch`
 
 **Step 1: Build the stereo instrument mix**
 
@@ -109,30 +109,30 @@ Connect `dcblock` → `eq` → external-sidechain `compressor` → `stereo` → 
 
 **Step 4: Run validation**
 
-Run: `mise run check -- patches/all-modules-song.patch`
+Run: `mise run check -- patches/minor-machinery.patch`
 
 Expected: `ok`.
 
 ### Task 5: Verify literal module coverage and audio behavior
 
 **Files:**
-- Modify if needed: `patches/all-modules-song.patch`
+- Modify if needed: `patches/minor-machinery.patch`
 
 **Step 1: Compare patch types to the registry**
 
-Extract every `&<name>_info` entry from `src/dsp/registry.cpp`, then verify a declaration of each corresponding type exists in `patches/all-modules-song.patch`.
+Extract every `&<name>_info` entry from `src/dsp/registry.cpp`, then verify a declaration of each corresponding type exists in `patches/minor-machinery.patch`.
 
 Expected: no missing types; all 43 registry entries are represented.
 
 **Step 2: Render the opening smoke window**
 
-Run: `build/modsynth render patches/all-modules-song.patch -d 30s -o /tmp/all-modules-smoke.wav --stats 5s`
+Run: `build/modsynth render patches/minor-machinery.patch -d 30s -o /tmp/all-modules-smoke.wav --stats 5s`
 
 Expected: successful render, finite non-silent RMS, peak below 1.0, and acceptably low DC.
 
 **Step 3: Render the full arrangement**
 
-Run: `build/modsynth render patches/all-modules-song.patch -d 280s -o /tmp/all-modules-song.wav --stats 8s`
+Run: `build/modsynth render patches/minor-machinery.patch -d 280s -o /tmp/minor-machinery.wav --stats 8s`
 
 Expected: successful render with audible/non-silent windows across the arranged body, a controlled peak below the limiter ceiling, and a final fade/tail.
 
@@ -145,6 +145,6 @@ Expected: all selected tests pass.
 **Step 5: Commit**
 
 ```bash
-git add patches/all-modules-song.patch docs/plans/2026-07-14-all-modules-song.md
+git add patches/minor-machinery.patch docs/plans/2026-07-14-minor-machinery.md
 git commit -m "feat: add all-modules A/B song"
 ```
