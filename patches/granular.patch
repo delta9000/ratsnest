@@ -1,0 +1,25 @@
+# granular.patch — frozen texture cloud from a simple drone.
+# grains does the granular core; dry/wet, reverb, and width are cables.
+
+drone = vco { freq: 55hz, wave: saw }
+sub   = vco { freq: 110hz, wave: sine }
+bed   = mix { levels: [.5, .4] }
+drone -> bed.in1
+sub -> bed.in2
+
+g = grains { secs: 2, seed: 7 }
+bed.out_l -> g.in
+
+# phase 0.5 starts unfrozen so the ring records first, then freezes at ~5s
+# to hold the drone as a static texture cloud for the rest of the render.
+frz = lfo { freq: 0.1hz, wave: square, phase: 0.5 }
+frz -> g.freeze
+
+drift = lfo { freq: 0.11hz }               # wander the read position
+drift -> g.position : 0.3
+
+verb = reverb { decay: .8, mix: .5 }
+g.out_l -> verb.in_l
+g.out_r -> verb.in_r
+verb.out_l -> out.left
+verb.out_r -> out.right

@@ -214,9 +214,15 @@ bridge. See `docs/modules.md` for behavior.)
 | `clipper` | oversampled stereo clipper | hard/soft (tanh) oversampled clipping, 4x polyphase allpass IIR half-band oversampling, dry-delay latency alignment |
 | `limiter` | lookahead peak limiter | fixed 2.0 ms lookahead, peak detection window, fast 0.1 ms attack, log-domain smoothing |
 
+### Phase 6 — granular (+1)
+
+| Module | Role | Notes |
+|---|---|---|
+| `grains` | granular processor | Clouds core only (buffer + scheduler + 64-grain player); blend section composes from `xfade`/`delay`/`reverb`/`stereo`; see `2026-07-14-grains-design.md` |
+
 ### Explicitly out of scope (Phase 5+ candidates)
 
-Granular processor, physical-modeling voice (Rings-alike), macro-oscillator
+Physical-modeling voice (Rings-alike), macro-oscillator
 (Plaits-alike), dedicated drum voice, `push` manual-gate (needs a GUI panel),
 wavetable VCO, module plugin ABI.
 
