@@ -88,7 +88,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `reverb`, `scope`, `stereo`, `out` |
+| Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `limiter`, `reverb`, `scope`, `stereo`, `out` |
 
 ## `vca`
 
@@ -394,6 +394,17 @@ Zero-gain sections are optimized with exact bypass coefficients.
 
 Internally oversampled at 4x using a cascade of highly optimized 2-path polyphase allpass IIR half-band filters.
 The dry branch is delay-aligned by exactly 1 sample to match the filter's peak latency.
+
+## `limiter`
+
+`limiter` — inputs `in_l` 0, `in_r` 0, `threshold` -0.1, `release` 0.05; outputs `out_l`, `out_r`, `gain`, `gr`.
+A stereo-linked peak limiter with a fixed 2.0 ms lookahead.
+*   `threshold` (clamped `-24..0`, default -0.1): Target ceiling threshold in dBFS.
+*   `release` (clamped `0.001..2`, default 0.05): Release time in seconds.
+*   `gain`: Output. Current linear gain reduction factor.
+*   `gr`: Output. Current gain reduction in positive dB.
+
+Guarantees a true hard ceiling at the target threshold by looking ahead 2.0 ms (96 samples at 48 kHz) to detect peak amplitude, applying a fast 0.1 ms attack curve before the peak arrives.
 
 ## Recipes
 

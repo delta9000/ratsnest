@@ -677,6 +677,13 @@ TEST_CASE("clipper migrates oversampling and delay states") {
   check_continuity("clipper", ins, 1000);
 }
 
+TEST_CASE("limiter migrates lookahead buffer states") {
+  // limiter inputs: in_l, in_r, threshold, release
+  const float ins[4] = {0.8f, -0.5f, -6.0f, 0.05f};
+  check_continuity("limiter", ins, 1000);
+}
+
+
 
 
 

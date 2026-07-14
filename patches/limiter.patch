@@ -1,0 +1,27 @@
+# limiter demo -- Lookahead peak limiting of a driven sawtooth wave
+#
+# A sawtooth wave is driven past the limiter threshold using an LFO-modulated VCA.
+# The limiter smoothly clamps any peaks to the -0.1 dBFS ceiling.
+
+osc   = vco { freq: 110hz, wave: saw }
+sweep = lfo { freq: 0.25hz }
+
+amp = vca { gain: 0.0 }
+osc -> amp.in
+
+# Modulate VCA total gain from 1.0 to 5.0 to dynamically drive the signal
+3.0   -> amp.gain
+sweep -> amp.cv : 2.0
+
+limit = limiter {
+  threshold: -0.1,
+  release: 0.05
+}
+
+# Connect VCA mono signal to stereo limiter inputs
+amp -> limit.in_l
+amp -> limit.in_r
+
+# Connect to master output
+limit.out_l -> out.left
+limit.out_r -> out.right

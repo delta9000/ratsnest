@@ -39,4 +39,5 @@ extern const ModuleInfo stereo_info;
 extern const ModuleInfo compressor_info;
 extern const ModuleInfo eq_info;
 extern const ModuleInfo clipper_info;
+extern const ModuleInfo limiter_info;
 }  // namespace ms::dsp

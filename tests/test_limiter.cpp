@@ -1,0 +1,120 @@
+#include <doctest/doctest.h>
+#include <cmath>
+#include <numbers>
+#include <algorithm>
+#include "dsp/modules.h"
+#include "dsp/mastering.h"
+
+using namespace ms::dsp;
+
+namespace {
+std::unique_ptr<Module> make_limiter(double rate = 48000.0) {
+  const ModuleInfo* info = find_module("limiter");
+  REQUIRE(info != nullptr);
+  auto m = info->create();
+  Config cfg;
+  m->init(rate, cfg);
+  return m;
+}
+}  // namespace
+
+TEST_CASE("limiter: metadata and default parameters") {
+  const ModuleInfo* info = find_module("limiter");
+  REQUIRE(info != nullptr);
+  CHECK(std::string(info->type) == "limiter");
+  
+  REQUIRE(info->inputs.size() == 4);
+  CHECK(std::string(info->inputs[0].name) == "in_l");
+  CHECK(info->inputs[0].def == 0.0f);
+  CHECK(std::string(info->inputs[1].name) == "in_r");
+  CHECK(info->inputs[1].def == 0.0f);
+  CHECK(std::string(info->inputs[2].name) == "threshold");
+  CHECK(info->inputs[2].def == -0.1f); // dBFS
+  CHECK(std::string(info->inputs[3].name) == "release");
+  CHECK(info->inputs[3].def == 0.05f); // s
+  
+  REQUIRE(info->outputs.size() == 4);
+  CHECK(std::string(info->outputs[0].name) == "out_l");
+  CHECK(std::string(info->outputs[1].name) == "out_r");
+  CHECK(std::string(info->outputs[2].name) == "gain");
+  CHECK(std::string(info->outputs[3].name) == "gr");
+}
+
+TEST_CASE("limiter: lookahead latency and hard ceiling") {
+  auto m = make_limiter();
+  // Threshold = -6 dBFS (0.501187)
+  float ins[4] = {0.0f, 0.0f, -6.0f, 0.05f};
+  float outs[4] = {};
+  
+  // 1. Measure latency
+  // Feed a single massive impulse (2.0) at sample 0, then silence.
+  // The output peak should be exactly clamped to threshold, and delayed by exactly 96 samples (2.0 ms lookahead).
+  float thresh_linear = db_to_linear(-6.0f);
+  int peak_idx = -1;
+  float max_val = 0.0f;
+  
+  for (int i = 0; i < 200; ++i) {
+    ins[0] = (i == 0) ? 2.0f : 0.0f;
+    m->process(ins, outs);
+    if (std::abs(outs[0]) > max_val) {
+      max_val = std::abs(outs[0]);
+      peak_idx = i;
+    }
+    // Hard ceiling: output must never exceed threshold
+    CHECK(outs[0] <= doctest::Approx(thresh_linear));
+  }
+  
+  // Latency at 48 kHz for 2.0 ms is exactly 96 samples!
+  CHECK(peak_idx == 96);
+  CHECK(max_val == doctest::Approx(thresh_linear));
+}
+
+TEST_CASE("limiter: lookahead peak extraction") {
+  auto m = make_limiter();
+  // Threshold = -6.0 dBFS. Feed an impulse of 2.0 at sample 0.
+  // The impulse is output at sample 96.
+  // Gain reduction should start rising immediately at sample 0 and be active before sample 96!
+  float ins[4] = {0.0f, 0.0f, -6.0f, 0.05f};
+  float outs[4] = {};
+  
+  bool gr_started_early = false;
+  for (int i = 0; i < 150; ++i) {
+    ins[0] = (i == 0) ? 2.0f : 0.0f;
+    m->process(ins, outs);
+    
+    // Check if gain reduction is active (gr > 0.1) before the impulse is output at sample 96
+    if (i > 5 && i < 96 && outs[3] > 0.1f) {
+      gr_started_early = true;
+    }
+  }
+  CHECK(gr_started_early);
+}
+
+TEST_CASE("limiter: stereo linking") {
+  auto m = make_limiter();
+  // Feed a hot signal on Left (2.0), Right is silent.
+  // Both channels must experience the same gain reduction.
+  float ins[4] = {2.0f, 0.0f, -6.0f, 0.05f};
+  float outs[4] = {};
+  
+  for (int i = 0; i < 150; ++i) {
+    m->process(ins, outs);
+  }
+  
+  // Settle at steady state
+  CHECK(outs[3] > 0.0f); // Gain reduction triggered
+  CHECK(outs[2] < 1.0f); // Gain < 1.0
+  // Left output is clamped, Right output is 0.0 (no signal), but the gain factor is identical
+  CHECK(outs[2] == doctest::Approx(db_to_linear(-outs[3])));
+}
+
+TEST_CASE("limiter: silence and hostile values") {
+  auto m = make_limiter();
+  float ins[4] = {NAN, INFINITY, NAN, NAN};
+  float outs[4] = {};
+  m->process(ins, outs);
+  CHECK(std::isfinite(outs[0]));
+  CHECK(std::isfinite(outs[1]));
+  CHECK(std::isfinite(outs[2]));
+  CHECK(std::isfinite(outs[3]));
+}

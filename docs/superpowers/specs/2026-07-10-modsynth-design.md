@@ -207,6 +207,7 @@ Drums need no module: trigger → `lpg.strike` (kick), `noise`+`svf.hp`+fast
 | `compressor` | stereo linked compressor | stereo-linked feed-forward log-domain soft-knee curve, attack/release smoothing, makeup and dry/wet |
 | `eq` | stereo mastering EQ | five-band parametric EQ (HPF, low shelf, mid1 peaking, mid2 peaking, high shelf), shared coefficients, 20 ms parameter smoothing, zero-gain bypass |
 | `clipper` | oversampled stereo clipper | hard/soft (tanh) oversampled clipping, 4x polyphase allpass IIR half-band oversampling, dry-delay latency alignment |
+| `limiter` | lookahead peak limiter | fixed 2.0 ms lookahead, peak detection window, fast 0.1 ms attack, log-domain smoothing |
 
 ### Explicitly out of scope (Phase 5+ candidates)
 
