@@ -4,7 +4,7 @@
 
 **Goal:** Add a self-running 4:32 A-minor-pentatonic song patch that uses all 43 registered module types and develops its A motif into a derived B section over VI–V–iv–V.
 
-**Architecture:** A tracker-style bank of 34 four-bar arrangement lanes controls a deterministic synthesis graph at 120 BPM. Fixed harmonic and motif sequencers provide the recognizable song material, while generative and live/file modules occupy controlled parallel branches; an eight-channel mix feeds tempo effects and a complete stereo mastering chain.
+**Architecture:** A tracker-style bank of 34 musical four-bar steps plus one silent guard step controls a deterministic synthesis graph at 120 BPM. Fixed harmonic and motif sequencers provide the recognizable song material, while generative and live/file modules occupy controlled parallel branches; an eight-channel mix feeds tempo effects and a complete stereo mastering chain.
 
 **Tech Stack:** modsynth text DSL, existing C++20 runtime registry, `mise` build/check/render tasks, shell-based registry coverage check.
 
@@ -32,7 +32,7 @@ Expected: non-zero exit with an unknown-module diagnostic for `pending_all_modul
 
 **Step 3: Replace the fixture with the timing and arrangement skeleton**
 
-Add the 480 BPM sixteenth clock, divider tree through a four-bar pulse, and 34-step section lanes for lead, bass, pad, percussion, texture, effects, B-selection, and master level. Add `func` slew stages for level lanes.
+Add the 480 BPM sixteenth clock, divider tree through a four-bar pulse, and section lanes with 34 musical steps plus a silent anti-wrap guard for lead, bass, pad, percussion, texture, effects, B-selection, and master level. Add `func` slew stages for level lanes.
 
 **Step 4: Run validation**
 

@@ -1,0 +1,469 @@
+# all-modules-song -- A minor pentatonic at 120 BPM, about 4:32.
+#
+# Thirty-four musical four-bar blocks plus one silent guard make a complete
+# song. A states an
+# eight-note hook; B derives its material by rotating/reversing that contour,
+# lifting selected tones, and changing the rhythm. Harmony is VI-V-iv-V:
+# F major | E major | D minor | E major.
+
+# ---- clock tree: sixteenths at a musical 120 BPM ----
+master   = clock { bpm: 480 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+two_bar  = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> two_bar.in
+bar -> four_bar.in
+
+# ---- 34 musical blocks = 272 seconds / 4:32, then a silent guard ----
+# 0-3 intro | 4-11 A1 | 12-17 B1 | 18-21 break
+# 22-27 A2 | 28-31 B2 | 32-33 outro
+arr_drums = stepseq { steps: [0,0,.15,.3,
+                               .65,.8,1,1,1,1,1,1,
+                               .9,.9,1,1,1,1,
+                               0,0,.2,.4,
+                               .8,1,1,1,1,1,
+                               1,1,1,.9,
+                               .35,0,0] }
+arr_bass = stepseq { steps: [0,.15,.3,.5,
+                              .65,.75,.8,.8,.85,.85,.9,.9,
+                              .75,.8,.85,.9,.9,.85,
+                              .1,.1,.25,.45,
+                              .85,.9,.95,.95,1,1,
+                              .9,.95,1,1,
+                              .35,0,0] }
+arr_lead = stepseq { steps: [0,0,.12,.25,
+                              .45,.55,.65,.7,.75,.8,.8,.85,
+                              .65,.7,.75,.8,.85,.85,
+                              .25,.2,.28,.4,
+                              .75,.8,.85,.9,.95,.95,
+                              .9,.95,1,1,
+                              .4,0,0] }
+arr_pad = stepseq { steps: [.7,.75,.8,.75,
+                             .55,.5,.48,.45,.45,.42,.4,.4,
+                             .5,.52,.55,.58,.6,.6,
+                             1,1,.9,.8,
+                             .48,.45,.42,.4,.38,.38,
+                             .48,.5,.52,.55,
+                             .75,0,0] }
+arr_texture = stepseq { steps: [.45,.5,.55,.6,
+                                 .25,.2,.18,.16,.15,.15,.18,.2,
+                                 .3,.35,.4,.45,.5,.55,
+                                 .8,1,1,.8,
+                                 .25,.2,.18,.18,.2,.25,
+                                 .35,.4,.5,.6,
+                                 .8,0,0] }
+arr_fx = stepseq { steps: [.45,.5,.55,.55,
+                            .35,.35,.4,.4,.42,.42,.45,.45,
+                            .5,.52,.55,.58,.6,.62,
+                            .85,1,1,.8,
+                            .42,.42,.45,.45,.48,.5,
+                            .58,.62,.68,.75,
+                            .9,.35,0] }
+arr_b = stepseq { steps: [0,0,0,0,
+                           0,0,0,0,0,0,0,0,
+                           1,1,1,1,1,1,
+                           1,1,1,1,
+                           0,0,0,0,0,0,
+                           1,1,1,1,
+                           0,0,0] }
+arr_mut = stepseq { steps: [0,0,.02,.02,
+                             .02,.02,.03,.03,.04,.04,.04,.05,
+                             .06,.07,.08,.08,.09,.1,
+                             .18,.22,.18,.12,
+                             .03,.03,.04,.04,.05,.05,
+                             .08,.1,.12,.15,
+                             .02,0,0] }
+arr_freeze = stepseq { steps: [0,0,0,0,
+                                0,0,0,0,0,0,0,0,
+                                0,0,0,0,0,0,
+                                1,1,1,1,
+                                0,0,0,0,0,0,
+                                0,0,0,0,
+                                1,0,0] }
+arr_main = stepseq { steps: [1,1,1,1,
+                              1,1,1,1,1,1,1,1,
+                              1,1,1,1,1,1,
+                              1,1,1,1,
+                              1,1,1,1,1,1,
+                              1,1,1,1,
+                              .45,0,0] }
+four_bar -> arr_drums.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_lead.clock
+four_bar -> arr_pad.clock
+four_bar -> arr_texture.clock
+four_bar -> arr_fx.clock
+four_bar -> arr_b.clock
+four_bar -> arr_mut.clock
+four_bar -> arr_freeze.clock
+four_bar -> arr_main.clock
+
+# Slewed section faders; discrete selector/freeze lanes remain stepped.
+drums_lvl = func { rise: 2, fall: 3 }
+bass_lvl = func { rise: 3, fall: 4 }
+lead_lvl = func { rise: 3, fall: 4 }
+pad_lvl = func { rise: 5, fall: 6 }
+texture_lvl = func { rise: 5, fall: 5 }
+fx_lvl = func { rise: 4, fall: 5 }
+main_lvl = func { rise: 1, fall: 7 }
+arr_drums.cv -> drums_lvl.in
+arr_bass.cv -> bass_lvl.in
+arr_lead.cv -> lead_lvl.in
+arr_pad.cv -> pad_lvl.in
+arr_texture.cv -> texture_lvl.in
+arr_fx.cv -> fx_lvl.in
+arr_main.cv -> main_lvl.in
+
+# ---- shared VI-V-iv-V harmony: F | E | Dm | E ----
+ch_root = stepseq { steps: [-.33333, -.41667, -.58333, -.41667] }
+ch_third = stepseq { steps: [0, -.08333, -.33333, -.08333] }
+ch_fifth = stepseq { steps: [.25, .16667, 0, .16667] }
+bar -> ch_root.clock
+bar -> ch_third.clock
+bar -> ch_fifth.clock
+
+# ---- A hook and derived B hook, both A minor pentatonic ----
+a_motif = stepseq {
+  steps: [0, .25, .58333, .25, .83333, .58333, .41667, .25],
+  gates: [1,1,1,0, 1,1,0,1]
+}
+# B = A's latter contour rotated forward, reverse-resolved, with octave lifts.
+b_motif = stepseq {
+  steps: [.58333, 1.25, .83333, 1.58333, 1.41667, .83333, .25, .41667],
+  gates: [1,0,1,1, 0,1,1,1]
+}
+eighth -> a_motif.clock
+eighth -> b_motif.clock
+two_bar -> a_motif.reset
+two_bar -> b_motif.reset
+
+motif_pitch = switch { mode: addr, n: 2 }
+a_motif.cv -> motif_pitch.in1
+b_motif.cv -> motif_pitch.in2
+arr_b.cv -> motif_pitch.addr
+motif_gate = switch { mode: addr, n: 2 }
+a_motif.trig -> motif_gate.in1
+b_motif.trig -> motif_gate.in2
+arr_b.cv -> motif_gate.addr
+
+motif_quant = quant { scale: [0,3,5,7,10], root: 0 }
+motif_pitch -> motif_quant.in
+motif_note = sh { mode: sample }
+motif_quant -> motif_note.in
+motif_gate -> motif_note.trig
+
+# A repeatable pentatonic ornament shadows the fixed motif.
+ornament_reg = turing { len: 16, prob: 0, seed: 41 }
+master -> ornament_reg.clock
+arr_mut.cv -> ornament_reg.prob
+ornament_quant = quant { scale: [0,3,5,7,10], root: 0 }
+ornament_reg.out -> ornament_quant.in : .72
+ornament_pattern = euclid { steps: 16, hits: 3, rot: 5 }
+master -> ornament_pattern.clock
+arr_lead.cv -> ornament_pattern.hits : 4
+ornament_coin = bern { prob: .76, seed: 19 }
+ornament_pattern.trig -> ornament_coin.gate
+ornament_note = sh { mode: sample }
+ornament_quant -> ornament_note.in
+ornament_coin.a -> ornament_note.trig
+
+# Tempo-derived dotted eighth for the later delay network.
+dotted_eighth = tempo { bpm: 120, beats: .75 }
+
+# ---- kick and audio-derived sidechain CV ----
+kick_gate = logic { op: and }
+quarter -> kick_gate.a
+arr_drums.cv -> kick_gate.b
+kick_env = func { rise: .0007, fall: .2, curve: log }
+kick_gate -> kick_env.trig
+kick_osc = vco { freq: 46hz, wave: sine }
+kick_gate -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.7
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : .95
+kick_drive = drive { amount: .2, mode: soft }
+kick_amp -> kick_drive.in
+kick_follow = follow { mode: peak, attack: 2ms, release: .16, thresh: .08 }
+kick_drive -> kick_follow.in
+
+# ---- clap and hats ----
+clap_steps = stepseq { steps: [0,0,0,0], gates: [0,1,0,1] }
+quarter -> clap_steps.clock
+clap_gate = logic { op: and }
+clap_steps.trig -> clap_gate.a
+arr_drums.cv -> clap_gate.b
+clap_env = func { rise: .001, fall: .13, curve: exp }
+clap_gate -> clap_env.trig
+clap_noise = noise { color: white, seed: 7 }
+clap_filter = svf { cutoff: 1700, res: .5 }
+clap_noise -> clap_filter.in
+clap_amp = vca { gain: 0 }
+clap_filter.bp -> clap_amp.in
+clap_env -> clap_amp.cv : .6
+
+hat_pattern = euclid { steps: 16, hits: 3, rot: 3 }
+master -> hat_pattern.clock
+drums_lvl -> hat_pattern.hits : 6
+hat_coin = bern { prob: .86, seed: 29 }
+hat_pattern.trig -> hat_coin.gate
+hat_env = func { rise: .0005, fall: .045, curve: exp }
+hat_coin.a -> hat_env.trig
+hat_noise = noise { color: white, seed: 31 }
+hat_filter = svf { cutoff: 9200, res: .2 }
+hat_noise -> hat_filter.in
+hat_amp = vca { gain: 0 }
+hat_filter.hp -> hat_amp.in
+hat_env -> hat_amp.cv : .34
+quarter -> hat_amp.cv : -.08
+
+# ---- offbeat bass follows the progression roots ----
+beat_not = logic { op: not }
+quarter -> beat_not.a
+offbeat = logic { op: and }
+eighth -> offbeat.a
+beat_not -> offbeat.b
+bass_gate = logic { op: and }
+offbeat -> bass_gate.a
+arr_bass.cv -> bass_gate.b
+bass_env = adsr { attack: .002, decay: .11, sustain: .45, release: .12,
+                  curve: exp }
+bass_gate -> bass_env.gate
+bass_osc = vco { freq: 110hz, wave: saw }
+ch_root.cv -> bass_osc.v_oct
+bass_filter = ladder { cutoff: 115, res: .2, drive: .45 }
+bass_osc -> bass_filter.in
+bass_env -> bass_filter.cutoff : 900
+bass_lvl -> bass_filter.cutoff : 240
+bass_amp = vca { gain: 0, response: exp }
+bass_filter -> bass_amp.in
+bass_env -> bass_amp.cv : .78
+bass_post = vca { gain: 0 }
+bass_amp -> bass_post.in
+bass_lvl -> bass_post.cv : .72
+
+# ---- four overlapping hook voices: folded A, brighter derived B ----
+motif_alloc = alloc { n: 4, mode: rr }
+motif_gate -> motif_alloc.gate
+motif_note -> motif_alloc.voct
+motif = voice { notes: motif_alloc }
+motif.osc = vco { freq: 220hz, wave: tri }
+motif_alloc.voct -> motif.osc.v_oct
+motif_alloc.spread -> motif.osc.v_oct : .006
+motif.fold = fold { fold: 1.7, sym: 0 }
+motif.osc -> motif.fold.in
+motif_color = lfo { freq: .037hz, wave: sine }
+motif.color = xfade { mix: .28 }
+motif.osc -> motif.color.a
+motif.fold -> motif.color.b
+arr_b.cv -> motif.color.mix : .38
+motif_color -> motif.color.mix : .08
+motif.pluck = lpg { damp: .55, decay: .7 }
+motif.color -> motif.pluck.in
+motif_alloc.gate -> motif.pluck.strike
+fx_lvl -> motif.pluck.decay : .8
+motif.left = vca { gain: .5 }
+motif.right = vca { gain: .5 }
+motif.pluck -> motif.left.in
+motif.pluck -> motif.right.in
+motif_alloc.spread -> motif.left.cv : -.5
+motif_alloc.spread -> motif.right.cv : .5
+motif_l = vca { gain: 0 }
+motif_r = vca { gain: 0 }
+motif.left -> motif_l.in : .32
+motif.right -> motif_r.in : .32
+lead_lvl -> motif_l.cv : .9
+lead_lvl -> motif_r.cv : .9
+
+# ---- sparse ornament derived from the same pentatonic pitch pool ----
+ornament_osc = vco { freq: 440hz, wave: pulse, pw: .5 }
+ornament_note -> ornament_osc.v_oct
+ornament_pwm = lfo { freq: .19hz, wave: tri }
+ornament_pwm -> ornament_osc.pwm : .12
+ornament_pluck = lpg { damp: .72, decay: .18 }
+ornament_osc -> ornament_pluck.in
+ornament_coin.a -> ornament_pluck.strike
+ornament_post = vca { gain: 0 }
+ornament_pluck -> ornament_post.in : .28
+lead_lvl -> ornament_post.cv : .65
+
+# ---- chord pad with A/B-related air morph and smooth random motion ----
+pad_osc1 = vco { freq: 110hz, wave: saw }
+pad_osc2 = vco { freq: 110hz, wave: pulse, pw: .5 }
+pad_osc3 = vco { freq: 110hz, wave: tri }
+ch_root.cv -> pad_osc1.v_oct
+ch_third.cv -> pad_osc2.v_oct
+ch_fifth.cv -> pad_osc3.v_oct
+.006 -> pad_osc2.v_oct
+-.007 -> pad_osc3.v_oct
+pad_pwm = lfo { freq: .071hz, wave: sine }
+pad_pwm -> pad_osc2.pwm : .2
+pad_tone = mix { levels: [.32,.28,.3], pans: [-.4,.35,0] }
+pad_osc1 -> pad_tone.in1
+pad_osc2 -> pad_tone.in2
+pad_osc3 -> pad_tone.in3
+pad_air = noise { color: pink, seed: 37 }
+pad_blend = xfade { mix: .12 }
+pad_tone.out_l -> pad_blend.a
+pad_air -> pad_blend.b : .4
+arr_b.cv -> pad_blend.mix : .12
+pad_wander = random { rate: .12hz, smooth: 1, seed: 43 }
+pad_motion = math { op: abs }
+pad_wander -> pad_motion.a
+pad_filter = svf { cutoff: 420, res: .22 }
+pad_blend -> pad_filter.in
+pad_motion -> pad_filter.cutoff : 260
+pad_lvl -> pad_filter.cutoff : 620
+pad_env = adsr { attack: .45, decay: .3, sustain: .82, release: 1.4,
+                 curve: exp }
+bar -> pad_env.gate
+pad_amp = vca { gain: 0, response: exp }
+pad_filter.lp -> pad_amp.in
+pad_env -> pad_amp.cv : .62
+pad_post = vca { gain: 0 }
+pad_amp -> pad_post.in
+pad_lvl -> pad_post.cv : .56
+kick_follow.env -> pad_post.cv : -.16
+
+# ---- optional performance/file layer (silent safely in offline renders) ----
+live_midi = midi { voices: 1, mode: last, cc: [74,1] }
+midi_osc = vco { freq: 220hz, wave: saw }
+live_midi.voct1 -> midi_osc.v_oct
+midi_env = adsr { attack: .01, decay: .18, sustain: .65, release: .5,
+                  curve: exp }
+live_midi.gate1 -> midi_env.gate
+midi_filter = svf { cutoff: 650, res: .25 }
+midi_osc -> midi_filter.in
+live_midi.cc1 -> midi_filter.cutoff : 3200
+midi_amp = vca { gain: 0 }
+midi_filter.lp -> midi_amp.in
+midi_env -> midi_amp.cv : .3
+
+live_audio = extin
+live_filter = svf { cutoff: 1200, res: .15 }
+live_audio -> live_filter.in : .2
+optional_sample = sampler { file: "samples/optional-loop.wav", loop: off }
+four_bar -> optional_sample.trig
+optional_bus = mix { levels: [.5,.4,.25], pans: [-.3,.3,0] }
+midi_amp -> optional_bus.in1
+live_filter.bp -> optional_bus.in2
+optional_sample -> optional_bus.in3
+
+# ---- eight-channel song mix ----
+song_mix = mix {
+  levels: [.78,.5,.72,.62,.62,.55,.3,.18],
+  pans: [0,.22,0,-1,1,-.18,.45,0]
+}
+kick_drive -> song_mix.in1
+clap_amp -> song_mix.in2
+hat_amp -> song_mix.in2
+bass_post -> song_mix.in3
+motif_l -> song_mix.in4
+motif_r -> song_mix.in5
+pad_post -> song_mix.in6
+ornament_post -> song_mix.in7
+optional_bus.out_l -> song_mix.in8
+optional_bus.out_r -> song_mix.in8
+kick_follow.env -> song_mix.lvl4 : -.08
+kick_follow.env -> song_mix.lvl5 : -.08
+kick_follow.env -> song_mix.lvl6 : -.18
+
+# ---- tempo echo, plate, and arranged granular memory ----
+hook_delay = delay { time: 0, feedback: .48, mix: 1, tone: 4300, slew: .08 }
+motif_l -> hook_delay.in : .32
+motif_r -> hook_delay.in : .32
+ornament_post -> hook_delay.in : .2
+dotted_eighth.seconds -> hook_delay.time
+arr_b.cv -> hook_delay.pitch : .08333
+
+song_plate = reverb { decay: .72, damp: .42, mix: 1, predelay: .018,
+                      mod_rate: .7, mod_depth: 11 }
+song_mix.out_l -> song_plate.in_l : .55
+song_mix.out_r -> song_plate.in_r : .55
+hook_delay -> song_plate.in_l : .24
+hook_delay -> song_plate.in_r : .24
+
+memory = grains { secs: 8, seed: 53 }
+pad_post -> memory.in : .72
+motif_l -> memory.in : .2
+motif_r -> memory.in : .2
+arr_freeze.cv -> memory.freeze
+arr_b.cv -> memory.reverse
+pad_wander -> memory.position : .24
+arr_b.cv -> memory.position : .12
+texture_lvl -> memory.scatter : .38
+texture_lvl -> memory.size : .28
+texture_lvl -> memory.density : 22
+arr_mut.cv -> memory.jitter : .5
+fx_lvl -> memory.spread : .42
+
+# Dry channels and stereo effects return without collapsing their image.
+fx_mix = mix {
+  levels: [.82,.82,.34,.34,.3,.3,.22],
+  pans: [-1,1,-1,1,-1,1,0]
+}
+song_mix.out_l -> fx_mix.in1
+song_mix.out_r -> fx_mix.in2
+song_plate.out_l -> fx_mix.in3
+song_plate.out_r -> fx_mix.in4
+memory.out_l -> fx_mix.in5
+memory.out_r -> fx_mix.in6
+hook_delay -> fx_mix.in7
+fx_lvl -> fx_mix.lvl3 : .12
+fx_lvl -> fx_mix.lvl4 : .12
+texture_lvl -> fx_mix.lvl5 : .22
+texture_lvl -> fx_mix.lvl6 : .22
+
+# ---- mastering and sinks ----
+master_gain_l = vca { gain: 0 }
+master_gain_r = vca { gain: 0 }
+fx_mix.out_l -> master_gain_l.in
+fx_mix.out_r -> master_gain_r.in
+main_lvl -> master_gain_l.cv : .72
+main_lvl -> master_gain_r.cv : .72
+
+master_dc = dcblock { cutoff: 12hz }
+master_gain_l -> master_dc.in_l
+master_gain_r -> master_dc.in_r
+master_eq = eq { hp_freq: 28, low_freq: 110, low_gain: -.8,
+                 mid1_freq: 360, mid1_gain: -1.2, mid1_q: .8,
+                 mid2_freq: 2600, mid2_gain: .7, mid2_q: .75,
+                 high_freq: 9500, high_gain: .6 }
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+master_comp = compressor { sidechain: external, threshold: -17, ratio: 2.2,
+                           knee: 5, attack: .012, release: .15,
+                           makeup: 1.2, mix: .82 }
+master_eq.out_l -> master_comp.in_l
+master_eq.out_r -> master_comp.in_r
+kick_drive -> master_comp.side_l : .72
+kick_drive -> master_comp.side_r : .72
+
+master_field = stereo { width: 1.12, balance: 0 }
+master_comp.out_l -> master_field.in_l
+master_comp.out_r -> master_field.in_r
+master_clip = clipper { mode: soft, threshold: -2.2, drive: 1.2, mix: .32 }
+master_field.out_l -> master_clip.in_l
+master_field.out_r -> master_clip.in_r
+master_limit = limiter { threshold: -.4, release: .08 }
+master_clip.out_l -> master_limit.in_l
+master_clip.out_r -> master_limit.in_r
+
+master_scope = scope { label: all_modules_master }
+master_limit.out_l -> master_scope.in
+capture = rec { file: "all-modules-song-take.wav", secs: 16 }
+master_limit.out_l -> capture.in_l
+master_limit.out_r -> capture.in_r
+arr_main.cv -> capture.gate
+
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
+-.08 -> out.level

@@ -11,9 +11,10 @@ than introducing unrelated material.
 ## Form and timing
 
 Run the sixteenth-note master clock at 480 BPM, equivalent to a musical tempo
-of 120 BPM. Clock thirty-four arrangement steps once every four bars. Each
-step lasts eight seconds, so the complete grid is 272 seconds (4:32), with the
-last steps fading into an effects tail.
+of 120 BPM. Clock thirty-four musical arrangement steps once every four bars.
+Each step lasts eight seconds, so the song grid is 272 seconds (4:32), with the
+last steps fading into an effects tail. Append one silent guard step so a
+slightly long render does not wrap immediately back to the intro.
 
 The form is:
 
