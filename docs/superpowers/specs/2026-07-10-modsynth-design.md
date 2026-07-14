@@ -222,9 +222,10 @@ bridge. See `docs/modules.md` for behavior.)
 
 ### Explicitly out of scope (Phase 5+ candidates)
 
-Physical-modeling voice (Rings-alike), macro-oscillator
-(Plaits-alike), dedicated drum voice, `push` manual-gate (needs a GUI panel),
-wavetable VCO, module plugin ABI.
+Macro-oscillator (Plaits-alike), dedicated drum voice, `push` manual-gate
+(needs a GUI panel), wavetable VCO, module plugin ABI. (The physical-modeling
+voice landed as `modal`/`string`; see
+`docs/superpowers/specs/2026-07-14-resonator-design.md`.)
 
 ## 6. Polyphony (implemented: see §3.5 and the voice-alloc spec)
 

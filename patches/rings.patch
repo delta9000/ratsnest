@@ -1,0 +1,27 @@
+# Rings-style plucked string + modal bell, generative.
+clk = clock { bpm: 110 }
+gate = euclid { steps: 8, hits: 3 }
+sub = div { by: 4 }
+mel = turing { len: 8, prob: 0.05, seed: 3 }
+pitch = quant { scale: [0, 3, 5, 7, 10] }
+
+pluck = string { seed: 7, damping: 0.7, position: 0.3 }
+bell = modal { modes: 48, structure: 0.6, damping: 0.65, brightness: 0.4 }
+verb = reverb { decay: 0.55, mix: 0.3 }
+
+clk -> gate.clock
+clk -> mel.clock
+clk -> sub.in
+mel.out -> pitch.in : 0.4
+pitch -> pluck.v_oct
+gate.gate -> pluck.strike
+pitch -> bell.v_oct
+-1 -> bell.v_oct
+sub -> bell.strike
+
+pluck.out -> verb.in_l : 0.5
+pluck.out -> verb.in_r : 0.4
+bell.out -> verb.in_r : 0.35
+bell.out -> verb.in_l : 0.25
+verb.out_l -> out.left
+verb.out_r -> out.right

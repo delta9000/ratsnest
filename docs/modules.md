@@ -577,3 +577,27 @@ kick -> m.in1
 pad -> m.in2
 kick_env -> m.lvl2 : -.3
 ```
+
+### Sympathetic strings (Rings recipe)
+
+Rings' sympathetic model is just coupled strings — string 0 feeds the others
+at low gain, tuned to intervals, ringing longer:
+
+```text
+main = string { seed: 2 }
+s1 = string { seed: 3, damping: 0.85 }
+s2 = string { seed: 4, damping: 0.85 }
+seq -> main.v_oct
+seq -> s1.v_oct
+0.58496 -> s1.v_oct          # +7.02 st: a just fifth, log2(3/2)
+seq -> s2.v_oct
+1 -> s2.v_oct                # +1 octave
+gate -> main.strike
+main.out -> s1.in : 0.1      # Rings couples at 0.2/n
+main.out -> s2.in : 0.1
+main.out -> m.in1
+s1.out -> m.in2 : 0.6
+s2.out -> m.in3 : 0.6
+```
+
+Detune shimmer: duplicate a string and add `0.001 -> dup.v_oct`.
