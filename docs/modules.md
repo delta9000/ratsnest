@@ -617,3 +617,17 @@ s2.out -> m.in3 : 0.6
 ```
 
 Detune shimmer: duplicate a string and add `0.001 -> dup.v_oct`.
+
+### Guitar pedals from existing modules
+
+Several classic pedals need no new module — they compose from what's here:
+
+- **Tremolo:** `lfo -> vca.cv` (1–25 Hz `lfo`; depth = cable gain).
+- **Ring mod:** `math { op: mult }` with an audio-rate carrier on the second
+  input (`carrier -> rm.b`).
+- **Auto-wah:** `follow -> svf.cutoff`, read `svf.bp` (an `lfo` instead of
+  `follow` gives a fixed-rate wah). Q via `svf.res`.
+- **Octave-up (Octavia):** `math { op: abs } -> dcblock` (a full-wave
+  rectifier; note it aliases on bright input).
+- **Big Muff fuzz:** `overdrive { model: muff }`, or cascade two `overdrive`
+  stages with a filter between them.

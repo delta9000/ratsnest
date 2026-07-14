@@ -1,0 +1,23 @@
+# Plucked string into a Tube Screamer, generative.
+# Param values are set in the { } blocks; constant cables would SUM onto the
+# input base (rule 4: no normalling), so `mix: 0.5` belongs in the block.
+clk = clock { bpm: 100 }
+gate = euclid { steps: 8, hits: 5 }
+mel = turing { len: 8, prob: 0.06, seed: 5 }
+pitch = quant { scale: [0, 3, 5, 7, 10] }
+
+gtr = string { seed: 4, damping: 0.72, position: 0.28 }
+od = overdrive { model: tubescreamer, drive: 0.6, tone: 0.6, mix: 0.5, level: 0.4 }
+verb = reverb { decay: 0.5, mix: 0.28 }
+
+clk -> gate.clock
+clk -> mel.clock
+mel.out -> pitch.in : 0.4
+pitch -> gtr.v_oct
+gate.gate -> gtr.strike
+
+gtr.out -> od.in : 0.6
+od.out -> verb.in_l : 0.6
+od.out -> verb.in_r : 0.55
+verb.out_l -> out.left
+verb.out_r -> out.right
