@@ -1,0 +1,17 @@
+# dcblock demo -- Left channel has a heavy DC offset, Right channel is blocked
+#
+# A pulse wave at pw: 0.2 introduces a strong DC offset of 2 * 0.2 - 1 = -0.6.
+# The low-pass filter passes this offset straight through.
+# The right channel uses dcblock to clean it up and restore headroom.
+
+osc  = vco { freq: 220hz, wave: pulse, pw: 0.2 }
+filt = ladder { cutoff: 600hz, res: 0.2 }
+osc  -> filt.in
+
+# Left channel: raw signal (DC offset is audible as asymmetry / loss of headroom)
+filt -> out.left : 0.4
+
+# Right channel: DC-blocked signal (perfectly centered around 0V)
+dc   = dcblock { cutoff: 10hz }
+filt -> dc.in_l
+dc.out_l -> out.right : 0.4

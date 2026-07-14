@@ -88,7 +88,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `delay`, `reverb`, `scope`, `out` |
+| Effects/I/O | `dcblock`, `delay`, `reverb`, `scope`, `out` |
 
 ## `vca`
 
@@ -327,6 +327,14 @@ rule (`alloc`/`midi` expose only banks so `poly.voct` can resolve to
 - `at` is channel pressure `0..1`. Sustain (CC 64) defers note-offs until the
   pedal releases. `channel` `0` = omni (default), else `1..16`; velocity-0
   note-ons are note-offs. All tracker state survives hot reload.
+
+## `dcblock`
+
+`dcblock { cutoff: 10 }` — inputs `in_l` 0, `in_r` 0, `cutoff` 10; outputs `out_l`,
+`out_r`. A first-order high-pass filter that removes DC offsets below the
+cutoff frequency (clamped `1..40` Hz, smoothed around 20 ms). Protects speakers
+and downstream dynamics processors from sub-bass drift. Silence is exact, and
+all internal filter states migrate during hot reload.
 
 ## Recipes
 

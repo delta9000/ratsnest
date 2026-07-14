@@ -646,3 +646,10 @@ TEST_CASE("reverb migrates tank contents, line positions, and lfo phase") {
     CHECK(out_a[1] == doctest::Approx(out_b[1]));
   }
 }
+
+TEST_CASE("dcblock migrates state and smoothed cutoff") {
+  // dcblock inputs: in_l, in_r, cutoff
+  const float ins[3] = {0.8f, -0.5f, 25.0f};
+  check_continuity("dcblock", ins, 1000);
+}
+

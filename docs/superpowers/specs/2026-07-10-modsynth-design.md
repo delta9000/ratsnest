@@ -198,6 +198,12 @@ Drums need no module: trigger → `lpg.strike` (kick), `noise`+`svf.hp`+fast
 | `extin` | external audio in | PipeWire capture ports |
 | `follow` | envelope follower | `attack` `release`; outs `env` `gate` — the audio→CV bridge |
 
+### Phase 5 — mastering modules (+6)
+
+| Module | Role | Notes |
+|---|---|---|
+| `dcblock` | stereo DC blocker | first-order high-pass filter, parameter smoothing around 20 ms, denormal flushing |
+
 ### Explicitly out of scope (Phase 5+ candidates)
 
 Granular processor, physical-modeling voice (Rings-alike), macro-oscillator

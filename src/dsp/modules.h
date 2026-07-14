@@ -34,4 +34,5 @@ extern const ModuleInfo stepseq_info;
 extern const ModuleInfo tempo_info;
 extern const ModuleInfo alloc_info;
 extern const ModuleInfo midi_info;
+extern const ModuleInfo dcblock_info;
 }  // namespace ms::dsp
