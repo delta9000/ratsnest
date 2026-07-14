@@ -84,7 +84,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 
 | Area | Modules |
 |---|---|
-| Sources | `vco`, `lfo`, `noise`, `random`, `sampler` |
+| Sources | `vco`, `lfo`, `noise`, `random`, `sampler`, `modal`, `string` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
@@ -516,6 +516,21 @@ drift -> g.position : 0.3
 g.out_l -> verb.in_l : 0.8
 g.out_r -> verb.in_r : 0.8
 ```
+
+## `modal`
+
+`modal { modes: 64 }` — physical resonator: a parallel bank of up to 128
+bandpass modes on a stretched-harmonic series (Rings' modal model). Inputs
+`in` 0 (excitation audio through a brightness-tracked lowpass), `freq` 220 Hz,
+`v_oct`, rising-edge `strike` (internal mallet: a filtered, energy-normalized
+impulse), `structure` 0.25 (partial spacing: below 0.25 compressed/drum-like,
+0.25..0.3 perfectly harmonic, then stretching toward bell/bar at 1),
+`brightness` 0.5 (spectral tilt of decay and exciter color), `damping` 0.5
+(decay time, exponential across ~4 decades of Q), `position` 0.25
+(strike-position comb; 0.5 nulls the even partials, the fundamental always
+sounds). Outputs `out` plus `odd`/`even` partial groups (`out = odd + even`).
+Config `modes` 2..128, rounded to even — the voice-quality/CPU knob. Bowed
+and blown textures come from `noise -> vca -> m.in` with slow `vca.cv`.
 
 ## Recipes
 
