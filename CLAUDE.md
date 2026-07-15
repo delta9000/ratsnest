@@ -49,3 +49,21 @@ Violating these is a design bug, not a style preference.
 Conventional prefixes (feat/fix/test/chore/docs). Tool-agnostic messages —
 no AI attribution, no session trailers. Docs are part of the diff: update
 spec/CLAUDE.md in the same commit as behavior they describe.
+
+## Attribution and licensing
+
+This project is a synthesis of others' work; provenance is part of the code.
+Before adapting a distinctive algorithm or implementation:
+
+1. Record its primary source and license. Do not copy code whose license is
+   absent, unclear, or incompatible with this MIT-licensed project.
+2. Preserve every required copyright, permission, and disclaimer in
+   `THIRD_PARTY_NOTICES.md` and describe material adaptations.
+3. Add a concise comment at the implementation site and a full entry in
+   `docs/attribution.md`, classified as code-derived, paper-derived,
+   concept-inspired, or an external dependency.
+4. When dependencies or borrowed implementations change, update their version,
+   mapping, and notice in the same commit.
+
+Never invent provenance. Mark an origin unresolved until a primary source can
+be verified.

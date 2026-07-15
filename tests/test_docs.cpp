@@ -73,4 +73,10 @@ TEST_CASE("license and attribution records cover implementation provenance") {
     check_contains(text, "docs/attribution.md");
     check_contains(text, "THIRD_PARTY_NOTICES.md");
   }
+
+  const std::string guidance = read_repo_file("CLAUDE.md");
+  check_contains(guidance, "## Attribution and licensing");
+  check_contains(guidance, "docs/attribution.md");
+  check_contains(guidance, "THIRD_PARTY_NOTICES.md");
+  check_contains(guidance, "absent, unclear, or incompatible");
 }
