@@ -1,0 +1,144 @@
+# "Steel Crusade" — epic power metal, take 2.
+# A natural minor, 168 BPM. Real guitars: string physical-model power chords
+# and lead through the overdrive, galloping over a double-kick. No synthy saws,
+# no bells. Heroic quarter-note lead on chord tones. Everything on short
+# looping stepseqs locked to the bar.
+
+# --- Clock tree: clk pulses on 16ths (672/min = 168 BPM in 16ths) ---
+clk = clock { bpm: 672 }
+beat = div { by: 4 }        # quarter notes
+eighth = div { by: 2 }      # 8th notes
+bar = div { by: 16 }        # bar downbeats
+clk -> beat.in
+clk -> eighth.in
+clk -> bar.in
+
+# --- Chords: Am - F - G - Am, one per bar (root as v/oct, A = 0) ---
+chord = stepseq { steps: [0, -0.3333, -0.1667, 0], gates: [1, 1, 1, 1] }
+bar -> chord.clock
+
+# --- Gallop: "dun - da-da" per beat, drives kick AND the chug ---
+gallop = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 1] }
+clk -> gallop.clock
+
+# ===================== DRUMS =====================
+# Kick (double bass): sine body with a fast pitch punch + a noise beater click
+# so it cuts through the distorted guitars. VCA amps give reliable, full level.
+kaenv = func { rise: 0.001s, fall: 0.095s }
+gallop.trig -> kaenv.trig
+kpenv = func { rise: 0.0003s, fall: 0.006s }
+gallop.trig -> kpenv.trig
+kosc = vco { wave: sine, freq: 50hz }
+kpenv -> kosc.v_oct : 3.2              # near-instant pitch collapse (click, not tom)
+kbody = vca { gain: 0 }
+kosc -> kbody.in
+kaenv -> kbody.cv
+kclk_env = func { rise: 0.0002s, fall: 0.009s }
+gallop.trig -> kclk_env.trig
+kclk_n = noise { color: white, seed: 9 }
+kclk_hp = svf { cutoff: 1700hz, res: 0.2 }
+kclk_n -> kclk_hp.in
+kclk = vca { gain: 0 }
+kclk_hp.hp -> kclk.in
+kclk_env -> kclk.cv
+kick = mix { levels: [1.0, 0.32] }
+kbody -> kick.in1
+kclk -> kick.in2
+
+# Snare on beats 2 & 4: filtered noise crack.
+snseq = stepseq { steps: [0, 0, 0, 0], gates: [0, 1, 0, 1] }
+beat -> snseq.clock
+snenv = func { rise: 0.001s, fall: 0.13s }
+snseq.trig -> snenv.trig
+snz = noise { color: white, seed: 3 }
+snbp = svf { cutoff: 1800hz, res: 0.35 }
+snz -> snbp.in
+snare = vca { gain: 0 }
+snbp.bp -> snare.in
+snenv -> snare.cv
+
+# Hi-hats: steady 8ths, high-passed noise, short decay.
+henv = func { rise: 0.001s, fall: 0.035s }
+eighth -> henv.trig
+hz = noise { color: white, seed: 7 }
+hhp = svf { cutoff: 9000hz, res: 0.2 }
+hz -> hhp.in
+hats = vca { gain: 0 }
+hhp.hp -> hats.in
+henv -> hats.cv
+
+# ===================== RHYTHM GUITAR (string power chords) =====================
+# Root + fifth strings, plucked short (palm mute) on the gallop, into a RAT.
+groot = string { seed: 11, damping: 0.34, position: 0.3, brightness: 0.55 }
+chord.cv -> groot.v_oct
+-2 -> groot.v_oct                 # A2 guitar register
+gallop.trig -> groot.strike
+gfifth = string { seed: 12, damping: 0.34, position: 0.3, brightness: 0.55 }
+chord.cv -> gfifth.v_oct
+-1 -> gfifth.v_oct
+0.5833 -> gfifth.v_oct             # + perfect fifth
+gallop.trig -> gfifth.strike
+gsum = mix { levels: [0.5, 0.5] }
+groot -> gsum.in1
+gfifth -> gsum.in2
+rhythm = overdrive { model: rat, drive: 0.64, tone: 0.5, mix: 1.0, level: 0.38 }
+gsum.out_l -> rhythm.in
+# Sidechain duck: each kick hit clamps the rhythm wall so the kick punches through.
+duck = compressor { sidechain: external, threshold: -8, ratio: 2.5, knee: 4, attack: 0.001s, release: 0.035s }
+rhythm.out -> duck.in_l
+rhythm.out -> duck.in_r
+kick -> duck.side_l
+kick -> duck.side_r
+
+# ===================== BASS (clean sub) =====================
+# Triangle sub an octave below the root, tight, follows the gallop.
+bosc = vco { wave: tri, freq: 55hz }
+chord.cv -> bosc.v_oct
+benv = func { rise: 0.005s, fall: 0.1s }
+gallop.trig -> benv.trig
+bass = vca { gain: 0 }
+bosc -> bass.in
+benv -> bass.cv
+
+# ===================== LEAD (string, heroic quarter notes) =====================
+# Diatonic A-minor line on chord tones, plucked guitar through a Tube Screamer,
+# then delay + hall. 16 quarter notes = 4 bars, loops with the chords.
+lseq = stepseq {
+  steps: [1.5833, 1.6667, 1.5833, 1.4167,  1.25, 1.4167, 1.5833, 2.0,
+          1.8333, 1.6667, 1.5833, 1.4167,  1.25, 1.4167, 1.5833, 1.0],
+  gates: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+}
+beat -> lseq.clock
+lstr = string { seed: 20, damping: 0.55, position: 0.22, brightness: 0.5 }
+lseq.cv -> lstr.v_oct
+lseq.trig -> lstr.strike
+-1 -> lseq.transpose
+ldist = overdrive { model: tubescreamer, drive: 0.96, tone: 0.62, mix: 1.0, level: 0.4 }
+lstr.out -> ldist.in
+ldel = delay { time: 0.214s, feedback: 0.24, mix: 0.12, tone: 5000hz }
+ldist.out -> ldel.in
+
+# ===================== REVERB SEND (lead only) =====================
+hall = reverb { decay: 0.15, damp: 0.5, mix: 1.0 }
+ldel -> hall.in_l : 0.32
+ldel -> hall.in_r : 0.32
+
+# ===================== MASTER MIX + LIMITER =====================
+premaster = mix {
+  levels: [1.35, 0.72, 0.5, 1.1, 0.8, 0.35, 0.4, 0.4],
+  pans:   [0, 0, 0.3, 0, 0, 0, -1, 1]
+}
+kick   -> premaster.in1
+snare  -> premaster.in2
+hats   -> premaster.in3
+duck.out_l -> premaster.in4
+bass   -> premaster.in5
+ldist  -> premaster.in6
+hall.out_l -> premaster.in7
+hall.out_r -> premaster.in8
+
+lim = limiter { threshold: -0.5, release: 0.06 }
+premaster.out_l -> lim.in_l
+premaster.out_r -> lim.in_r
+lim.out_l -> out.left
+lim.out_r -> out.right
