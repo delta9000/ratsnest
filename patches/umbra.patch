@@ -1,0 +1,306 @@
+# umbra -- ethereal half-time closer in D major at 100 BPM, ~3:48.
+# Track 4 of f5ble: the comedown.
+#
+# The album's engine at half speed: the same arrangement grid, chord lanes,
+# and mastering chain, but the drums breathe in half-time and the space IS
+# the instrument:
+#
+#   * an infinite STRING DRONE (Rings string at damping ~.96) restruck once
+#     per chord on the glided root -- the floor the track floats on.
+#   * BELL motif: modal resonator playing a fixed two-bar D-major-pentatonic
+#     phrase in slow quarters -- the album's motif idea at prayer speed.
+#   * GRAIN HALO: the bells feed a `grains` cloud pitched +1 octave with
+#     wide random pan -- a granular shimmer-verb blooming over everything,
+#     frozen sections drifting through the breakdown.
+#   * half-time kick (beats 1 & 3), soft snare on 3, sparse ticks. No claps,
+#     no risers screaming -- one gentle noise swell per section.
+#
+# Harmony is D | A | Bm | G (I - V - vi - IV), one chord per bar: the eternal
+# cadence, played warm. Lanes in v/oct around A.
+#
+# Arrangement (24 four-bar blocks, 9.6 s each):
+#   0-1   intro    drone + grain halo alone
+#   2-4   bells    the motif appears, halo thickens
+#   5     swell    noise rises once
+#   6-11  MOVE 1   half-time kick + sub, the slow groove
+#   12-14 break    drums gone, grains frozen wide, drone blooms
+#   15-19 MOVE 2   groove returns deeper, bells doubled by their halo
+#   20-21 peel     drums out, halo carries the tail
+#   22-23 tail     silence guard
+
+# ---- clock tree: sixteenths at 100 BPM ----
+master   = clock { bpm: 400 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+two_bar  = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> two_bar.in
+bar -> four_bar.in
+
+# ---- 24-block arrangement grid ----
+arr_kick = stepseq { steps: [0,0,0,0,0,0, 1,1,1,1,1,1, 0,0,0, 1,1,1,1,1, 0,0,0,0] }
+arr_bass = stepseq { steps: [0,0,.2,.3,.4,.5, .9,.9,.9,.9,.9,.9, .4,.35,.5,
+                             .95,.95,.95,.95,.9, .5,.2,0,0] }
+arr_bell = stepseq { steps: [0,0,.5,.6,.7,.7, .8,.8,.8,.8,.8,.8, .9,.95,.9,
+                             .85,.85,.85,.85,.8, .6,.3,0,0] }
+arr_grn  = stepseq { steps: [.35,.45,.5,.55,.6,.8, .5,.5,.5,.5,.5,.5, .9,1,.95,
+                             .6,.6,.6,.6,.65, .7,.5,0,0] }
+arr_drn  = stepseq { steps: [.8,.8,.7,.65,.6,.5, .45,.45,.45,.45,.45,.5, .9,.95,.85,
+                             .5,.5,.5,.5,.55, .7,.6,0,0] }
+arr_perc = stepseq { steps: [0,0,0,0,.3,.4, .6,.6,.6,.6,.6,.6, 0,0,.3,
+                             .65,.65,.65,.65,.6, .3,0,0,0] }
+arr_rise = stepseq { steps: [0,0,0,0,0,1, 0,0,0,0,0,0, 0,0,1, 0,0,0,0,0, 0,0,0,0] }
+arr_frz  = stepseq { steps: [0,0,0,0,0,0, 0,0,0,0,0,0, 1,1,0, 0,0,0,0,0, 0,0,0,0] }
+arr_main = stepseq { steps: [1,1,1,1,1,1, 1,1,1,1,1,1, 1,1,1, 1,1,1,1,1, .8,.4,0,0] }
+four_bar -> arr_kick.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_bell.clock
+four_bar -> arr_grn.clock
+four_bar -> arr_drn.clock
+four_bar -> arr_perc.clock
+four_bar -> arr_rise.clock
+four_bar -> arr_frz.clock
+four_bar -> arr_main.clock
+
+bass_lvl = func { rise: 3, fall: 3 }
+bell_lvl = func { rise: 4, fall: 4 }
+grn_lvl  = func { rise: 6, fall: 6 }
+drn_lvl  = func { rise: 6, fall: 6 }
+perc_lvl = func { rise: 2, fall: 2 }
+rise_cv  = func { rise: 7, fall: 0.5 }
+main_out = func { rise: 2, fall: 7 }
+arr_bass.cv -> bass_lvl.in
+arr_bell.cv -> bell_lvl.in
+arr_grn.cv  -> grn_lvl.in
+arr_drn.cv  -> drn_lvl.in
+arr_perc.cv -> perc_lvl.in
+arr_rise.cv -> rise_cv.in
+arr_main.cv -> main_out.in
+
+# ---- harmony: D | A | Bm | G (I - V - vi - IV), one chord per bar ----
+ch_root = stepseq { steps: [0.41667, 0, 0.16667, -0.16667] }
+ch_v2   = stepseq { steps: [0.75, 0.33333, 0.41667, 0.16667] }
+ch_v3   = stepseq { steps: [1.0, 0.58333, 0.75, 0.41667] }
+bar -> ch_root.clock
+bar -> ch_v2.clock
+bar -> ch_v3.clock
+
+# ---- half-time kick: beats 1 & 3, round and slow ----
+kick_gate = logic { op: and }
+half -> kick_gate.a
+arr_kick.cv -> kick_gate.b
+kick_env = func { rise: 0.0008, fall: 0.28, curve: log }
+kick_gate -> kick_env.trig
+kick_osc = vco { freq: 44hz, wave: sine }
+kick_gate -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.4
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : 0.95
+kick_drive = drive { amount: 0.15, mode: soft }
+kick_amp -> kick_drive.in
+
+# ---- soft snare on beat 3 ----
+snr_seq = stepseq { steps: [0,0,0,0], gates: [0,0,1,0] }
+quarter -> snr_seq.clock
+snr_gate = logic { op: and }
+snr_seq.trig -> snr_gate.a
+arr_kick.cv -> snr_gate.b
+snr_env = func { rise: 0.001, fall: 0.18, curve: exp }
+snr_gate -> snr_env.trig
+snr_noise = noise { color: pink, seed: 17 }
+snr_filter = svf { cutoff: 1400, res: 0.4 }
+snr_noise -> snr_filter.in
+snr_amp = vca { gain: 0 }
+snr_filter.bp -> snr_amp.in
+snr_env -> snr_amp.cv : 0.5
+
+# ---- sparse ticks: 3-of-16 euclid, brushed ----
+hat_pattern = euclid { steps: 16, hits: 3, rot: 5 }
+master -> hat_pattern.clock
+hat_env = func { rise: 0.001, fall: 0.05, curve: exp }
+hat_pattern.trig -> hat_env.trig
+hat_noise = noise { color: white, seed: 23 }
+hat_filter = svf { cutoff: 7500, res: 0.2 }
+hat_noise -> hat_filter.in
+hat_amp = vca { gain: 0 }
+hat_filter.hp -> hat_amp.in
+# The env alone can't open the VCA (gain 0); it only speaks when the perc
+# lane is up, scaled so intro/break stay tickless without a negative bias.
+hat_mult = math { op: mult }
+hat_env -> hat_mult.a
+-1 -> hat_mult.b           # cancel mult's default b base of 1
+perc_lvl -> hat_mult.b : 1.5
+hat_mult -> hat_amp.cv : 0.6
+
+# ---- STRING DRONE: near-infinite sustain, restruck on every chord change
+# so each new root blooms into the standing wave. Glided pitch keeps the
+# transitions seamless. ----
+drn_glide = func { rise: 0.3, fall: 0.3 }
+ch_root.cv -> drn_glide.in
+drn = string { seed: 3, freq: 73.42hz, structure: 0.25, brightness: 0.4,
+               damping: 0.96, position: 0.2 }
+drn_glide -> drn.v_oct
+bar -> drn.strike
+drn_filt = svf { cutoff: 900, res: 0.15 }
+drn.out -> drn_filt.in
+drn_lvl -> drn_filt.cutoff : 600
+drn_amp = vca { gain: 0 }
+drn_filt.lp -> drn_amp.in
+drn_lvl -> drn_amp.cv : 0.55
+
+# ---- BELL motif: fixed two-bar D-major-pentatonic phrase in slow quarters
+# (D F# E A | B A F# E), modal bell voice. Absolute pitch -- every note of
+# D pentatonic is consonant over all four chords of the cadence. ----
+bell_seq = stepseq { steps: [0,.33333,.16667,.58333, .75,.58333,.33333,.16667],
+                     gates: [1,0,1,1, 0,1,0,1] }
+quarter -> bell_seq.clock
+# structure 0.28 = harmonic partials; 0.6 stretched them audibly sharp
+# against the string drone (see selene's bell note).
+bell = modal { modes: 48, freq: 293.66hz, structure: 0.28, brightness: 0.45,
+               damping: 0.7, position: 0.2 }
+bell_seq.cv -> bell.v_oct
+bell_seq.trig -> bell.strike
+bell_amp = vca { gain: 0 }
+bell.out -> bell_amp.in
+bell_lvl -> bell_amp.cv : 0.65
+
+# ---- GRAIN HALO: the bells feed a granular cloud pitched one octave up,
+# wide random pan, slow position drift -- a shimmer-verb built from grains.
+# The freeze lane locks the buffer through the breakdown so the halo hangs
+# as a static aurora while the drone blooms under it. ----
+halo = grains { secs: 4, seed: 9, position: 0.35, size: 0.25, pitch: 1,
+                density: 12, jitter: 0.6, shape: 0.7, spread: 0.8 }
+bell_amp -> halo.in : 0.9
+arr_frz.cv -> halo.freeze
+halo_drift = lfo { freq: 0.03hz, wave: tri }
+halo_drift -> halo.position : 0.2
+halo_l = vca { gain: 0 }
+halo_r = vca { gain: 0 }
+halo.out_l -> halo_l.in
+halo.out_r -> halo_r.in
+grn_lvl -> halo_l.cv : 0.6
+grn_lvl -> halo_r.cv : 0.6
+
+# ---- sub bass: glided roots, swelling once per bar ----
+sub_glide = func { rise: 0.15, fall: 0.15 }
+ch_root.cv -> sub_glide.in
+sub_env = adsr { attack: 0.4, decay: 0.5, sustain: 0.8, release: 1.0, curve: exp }
+bar -> sub_env.gate
+sub_osc = vco { freq: 55hz, wave: sine }
+sub_glide -> sub_osc.v_oct
+sub_filt = ladder { cutoff: 100, res: 0.1, drive: 0.2 }
+sub_osc -> sub_filt.in
+sub_amp = vca { gain: 0 }
+sub_filt -> sub_amp.in
+sub_env -> sub_amp.cv : 0.45
+sub_post = vca { gain: 0 }
+sub_amp -> sub_post.in
+bass_lvl -> sub_post.cv : 0.9
+
+# ---- one gentle noise swell per section ----
+riser_noise = noise { color: pink, seed: 7 }
+riser_filter = svf { cutoff: 240, res: 0.4 }
+riser_noise -> riser_filter.in
+rise_cv -> riser_filter.cutoff : 3200
+riser_amp = vca { gain: 0 }
+riser_filter.lp -> riser_amp.in
+rise_cv -> riser_amp.cv : 0.4
+
+# ---- dry band: everything close to center, the halo does the width ----
+band = mix { levels: [0.85, 0.75, 0.5, 0.4, 0.6, 0.55, 0.55, 0.55],
+             pans: [0, 0, 0.1, -0.25, -0.1, 0.1, -0.5, 0.5] }
+kick_drive -> band.in1
+sub_post  -> band.in2
+snr_amp   -> band.in3
+hat_amp   -> band.in4
+bell_amp  -> band.in5
+drn_amp   -> band.in6
+halo_l    -> band.in7
+halo_r    -> band.in8
+kick_env -> band.lvl2 : -0.2
+kick_env -> band.lvl5 : -0.1
+kick_env -> band.lvl6 : -0.18
+kick_env -> band.lvl7 : -0.12
+kick_env -> band.lvl8 : -0.12
+
+# ---- FX: one slow dotted-eighth echo for the bells, huge slow plate ----
+sync_de = tempo { bpm: 100, beats: 0.75 }
+sync_q  = tempo { bpm: 100, beats: 1 }
+dly_l = delay { time: 0ms, feedback: 0.5, tone: 2800, mix: 1, slew: 0.25 }
+dly_r = delay { time: 0ms, feedback: 0.45, tone: 2400, mix: 1, slew: 0.25 }
+sync_de.seconds -> dly_l.time
+sync_q.seconds  -> dly_r.time
+bell_amp -> dly_l.in : 0.4
+bell_amp -> dly_r.in : 0.32
+
+space = reverb { decay: 0.92, damp: 0.35, mix: 1,
+                 predelay: 0.03, bandwidth: 0.9,
+                 mod_rate: 0.4, mod_depth: 30 }
+drn_amp  -> space.in_l : 0.35
+drn_amp  -> space.in_r : 0.35
+bell_amp -> space.in_l : 0.25
+bell_amp -> space.in_r : 0.3
+halo_l   -> space.in_l : 0.4
+halo_r   -> space.in_r : 0.4
+snr_amp  -> space.in_l : 0.2
+snr_amp  -> space.in_r : 0.25
+riser_amp -> space.in_l : 0.25
+riser_amp -> space.in_r : 0.25
+
+# ---- master + mastering chain (album settings, gentler comp) ----
+master_mix = mix { levels: [1, 1, 0.6, 0.6, 0.42, 0.42, 0.4],
+                   pans: [-1, 1, -1, 1, -0.8, 0.8, 0] }
+band.out_l  -> master_mix.in1
+band.out_r  -> master_mix.in2
+space.out_l -> master_mix.in3
+space.out_r -> master_mix.in4
+dly_l       -> master_mix.in5
+dly_r       -> master_mix.in6
+riser_amp   -> master_mix.in7
+kick_env -> master_mix.lvl3 : -0.14
+kick_env -> master_mix.lvl4 : -0.14
+kick_env -> master_mix.lvl5 : -0.1
+kick_env -> master_mix.lvl6 : -0.1
+
+master_dc = dcblock { cutoff: 12hz }
+master_mix.out_l -> master_dc.in_l
+master_mix.out_r -> master_dc.in_r
+
+master_eq = eq { hp_freq: 24, low_freq: 90, low_gain: -0.3,
+                 mid1_freq: 450, mid1_gain: -0.8, mid1_q: 0.9,
+                 mid2_freq: 2600, mid2_gain: 0.4, mid2_q: 0.8,
+                 high_freq: 8500, high_gain: 0.5 }
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+master_comp = compressor { sidechain: external, threshold: -18, ratio: 1.8,
+                           knee: 6, attack: 0.02, release: 0.2,
+                           makeup: 1.2, mix: 0.8 }
+master_eq.out_l -> master_comp.in_l
+master_eq.out_r -> master_comp.in_r
+kick_drive -> master_comp.side_l : 0.6
+kick_drive -> master_comp.side_r : 0.6
+
+master_field = stereo { width: 1.2, balance: 0 }
+master_comp.out_l -> master_field.in_l
+master_comp.out_r -> master_field.in_r
+
+master_clip = clipper { mode: soft, threshold: -3, drive: 0.8, mix: 0.25 }
+master_field.out_l -> master_clip.in_l
+master_field.out_r -> master_clip.in_r
+
+master_limit = limiter { threshold: -0.5, release: 0.1 }
+master_clip.out_l -> master_limit.in_l
+master_clip.out_r -> master_limit.in_r
+
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
+-1 -> out.level
+main_out -> out.level : 0.95

@@ -1,0 +1,428 @@
+# selene -- deep melodic house in F# minor at 122 BPM, ~4:12. Track 2 of f5ble.
+#
+# Polaris's sibling, one shade darker and warmer. Same album DNA -- tracker
+# arrangement grid, chord-lane harmony, kick-sidechain pump, dotted/straight
+# delay lattice, the full mastering chain -- but the voices are physical
+# models instead of subtractive saws:
+#
+#   * BELL motif: a `modal` resonator (bell-stretched partials) striking a
+#     fixed one-bar interval motif (root/5th/octave/9th added to the chord
+#     root, so it transposes with the harmony). The delay lattice turns the
+#     bell taps into a glittering canon.
+#   * STRING arp: a Rings-style `string` plucking a chord-tracking 8-step
+#     contour (halcyon's switch trick) on a euclid reset every two bars --
+#     woody, plucky, nothing like polaris's filtered saws.
+#   * rolling OFFBEAT bass (meridian's move) + glide sub on the roots.
+#   * dark pad (saw/tri through low filters) and a high tremolo shimmer.
+#   * soft rim on 2 & 4 instead of a clap; hats sit lower and softer.
+#
+# Harmony is F#m | E | D | E (i - VII - VI - VII), one chord per bar: the
+# descending dream-pop loop. Voicing lanes are absolute v/oct around A.
+#
+# Arrangement (32 four-bar blocks, 7.87 s each):
+#   0-1   intro    pad + shimmer
+#   2-4   bells    the motif fades in over the pad
+#   5-6   build    bass slides under, ticks appear; riser at 6
+#   7-12  DROP 1   kick + rim + bass + bells, pad pumping
+#   13-15 break    drums gone, strings bloom, shimmer at full
+#   14-15 riser-2  sweep into the second drop
+#   16-23 DROP 2   everything + string arp at maximum
+#   24-26 peel     drums out, bells thin, pad returns
+#   27-29 fade     master fade
+#   30-31 tail     silent guard
+
+# ---- clock tree: sixteenths at 122 BPM ----
+master   = clock { bpm: 488 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+two_bar  = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> two_bar.in
+bar -> four_bar.in
+
+# ---- 32-block arrangement grid ----
+arr_kick = stepseq { steps: [0,0,0,0,0,0,0,1, 1,1,1,1,1,0,0,0,
+                             1,1,1,1,1,1,1,1, 1,1,0,0,0,0,0,0] }
+arr_bass = stepseq { steps: [0,0,0,.1,.3,.5,.7,.9, .9,.9,.9,.9,.9,.3,.25,.4,
+                             .95,.95,.95,.95,.95,.95,.95,.95, .9,.8,.6,.3,0,0,0,0] }
+arr_hats = stepseq { steps: [0,0,0,0,.2,.35,.5,.65, .65,.65,.65,.65,.65,0,0,.2,
+                             .75,.75,.75,.75,.75,.75,.75,.75, .7,.6,.4,.15,0,0,0,0] }
+arr_bell = stepseq { steps: [0,0,.35,.5,.6,.65,.7,.85, .85,.85,.85,.85,.85,.6,.55,.6,
+                             .9,.9,.9,.9,.9,.9,.9,.9, .7,.55,.4,.25,.1,0,0,0] }
+arr_str  = stepseq { steps: [0,0,0,0,0,.2,.3,.5, .5,.5,.5,.5,.5,.7,.8,.85,
+                             .9,.9,.9,.9,.9,.9,.9,.9, .6,.4,.2,0,0,0,0,0] }
+arr_pad  = stepseq { steps: [.75,.75,.65,.6,.5,.45,.4,.35, .35,.35,.35,.35,.35,.9,.95,.85,
+                             .45,.45,.45,.45,.45,.45,.45,.45, .5,.6,.65,.6,.4,.15,0,0] }
+arr_shim = stepseq { steps: [.55,.65,.55,.5,.45,.4,.35,.3, .3,.3,.3,.3,.3,.95,1,.9,
+                             .5,.5,.5,.5,.5,.5,.5,.5, .55,.6,.6,.5,.3,.1,0,0] }
+arr_perc = stepseq { steps: [0,0,0,0,0,0,0,.6, .6,.6,.6,.6,.6,0,0,0,
+                             .7,.7,.7,.7,.7,.7,.7,.7, .6,.5,0,0,0,0,0,0] }
+arr_rise = stepseq { steps: [0,0,0,0,0,0,1,0, 0,0,0,0,0,0,.5,1,
+                             0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0] }
+arr_main = stepseq { steps: [1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+                             1,1,1,1,1,1,1,1, 1,1,1,.7,.35,.1,0,0] }
+four_bar -> arr_kick.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_hats.clock
+four_bar -> arr_bell.clock
+four_bar -> arr_str.clock
+four_bar -> arr_pad.clock
+four_bar -> arr_shim.clock
+four_bar -> arr_perc.clock
+four_bar -> arr_rise.clock
+four_bar -> arr_main.clock
+
+bass_lvl = func { rise: 3, fall: 3 }
+hats_lvl = func { rise: 2, fall: 2 }
+bell_lvl = func { rise: 3, fall: 3 }
+str_lvl  = func { rise: 4, fall: 4 }
+pad_lvl  = func { rise: 5, fall: 5 }
+shim_lvl = func { rise: 5, fall: 5 }
+perc_lvl = func { rise: 2, fall: 2 }
+rise_cv  = func { rise: 6, fall: 0.4 }
+main_out = func { rise: 2, fall: 6 }
+arr_bass.cv -> bass_lvl.in
+arr_hats.cv -> hats_lvl.in
+arr_bell.cv -> bell_lvl.in
+arr_str.cv  -> str_lvl.in
+arr_pad.cv  -> pad_lvl.in
+arr_shim.cv -> shim_lvl.in
+arr_perc.cv -> perc_lvl.in
+arr_rise.cv -> rise_cv.in
+arr_main.cv -> main_out.in
+
+# ---- harmony: F#m | E | D | E (i - VII - VI - VII), one chord per bar.
+# Absolute chord tones in v/oct around A; the root lane walks DOWN
+# (F# - E - D - E), the sinking dream-pop motion.
+ch_root = stepseq { steps: [-0.25, -0.41667, -0.58333, -0.41667] }
+ch_v2   = stepseq { steps: [0, -0.08333, -0.25, -0.08333] }
+ch_v3   = stepseq { steps: [0.33333, 0.16667, 0, 0.16667] }
+ch_v9   = stepseq { steps: [-0.08333, -0.25, -0.41667, -0.25] }
+bar -> ch_root.clock
+bar -> ch_v2.clock
+bar -> ch_v3.clock
+bar -> ch_v9.clock
+
+# ---- kick: rounder and softer than polaris's -- deep house, not big room ----
+kick_gate = logic { op: and }
+quarter -> kick_gate.a
+arr_kick.cv -> kick_gate.b
+kick_env = func { rise: 0.0007, fall: 0.22, curve: log }
+kick_gate -> kick_env.trig
+kick_osc = vco { freq: 46hz, wave: sine }
+kick_gate -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.5
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : 0.95
+kick_drive = drive { amount: 0.18, mode: soft }
+kick_amp -> kick_drive.in
+
+# ---- soft rim on 2 & 4: lower, woodier than a clap ----
+rim_seq = stepseq { steps: [0,0,0,0], gates: [0,1,0,1] }
+quarter -> rim_seq.clock
+rim_gate = logic { op: and }
+rim_seq.trig -> rim_gate.a
+arr_kick.cv -> rim_gate.b
+rim_env = func { rise: 0.0008, fall: 0.09, curve: exp }
+rim_gate -> rim_env.trig
+rim_noise = noise { color: white, seed: 13 }
+rim_filter = svf { cutoff: 2100, res: 0.65 }
+rim_noise -> rim_filter.in
+rim_amp = vca { gain: 0 }
+rim_filter.bp -> rim_amp.in
+rim_env -> rim_amp.cv : 0.6
+
+# ---- hats: soft euclid ticks, density on the lane ----
+hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
+master -> hat_pattern.clock
+hats_lvl -> hat_pattern.hits : 5
+hat_env = func { rise: 0.0006, fall: 0.03, curve: exp }
+hat_pattern.trig -> hat_env.trig
+hats_lvl -> hat_env.fall : 0.025
+hat_noise = noise { color: white, seed: 29 }
+hat_filter = svf { cutoff: 8200, res: 0.2 }
+hat_noise -> hat_filter.in
+hat_amp = vca { gain: 0 }
+hat_filter.hp -> hat_amp.in
+hat_env -> hat_amp.cv : 0.42
+quarter -> hat_amp.cv : -0.1
+
+# ---- offbeat open hat ----
+beat_not = logic { op: not }
+quarter -> beat_not.a
+offbeat = logic { op: and }
+eighth -> offbeat.a
+beat_not -> offbeat.b
+oh_env = func { rise: 0.001, fall: 0.16, curve: exp }
+offbeat -> oh_env.trig
+oh_noise = noise { color: white, seed: 43 }
+oh_filter = svf { cutoff: 5800, res: 0.3 }
+oh_noise -> oh_filter.in
+oh_amp = vca { gain: 0 }
+oh_filter.hp -> oh_amp.in
+oh_env -> oh_amp.cv : 0.26
+perc_lvl -> oh_amp.cv : 0.55
+
+# ---- BELL motif: modal resonator, bell-stretched partials, striking a
+# fixed one-bar interval motif (root / 5th / octave / 9th over the chord
+# root). The S&H holds pitch through each ring-out. ----
+bell_seq = stepseq { steps: [0,0,0,.58333, .58333,.58333,1,1,
+                             1.16667,1.16667,1.16667,.58333, .58333,0,0,0],
+                     gates: [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,1,0,0] }
+master -> bell_seq.clock
+bell_pitch = math { op: add }
+bell_seq.cv -> bell_pitch.a
+ch_root.cv -> bell_pitch.b
+bell_note = sh { mode: sample }
+bell_pitch -> bell_note.in
+bell_seq.trig -> bell_note.trig
+
+# structure stays in the 0.25..0.3 harmonic band: above it the modal series
+# stretches sharp (at 0.55 the dominant partial rang +98 cents — a semitone
+# out of tune against the pads). Bell character comes from the strike,
+# damping, and position comb, not the stretch.
+bell = modal { modes: 48, freq: 440hz, structure: 0.28, brightness: 0.5,
+               damping: 0.6, position: 0.2 }
+bell_note -> bell.v_oct
+bell_seq.trig -> bell.strike
+bell_amp = vca { gain: 0 }
+bell.out -> bell_amp.in
+bell_lvl -> bell_amp.cv : 0.7
+
+# ---- STRING arp: a Rings string plucking a chord-tracking 8-step contour
+# (switch steps eighth-by-eighth through the voicing lanes; euclid gates the
+# plucks, reset every two bars so the riff repeats exactly). ----
+str_lift = math { op: add }
+ch_root.cv -> str_lift.a
+1 -> str_lift.b
+str_switch = switch { mode: seq, n: 8 }
+eighth -> str_switch.clock
+ch_root.cv -> str_switch.in1
+ch_v3.cv   -> str_switch.in2
+ch_v2.cv   -> str_switch.in3
+ch_v3.cv   -> str_switch.in4
+str_lift   -> str_switch.in5
+ch_v2.cv   -> str_switch.in6
+ch_v3.cv   -> str_switch.in7
+ch_root.cv -> str_switch.in8
+
+str_euclid = euclid { steps: 16, hits: 6, rot: 2 }
+eighth -> str_euclid.clock
+two_bar -> str_euclid.reset
+str_note = sh { mode: sample }
+str_switch -> str_note.in
+str_euclid.trig -> str_note.trig
+
+str = string { seed: 6, freq: 220hz, structure: 0.25, brightness: 0.55,
+               damping: 0.45, position: 0.3 }
+str_note -> str.v_oct
+str_euclid.trig -> str.strike
+str_amp = vca { gain: 0 }
+str.out -> str_amp.in
+str_lvl -> str_amp.cv : 0.75
+
+# ---- bass: rolling offbeat eighths + glide sub, both on the roots ----
+bass_env = func { rise: 0.0015, fall: 0.13, curve: exp }
+offbeat -> bass_env.trig
+bass_osc = vco { freq: 110hz, wave: saw }
+ch_root.cv -> bass_osc.v_oct
+bass_filt = ladder { cutoff: 130, res: 0.18, drive: 0.5 }
+bass_osc -> bass_filt.in
+bass_env -> bass_filt.cutoff : 900
+bass_lvl -> bass_filt.cutoff : 220
+bass_amp = vca { gain: 0 }
+bass_filt -> bass_amp.in
+bass_env -> bass_amp.cv : 0.9
+bass_post = vca { gain: 0 }
+bass_amp -> bass_post.in
+bass_lvl -> bass_post.cv : 0.8
+
+sub_glide = func { rise: 0.06, fall: 0.06 }
+ch_root.cv -> sub_glide.in
+sub_osc = vco { freq: 55hz, wave: sine }
+sub_glide -> sub_osc.v_oct
+sub_filt = ladder { cutoff: 110, res: 0.1, drive: 0.2 }
+sub_osc -> sub_filt.in
+sub_amp = vca { gain: 0 }
+sub_filt -> sub_amp.in
+bass_lvl -> sub_amp.cv : 0.65
+
+# ---- pad: darker than polaris -- saw + tri + saw through low filters,
+# glided lanes so the chord changes smear ----
+pad_gl_r = func { rise: 0.09, fall: 0.09 }
+pad_gl_2 = func { rise: 0.09, fall: 0.09 }
+pad_gl_3 = func { rise: 0.09, fall: 0.09 }
+ch_root.cv -> pad_gl_r.in
+ch_v2.cv   -> pad_gl_2.in
+ch_v3.cv   -> pad_gl_3.in
+pad_a = vco { freq: 220hz, wave: saw }
+pad_b = vco { freq: 220hz, wave: tri }
+pad_c = vco { freq: 220hz, wave: saw }
+pad_gl_r -> pad_a.v_oct
+pad_gl_2 -> pad_b.v_oct
+pad_gl_3 -> pad_c.v_oct
+0.007 -> pad_c.v_oct
+pad_filt_l = svf { cutoff: 300, res: 0.2 }
+pad_filt_r = svf { cutoff: 330, res: 0.22 }
+pad_a -> pad_filt_l.in : 0.42
+pad_b -> pad_filt_l.in : 0.35
+pad_c -> pad_filt_r.in : 0.42
+pad_b -> pad_filt_r.in : 0.3
+pad_breath = lfo { freq: 0.04hz, wave: sine }
+pad_breath -> pad_filt_l.cutoff : 130
+pad_breath -> pad_filt_r.cutoff : -120
+pad_lvl -> pad_filt_l.cutoff : 650
+pad_lvl -> pad_filt_r.cutoff : 650
+pad_env = adsr { attack: 0.7, decay: 0.3, sustain: 0.85, release: 1.6, curve: exp }
+bar -> pad_env.gate
+pad_amp_l = vca { gain: 0 }
+pad_amp_r = vca { gain: 0 }
+pad_filt_l.lp -> pad_amp_l.in
+pad_filt_r.lp -> pad_amp_r.in
+pad_env -> pad_amp_l.cv : 0.5
+pad_env -> pad_amp_r.cv : 0.5
+pad_post_l = vca { gain: 0 }
+pad_post_r = vca { gain: 0 }
+pad_amp_l -> pad_post_l.in
+pad_amp_r -> pad_post_r.in
+pad_lvl -> pad_post_l.cv : 0.5
+pad_lvl -> pad_post_r.cv : 0.5
+
+# ---- shimmer: high triangle on the 9th lane, an octave above the pad ----
+shim_gl = func { rise: 0.14, fall: 0.14 }
+ch_v9.cv -> shim_gl.in
+shim_osc = vco { freq: 880hz, wave: tri }
+shim_gl -> shim_osc.v_oct
+shim_trem = lfo { freq: 0.25hz, wave: sine }
+shim_amp = vca { gain: 0 }
+shim_osc -> shim_amp.in
+shim_lvl -> shim_amp.cv : 0.28
+shim_trem -> shim_amp.cv : 0.07
+
+# ---- riser + roll ----
+riser_noise = noise { color: white, seed: 7 }
+riser_filter = svf { cutoff: 260, res: 0.5 }
+riser_noise -> riser_filter.in
+rise_cv -> riser_filter.cutoff : 4800
+riser_amp = vca { gain: 0 }
+riser_filter.lp -> riser_amp.in
+rise_cv -> riser_amp.cv : 0.5
+
+roll_pattern = euclid { steps: 16, hits: 4, rot: 0 }
+master -> roll_pattern.clock
+rise_cv -> roll_pattern.hits : 12
+roll_env = func { rise: 0.001, fall: 0.06, curve: exp }
+roll_pattern.trig -> roll_env.trig
+roll_noise = noise { color: white, seed: 41 }
+roll_filter = svf { cutoff: 2200, res: 0.45 }
+roll_noise -> roll_filter.in
+roll_amp = vca { gain: 0 }
+roll_filter.bp -> roll_amp.in
+roll_env -> roll_amp.cv : 0.2
+rise_cv -> roll_amp.cv : 0.16
+
+# ---- dry band: bells just left, strings just right, deep pad pump ----
+band = mix { levels: [0.85, 0.72, 0.5, 0.45, 0.45, 0.62, 0.6, 0.58],
+             pans: [0, 0, 0.1, 0.35, -0.3, -0.15, 0.2, 0] }
+kick_drive -> band.in1
+bass_post -> band.in2 : 0.7
+sub_amp   -> band.in2 : 0.6
+rim_amp   -> band.in3
+hat_amp   -> band.in4
+oh_amp    -> band.in5
+bell_amp  -> band.in6
+str_amp   -> band.in7
+pad_post_l -> band.in8 : 0.5
+pad_post_r -> band.in8 : 0.5
+shim_amp   -> band.in8 : 0.15
+kick_env -> band.lvl2 : -0.24
+kick_env -> band.lvl6 : -0.12
+kick_env -> band.lvl7 : -0.12
+kick_env -> band.lvl8 : -0.3
+
+# ---- FX: the album's delay lattice, bells sent hard ----
+sync_de = tempo { bpm: 122, beats: 0.75 }
+sync_e  = tempo { bpm: 122, beats: 0.5 }
+dly_l = delay { time: 0ms, feedback: 0.5, tone: 3400, mix: 1, slew: 0.2 }
+dly_r = delay { time: 0ms, feedback: 0.44, tone: 2900, mix: 1, slew: 0.2 }
+sync_de.seconds -> dly_l.time
+sync_e.seconds  -> dly_r.time
+bell_amp -> dly_l.in : 0.5
+bell_amp -> dly_r.in : 0.42
+str_amp  -> dly_l.in : 0.2
+str_amp  -> dly_r.in : 0.25
+
+space = reverb { decay: 0.87, damp: 0.32, mix: 1,
+                 predelay: 0.025, bandwidth: 0.92,
+                 mod_rate: 0.5, mod_depth: 26 }
+pad_post_l -> space.in_l : 0.35
+pad_post_r -> space.in_r : 0.35
+shim_amp   -> space.in_l : 0.5
+shim_amp   -> space.in_r : 0.45
+bell_amp   -> space.in_l : 0.18
+bell_amp   -> space.in_r : 0.22
+str_amp    -> space.in_l : 0.15
+str_amp    -> space.in_r : 0.12
+rim_amp    -> space.in_l : 0.15
+rim_amp    -> space.in_r : 0.2
+riser_amp  -> space.in_l : 0.2
+riser_amp  -> space.in_r : 0.2
+
+# ---- master + mastering chain (album settings) ----
+master_mix = mix { levels: [1, 1, 0.52, 0.52, 0.42, 0.42, 0.4],
+                   pans: [-1, 1, -1, 1, -0.8, 0.8, 0] }
+band.out_l  -> master_mix.in1
+band.out_r  -> master_mix.in2
+space.out_l -> master_mix.in3
+space.out_r -> master_mix.in4
+dly_l       -> master_mix.in5
+dly_r       -> master_mix.in6
+riser_amp   -> master_mix.in7 : 0.5
+roll_amp    -> master_mix.in7 : 0.5
+kick_env -> master_mix.lvl3 : -0.18
+kick_env -> master_mix.lvl4 : -0.18
+kick_env -> master_mix.lvl5 : -0.14
+kick_env -> master_mix.lvl6 : -0.14
+
+master_dc = dcblock { cutoff: 12hz }
+master_mix.out_l -> master_dc.in_l
+master_mix.out_r -> master_dc.in_r
+
+master_eq = eq { hp_freq: 26, low_freq: 100, low_gain: -0.4,
+                 mid1_freq: 420, mid1_gain: -1.0, mid1_q: 0.9,
+                 mid2_freq: 2800, mid2_gain: 0.5, mid2_q: 0.8,
+                 high_freq: 9000, high_gain: 0.4 }
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.2,
+                           knee: 5, attack: 0.012, release: 0.15,
+                           makeup: 1.4, mix: 0.85 }
+master_eq.out_l -> master_comp.in_l
+master_eq.out_r -> master_comp.in_r
+kick_drive -> master_comp.side_l : 0.7
+kick_drive -> master_comp.side_r : 0.7
+
+master_field = stereo { width: 1.12, balance: 0 }
+master_comp.out_l -> master_field.in_l
+master_comp.out_r -> master_field.in_r
+
+master_clip = clipper { mode: soft, threshold: -2.5, drive: 1.0, mix: 0.3 }
+master_field.out_l -> master_clip.in_l
+master_field.out_r -> master_clip.in_r
+
+master_limit = limiter { threshold: -0.5, release: 0.08 }
+master_clip.out_l -> master_limit.in_l
+master_clip.out_r -> master_limit.in_r
+
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
+-1 -> out.level
+main_out -> out.level : 0.8

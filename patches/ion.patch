@@ -1,0 +1,379 @@
+# ion -- peak-time melodic techno / trance in A minor at 132 BPM, ~3:52.
+# Track 3 of f5ble: the banger.
+#
+# Same album DNA as polaris/selene -- tracker arrangement, chord lanes,
+# kick-sidechain pump, tempo-synced delay lattice, the mastering chain --
+# but every voice is electric where selene's were wooden:
+#
+#   * ACID line: a 16-step sixteenth riff of intervals over the chord root
+#     through a hot resonant ladder -- env squelch on every note, an accent
+#     lane kicking the cutoff harder on the downbeats. The classic acid move.
+#   * TRANCE-GATE pad: a root/third/fifth saw stack chopped by a fixed
+#     sixteenth gate pattern -- the pad itself becomes rhythm.
+#   * supersaw HOOK in drop 2: a fixed two-bar A-minor-pentatonic phrase
+#     in straight quarters, huge and simple, made for the top of the night.
+#   * harder kick (52 Hz, more drive), brighter hats, bigger riser.
+#
+# Harmony is Am | Em | F | G (i - v - VI - VII), one chord per bar: rising
+# tension that never resolves -- the peak-time loop. Lanes in v/oct around A.
+#
+# Arrangement (32 four-bar blocks, 7.27 s each):
+#   0-1   intro    gated pad alone, filtered down
+#   2-4   acid     the line fades in dark
+#   5-6   build    hats + gate pad rise; riser at 6
+#   7-12  DROP 1   kick + clap + acid, full squelch
+#   13-15 break    drums gone, gate pad blooms wide; riser 15
+#   16-23 DROP 2   everything + supersaw hook
+#   24-26 groove   hook out, acid carries
+#   27-29 fade     master fade
+#   30-31 tail     silent guard
+
+# ---- clock tree: sixteenths at 132 BPM ----
+master   = clock { bpm: 528 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+two_bar  = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> two_bar.in
+bar -> four_bar.in
+
+# ---- 32-block arrangement grid ----
+arr_kick = stepseq { steps: [0,0,0,0,0,0,0,1, 1,1,1,1,1,0,0,0,
+                             1,1,1,1,1,1,1,1, 1,1,1,0,0,0,0,0] }
+arr_acid = stepseq { steps: [0,0,.3,.4,.55,.65,.75,.9, .9,.9,.9,.9,.9,.35,.3,.45,
+                             .95,.95,.95,.95,.95,.95,.95,.95, .9,.9,.85,.5,.2,0,0,0] }
+arr_hats = stepseq { steps: [0,0,0,.15,.35,.5,.6,.75, .75,.75,.75,.75,.75,0,0,.25,
+                             .85,.85,.85,.85,.85,.85,.85,.85, .8,.75,.6,.3,0,0,0,0] }
+arr_gate = stepseq { steps: [.45,.5,.4,.4,.45,.5,.55,.6, .6,.6,.6,.6,.6,.9,1,.95,
+                             .7,.7,.7,.7,.7,.7,.7,.7, .7,.65,.6,.5,.3,.1,0,0] }
+arr_lead = stepseq { steps: [0,0,0,0,0,0,0,0, 0,0,0,0,0,0,.2,.35,
+                             .9,.9,.9,.9,.9,.9,.9,.9, .6,.3,0,0,0,0,0,0] }
+arr_perc = stepseq { steps: [0,0,0,0,0,0,0,.7, .7,.7,.7,.7,.7,0,0,0,
+                             .8,.8,.8,.8,.8,.8,.8,.8, .75,.7,.6,0,0,0,0,0] }
+arr_rise = stepseq { steps: [0,0,0,0,0,0,1,0, 0,0,0,0,0,0,.5,1,
+                             0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0] }
+arr_main = stepseq { steps: [1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+                             1,1,1,1,1,1,1,1, 1,1,1,.7,.35,.1,0,0] }
+four_bar -> arr_kick.clock
+four_bar -> arr_acid.clock
+four_bar -> arr_hats.clock
+four_bar -> arr_gate.clock
+four_bar -> arr_lead.clock
+four_bar -> arr_perc.clock
+four_bar -> arr_rise.clock
+four_bar -> arr_main.clock
+
+acid_lvl = func { rise: 3, fall: 3 }
+hats_lvl = func { rise: 2, fall: 2 }
+gate_lvl = func { rise: 4, fall: 4 }
+lead_lvl = func { rise: 3, fall: 3 }
+perc_lvl = func { rise: 2, fall: 2 }
+rise_cv  = func { rise: 6, fall: 0.4 }
+main_out = func { rise: 2, fall: 6 }
+arr_acid.cv -> acid_lvl.in
+arr_hats.cv -> hats_lvl.in
+arr_gate.cv -> gate_lvl.in
+arr_lead.cv -> lead_lvl.in
+arr_perc.cv -> perc_lvl.in
+arr_rise.cv -> rise_cv.in
+arr_main.cv -> main_out.in
+
+# ---- harmony: Am | Em | F | G (i - v - VI - VII), one chord per bar ----
+ch_root = stepseq { steps: [0, -0.41667, -0.33333, -0.16667] }
+ch_v2   = stepseq { steps: [0.25, -0.16667, 0, 0.16667] }
+ch_v3   = stepseq { steps: [0.58333, 0.16667, 0.25, 0.41667] }
+bar -> ch_root.clock
+bar -> ch_v2.clock
+bar -> ch_v3.clock
+
+# ---- kick: harder than the rest of the album ----
+kick_gate = logic { op: and }
+quarter -> kick_gate.a
+arr_kick.cv -> kick_gate.b
+kick_env = func { rise: 0.0006, fall: 0.18, curve: log }
+kick_gate -> kick_env.trig
+kick_osc = vco { freq: 52hz, wave: sine }
+kick_gate -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.8
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : 0.95
+kick_drive = drive { amount: 0.3, mode: soft }
+kick_amp -> kick_drive.in
+
+# ---- clap on 2 & 4 ----
+clap_seq = stepseq { steps: [0,0,0,0], gates: [0,1,0,1] }
+quarter -> clap_seq.clock
+clap_gate = logic { op: and }
+clap_seq.trig -> clap_gate.a
+arr_kick.cv -> clap_gate.b
+clap_env = func { rise: 0.001, fall: 0.13, curve: exp }
+clap_gate -> clap_env.trig
+clap_noise = noise { color: white, seed: 5 }
+clap_filter = svf { cutoff: 1800, res: 0.5 }
+clap_noise -> clap_filter.in
+clap_amp = vca { gain: 0 }
+clap_filter.bp -> clap_amp.in
+clap_env -> clap_amp.cv : 0.72
+
+# ---- hats: bright euclid ticks + offbeat open hat ----
+hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
+master -> hat_pattern.clock
+hats_lvl -> hat_pattern.hits : 7
+hat_env = func { rise: 0.0006, fall: 0.035, curve: exp }
+hat_pattern.trig -> hat_env.trig
+hats_lvl -> hat_env.fall : 0.03
+hat_noise = noise { color: white, seed: 19 }
+hat_filter = svf { cutoff: 10000, res: 0.25 }
+hat_noise -> hat_filter.in
+hat_amp = vca { gain: 0 }
+hat_filter.hp -> hat_amp.in
+hat_env -> hat_amp.cv : 0.5
+quarter -> hat_amp.cv : -0.13
+
+beat_not = logic { op: not }
+quarter -> beat_not.a
+offbeat = logic { op: and }
+eighth -> offbeat.a
+beat_not -> offbeat.b
+oh_env = func { rise: 0.001, fall: 0.2, curve: exp }
+offbeat -> oh_env.trig
+oh_noise = noise { color: white, seed: 37 }
+oh_filter = svf { cutoff: 7000, res: 0.3 }
+oh_noise -> oh_filter.in
+oh_amp = vca { gain: 0 }
+oh_filter.hp -> oh_amp.in
+oh_env -> oh_amp.cv : 0.32
+perc_lvl -> oh_amp.cv : 0.6
+
+# ---- ACID line: 16-step sixteenth riff of intervals (root/5th/oct/b7)
+# added to the chord root, dense gates, through a hot ladder. The env
+# squelches every note; the accent lane slams the cutoff on key steps. ----
+acid_seq = stepseq { steps: [0,0,1,0, 0,.58333,0,1, 0,0,.58333,0, 1,.58333,.83333,0],
+                     gates: [1,1,0,1, 1,0,1,1, 0,1,1,0, 1,1,1,1] }
+master -> acid_seq.clock
+acid_acc = stepseq { steps: [0,0,0,0], gates: [1,0,0,1, 0,0,1,0, 0,0,1,0, 0,0,1,0] }
+master -> acid_acc.clock
+acid_pitch = math { op: add }
+acid_seq.cv -> acid_pitch.a
+ch_root.cv -> acid_pitch.b
+acid_note = sh { mode: sample }
+acid_pitch -> acid_note.in
+acid_seq.trig -> acid_note.trig
+
+acid_env = func { rise: 0.001, fall: 0.11, curve: exp }
+acid_seq.trig -> acid_env.trig
+acid_acc_env = func { rise: 0.001, fall: 0.14, curve: exp }
+acid_acc.trig -> acid_acc_env.trig
+
+acid_osc = vco { freq: 110hz, wave: saw }
+acid_note -> acid_osc.v_oct
+acid_filt = ladder { cutoff: 200, res: 0.8, drive: 0.8 }
+acid_osc -> acid_filt.in
+acid_env -> acid_filt.cutoff : 1600
+acid_acc_env -> acid_filt.cutoff : 1100
+acid_lvl -> acid_filt.cutoff : 500
+acid_amp = vca { gain: 0 }
+acid_filt -> acid_amp.in
+acid_env -> acid_amp.cv : 0.8
+acid_acc_env -> acid_amp.cv : 0.15
+acid_post = vca { gain: 0 }
+acid_amp -> acid_post.in
+acid_lvl -> acid_post.cv : 0.85
+
+# ---- glide sub under the acid, roots only ----
+sub_glide = func { rise: 0.05, fall: 0.05 }
+ch_root.cv -> sub_glide.in
+sub_osc = vco { freq: 55hz, wave: sine }
+sub_glide -> sub_osc.v_oct
+sub_filt = ladder { cutoff: 120, res: 0.1, drive: 0.2 }
+sub_osc -> sub_filt.in
+sub_amp = vca { gain: 0 }
+sub_filt -> sub_amp.in
+acid_lvl -> sub_amp.cv : 0.6
+
+# ---- TRANCE-GATE pad: root/third/fifth saws chopped by a fixed sixteenth
+# gate pattern -- the pad becomes the groove. Glided lanes underneath so
+# the harmony still smears ethereally between chops. ----
+gate_gl_r = func { rise: 0.07, fall: 0.07 }
+gate_gl_2 = func { rise: 0.07, fall: 0.07 }
+gate_gl_3 = func { rise: 0.07, fall: 0.07 }
+ch_root.cv -> gate_gl_r.in
+ch_v2.cv   -> gate_gl_2.in
+ch_v3.cv   -> gate_gl_3.in
+gp_a = vco { freq: 220hz, wave: saw }
+gp_b = vco { freq: 220hz, wave: saw }
+gp_c = vco { freq: 440hz, wave: saw }
+gate_gl_r -> gp_a.v_oct
+gate_gl_2 -> gp_b.v_oct
+gate_gl_3 -> gp_c.v_oct
+0.006 -> gp_b.v_oct
+-0.005 -> gp_c.v_oct
+gp_filt = svf { cutoff: 500, res: 0.25 }
+gp_a -> gp_filt.in : 0.35
+gp_b -> gp_filt.in : 0.32
+gp_c -> gp_filt.in : 0.28
+gate_lvl -> gp_filt.cutoff : 1800
+
+gate_seq = stepseq { steps: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+                     gates: [1,0,1,1, 0,1,0,1, 1,0,1,0, 1,1,0,1] }
+master -> gate_seq.clock
+gate_env = func { rise: 0.002, fall: 0.09, curve: exp }
+gate_seq.trig -> gate_env.trig
+gp_chop = vca { gain: 0 }
+gp_filt.lp -> gp_chop.in
+gate_env -> gp_chop.cv : 0.9
+gp_post = vca { gain: 0 }
+gp_chop -> gp_post.in
+gate_lvl -> gp_post.cv : 0.7
+
+# ---- supersaw HOOK (drop 2): fixed two-bar phrase, A minor pentatonic,
+# straight quarters -- A C E D | C A G A. Big, dumb, correct. ----
+lead_seq = stepseq { steps: [0,0,.25,.25, .58333,.58333,.41667,.41667,
+                             .25,.25,0,0, -0.16667,-0.16667,0,0],
+                     gates: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0] }
+eighth -> lead_seq.clock
+lead_env = func { rise: 0.006, fall: 0.4, curve: exp }
+lead_seq.trig -> lead_env.trig
+lead_a = vco { freq: 440hz, wave: saw }
+lead_b = vco { freq: 440hz, wave: saw }
+lead_c = vco { freq: 440hz, wave: saw }
+lead_seq.cv -> lead_a.v_oct
+lead_seq.cv -> lead_b.v_oct
+lead_seq.cv -> lead_c.v_oct
+0.007 -> lead_b.v_oct
+-0.005 -> lead_c.v_oct
+lead_filt = svf { cutoff: 1200, res: 0.25 }
+lead_a -> lead_filt.in : 0.32
+lead_b -> lead_filt.in : 0.32
+lead_c -> lead_filt.in : 0.32
+lead_env -> lead_filt.cutoff : 2000
+lead_lvl -> lead_filt.cutoff : 1600
+lead_amp = vca { gain: 0 }
+lead_filt.lp -> lead_amp.in
+lead_env -> lead_amp.cv : 0.5
+lead_post = vca { gain: 0 }
+lead_amp -> lead_post.in
+lead_lvl -> lead_post.cv : 0.8
+
+# ---- riser + roll: bigger sweep than the others ----
+riser_noise = noise { color: white, seed: 7 }
+riser_filter = svf { cutoff: 300, res: 0.55 }
+riser_noise -> riser_filter.in
+rise_cv -> riser_filter.cutoff : 6000
+riser_amp = vca { gain: 0 }
+riser_filter.lp -> riser_amp.in
+rise_cv -> riser_amp.cv : 0.6
+
+roll_pattern = euclid { steps: 16, hits: 4, rot: 0 }
+master -> roll_pattern.clock
+rise_cv -> roll_pattern.hits : 12
+roll_env = func { rise: 0.001, fall: 0.055, curve: exp }
+roll_pattern.trig -> roll_env.trig
+roll_noise = noise { color: white, seed: 41 }
+roll_filter = svf { cutoff: 2600, res: 0.45 }
+roll_noise -> roll_filter.in
+roll_amp = vca { gain: 0 }
+roll_filter.bp -> roll_amp.in
+roll_env -> roll_amp.cv : 0.24
+rise_cv -> roll_amp.cv : 0.18
+
+# ---- dry band: acid center-right, gate pad wide-ish, hook near center ----
+band = mix { levels: [0.88, 0.7, 0.55, 0.45, 0.45, 0.68, 0.55, 0.6],
+             pans: [0, 0, 0, 0.35, -0.3, 0.12, -0.15, 0.05] }
+kick_drive -> band.in1
+sub_amp   -> band.in2
+clap_amp  -> band.in3
+hat_amp   -> band.in4
+oh_amp    -> band.in5
+acid_post -> band.in6
+gp_post   -> band.in7
+lead_post -> band.in8
+kick_env -> band.lvl2 : -0.24
+kick_env -> band.lvl6 : -0.14
+kick_env -> band.lvl7 : -0.26
+kick_env -> band.lvl8 : -0.14
+
+# ---- FX: delay lattice (acid + hook), plate for gate pad and hook ----
+sync_de = tempo { bpm: 132, beats: 0.75 }
+sync_e  = tempo { bpm: 132, beats: 0.5 }
+dly_l = delay { time: 0ms, feedback: 0.45, tone: 3600, mix: 1, slew: 0.2 }
+dly_r = delay { time: 0ms, feedback: 0.4, tone: 3100, mix: 1, slew: 0.2 }
+sync_de.seconds -> dly_l.time
+sync_e.seconds  -> dly_r.time
+acid_post -> dly_l.in : 0.35
+acid_post -> dly_r.in : 0.3
+lead_post -> dly_l.in : 0.3
+lead_post -> dly_r.in : 0.35
+
+space = reverb { decay: 0.8, damp: 0.3, mix: 1,
+                 predelay: 0.02, bandwidth: 0.92,
+                 mod_rate: 0.6, mod_depth: 24 }
+gp_post   -> space.in_l : 0.35
+gp_post   -> space.in_r : 0.35
+lead_post -> space.in_l : 0.28
+lead_post -> space.in_r : 0.28
+clap_amp  -> space.in_l : 0.15
+clap_amp  -> space.in_r : 0.2
+acid_post -> space.in_l : 0.08
+acid_post -> space.in_r : 0.1
+riser_amp -> space.in_l : 0.22
+riser_amp -> space.in_r : 0.22
+
+# ---- master + mastering chain (album settings) ----
+master_mix = mix { levels: [1, 1, 0.5, 0.5, 0.42, 0.42, 0.42],
+                   pans: [-1, 1, -1, 1, -0.8, 0.8, 0] }
+band.out_l  -> master_mix.in1
+band.out_r  -> master_mix.in2
+space.out_l -> master_mix.in3
+space.out_r -> master_mix.in4
+dly_l       -> master_mix.in5
+dly_r       -> master_mix.in6
+riser_amp   -> master_mix.in7 : 0.5
+roll_amp    -> master_mix.in7 : 0.5
+kick_env -> master_mix.lvl3 : -0.18
+kick_env -> master_mix.lvl4 : -0.18
+kick_env -> master_mix.lvl5 : -0.14
+kick_env -> master_mix.lvl6 : -0.14
+
+master_dc = dcblock { cutoff: 12hz }
+master_mix.out_l -> master_dc.in_l
+master_mix.out_r -> master_dc.in_r
+
+master_eq = eq { hp_freq: 28, low_freq: 100, low_gain: -0.5,
+                 mid1_freq: 380, mid1_gain: -1.2, mid1_q: 0.9,
+                 mid2_freq: 3400, mid2_gain: 0.7, mid2_q: 0.8,
+                 high_freq: 10000, high_gain: 0.6 }
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.4,
+                           knee: 5, attack: 0.012, release: 0.14,
+                           makeup: 1.5, mix: 0.85 }
+master_eq.out_l -> master_comp.in_l
+master_eq.out_r -> master_comp.in_r
+kick_drive -> master_comp.side_l : 0.7
+kick_drive -> master_comp.side_r : 0.7
+
+master_field = stereo { width: 1.15, balance: 0 }
+master_comp.out_l -> master_field.in_l
+master_comp.out_r -> master_field.in_r
+
+master_clip = clipper { mode: soft, threshold: -2.5, drive: 1.2, mix: 0.32 }
+master_field.out_l -> master_clip.in_l
+master_field.out_r -> master_clip.in_r
+
+master_limit = limiter { threshold: -0.5, release: 0.08 }
+master_clip.out_l -> master_limit.in_l
+master_clip.out_r -> master_limit.in_r
+
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
+-1 -> out.level
+main_out -> out.level : 0.8

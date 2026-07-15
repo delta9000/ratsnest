@@ -1,47 +1,159 @@
-# "Steel Crusade" — epic power metal, take 2.
-# A natural minor, 168 BPM. Real guitars: string physical-model power chords
-# and lead through the overdrive, galloping over a double-kick. No synthy saws,
-# no bells. Heroic quarter-note lead on chord tones. Everything on short
-# looping stepseqs locked to the bar.
+# "Steel Crusade" — epic power metal, take 4.
+# A natural minor, 168 BPM. A real song, not a loop: a 34-block arrangement
+# grid (one block = 4 bars = one Am-F-G-Am cycle ≈ 5.71 s) drives slewed
+# level lanes per instrument, a half-time selector for the intro/bridge, a
+# two-phrase lead (A verse/chorus line, B climactic solo/final line), and a
+# sustained chord pad that underpins the intro and fills the bridge drop.
+#
+# Take-4 mix overhaul (the take-3 render was a mono brick):
+#   * gain-staged so the limiter is a safety net, not the sound — the mix
+#     bus no longer pins -0.5 dBFS wall-to-wall, so the gallop has shape
+#   * double-tracked rhythm guitar, two detuned string pairs hard L/R
+#   * cymbal bus: hats + quarter-note ride wash + crash on chorus/solo
+#     downbeats, on its own channel so the top end survives the chug
+#   * lead: rests in the A phrase, a real hall (decay .8), tempo-synced
+#     dotted-8th delay; pad shares the hall for the intro bed
+#   * master fade 6 s, and TWO silent guard blocks: the stepseq grid
+#     consumes its first four_bar edge at t=0, so the audible song runs one
+#     block ahead of the step index — one guard block wrapped back into the
+#     intro before a 186 s render ended
+#
+# Form (34 blocks ≈ 3:08 + tail):
+#   0-1  Intro      FANFARE: the A-phrase lead hook stated over half-time
+#                   drums, crash-marked downbeats, chug + pad bed — the
+#                   song announces itself instead of idling
+#   2-5  Verse 1    full gallop, rhythm + bass + drums
+#   6-9  Chorus 1   lead (A phrase) enters, pad lifts
+#   10-13 Verse 2
+#   14-17 Bridge    half-time breakdown, pad carries it, sparse gallop
+#   18-21 Solo      lead B phrase (higher), double-kick gallop
+#   22-25 Chorus 2  lead A + B alternation
+#   26-29 Final     max energy
+#   30-31 Outro     fade (~6 s)
+#   32-33 Guard     silent, so a long render does not wrap back to the intro
 
-# --- Clock tree: clk pulses on 16ths (672/min = 168 BPM in 16ths) ---
+# ===================== CLOCK TREE =====================
+# clk pulses on 16ths (672/min = 168 BPM in 16ths).
 clk = clock { bpm: 672 }
-beat = div { by: 4 }        # quarter notes
-eighth = div { by: 2 }      # 8th notes
-bar = div { by: 16 }        # bar downbeats
+beat   = div { by: 4 }   # quarter notes
+eighth = div { by: 2 }   # 8th notes
+bar    = div { by: 16 }  # bar downbeats
+four_bar = div { by: 4 } # one chord-progression cycle = one arrangement block
 clk -> beat.in
 clk -> eighth.in
 clk -> bar.in
+bar -> four_bar.in
 
-# --- Chords: Am - F - G - Am, one per bar (root as v/oct, A = 0) ---
+# ===================== ARRANGEMENT GRID =====================
+# Each lane is a 34-step stepseq clocked once per block. Level lanes (0..1)
+# slew through func for musical fades; selector lanes (0/1) stay stepped and
+# drive switches / gates directly. Blocks 32-33 are the silent guard.
+arr_drums = stepseq { steps: [
+  0.6, 0.8,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.6, 0.5, 0.5, 0.6,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.6, 0.0,  0, 0 ] }
+arr_rhythm = stepseq { steps: [
+  0.3, 0.5,
+  0.7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.4, 0.35, 0.35, 0.45,
+  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  0.5, 0.0,  0, 0 ] }
+arr_bass = stepseq { steps: [
+  0.25, 0.6,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.5, 0.45, 0.45, 0.55,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.5, 0.0,  0, 0 ] }
+arr_pad = stepseq { steps: [
+  0.85, 0.85,
+  0.3, 0.3, 0.3, 0.3,   0.55, 0.55, 0.55, 0.55,
+  0.3, 0.3, 0.3, 0.3,   0.9, 0.9, 0.9, 0.9,
+  0.35, 0.35, 0.35, 0.35,   0.65, 0.65, 0.65, 0.65,
+  0.65, 0.65, 0.65, 0.65,   0.55, 0.0,  0, 0 ] }
+arr_lead = stepseq { steps: [
+  0.85, 0.85,
+  0, 0, 0, 0,   1, 1, 1, 1,   0, 0, 0, 0.7,   0, 0, 0, 0,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.4, 0.0,  0, 0 ] }
+arr_main = stepseq { steps: [
+  1, 1,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.7, 0.0,  0, 0 ] }
+# Stepped 0/1 selector lanes.
+arr_halftime = stepseq { steps: [
+  1, 1,
+  0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,   1, 1, 1, 1,
+  0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,   0, 0,  0, 0 ] }
+arr_solo = stepseq { steps: [
+  0, 0,
+  0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,
+  1, 1, 1, 1,   0, 0, 0, 0,   0, 0, 0, 0,   0, 0,  0, 0 ] }
+# (block 0-1 high: crashes + bright chug make the intro a fanfare)
+arr_chorus = stepseq { steps: [
+  1, 1,
+  0, 0, 0, 0,   1, 1, 1, 1,   0, 0, 0, 0,   0, 0, 0, 0,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0, 0,  0, 0 ] }
+arr_leadgate = stepseq { steps: [
+  1, 1,
+  0, 0, 0, 0,   1, 1, 1, 1,   0, 0, 0, 1,   0, 0, 0, 0,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   1, 0,  0, 0 ] }
+four_bar -> arr_drums.clock
+four_bar -> arr_rhythm.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_pad.clock
+four_bar -> arr_lead.clock
+four_bar -> arr_main.clock
+four_bar -> arr_halftime.clock
+four_bar -> arr_solo.clock
+four_bar -> arr_chorus.clock
+four_bar -> arr_leadgate.clock
+
+# Slewed section faders (slow musical fades across block boundaries).
+drums_lvl  = func { rise: 1.5, fall: 2.5 }
+rhythm_lvl = func { rise: 2.0, fall: 3.0 }
+bass_lvl   = func { rise: 1.5, fall: 2.5 }
+pad_lvl    = func { rise: 2.5, fall: 4.0 }
+lead_lvl   = func { rise: 2.0, fall: 3.0 }
+main_lvl   = func { rise: 1.0, fall: 6.0 }
+arr_drums.cv  -> drums_lvl.in
+arr_rhythm.cv -> rhythm_lvl.in
+arr_bass.cv   -> bass_lvl.in
+arr_pad.cv    -> pad_lvl.in
+arr_lead.cv   -> lead_lvl.in
+arr_main.cv   -> main_lvl.in
+
+# ===================== HARMONY =====================
+# Am - F - G - Am, one per bar (root as v/oct, A = 0).
 chord = stepseq { steps: [0, -0.3333, -0.1667, 0], gates: [1, 1, 1, 1] }
 bar -> chord.clock
 
-# --- Gallop: "dun - da-da" per beat, drives kick AND the chug ---
+# ===================== GALLOP + HALF-TIME SELECTOR =====================
+# Gallop: "dun - da-da" per beat. Half-time: kick/chug on beats 1 & 3 only,
+# used for the intro build and the bridge breakdown.
 gallop = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 1] }
 clk -> gallop.clock
+half = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 0] }
+beat -> half.clock
+strike_src = switch { mode: addr, n: 2 }
+gallop.trig -> strike_src.in1
+half.trig   -> strike_src.in2
+arr_halftime.cv -> strike_src.addr     # 0 = gallop, 1 = half-time
 
 # ===================== DRUMS =====================
-# Kick (double bass): sine body with a fast pitch punch + a noise beater click
-# so it cuts through the distorted guitars. VCA amps give reliable, full level.
-kaenv = func { rise: 0.001s, fall: 0.095s }
-gallop.trig -> kaenv.trig
-kpenv = func { rise: 0.0003s, fall: 0.006s }
-gallop.trig -> kpenv.trig
-kosc = vco { wave: sine, freq: 50hz }
-kpenv -> kosc.v_oct : 3.2              # near-instant pitch collapse (click, not tom)
+# Kick (double bass): sine body with a fast pitch punch + a noise beater click.
+kaenv = func { rise: 0.001s, fall: 0.14s }
+strike_src -> kaenv.trig
+kpenv = func { rise: 0.0004s, fall: 0.035s }
+strike_src -> kpenv.trig
+kosc = vco { wave: sine, freq: 55hz }
+kpenv -> kosc.v_oct : 2.8
 kbody = vca { gain: 0 }
 kosc -> kbody.in
 kaenv -> kbody.cv
 kclk_env = func { rise: 0.0002s, fall: 0.009s }
-gallop.trig -> kclk_env.trig
+strike_src -> kclk_env.trig
 kclk_n = noise { color: white, seed: 9 }
-kclk_hp = svf { cutoff: 1700hz, res: 0.2 }
+kclk_hp = svf { cutoff: 2500hz, res: 0.2 }
 kclk_n -> kclk_hp.in
 kclk = vca { gain: 0 }
 kclk_hp.hp -> kclk.in
 kclk_env -> kclk.cv
-kick = mix { levels: [1.0, 0.32] }
+kick = mix { levels: [1.0, 0.55] }
 kbody -> kick.in1
 kclk -> kick.in2
 
@@ -67,78 +179,232 @@ hats = vca { gain: 0 }
 hhp.hp -> hats.in
 henv -> hats.cv
 
+# Ride wash on quarters + crash on chorus/solo bar downbeats. Power metal
+# keeps constant cymbal energy up top; without this the chug owns the whole
+# spectrum above 2 kHz by default.
+renv = func { rise: 0.001s, fall: 0.18s }
+beat -> renv.trig
+rz = noise { color: white, seed: 15 }
+rhp = svf { cutoff: 7000hz, res: 0.15 }
+rz -> rhp.in
+ride = vca { gain: 0 }
+rhp.hp -> ride.in
+renv -> ride.cv : 0.5
+
+crash_gate = logic { op: and }
+bar -> crash_gate.a
+arr_chorus.cv -> crash_gate.b
+crenv = func { rise: 0.001s, fall: 0.9s, curve: exp }
+crash_gate -> crenv.trig
+crz = noise { color: white, seed: 21 }
+crhp = svf { cutoff: 5500hz, res: 0.1 }
+crz -> crhp.in
+crash = vca { gain: 0 }
+crhp.hp -> crash.in
+crenv -> crash.cv : 0.6
+
+cyms = mix { levels: [0.9, 0.5, 0.7] }
+hats -> cyms.in1
+ride -> cyms.in2
+crash -> cyms.in3
+
 # ===================== RHYTHM GUITAR (string power chords) =====================
-# Root + fifth strings, plucked short (palm mute) on the gallop, into a RAT.
+# Root + fifth strings, palm-muted on the selected strike source, into a RAT.
 groot = string { seed: 11, damping: 0.34, position: 0.3, brightness: 0.55 }
 chord.cv -> groot.v_oct
 -2 -> groot.v_oct                 # A2 guitar register
-gallop.trig -> groot.strike
+strike_src -> groot.strike
 gfifth = string { seed: 12, damping: 0.34, position: 0.3, brightness: 0.55 }
 chord.cv -> gfifth.v_oct
 -1 -> gfifth.v_oct
-0.5833 -> gfifth.v_oct             # + perfect fifth
-gallop.trig -> gfifth.strike
+0.5833 -> gfifth.v_oct            # + perfect fifth
+strike_src -> gfifth.strike
 gsum = mix { levels: [0.5, 0.5] }
 groot -> gsum.in1
 gfifth -> gsum.in2
 rhythm = overdrive { model: rat, drive: 0.64, tone: 0.5, mix: 1.0, level: 0.38 }
 gsum.out_l -> rhythm.in
-# Sidechain duck: each kick hit clamps the rhythm wall so the kick punches through.
-duck = compressor { sidechain: external, threshold: -8, ratio: 2.5, knee: 4, attack: 0.001s, release: 0.035s }
-rhythm.out -> duck.in_l
-rhythm.out -> duck.in_r
-kick -> duck.side_l
-kick -> duck.side_r
+arr_chorus.cv -> rhythm.tone : 0.15   # brighten the chug in big sections
+
+# Double-track: a second, independently seeded and detuned string pair
+# through its own RAT, panned opposite the first — the metal wall is two
+# performances hard L/R, never one mono chug.
+groot2 = string { seed: 13, damping: 0.34, position: 0.3, brightness: 0.55 }
+chord.cv -> groot2.v_oct
+-2 -> groot2.v_oct
+0.004 -> groot2.v_oct             # detune against the left track
+strike_src -> groot2.strike
+gfifth2 = string { seed: 14, damping: 0.34, position: 0.3, brightness: 0.55 }
+chord.cv -> gfifth2.v_oct
+-1 -> gfifth2.v_oct
+0.5833 -> gfifth2.v_oct
+-0.004 -> gfifth2.v_oct
+strike_src -> gfifth2.strike
+gsum2 = mix { levels: [0.5, 0.5] }
+groot2 -> gsum2.in1
+gfifth2 -> gsum2.in2
+rhythm2 = overdrive { model: rat, drive: 0.6, tone: 0.5, mix: 1.0, level: 0.38 }
+gsum2.out_l -> rhythm2.in
+arr_chorus.cv -> rhythm2.tone : 0.15
 
 # ===================== BASS (clean sub) =====================
-# Triangle sub an octave below the root, tight, follows the gallop.
+# Triangle sub an octave below the root, follows the selected strike source.
 bosc = vco { wave: tri, freq: 55hz }
 chord.cv -> bosc.v_oct
 benv = func { rise: 0.005s, fall: 0.1s }
-gallop.trig -> benv.trig
+strike_src -> benv.trig
 bass = vca { gain: 0 }
 bosc -> bass.in
 benv -> bass.cv
 
-# ===================== LEAD (string, heroic quarter notes) =====================
-# Diatonic A-minor line on chord tones, plucked guitar through a Tube Screamer,
-# then delay + hall. 16 quarter notes = 4 bars, loops with the chords.
-lseq = stepseq {
-  steps: [1.5833, 1.6667, 1.5833, 1.4167,  1.25, 1.4167, 1.5833, 2.0,
-          1.8333, 1.6667, 1.5833, 1.4167,  1.25, 1.4167, 1.5833, 1.0],
-  gates: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+# ===================== PAD (sustained chord bed) =====================
+# Detuned saw/tri stack tracking the chord root + fifth, slow attack, lowpass.
+# Carries the intro (so it reads as power-metal, not R&B) and fills the
+# bridge drop; sits low under the verses and behind the solo/final.
+pad1 = vco { wave: saw, freq: 220hz }
+pad2 = vco { wave: saw, freq: 220hz }
+pad3 = vco { wave: tri, freq: 220hz }
+chord.cv -> pad1.v_oct
+chord.cv -> pad2.v_oct
+0.5833 -> pad2.v_oct            # fifth above (chord tone)
+0.003  -> pad2.v_oct            # slight detune for chorus shimmer
+chord.cv -> pad3.v_oct
+-1 -> pad3.v_oct                 # octave below to thicken the root
+pad_tone = mix { levels: [0.3, 0.3, 0.35], pans: [-0.35, 0.35, 0] }
+pad1 -> pad_tone.in1
+pad2 -> pad_tone.in2
+pad3 -> pad_tone.in3
+pad_fil = svf { cutoff: 700, res: 0.2 }
+pad_tone -> pad_fil.in
+pad_env = adsr { attack: 0.6, decay: 0.4, sustain: 0.8, release: 1.6,
+                curve: exp }
+bar -> pad_env.gate
+pad_amp = vca { gain: 0, response: exp }
+pad_fil.lp -> pad_amp.in
+pad_env -> pad_amp.cv : 0.6
+pad_post = vca { gain: 0 }
+pad_amp -> pad_post.in
+pad_lvl -> pad_post.cv : 0.5
+
+# ===================== LEAD (string, two alternating phrases) =====================
+# Two 16-step phrases loop with the chords (one block = 4 bars). A is the
+# verse/chorus line on chord tones with breathing rests. B is the climactic
+# solo/final line, higher and denser. A switch picks B whenever the solo lane
+# is high; otherwise A. The +1 octave lift during the solo applies to both.
+# Strike-gated by the arrangement so the lead only speaks in chorus/solo/final.
+aseq = stepseq {
+  steps: [2.0, 2.25, 2.5833, 2.25,  2.0, 2.25, 2.6667, 3.0,
+          1.8333, 2.1667, 2.4167, 2.8333,  2.5833, 2.25, 2.0, 1.5833],
+  gates:  [1, 1, 1, 0,  1, 1, 1, 1,  1, 0, 1, 1,  1, 1, 1, 0]
 }
-beat -> lseq.clock
+bseq = stepseq {
+  steps: [2.0, 2.25, 2.0, 1.8333,  2.0, 2.25, 2.5833, 2.0,
+          1.8333, 2.0, 2.25, 2.0,  2.5833, 2.25, 2.0, 1.5833],
+  gates:  [1, 1, 1, 0,  1, 1, 1, 1,  1, 1, 1, 0,  1, 1, 1, 1]
+}
+beat -> aseq.clock
+eighth -> bseq.clock
+lpick = switch { mode: addr, n: 2 }
+aseq.cv  -> lpick.in1
+bseq.cv  -> lpick.in2
+arr_solo.cv -> lpick.addr           # 0 = A phrase, 1 = B phrase
+lgate_src = switch { mode: addr, n: 2 }
+aseq.trig -> lgate_src.in1
+bseq.trig -> lgate_src.in2
+arr_solo.cv -> lgate_src.addr
+-1 -> aseq.transpose              # guitar lead register (A3-A4)
+-1 -> bseq.transpose              # B already sits an octave above A
+lead_gate = logic { op: and }
+lgate_src -> lead_gate.a
+arr_leadgate.cv -> lead_gate.b     # only strike when the lead lane is open
 lstr = string { seed: 20, damping: 0.55, position: 0.22, brightness: 0.5 }
-lseq.cv -> lstr.v_oct
-lseq.trig -> lstr.strike
--1 -> lseq.transpose
-ldist = overdrive { model: tubescreamer, drive: 0.96, tone: 0.62, mix: 1.0, level: 0.4 }
-lstr.out -> ldist.in
-ldel = delay { time: 0.214s, feedback: 0.24, mix: 0.12, tone: 5000hz }
+lpick -> lstr.v_oct
+lead_gate -> lstr.strike
+
+# Per-note velocity: random level per strike so it doesn't sound robotic.
+# Clocked on quarter notes so A and B phrase both get variation.
+lvel_rnd = turing { len: 8, prob: 0.3, seed: 42 }
+lvel = vca { gain: 0.7 }
+beat -> lvel_rnd.clock
+lvel_rnd.out -> lvel.cv : 0.3
+lstr.out -> lvel.in
+
+ldist = overdrive { model: tubescreamer, drive: 0.65, tone: 0.62, mix: 0.5, level: 0.5 }
+lvel -> ldist.in
+sync_de = tempo { bpm: 168, beats: 0.75 }
+ldel = delay { time: 0ms, feedback: 0.3, mix: 0.18, tone: 5000hz }
+sync_de.seconds -> ldel.time      # dotted-8th throw, locked to the tempo
 ldist.out -> ldel.in
 
-# ===================== REVERB SEND (lead only) =====================
-hall = reverb { decay: 0.15, damp: 0.5, mix: 1.0 }
+# ===================== REVERB SEND (lead + pad) =====================
+# A real hall — the epic space the lead sings into; the pad shares it so
+# the intro bed has depth. (Take 3's decay .15 was a broom cupboard.)
+hall = reverb { decay: 0.8, damp: 0.4, mix: 1.0 }
 ldel -> hall.in_l : 0.32
 ldel -> hall.in_r : 0.32
+pad_post -> hall.in_l : 0.25
+pad_post -> hall.in_r : 0.25
 
-# ===================== MASTER MIX + LIMITER =====================
-premaster = mix {
-  levels: [1.35, 0.72, 0.5, 1.1, 0.8, 0.35, 0.4, 0.4],
-  pans:   [0, 0, 0.3, 0, 0, 0, -1, 1]
+# ===================== SONG MIX (levels driven by arrangement lanes) =====================
+# Dry band + stereo return stage. Config levels are zero; the slewed lane
+# CVs carry each part's full level. Gains are staged ~6 dB below take 3 so
+# the section fades survive to the output — the limiter is a safety net,
+# not the sound. Pad channel level is fixed (pad_post already carries
+# pad_lvl; take 3 applied the lane twice).
+band = mix {
+  levels: [0, 0, 0, 0, 0, 0, 0.9, 0],
+  pans:   [0, 0.12, 0.3, -0.75, 0.75, 0, 0, 0.1]
 }
-kick   -> premaster.in1
-snare  -> premaster.in2
-hats   -> premaster.in3
-duck.out_l -> premaster.in4
-bass   -> premaster.in5
-ldist  -> premaster.in6
-hall.out_l -> premaster.in7
-hall.out_r -> premaster.in8
+kick    -> band.in1
+snare   -> band.in2
+cyms.out_l -> band.in3
+rhythm  -> band.in4
+rhythm2 -> band.in5
+bass    -> band.in6
+pad_post -> band.in7
+ldist   -> band.in8
+drums_lvl  -> band.lvl1 : 0.95
+drums_lvl  -> band.lvl2 : 0.45
+drums_lvl  -> band.lvl3 : 0.55
+rhythm_lvl -> band.lvl4 : 0.5
+rhythm_lvl -> band.lvl5 : 0.5
+bass_lvl   -> band.lvl6 : 0.5
+lead_lvl   -> band.lvl8 : 0.55
+
+# Hall returns at a fixed level: the lead is strike-gated and the pad send
+# is post-fader, so nothing bleeds in when its lane is closed.
+premaster = mix { levels: [0.62, 0.62, 0.36, 0.36], pans: [-1, 1, -1, 1] }
+band.out_l -> premaster.in1
+band.out_r -> premaster.in2
+hall.out_l -> premaster.in3
+hall.out_r -> premaster.in4
+
+# ===================== MASTER CHAIN + CAPTURE =====================
+# Master fade VCA, DC guard, light glue compression, limiter, out.
+master_l = vca { gain: 0 }
+master_r = vca { gain: 0 }
+premaster.out_l -> master_l.in
+premaster.out_r -> master_r.in
+main_lvl -> master_l.cv
+main_lvl -> master_r.cv
+
+master_dc = dcblock { cutoff: 12hz }
+master_l -> master_dc.in_l
+master_r -> master_dc.in_r
+master_comp = compressor { threshold: -14, ratio: 2.0, knee: 4,
+                           attack: 0.015, release: 0.12, makeup: 0.5, mix: 0.6 }
+master_dc.out_l -> master_comp.in_l
+master_dc.out_r -> master_comp.in_r
 
 lim = limiter { threshold: -0.5, release: 0.06 }
-premaster.out_l -> lim.in_l
-premaster.out_r -> lim.in_r
+master_comp.out_l -> lim.in_l
+master_comp.out_r -> lim.in_r
 lim.out_l -> out.left
 lim.out_r -> out.right
+
+# Capture a take alongside the mix; gated by the arrangement so the silent
+# guard block at the end is not recorded as a long tail.
+capture = rec { file: "steel-crusade-take.wav", secs: 200 }
+lim.out_l -> capture.in_l
+lim.out_r -> capture.in_r
+arr_main.cv -> capture.gate
