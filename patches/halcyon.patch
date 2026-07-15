@@ -1,0 +1,480 @@
+# halcyon -- progressive / melodic techno in E minor at 126 BPM, ~4:00.
+#
+# A self-conducting song: eight tracker lanes (one value per 4-bar block)
+# drive a 32-block arrangement through func slew limiters, so the track
+# builds, breaks, drops, and fades on its own. Proven EDM idioms composed
+# into a combination none of the other patches use:
+#
+#   * four-on-the-floor kick with clap on 2 & 4 and audio-derived sidechain
+#   * Reese bass -- two chorus-drifting detuned saws + a clean sub an octave
+#     below, all tracking the progression roots through one ladder
+#   * a chord-tracking trance ARP: a `switch` steps eighth-by-eighth through
+#     the root/third/fifth harmony lanes, so the same 8-step contour plays
+#     against every chord -- the arp follows the harmony, it doesn't drift
+#   * a supersaw LEAD hook: three detuned saws picking chord tones from the
+#     harmony lanes via an eighth-clocked switch (with an octave lift), struck
+#     on a 5-of-16 euclid reset every two bars -- a real repeating riff that
+#     stays consonant over every bar of the cadence
+#   * offbeat open-hat (eighth AND NOT quarter) + a snare-roll build layer
+#     whose euclid density rides the riser lane into each drop
+#   * tempo-synced dotted-eighth / straight-eighth delay throws, plate reverb,
+#     and a full dcblock -> eq -> kick-sidechain comp -> stereo -> clip ->
+#     limit mastering chain
+#
+# Harmony is Em | C | D | Em (i - VI - VII - i): it resolves home every four
+# bars, the anthemic cadence the track is built around. Three voicing lanes
+# (root / third / fifth as absolute v/oct around an E2 = 82.41 Hz base) feed
+# bass, pad, and arp alike, so the whole track re-voices from three numbers.
+#
+# Arrangement (32 four-bar blocks, ~7.62 s each):
+#   0-1   intro    pad breathes alone
+#   2-3   build-A  sub + sparse arp + sparse hats ease in
+#   4-5   grow     hats + arp denser, bass firms
+#   6     riser-1  noise sweep + snare roll into drop 1
+#   7-10  DROP 1   kick + clap + reese + arp + oh + pad, full groove
+#   11    breathe  kick/clap out, arp + reese tail + pad
+#   12-13 break    drums gone, pad blooms (filter opens), lead teases
+#   14-15 riser-2  two-block sweep, roll thickens, lead lifts
+#   16-21 DROP 2   everything + supersaw lead, arp + hats at maximum
+#   22-23 groove   lead recedes, back to drop-1 density
+#   24-26 peel     drums and reese pull away, arp thins, pad returns
+#   27-29 fade     master fade to silence
+#   30-31 tail     silent guard so a render ends before the grid wraps
+
+# ---- clock tree: sixteenths at 126 BPM (504 gates/min) ----
+master   = clock { bpm: 504 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+two_bar  = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> two_bar.in
+bar -> four_bar.in
+
+# ---- 32-block arrangement grid: one value per 4-bar block, slewed below ----
+arr_kick = stepseq { steps: [0,0,0,0,0,0,0,1, 1,1,1,0,0,0,0,0,
+                              1,1,1,1,1,1,1,1, 0,0,0,0,0,0,0,0] }
+arr_bass = stepseq { steps: [0,0,.22,.25,.35,.4,.5,.85, .85,.85,.85,.4,.28,.28,.4,.5,
+                             .9,.9,.9,.9,.9,.9,.85,.8, .28,.2,.15,.1,0,0,0,0] }
+arr_hats = stepseq { steps: [0,0,0,.2,.4,.5,.55,.7, .7,.7,.7,.2,0,0,.2,.4,
+                             .75,.75,.75,.75,.75,.75,.7,.6, .4,.15,0,0,0,0,0,0] }
+arr_arp  = stepseq { steps: [0,0,.12,.22,.4,.5,.5,.7, .7,.7,.7,.4,.22,.18,.35,.5,
+                             .82,.82,.82,.82,.82,.78,.7,.6, .35,.2,.1,.04,0,0,0,0] }
+arr_pad  = stepseq { steps: [.6,.6,.55,.5,.45,.4,.35,.3, .3,.3,.3,.5,.85,.9,.7,.5,
+                             .32,.32,.32,.32,.32,.35,.35,.4, .5,.6,.55,.4,.2,.05,0,0] }
+arr_lead = stepseq { steps: [0,0,0,0,0,0,0,0, 0,0,0,0,0,.1,.22,.42,
+                             .85,.85,.85,.85,.85,.68,0,0, 0,0,0,0,0,0,0,0] }
+arr_perc = stepseq { steps: [0,0,0,0,0,0,0,.7, .7,.7,.7,0,0,0,0,0,
+                             .7,.7,.7,.7,.7,.7,.7,.6, 0,0,0,0,0,0,0,0] }
+arr_rise = stepseq { steps: [0,0,0,0,0,0,1,0, 0,0,0,0,0,0,.5,1,
+                             0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0] }
+arr_main = stepseq { steps: [1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,
+                             1,1,1,1,1,1,1,1, 1,1,1,.6,.25,.05,0,0] }
+four_bar -> arr_kick.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_hats.clock
+four_bar -> arr_arp.clock
+four_bar -> arr_pad.clock
+four_bar -> arr_lead.clock
+four_bar -> arr_perc.clock
+four_bar -> arr_rise.clock
+four_bar -> arr_main.clock
+
+# Slew limiters turn lane steps into section crossfades (func with no trig
+# input slews toward `in`). The riser attacks slowly and releases fast so
+# the drop lands clean; the master fades out over a long fall.
+bass_lvl = func { rise: 3, fall: 3 }
+hats_lvl = func { rise: 2, fall: 2 }
+arp_lvl  = func { rise: 3, fall: 3 }
+pad_lvl  = func { rise: 5, fall: 5 }
+lead_lvl = func { rise: 3, fall: 3 }
+perc_lvl = func { rise: 2, fall: 2 }
+rise_cv  = func { rise: 6, fall: 0.4 }
+main_out = func { rise: 2, fall: 6 }
+arr_bass.cv -> bass_lvl.in
+arr_hats.cv -> hats_lvl.in
+arr_arp.cv  -> arp_lvl.in
+arr_pad.cv  -> pad_lvl.in
+arr_lead.cv -> lead_lvl.in
+arr_perc.cv -> perc_lvl.in
+arr_rise.cv -> rise_cv.in
+arr_main.cv -> main_out.in
+
+# ---- harmony: Em | C | D | Em (i - VI - VII - i), one chord per bar.
+# Values are absolute chord tones in v/oct around an E2 = 82.41 Hz base, so a
+# single set of lanes voices bass, pad, and arp identically.
+ch_root  = stepseq { steps: [0, -0.33333, -0.16667, 0] }
+ch_third = stepseq { steps: [0.25, 0, 0.16667, 0.25] }
+ch_fifth = stepseq { steps: [0.58333, 0.25, 0.41667, 0.58333] }
+bar -> ch_root.clock
+bar -> ch_third.clock
+bar -> ch_fifth.clock
+
+# ---- kick: gated four-on-the-floor, pitch-thump sine, log envelope ----
+kick_gate = logic { op: and }
+quarter -> kick_gate.a
+arr_kick.cv -> kick_gate.b
+kick_env = func { rise: 0.0006, fall: 0.2, curve: log }
+kick_gate -> kick_env.trig
+kick_osc = vco { freq: 48hz, wave: sine }
+kick_gate -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 1.75
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : 0.95
+kick_drive = drive { amount: 0.22, mode: soft }
+kick_amp -> kick_drive.in
+
+# ---- clap on beats 2 & 4, band-passed noise, only while the kick plays ----
+clap_seq = stepseq { steps: [0,0,0,0], gates: [0,1,0,1] }
+quarter -> clap_seq.clock
+clap_gate = logic { op: and }
+clap_seq.trig -> clap_gate.a
+arr_kick.cv -> clap_gate.b
+clap_env = func { rise: 0.001, fall: 0.14, curve: exp }
+clap_gate -> clap_env.trig
+clap_noise = noise { color: white, seed: 5 }
+clap_filter = svf { cutoff: 1600, res: 0.5 }
+clap_noise -> clap_filter.in
+clap_amp = vca { gain: 0 }
+clap_filter.bp -> clap_amp.in
+clap_env -> clap_amp.cv : 0.7
+
+# ---- hats: euclid sixteenths whose density rides the arrangement ----
+hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
+master -> hat_pattern.clock
+hats_lvl -> hat_pattern.hits : 6
+hat_env = func { rise: 0.0006, fall: 0.04, curve: exp }
+hat_pattern.trig -> hat_env.trig
+hats_lvl -> hat_env.fall : 0.03
+hat_noise = noise { color: white, seed: 19 }
+hat_filter = svf { cutoff: 9000, res: 0.25 }
+hat_noise -> hat_filter.in
+hat_amp = vca { gain: 0 }
+hat_filter.hp -> hat_amp.in
+hat_env -> hat_amp.cv : 0.5
+quarter -> hat_amp.cv : -0.13
+
+# ---- offbeat open-hat: the classic house "chh" on the and of each beat.
+# Offbeat = eighth AND NOT quarter, both from the same div chain so edges
+# stay phase-locked to the kick. ----
+beat_not = logic { op: not }
+quarter -> beat_not.a
+offbeat = logic { op: and }
+eighth -> offbeat.a
+beat_not -> offbeat.b
+oh_env = func { rise: 0.001, fall: 0.18, curve: exp }
+offbeat -> oh_env.trig
+oh_noise = noise { color: white, seed: 37 }
+oh_filter = svf { cutoff: 6000, res: 0.3 }
+oh_noise -> oh_filter.in
+oh_amp = vca { gain: 0 }
+oh_filter.hp -> oh_amp.in
+oh_env -> oh_amp.cv : 0.3
+perc_lvl -> oh_amp.cv : 0.6
+
+# ---- Reese bass: two chorus-drifting detuned saws through a lowpass with
+# slow cutoff motion, plus a clean sub sine an octave below the root. All
+# three track ch_root, so the bass walks E - C - D - E with the progression.
+# Sustained (no per-bar env): the kick sidechain pumps it, the filter moves. ----
+reese_a = vco { freq: 164.81hz, wave: saw }
+reese_b = vco { freq: 166.5hz, wave: saw }
+reese_sub = vco { freq: 82.41hz, wave: sine }
+ch_root.cv -> reese_a.v_oct
+ch_root.cv -> reese_b.v_oct
+ch_root.cv -> reese_sub.v_oct
+reese_detune = lfo { freq: 0.05hz, wave: tri }
+reese_detune -> reese_b.v_oct : 0.006
+reese_filt = ladder { cutoff: 260, res: 0.15, drive: 0.6 }
+reese_a -> reese_filt.in : 0.5
+reese_b -> reese_filt.in : 0.5
+reese_motion = lfo { freq: 0.07hz, wave: tri }
+reese_motion -> reese_filt.cutoff : 80
+bass_lvl -> reese_filt.cutoff : 220
+reese_amp = vca { gain: 0, response: exp }
+reese_filt -> reese_amp.in
+bass_lvl -> reese_amp.cv : 0.8
+
+sub_filt = ladder { cutoff: 140, res: 0.1, drive: 0.2 }
+reese_sub -> sub_filt.in
+sub_amp = vca { gain: 0 }
+sub_filt -> sub_amp.in
+bass_lvl -> sub_amp.cv : 0.7
+
+# ---- chord-tracking trance ARP. A `switch` in seq mode steps one input per
+# eighth through an 8-step contour built from the root/third/fifth lanes; the
+# octave-lifted step 8 uses a math add. Because the lanes update every bar
+# (bar-clocked stepseqs) and the switch is eighth-clocked and phase-locked
+# to the bar, the same contour plays the right chord tones every bar. An
+# euclid gates the strikes; its hit count rides the arp lane so the riff is
+# sparse in the intro and saturates into the drops. ----
+arp_lift = math { op: add }
+ch_fifth.cv -> arp_lift.a
+1 -> arp_lift.b
+arp_switch = switch { mode: seq, n: 8 }
+eighth -> arp_switch.clock
+ch_root.cv  -> arp_switch.in1
+ch_third.cv -> arp_switch.in2
+ch_fifth.cv -> arp_switch.in3
+ch_third.cv -> arp_switch.in4
+ch_root.cv  -> arp_switch.in5
+ch_third.cv -> arp_switch.in6
+ch_fifth.cv -> arp_switch.in7
+arp_lift    -> arp_switch.in8
+
+arp_gate_pat = euclid { steps: 16, hits: 5, rot: 2 }
+eighth -> arp_gate_pat.clock
+arp_lvl -> arp_gate_pat.hits : 10
+arp_strike = logic { op: and }
+eighth -> arp_strike.a
+arp_gate_pat.gate -> arp_strike.b
+
+arp_osc = vco { freq: 329.63hz, wave: saw }
+arp_switch -> arp_osc.v_oct
+arp_pluck = lpg { damp: 0.6, decay: 0.25 }
+arp_osc -> arp_pluck.in
+arp_strike -> arp_pluck.strike
+arp_amp = vca { gain: 0 }
+arp_pluck -> arp_amp.in
+arp_lvl -> arp_amp.cv : 0.8
+
+# ---- supersaw LEAD hook: three detuned saws picking chord tones from the
+# harmony lanes via an eighth-clocked switch with a fixed 8-step contour and
+# an octave lift, struck on a 5-of-16 euclid reset every two bars -> a real
+# repeating riff. CHORD-TONE TRACKING is the point: a fixed E-natural-minor
+# quantizer would put F# over the C-major chord (half-step under its 5th G)
+# and C natural over D major (tritone against F#) -- the avoid-note clashes
+# that sounded "out of tune". Reading the root/third/fifth lanes keeps the
+# lead diatonic to whichever chord is currently sounding. An S&H holds the
+# pitch through each note's release tail so a ringing note never retunes
+# mid-decay.
+lead_lift_r = math { op: add }
+ch_root.cv  -> lead_lift_r.a
+1           -> lead_lift_r.b
+lead_lift_t = math { op: add }
+ch_third.cv -> lead_lift_t.a
+1           -> lead_lift_t.b
+lead_lift_f = math { op: add }
+ch_fifth.cv -> lead_lift_f.a
+1           -> lead_lift_f.b
+
+lead_switch = switch { mode: seq, n: 8 }
+eighth -> lead_switch.clock
+ch_third.cv  -> lead_switch.in1
+lead_lift_r  -> lead_switch.in2
+lead_lift_f  -> lead_switch.in3
+ch_root.cv   -> lead_switch.in4
+lead_lift_t  -> lead_switch.in5
+ch_fifth.cv  -> lead_switch.in6
+lead_lift_r  -> lead_switch.in7
+lead_lift_f  -> lead_switch.in8
+
+lead_euclid = euclid { steps: 16, hits: 5, rot: 1 }
+eighth -> lead_euclid.clock
+two_bar -> lead_euclid.reset
+lead_note = sh { mode: sample }
+lead_switch -> lead_note.in
+lead_euclid.trig -> lead_note.trig
+
+lead_a = vco { freq: 659.25hz, wave: saw }
+lead_b = vco { freq: 661.5hz, wave: saw }
+lead_c = vco { freq: 657.0hz, wave: saw }
+lead_note -> lead_a.v_oct
+lead_note -> lead_b.v_oct
+lead_note -> lead_c.v_oct
+lead_filt = svf { cutoff: 1800, res: 0.3 }
+lead_a -> lead_filt.in : 0.3
+lead_b -> lead_filt.in : 0.3
+lead_c -> lead_filt.in : 0.3
+lead_env = func { rise: 0.003, fall: 0.35, curve: exp }
+lead_euclid.trig -> lead_env.trig
+lead_filt_env = func { rise: 0.002, fall: 0.3, curve: exp }
+lead_euclid.trig -> lead_filt_env.trig
+lead_filt_env -> lead_filt.cutoff : 2200
+lead_wander = lfo { freq: 0.05hz, wave: tri }
+lead_wander -> lead_filt.cutoff : 350
+lead_lvl -> lead_filt.cutoff : 1200
+lead_amp = vca { gain: 0 }
+lead_filt.lp -> lead_amp.in
+lead_env -> lead_amp.cv : 0.5
+lead_post = vca { gain: 0 }
+lead_amp -> lead_post.in
+lead_lvl -> lead_post.cv : 0.8
+
+# ---- pad: triad (root/third/fifth) split across two filters for width, a
+# slow LFO breath on the cutoffs, and the pad lane opening the filters so
+# it BLOOMS in the breakdown. Long-release ADSR gated per bar lets each
+# chord swell in and ring out into the next. ----
+pad_a = vco { freq: 164.81hz, wave: saw }
+pad_b = vco { freq: 164.81hz, wave: pulse, pw: 0.5 }
+pad_c = vco { freq: 164.81hz, wave: tri }
+ch_root.cv  -> pad_a.v_oct
+ch_third.cv -> pad_b.v_oct
+ch_fifth.cv -> pad_c.v_oct
+0.008 -> pad_b.v_oct
+-0.006 -> pad_c.v_oct
+pad_pwm = lfo { freq: 0.07hz, wave: sine }
+pad_pwm -> pad_b.pwm : 0.2
+pad_filt_l = svf { cutoff: 380, res: 0.2 }
+pad_filt_r = svf { cutoff: 400, res: 0.22 }
+pad_a -> pad_filt_l.in : 0.4
+pad_c -> pad_filt_l.in : 0.3
+pad_b -> pad_filt_r.in : 0.4
+pad_c -> pad_filt_r.in : 0.3
+pad_breath = lfo { freq: 0.043hz, wave: sine }
+pad_breath -> pad_filt_l.cutoff : 160
+pad_breath -> pad_filt_r.cutoff : -140
+pad_lvl -> pad_filt_l.cutoff : 700
+pad_lvl -> pad_filt_r.cutoff : 700
+pad_env = adsr { attack: 0.5, decay: 0.3, sustain: 0.85, release: 1.2, curve: exp }
+bar -> pad_env.gate
+pad_amp_l = vca { gain: 0 }
+pad_amp_r = vca { gain: 0 }
+pad_filt_l.lp -> pad_amp_l.in
+pad_filt_r.lp -> pad_amp_r.in
+pad_env -> pad_amp_l.cv : 0.5
+pad_env -> pad_amp_r.cv : 0.5
+pad_post_l = vca { gain: 0 }
+pad_post_r = vca { gain: 0 }
+pad_amp_l -> pad_post_l.in
+pad_amp_r -> pad_post_r.in
+pad_lvl -> pad_post_l.cv : 0.5
+pad_lvl -> pad_post_r.cv : 0.5
+
+# ---- riser: filtered noise sweep into each drop ----
+riser_noise = noise { color: white, seed: 7 }
+riser_filter = svf { cutoff: 280, res: 0.5 }
+riser_noise -> riser_filter.in
+rise_cv -> riser_filter.cutoff : 5200
+riser_amp = vca { gain: 0 }
+riser_filter.lp -> riser_amp.in
+rise_cv -> riser_amp.cv : 0.55
+
+# ---- snare-roll build layer: a band-passed noise burst on a 16-step euclid
+# clocked at sixteenths, whose hit count rides the riser lane, so the roll
+# thickens into each drop. ----
+roll_pattern = euclid { steps: 16, hits: 4, rot: 0 }
+master -> roll_pattern.clock
+rise_cv -> roll_pattern.hits : 12
+roll_env = func { rise: 0.001, fall: 0.06, curve: exp }
+roll_pattern.trig -> roll_env.trig
+roll_noise = noise { color: white, seed: 41 }
+roll_filter = svf { cutoff: 2400, res: 0.45 }
+roll_noise -> roll_filter.in
+roll_amp = vca { gain: 0 }
+roll_filter.bp -> roll_amp.in
+roll_env -> roll_amp.cv : 0.22
+rise_cv -> roll_amp.cv : 0.18
+
+# ---- dry band: kick center, bass center, clap center, hats right, oh left,
+# arp just right, pad summed to a soft center (reverb re-widens it), lead
+# near center (the delay throws widen it). The kick envelope ducks the
+# tonal channels through their lvl inputs -- sidechain pumping, no extra
+# modules. ----
+band = mix { levels: [0.85, 0.7, 0.55, 0.5, 0.5, 0.6, 0.55, 0.62],
+             pans: [0, 0, 0, 0.35, -0.3, 0.15, -0.1, 0.05] }
+kick_drive -> band.in1
+reese_amp -> band.in2 : 0.7
+sub_amp   -> band.in2 : 0.5
+clap_amp  -> band.in3
+hat_amp   -> band.in4
+oh_amp    -> band.in5
+arp_amp   -> band.in6
+pad_post_l -> band.in7 : 0.5
+pad_post_r -> band.in7 : 0.5
+lead_post -> band.in8
+kick_env -> band.lvl2 : -0.22
+kick_env -> band.lvl6 : -0.12
+kick_env -> band.lvl7 : -0.16
+kick_env -> band.lvl8 : -0.14
+
+# ---- FX: tempo-synced dotted-eighth / straight-eighth delay throws, plate
+# reverb. Delay time bases are zeroed so the tempo modules own them outright. ----
+sync_de = tempo { bpm: 126, beats: 0.75 }
+sync_e  = tempo { bpm: 126, beats: 0.5 }
+dly_l = delay { time: 0ms, feedback: 0.42, tone: 3800, mix: 1, slew: 0.2 }
+dly_r = delay { time: 0ms, feedback: 0.48, tone: 3200, mix: 1, slew: 0.2 }
+sync_de.seconds -> dly_l.time
+sync_e.seconds  -> dly_r.time
+arp_amp   -> dly_l.in : 0.5
+arp_amp   -> dly_r.in : 0.4
+lead_post -> dly_l.in : 0.3
+lead_post -> dly_r.in : 0.3
+
+space = reverb { decay: 0.8, damp: 0.32, mix: 1,
+                 predelay: 0.02, bandwidth: 0.92,
+                 mod_rate: 0.6, mod_depth: 24 }
+pad_post_l -> space.in_l : 0.3
+pad_post_r -> space.in_r : 0.3
+clap_amp   -> space.in_l : 0.15
+clap_amp   -> space.in_r : 0.2
+lead_post  -> space.in_l : 0.15
+lead_post  -> space.in_r : 0.15
+arp_amp    -> space.in_l : 0.1
+arp_amp    -> space.in_r : 0.12
+riser_amp  -> space.in_l : 0.2
+riser_amp  -> space.in_r : 0.2
+
+# ---- master: band + FX returns, returns ducked by the kick ----
+master_mix = mix { levels: [1, 1, 0.5, 0.5, 0.45, 0.45, 0.4],
+                   pans: [-1, 1, -1, 1, -0.8, 0.8, 0] }
+band.out_l  -> master_mix.in1
+band.out_r  -> master_mix.in2
+space.out_l -> master_mix.in3
+space.out_r -> master_mix.in4
+dly_l       -> master_mix.in5
+dly_r       -> master_mix.in6
+riser_amp   -> master_mix.in7 : 0.5
+roll_amp    -> master_mix.in7 : 0.5
+kick_env -> master_mix.lvl3 : -0.18
+kick_env -> master_mix.lvl4 : -0.18
+kick_env -> master_mix.lvl5 : -0.12
+kick_env -> master_mix.lvl6 : -0.12
+
+# ---- mastering: DC block -> parametric EQ -> kick-sidechain glue comp ->
+# stereo width -> soft clip -> brickwall limit. The external-sidechain
+# compressor pumps gently with the kick for the "glue pump" EDM mastering
+# idiom; the limiter sets a true ceiling. ----
+master_dc = dcblock { cutoff: 12hz }
+master_mix.out_l -> master_dc.in_l
+master_mix.out_r -> master_dc.in_r
+
+master_eq = eq { hp_freq: 28, low_freq: 100, low_gain: -0.6,
+                 mid1_freq: 380, mid1_gain: -1.0, mid1_q: 0.9,
+                 mid2_freq: 3000, mid2_gain: 0.6, mid2_q: 0.8,
+                 high_freq: 9000, high_gain: 0.5 }
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.2,
+                           knee: 5, attack: 0.012, release: 0.15,
+                           makeup: 1.4, mix: 0.85 }
+master_eq.out_l -> master_comp.in_l
+master_eq.out_r -> master_comp.in_r
+kick_drive -> master_comp.side_l : 0.7
+kick_drive -> master_comp.side_r : 0.7
+
+master_field = stereo { width: 1.1, balance: 0 }
+master_comp.out_l -> master_field.in_l
+master_comp.out_r -> master_field.in_r
+
+master_clip = clipper { mode: soft, threshold: -2.5, drive: 1.0, mix: 0.3 }
+master_field.out_l -> master_clip.in_l
+master_field.out_r -> master_clip.in_r
+
+master_limit = limiter { threshold: -0.5, release: 0.08 }
+master_clip.out_l -> master_limit.in_l
+master_clip.out_r -> master_limit.in_r
+
+# ---- output: the arrangement's main lane fades the whole track out through
+# out.level. -1 cancels the default base of 1, leaving 0.7 * main_out, which
+# ranges 0.7 at full play to 0 in the silent tail. ----
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
+-1 -> out.level
+main_out -> out.level : 0.7

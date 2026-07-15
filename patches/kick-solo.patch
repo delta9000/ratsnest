@@ -1,0 +1,31 @@
+# Solo kick for auditioning — steady quarter notes at 120 BPM.
+# Identical design to the kick in power-metal.patch.
+clk = clock { bpm: 120 }
+
+# Body: sine that thuds short, with a near-instant pitch collapse (a click,
+# not a tom's audible pitch bend).
+kaenv = func { rise: 0.001s, fall: 0.095s }
+clk -> kaenv.trig
+kpenv = func { rise: 0.0003s, fall: 0.006s }
+clk -> kpenv.trig
+kosc = vco { wave: sine, freq: 50hz }
+kpenv -> kosc.v_oct : 3.2
+kbody = vca { gain: 0 }
+kosc -> kbody.in
+kaenv -> kbody.cv
+
+# Beater click: short filtered noise transient.
+kclk_env = func { rise: 0.0002s, fall: 0.009s }
+clk -> kclk_env.trig
+kclk_n = noise { color: white, seed: 9 }
+kclk_hp = svf { cutoff: 1700hz, res: 0.2 }
+kclk_n -> kclk_hp.in
+kclk = vca { gain: 0 }
+kclk_hp.hp -> kclk.in
+kclk_env -> kclk.cv
+
+kmix = mix { levels: [1.0, 0.32] }
+kbody -> kmix.in1
+kclk -> kmix.in2
+kmix.out_l -> out.left
+kmix.out_l -> out.right
