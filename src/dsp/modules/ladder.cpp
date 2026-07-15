@@ -3,6 +3,9 @@
 #include <numbers>
 #include "dsp/modules.h"
 
+// Paper/technical-note-derived Zavalishin topology-preserving four-stage
+// ladder with analytically solved linear feedback. See docs/attribution.md.
+
 namespace ms::dsp {
 namespace {
 

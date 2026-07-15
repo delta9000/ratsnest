@@ -2,6 +2,9 @@
 #include <cmath>
 #include "dsp/modules.h"
 
+// Toussaint's Euclidean-rhythm framing, concept/paper-derived; this uses a
+// modular bucket test rather than a Bjorklund code port. See docs/attribution.md.
+
 namespace ms::dsp {
 namespace {
 

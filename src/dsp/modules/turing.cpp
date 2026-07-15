@@ -3,6 +3,9 @@
 #include <cstdint>
 #include "dsp/modules.h"
 
+// Concept-inspired by the Music Thing Modular Turing Machine; no firmware
+// code was copied. See docs/attribution.md.
+
 namespace ms::dsp {
 namespace {
 constexpr InputInfo kIns[] = {{"clock", 0.f}, {"write", 0.f}, {"clear", 0.f},
@@ -51,8 +54,9 @@ class Turing final : public Module {
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Turing&>(other);
     rng_ = o.rng_; reg_ = o.reg_; prev_clock_ = o.prev_clock_;
-  }
+ }
  private:
+  // Marsaglia xorshift32; see docs/attribution.md.
   float draw() {
     std::uint32_t x = rng_;
     x ^= x << 13; x ^= x >> 17; x ^= x << 5;

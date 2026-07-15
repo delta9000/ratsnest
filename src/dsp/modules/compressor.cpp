@@ -4,6 +4,9 @@
 #include "dsp/modules.h"
 #include "dsp/mastering.h"
 
+// Paper-derived Giannoulis/Massberg/Reiss log-domain soft-knee curve and
+// ballistics. See docs/attribution.md.
+
 namespace ms::dsp {
 namespace {
 

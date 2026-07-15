@@ -12,7 +12,8 @@ constexpr const char* kWaves[] = {"sine", "tri", "saw", "pulse", nullptr};
 constexpr ConfigInfo kCfg[] = {{"wave", kWaves}};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
-// Standard 2-sample polyBLEP residual for a falling step at phase t.
+// Two-sample polyBLEP family after Välimäki/Pekonen/Nam; this compact
+// residual formula is locally written. See docs/attribution.md.
 float polyblep(float t, float dt) {
   if (t < dt) { t /= dt; return t + t - t * t - 1.0f; }
   if (t > 1.0f - dt) { t = (t - 1.0f) / dt; return t * t + t + t + 1.0f; }

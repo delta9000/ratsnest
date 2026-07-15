@@ -318,7 +318,7 @@ class Grains final : public Module {
     return ((c3 * f + c2) * f + c1) * f + x1;
   }
 
-  // xorshift32 in [0, 1): deterministic per the seed config.
+  // Marsaglia xorshift32; see docs/attribution.md. Deterministic per seed.
   float frand() {
     rng_ ^= rng_ << 13;
     rng_ ^= rng_ >> 17;

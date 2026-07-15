@@ -25,6 +25,7 @@ class Noise final : public Module {
   }
 
   void process(const float*, float* outs) override {
+    // Marsaglia xorshift32; see docs/attribution.md.
     std::uint32_t x = state_;
     x ^= x << 13;
     x ^= x >> 17;

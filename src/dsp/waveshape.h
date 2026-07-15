@@ -1,9 +1,8 @@
 #pragma once
 // Memoryless waveshaper curves with antiderivatives, plus first-order
 // antiderivative anti-aliasing (ADAA), for the overdrive module.
-// Curves after Vicanek (vicanek.de/articles/AADistortion.pdf); ADAA after
-// Parker, Zavalishin & Le Bivic (DAFx-16). Constants documented in
-// docs/superpowers/specs/2026-07-14-overdrive-design.md.
+// Paper-derived: curves after Vicanek; ADAA after Parker, Zavalishin, and
+// Le Bivic (DAFx-16). See docs/attribution.md.
 #include <cmath>
 
 namespace ms::dsp::waveshape {

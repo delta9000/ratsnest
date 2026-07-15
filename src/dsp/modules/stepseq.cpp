@@ -65,6 +65,7 @@ class StepSeq final : public Module {
     active_ = o.active_; prev_clock_ = o.prev_clock_; prev_reset_ = o.prev_reset_;
   }
  private:
+  // Marsaglia xorshift32; see docs/attribution.md.
   std::uint32_t draw() { std::uint32_t x = rng_; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return rng_ = x; }
   std::vector<double> steps_;
   std::vector<double> gates_;

@@ -1,8 +1,8 @@
 #pragma once
 // Shared physical-resonator DSP core for the modal/string modules.
-// Algorithms derived from Mutable Instruments Rings (MIT,
-// github.com/pichenettes/eurorack); constants documented in
-// docs/superpowers/specs/2026-07-14-resonator-design.md.
+// Code-derived from Mutable Instruments Rings and stmlib (MIT), substantially
+// adapted for modsynth. See docs/attribution.md and THIRD_PARTY_NOTICES.md.
+// Upstream: https://github.com/pichenettes/eurorack/tree/master/rings/dsp
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -222,7 +222,7 @@ class DcBlocker {
   float pole_ = 0.995f, x_ = 0.0f, y_ = 0.0f;
 };
 
-// xorshift32; zero state is forbidden.
+// Marsaglia xorshift32; see docs/attribution.md. Zero state is forbidden.
 class Rng {
  public:
   explicit Rng(uint32_t seed = 1u) : s_(seed ? seed : 1u) {}

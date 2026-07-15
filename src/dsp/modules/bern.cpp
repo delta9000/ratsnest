@@ -3,6 +3,9 @@
 #include <cstdint>
 #include "dsp/modules.h"
 
+// Concept-inspired by Mutable Instruments Branches' Bernoulli gate routing;
+// no Branches firmware code was copied. See docs/attribution.md.
+
 namespace ms::dsp {
 namespace {
 constexpr InputInfo kIns[] = {{"gate", 0.f}, {"prob", 0.5f}};
@@ -35,8 +38,9 @@ class Bern final : public Module {
     state_ = o.state_;
     selected_a_ = o.selected_a_;
     prev_gate_ = o.prev_gate_;
-  }
+ }
  private:
+  // Marsaglia xorshift32; see docs/attribution.md.
   float draw() {
     std::uint32_t x = state_;
     x ^= x << 13; x ^= x >> 17; x ^= x << 5;

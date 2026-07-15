@@ -1,4 +1,8 @@
 #pragma once
+// The cached peer-index optimization is implementation-influenced by Cameron
+// Desrochers' readerwriterqueue (BSD-2-Clause), and the acquire/release protocol
+// follows PipeWire's MIT-licensed ring buffer. This is not a verbatim port.
+// See docs/attribution.md and THIRD_PARTY_NOTICES.md.
 #include <array>
 #include <atomic>
 #include <cstddef>

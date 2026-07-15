@@ -27,6 +27,10 @@ struct Allpass {
 // stopband attenuation ~40 dB with coefficients:
 // Path 0: a0 = 0.117565365538f
 // Path 1: a1 = 0.541450201656f
+// The design provenance of the two coefficients below was not recorded when
+// this file was introduced and could not be recovered during the 2026-07-14
+// attribution audit. Do not attribute them speculatively; see the unresolved
+// entry in docs/attribution.md before replacing or regenerating them.
 struct Halfband2x {
   Allpass ap0;
   Allpass ap1;

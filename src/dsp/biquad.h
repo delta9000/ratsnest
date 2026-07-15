@@ -41,8 +41,8 @@ class Biquad {
   }
 };
 
-// Builder functions for Robert Bristow-Johnson (RBJ) filter coefficients.
-// Formula references: W3C Audio WG note & RBJ Audio EQ Cookbook.
+// Bristow-Johnson/W3C Audio EQ Cookbook coefficients, technical-note-derived.
+// See docs/attribution.md.
 
 inline BiquadCoeffs make_bypass() {
   BiquadCoeffs c;

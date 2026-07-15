@@ -3,6 +3,9 @@
 #include <numbers>
 #include "dsp/modules.h"
 
+// Paper/technical-note-derived Zavalishin/Simper trapezoidal-integrator TPT
+// state-variable filter. See docs/attribution.md.
+
 namespace ms::dsp {
 namespace {
 

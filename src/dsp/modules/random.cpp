@@ -51,6 +51,7 @@ class Random final : public Module {
   }
 
  private:
+  // Marsaglia xorshift32; see docs/attribution.md.
   float draw() {
     std::uint32_t x = state_;
     x ^= x << 13;

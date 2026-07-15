@@ -5,9 +5,9 @@
 #include <vector>
 #include "dsp/modules.h"
 
-// Dattorro plate reverb. Topology, delay lengths, coefficients, and output
-// taps are from J. Dattorro, "Effect Design Part 1: Reverberator and Other
-// Filters", JAES 45(9), 1997, scaled from the paper's 29761 Hz reference.
+// Paper-derived Dattorro 1997 plate: topology, delay lengths, coefficients,
+// and output taps, scaled from the paper's 29761 Hz reference.
+// See docs/attribution.md.
 
 namespace ms::dsp {
 namespace {

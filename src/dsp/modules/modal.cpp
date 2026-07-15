@@ -4,6 +4,9 @@
 #include "dsp/modules.h"
 #include "dsp/resonate.h"
 
+// Code-derived from Mutable Instruments Rings (MIT), substantially adapted.
+// See docs/attribution.md and THIRD_PARTY_NOTICES.md.
+
 namespace ms::dsp {
 namespace {
 
