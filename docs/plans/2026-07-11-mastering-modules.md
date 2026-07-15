@@ -6,7 +6,7 @@
 
 **Architecture:** Build simple linear utilities first, then shared dynamics and biquad infrastructure, then nonlinear oversampling, and finally the lookahead limiter. Each module owns fixed scalar/buffer state, links stereo control paths, sanitizes live inputs, and appends to registry order.
 
-**Tech Stack:** C++20, doctest, modsynth audio-rate module API, CMake/mise, float DSP
+**Tech Stack:** C++20, doctest, ratsnest audio-rate module API, CMake/mise, float DSP
 
 ---
 
@@ -19,7 +19,7 @@
 - Modify: `src/dsp/registry.cpp`
 - Modify: `tests/test_migrate.cpp`
 - Modify: `docs/modules.md`
-- Modify: `docs/superpowers/specs/2026-07-10-modsynth-design.md`
+- Modify: `docs/superpowers/specs/2026-07-10-ratsnest-design.md`
 
 1. Write failing tests for exact metadata/defaults, constant-DC decay below
    -80 dB, 1 kHz pass-through amplitude, stereo independence, cutoff smoothing,
@@ -151,13 +151,13 @@
    samples, non-silence, sample peak within configured limiter ceiling plus
    tolerance, and stable ten-second RMS windows.
 3. Run `mise run test`, `mise run test-san`, `mise run ci`, every patch through
-   `modsynth check`, documentation coverage, and `git diff --check`.
+   `ratsnest check`, documentation coverage, and `git diff --check`.
 4. Listen when playback is available; report honestly if not. Commit
    `feat: add mastering chain demo patch`.
 
 ### Deferred follow-up: standards-based metering
 
-Plan separately: a non-audible `meter` probe plus `modsynth analyze` implementing
+Plan separately: a non-audible `meter` probe plus `ratsnest analyze` implementing
 BS.1770-5 K-weighting, channel weights, absolute/relative gates, ITU true-peak
 reconstruction, EBU 400 ms/3 s windows, integrated LUFS, loudness range, and
 published conformance vectors. Do not couple it to the six-module plan or use

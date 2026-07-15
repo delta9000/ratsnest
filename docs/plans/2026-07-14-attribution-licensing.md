@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Release modsynth under MIT while preserving third-party license notices and making every distinctive borrowed or paper-derived algorithm traceable from its implementation.
+**Goal:** Release ratsnest under MIT while preserving third-party license notices and making every distinctive borrowed or paper-derived algorithm traceable from its implementation.
 
 **Architecture:** A root project license and third-party notice file provide the legal layer; `docs/attribution.md` provides a maintained provenance map; concise source comments connect implementation sites to that map. A documentation regression test prevents the critical license and attribution records from silently disappearing, and `CLAUDE.md` makes provenance review part of future development.
 
@@ -112,7 +112,7 @@ Do not commit the deliberately failing state.
 - Create: `THIRD_PARTY_NOTICES.md`
 - Test: `tests/test_docs.cpp`
 
-**Step 1: Add the modsynth MIT license**
+**Step 1: Add the ratsnest MIT license**
 
 Create `LICENSE` with the canonical MIT text and this copyright line:
 
@@ -147,7 +147,7 @@ Create `THIRD_PARTY_NOTICES.md` with this structure:
 ```markdown
 # Third-party notices
 
-modsynth is licensed under the MIT License. Portions derive from or are
+ratsnest is licensed under the MIT License. Portions derive from or are
 informed by the software below and remain subject to their original notices.
 Paper and algorithm acknowledgements that do not involve copied software are
 listed in `docs/attribution.md`.
@@ -224,10 +224,10 @@ Start `docs/attribution.md` with:
 ```markdown
 # Attribution and implementation provenance
 
-modsynth stands on the work of many researchers and open-source developers.
+ratsnest stands on the work of many researchers and open-source developers.
 This document maps distinctive implementations to their sources and describes
 how they were adapted. Legal notices for software-derived portions are retained
-in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md); modsynth's project
+in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md); ratsnest's project
 license is in [`LICENSE`](../LICENSE).
 
 Relationships are classified as:
@@ -244,7 +244,7 @@ Relationships are classified as:
 
 **Step 2: Add the implementation provenance table**
 
-Add a table with columns `modsynth code`, `relationship`, `source`, and
+Add a table with columns `ratsnest code`, `relationship`, `source`, and
 `adaptation`. Include these entries and references:
 
 - `src/dsp/resonate.h`, `modal.cpp`, `string.cpp`: **Code-derived** from Emilie
@@ -276,7 +276,7 @@ Add a table with columns `modsynth code`, `relationship`, `source`, and
   Filter Design* and Andrew Simper's Cytomic trapezoidal SVF notes.
 - `euclid.cpp`: **Concept/paper-derived** from Godfried Toussaint, “The
   Euclidean Algorithm Generates Traditional Musical Rhythms,” 2005; explain
-  that modsynth uses a constant-time modular bucket/Bresenham-style test rather
+  that ratsnest uses a constant-time modular bucket/Bresenham-style test rather
   than copying Bjorklund code.
 - xorshift sites (`noise.cpp`, `random.cpp`, `bern.cpp`, `turing.cpp`,
   `stepseq.cpp`, `grains.cpp`, and `resonate.h`): **Paper-derived** from George
@@ -374,7 +374,7 @@ Use this four-line header in `src/dsp/resonate.h`, before includes:
 ```cpp
 // Shared physical-resonator DSP core for the modal/string modules.
 // Code-derived from Mutable Instruments Rings and stmlib (MIT), substantially
-// adapted for modsynth. See docs/attribution.md and THIRD_PARTY_NOTICES.md.
+// adapted for ratsnest. See docs/attribution.md and THIRD_PARTY_NOTICES.md.
 // Upstream: https://github.com/pichenettes/eurorack/tree/master/rings/dsp
 ```
 

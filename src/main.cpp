@@ -29,9 +29,9 @@ namespace {
 int usage() {
   std::fprintf(stderr,
       "usage:\n"
-      "  modsynth check  <patch>\n"
-      "  modsynth render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>] [--stats [Ns]]\n"
-      "  modsynth play   <patch> [--latency <N/RATE>] [--rate <hz>] [--watch <mod[.port]>]\n");
+      "  ratsnest check  <patch>\n"
+      "  ratsnest render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>] [--stats [Ns]]\n"
+      "  ratsnest play   <patch> [--latency <N/RATE>] [--rate <hz>] [--watch <mod[.port]>]\n");
   return 2;
 }
 
@@ -127,14 +127,14 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
   }
 
   auto pw = std::make_unique<ms::engine::PipewireOut>(
-      "modsynth", &render_trampoline, &runner, latency,
+      "ratsnest", &render_trampoline, &runner, latency,
       static_cast<uint32_t>(rate));
 
   // Constructed once for the whole play session and never touched again:
   // the port (and any patchbay connection to a controller) must survive
   // every hot-reload below (midi spec §4). A refused port is a guarded,
   // non-fatal condition -- keep playing audio-only (design rule 6 spirit).
-  ms::engine::MidiIn midi_in("modsynth-midi", runner);
+  ms::engine::MidiIn midi_in("ratsnest-midi", runner);
   // error() is only ever set by a definite failure (port/filter refused at
   // connect time, or a later ERROR state); unlike ok() it does not race the
   // async PipeWire connection handshake, so it is safe to check once, right
@@ -146,7 +146,7 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
   }
 
   // Audio capture for `extin`, same lifecycle and non-fatal contract as MidiIn.
-  ms::engine::AudioIn audio_in("modsynth-capture", runner,
+  ms::engine::AudioIn audio_in("ratsnest-capture", runner,
                                static_cast<uint32_t>(rate));
   if (!audio_in.error().empty()) {
     std::fprintf(stderr,
@@ -218,7 +218,7 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
       if (g_stop.load()) break;
       pw = std::make_unique<ms::engine::PipewireOut>(
-          "modsynth", &render_trampoline, &runner, latency,
+          "ratsnest", &render_trampoline, &runner, latency,
           static_cast<uint32_t>(rate));
       prev_ok = false;
       down_since_set = false;

@@ -1,7 +1,7 @@
 # Polyphony: `alloc` + `voice` groups — Design
 
 2026-07-11. Status: implemented (2026-07-11, this branch). Refines §6 and §3.5 of
-`2026-07-10-modsynth-design.md` (per-voice patch instancing, decided there;
+`2026-07-10-ratsnest-design.md` (per-voice patch instancing, decided there;
 poly cables rejected there). Built before `midi` so midi's port surface is
 designed against a proven voice mechanism, not the other way around.
 

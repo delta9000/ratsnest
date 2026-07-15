@@ -8,7 +8,7 @@ that list in the same commit that lands the first module.
 
 ## 1. Goal and shape
 
-A Rings-like resonator capability, decomposed the modsynth way (rule 5: small
+A Rings-like resonator capability, decomposed the ratsnest way (rule 5: small
 single-purpose modules; grains precedent: MI core, periphery on cables). Two
 modules that share one parameter language:
 

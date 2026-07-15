@@ -6,7 +6,7 @@
 
 **Architecture:** Each module is a fixed-port audio-rate DSP unit with defensive live-input clamping. Clocked modules use rising-edge state machines, seeded local xorshift RNG where needed, and complete RT-safe state migration.
 
-**Tech Stack:** C++20, doctest, modsynth patch DSL, CMake/mise
+**Tech Stack:** C++20, doctest, ratsnest patch DSL, CMake/mise
 
 ---
 

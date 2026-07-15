@@ -103,7 +103,7 @@ Evolution of the load loop, in order:
 
 **Vendor response pattern** — notable in itself: the grammar never changed across 7 firmware generations; every complaint was answered with *hardware, tooling, or new circuits* (X7 → Forge → generators → DB8E display), and release notes credit suggesting users by name.
 
-## 7. Design lessons for the modsynth DSL
+## 7. Design lessons for the ratsnest DSL
 
 For a grammar of `name = type { param: value, ... }` declarations plus `src.port -> dst.port : depth` cables, with modulation summing onto param bases and no normalling:
 
@@ -115,13 +115,13 @@ For a grammar of `name = type { param: value, ... }` declarations plus `src.port
 
 4. **Error messages and introspection are the product, not a feature.** `ERROR IN LINE 17: Invalid output 'O9'. Allowed is O1 ... O8` made a screenless module debuggable; conversely, the *lack of runtime value visibility* was the longest-running complaint, only resolved by shipping a display five years in. For load errors: exact location + what was expected + what's allowed. For runtime: build value-watch/scope/probe on any port from day one — DROID proves users hit this wall immediately on non-trivial patches.
 
-5. **Units need to be first-class, not suffix arithmetic.** DROID's normalized-float core with `V`/`%` sugar is elegant until `1/12V ≠ (1/12)V` and "semitones are `1/120`" — real traps documented in the manual itself. modsynth avoids the precedence trap by having no inline arithmetic at all; keep it that way, and keep declaring params in natural units (`hz`, `s`) normalized at lex time.
+5. **Units need to be first-class, not suffix arithmetic.** DROID's normalized-float core with `V`/`%` sugar is elegant until `1/12V ≠ (1/12)V` and "semitones are `1/120`" — real traps documented in the manual itself. ratsnest avoids the precedence trap by having no inline arithmetic at all; keep it that way, and keep declaring params in natural units (`hz`, `s`) normalized at lex time.
 
 6. **Freeze the grammar, grow the vocabulary.** Seven firmware versions, zero syntax changes — everything shipped as new node types and new params on existing types. That stability is why third-party editors, the Forge, and Python generators all interoperate on the same files, and why old patches keep loading. Version the *module library*, not the language.
 
-7. **Separate structure (text) from performance state (sidecar), and define the boundary explicitly.** DROID's rule — text declares behavior; manual-interaction state auto-saves to a binary sidecar and is re-matched on reload; CV-driven values are never state — is a genuinely good architecture for hot-reload. modsynth's answer differs (the GUI writes *back to the text*, which stays the single source of truth) but the "CV-driven values are never state" distinction and the per-node `dontsave` escape hatch are worth keeping in mind for the GUI/preset era.
+7. **Separate structure (text) from performance state (sidecar), and define the boundary explicitly.** DROID's rule — text declares behavior; manual-interaction state auto-saves to a binary sidecar and is re-matched on reload; CV-driven values are never state — is a genuinely good architecture for hot-reload. ratsnest's answer differs (the GUI writes *back to the text*, which stays the single source of truth) but the "CV-driven values are never state" distinction and the per-node `dontsave` escape hatch are worth keeping in mind for the GUI/preset era.
 
-8. **Plan the abstraction layer before users do.** DROID's flat format has no loops, arrays-of-nodes, or user-defined subcircuits; power users immediately built external Python generators and the vendor eventually blessed metaprogramming rather than extending the language. Decide up front: lightweight in-language repetition (banks), or a first-class generation API. Either beats five years of ad-hoc scripts. Corollary on the "no normalling" stance: DROID made normalling *programmable* (`N` registers as writable defaults) and it's beloved — modsynth's params-with-defaults covers most of this; if a "default source overridden by a later cable" idiom is ever needed, design it deliberately.
+8. **Plan the abstraction layer before users do.** DROID's flat format has no loops, arrays-of-nodes, or user-defined subcircuits; power users immediately built external Python generators and the vendor eventually blessed metaprogramming rather than extending the language. Decide up front: lightweight in-language repetition (banks), or a first-class generation API. Either beats five years of ad-hoc scripts. Corollary on the "no normalling" stance: DROID made normalling *programmable* (`N` registers as writable defaults) and it's beloved — ratsnest's params-with-defaults covers most of this; if a "default source overridden by a later cable" idiom is ever needed, design it deliberately.
 
 ---
 

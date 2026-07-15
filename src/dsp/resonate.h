@@ -1,7 +1,7 @@
 #pragma once
 // Shared physical-resonator DSP core for the modal/string modules.
 // Code-derived from Mutable Instruments Rings and stmlib (MIT), substantially
-// adapted for modsynth. See docs/attribution.md and THIRD_PARTY_NOTICES.md.
+// adapted for ratsnest. See docs/attribution.md and THIRD_PARTY_NOTICES.md.
 // Upstream: https://github.com/pichenettes/eurorack/tree/master/rings/dsp
 #include <algorithm>
 #include <cmath>

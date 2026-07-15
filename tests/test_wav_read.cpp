@@ -57,7 +57,7 @@ std::vector<uint8_t> build_wav(uint16_t fmt, uint16_t bits, uint16_t channels,
 }  // namespace
 
 TEST_CASE("read_wav_f32: round-trips a float32 stereo file written by write_wav_f32") {
-  auto path = std::filesystem::temp_directory_path() / "modsynth_rt_f32.wav";
+  auto path = std::filesystem::temp_directory_path() / "ratsnest_rt_f32.wav";
   const float in[8] = {0.f, 0.f, 0.5f, -0.5f, 1.f, -1.f, 0.25f, -0.75f};  // 4 frames
   REQUIRE(write_wav_f32(path.string(), in, 4, 2, 44100));
 
@@ -79,7 +79,7 @@ TEST_CASE("read_wav_f32: decodes 16-bit PCM normalized to [-1, 1]") {
   put_u16(data, 0x7fff);   // ~+1.0
   put_u16(data, 0x8000);   // -1.0 (int16 min)
   auto bytes = build_wav(/*fmt=*/1, /*bits=*/16, /*channels=*/1, /*rate=*/48000, data);
-  auto path = write_bytes("modsynth_pcm16.wav", bytes);
+  auto path = write_bytes("ratsnest_pcm16.wav", bytes);
 
   WavData w;
   REQUIRE(read_wav_f32(path.string(), w));
@@ -100,7 +100,7 @@ TEST_CASE("read_wav_f32: decodes 24-bit PCM") {
       0xff, 0xff, 0x7f,   // ~+1.0
   };
   auto bytes = build_wav(/*fmt=*/1, /*bits=*/24, /*channels=*/1, /*rate=*/48000, data);
-  auto path = write_bytes("modsynth_pcm24.wav", bytes);
+  auto path = write_bytes("ratsnest_pcm24.wav", bytes);
 
   WavData w;
   REQUIRE(read_wav_f32(path.string(), w));
@@ -130,7 +130,7 @@ TEST_CASE("read_wav_f32: skips unknown chunks before data") {
   put_tag(b, "data");
   put_u32(b, static_cast<uint32_t>(data.size()));
   b.insert(b.end(), data.begin(), data.end());
-  auto path = write_bytes("modsynth_list.wav", b);
+  auto path = write_bytes("ratsnest_list.wav", b);
 
   WavData w;
   REQUIRE(read_wav_f32(path.string(), w));
@@ -143,7 +143,7 @@ TEST_CASE("read_wav_f32: rejects missing and malformed files") {
   WavData w;
   CHECK_FALSE(read_wav_f32("/nonexistent/path/nope.wav", w));
 
-  auto junk = write_bytes("modsynth_junk.wav", {'n', 'o', 't', 'a', 'w', 'a', 'v'});
+  auto junk = write_bytes("ratsnest_junk.wav", {'n', 'o', 't', 'a', 'w', 'a', 'v'});
   CHECK_FALSE(read_wav_f32(junk.string(), w));
   std::filesystem::remove(junk);
 }

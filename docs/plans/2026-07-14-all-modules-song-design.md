@@ -8,7 +8,7 @@ demo.
 
 ## Goal
 
-Create a deterministic, self-running modsynth patch targeting 4:30. The song
+Create a deterministic, self-running ratsnest patch targeting 4:30. The song
 uses every registered module type, stays centered on A minor pentatonic, and
 uses the four-bar progression F major | E major | D minor | E major
 (VI–V–iv–V). Its B section must be audibly derived from its A section rather
@@ -78,7 +78,7 @@ back into the mix at conservative gains. The master chain is `dcblock` → `eq`
 
 ## Verification
 
-Validate the DSL with `modsynth check`. Render at least the full arrangement
+Validate the DSL with `ratsnest check`. Render at least the full arrangement
 plus tail and inspect peak, RMS, DC, and window statistics. Check registry
 coverage mechanically by comparing declarations in the patch to the registry.
 Run the repository's patch/documentation tests after validation.

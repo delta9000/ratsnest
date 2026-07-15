@@ -6,7 +6,7 @@
 
 **Architecture:** A tracker-style bank of 34 musical four-bar steps plus one silent guard step controls a deterministic synthesis graph at 120 BPM. Fixed harmonic and motif sequencers provide the recognizable song material, while generative and live/file modules occupy controlled parallel branches; an eight-channel mix feeds tempo effects and a complete stereo mastering chain.
 
-**Tech Stack:** modsynth text DSL, existing C++20 runtime registry, `mise` build/check/render tasks, shell-based registry coverage check.
+**Tech Stack:** ratsnest text DSL, existing C++20 runtime registry, `mise` build/check/render tasks, shell-based registry coverage check.
 
 ---
 
@@ -126,13 +126,13 @@ Expected: no missing types; all 43 registry entries are represented.
 
 **Step 2: Render the opening smoke window**
 
-Run: `build/modsynth render patches/minor-machinery.patch -d 30s -o /tmp/all-modules-smoke.wav --stats 5s`
+Run: `build/ratsnest render patches/minor-machinery.patch -d 30s -o /tmp/all-modules-smoke.wav --stats 5s`
 
 Expected: successful render, finite non-silent RMS, peak below 1.0, and acceptably low DC.
 
 **Step 3: Render the full arrangement**
 
-Run: `build/modsynth render patches/minor-machinery.patch -d 280s -o /tmp/minor-machinery.wav --stats 8s`
+Run: `build/ratsnest render patches/minor-machinery.patch -d 280s -o /tmp/minor-machinery.wav --stats 8s`
 
 Expected: successful render with audible/non-silent windows across the arranged body, a controlled peak below the limiter ceiling, and a final fade/tail.
 

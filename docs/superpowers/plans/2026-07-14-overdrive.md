@@ -16,7 +16,7 @@
 - Hostile inputs must not kill the session: sanitize audio with `sanitize()` (mastering.h); NaN-proof clamp for control inputs uses the `!(x >= lo)` pattern.
 - Offline render has no FTZ: flush decaying states below 1e-20 (`flush_denormal`; `Biquad::process` and `OnePole` already self-flush).
 - Docs are part of the diff: `docs/modules.md` has a registry-coverage test (`tests/test_docs.cpp`) requiring a `` ## `type` `` heading per registered module.
-- Build/test: `mise run build`, `mise run test`, `mise run test-san`, `mise run ci`. Sources and tests are CMake-globbed — new files need no CMakeLists edits. Every `patches/*.patch` gets an automatic `modsynth check` ctest.
+- Build/test: `mise run build`, `mise run test`, `mise run test-san`, `mise run ci`. Sources and tests are CMake-globbed — new files need no CMakeLists edits. Every `patches/*.patch` gets an automatic `ratsnest check` ctest.
 - Commits: conventional prefixes, no AI attribution.
 - Sample rate is a `double` passed to `init`; tests use 48000.
 - Reused APIs (verbatim signatures):

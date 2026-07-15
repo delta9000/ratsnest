@@ -6,7 +6,7 @@
 
 **Architecture:** A 122 BPM clock tree triggers kick, hats, and two-bar chord stabs. Seeded random voltage sampled at chord boundaries selects pitches from a narrow D-minor/Dorian set; detuned chord oscillators pass through an enveloped driven ladder, dark modulated delay, and stereo plate, with slow LFO evolution and kick ducking.
 
-**Tech Stack:** modsynth patch DSL, existing C++20 DSP modules, `modsynth check`, offline WAV rendering, Python standard-library WAV inspection
+**Tech Stack:** ratsnest patch DSL, existing C++20 DSP modules, `ratsnest check`, offline WAV rendering, Python standard-library WAV inspection
 
 ---
 
@@ -53,7 +53,7 @@ Create `patches/dub-techno.patch` with these named sections and connections:
 
 **Step 3: Check patch syntax**
 
-Run: `mise run build && ./build/modsynth check patches/dub-techno.patch`
+Run: `mise run build && ./build/ratsnest check patches/dub-techno.patch`
 Expected: build succeeds and checker prints `ok`.
 
 **Step 4: Commit the patch**
@@ -71,7 +71,7 @@ git commit -m "feat: add generative dub techno patch"
 
 **Step 1: Render one minute**
 
-Run: `./build/modsynth render patches/dub-techno.patch -d 60s -o /tmp/dub-techno.wav`
+Run: `./build/ratsnest render patches/dub-techno.patch -d 60s -o /tmp/dub-techno.wav`
 Expected: exit status 0 and a non-empty float32 WAV.
 
 **Step 2: Inspect numerical safety and loudness**
@@ -105,7 +105,7 @@ render checks without claiming subjective listening verification.
 
 **Step 5: Re-check after tuning**
 
-Run: `./build/modsynth check patches/dub-techno.patch`
+Run: `./build/ratsnest check patches/dub-techno.patch`
 Expected: `ok`.
 
 Run: `git diff --check`

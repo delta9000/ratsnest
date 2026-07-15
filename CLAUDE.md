@@ -1,12 +1,12 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# modsynth
+# ratsnest
 
 A software modular synthesizer for Linux where **the patch is a plain-text file**.
 Hand-written C++20 DSP, PipeWire out, hot-reload on save. Personal instrument;
 single author. Non-goals: DAW, plugin host, livecoding language, marketplace.
 
-Authoritative design: `docs/superpowers/specs/2026-07-10-modsynth-design.md`.
+Authoritative design: `docs/superpowers/specs/2026-07-10-ratsnest-design.md`.
 Implemented module palette and patch syntax: `docs/modules.md` (read this before
 authoring or reviewing patches; its registry-coverage test prevents omissions).
 Implementation plans: `docs/superpowers/plans/` (checkbox tasks = status; a task

@@ -2,7 +2,7 @@
 
 **Status:** implemented 2026-07-14 (WAV reader + `sampler` + `rec` + `extin`,
 each with tests; all gates — `test`, `test-san`, `ci` — green). Completes the
-spec's Phase 4 (`docs/superpowers/specs/2026-07-10-modsynth-design.md` §5). `follow` already shipped; this covers the three I/O members: `sampler`, `rec`, `extin`, plus the shared WAV reader and the audio-capture engine hook `extin` needs.
+spec's Phase 4 (`docs/superpowers/specs/2026-07-10-ratsnest-design.md` §5). `follow` already shipped; this covers the three I/O members: `sampler`, `rec`, `extin`, plus the shared WAV reader and the audio-capture engine hook `extin` needs.
 
 **Autonomy note:** authored without user Q&A at the user's explicit request ("build out the rest autonomously, no questions"). Every fork below was decided against the project's non-negotiable rules; the rationale is recorded here in lieu of a brainstorming dialogue.
 

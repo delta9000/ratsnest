@@ -7,7 +7,7 @@
 #include "io/wav.h"
 
 TEST_CASE("writes a valid float32 stereo wav") {
-  auto path = std::filesystem::temp_directory_path() / "modsynth_test.wav";
+  auto path = std::filesystem::temp_directory_path() / "ratsnest_test.wav";
   float data[8] = {0.f, 0.f, 0.5f, -0.5f, 1.f, -1.f, 0.25f, 0.25f};  // 4 frames
   REQUIRE(ms::io::write_wav_f32(path.string(), data, 4, 2, 48000));
 

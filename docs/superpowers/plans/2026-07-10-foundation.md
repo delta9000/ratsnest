@@ -1,14 +1,14 @@
-# modsynth Foundation (Phase 1a) Implementation Plan
+# ratsnest Foundation (Phase 1a) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The modsynth base: repo conventions, patch DSL (lexer/parser), module system, graph compiler, offline per-sample engine, WAV writer, and a CLI whose exit state is `modsynth render patches/first.patch` producing a detuned-saw drone WAV — deterministic and fully tested.
+**Goal:** The ratsnest base: repo conventions, patch DSL (lexer/parser), module system, graph compiler, offline per-sample engine, WAV writer, and a CLI whose exit state is `ratsnest render patches/first.patch` producing a detuned-saw drone WAV — deterministic and fully tested.
 
 **Architecture:** Text patch → `dsl/` (lexer → parser → AST) → `graph/` (validate against module registry, topo-sort, fold literal cables) → `engine/` (per-sample walk; persistent output array makes feedback = 1-sample delay automatically) → `io/` WAV. No realtime audio in this plan (Phase 1b adds PipeWire); everything is testable offline and deterministic.
 
 **Tech Stack:** C++20 · CMake + CMakePresets (dev/ci/san) · doctest via FetchContent · ctest · mise tasks · clang-tidy.
 
-**Spec:** `docs/superpowers/specs/2026-07-10-modsynth-design.md` (approved 2026-07-10). Sibling plans to follow: 1b realtime+hot-reload, 1c remaining Phase-1 modules.
+**Spec:** `docs/superpowers/specs/2026-07-10-ratsnest-design.md` (approved 2026-07-10). Sibling plans to follow: 1b realtime+hot-reload, 1c remaining Phase-1 modules.
 
 ## Global Constraints
 
@@ -52,7 +52,7 @@ patches/first.patch
 - Create: `.gitignore`, `CMakeLists.txt`, `CMakePresets.json`, `mise.toml`, `.clang-tidy`, `CLAUDE.md`, `tests/test_smoke.cpp`
 
 **Interfaces:**
-- Produces: build system every later task uses — library target `mscore` (all `src/` except `main.cpp`), executable `modsynth`, test executable `mstests` registered with ctest. Commands: `mise run build`, `mise run test`.
+- Produces: build system every later task uses — library target `mscore` (all `src/` except `main.cpp`), executable `ratsnest`, test executable `mstests` registered with ctest. Commands: `mise run build`, `mise run test`.
 
 - [ ] **Step 1: Write files**
 
@@ -67,19 +67,19 @@ compile_commands.json
 `CMakeLists.txt`:
 ```cmake
 cmake_minimum_required(VERSION 3.25)
-project(modsynth CXX)
+project(ratsnest CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(MODSYNTH_WERROR "Treat warnings as errors" OFF)
-option(MODSYNTH_SAN "Enable ASan + UBSan for every target" OFF)
+option(RATSNEST_WERROR "Treat warnings as errors" OFF)
+option(RATSNEST_SAN "Enable ASan + UBSan for every target" OFF)
 
 add_compile_options(-Wall -Wextra -Wconversion)
-if(MODSYNTH_WERROR)
+if(RATSNEST_WERROR)
   add_compile_options(-Werror)
 endif()
-if(MODSYNTH_SAN)
+if(RATSNEST_SAN)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer
                       -fno-sanitize-recover=all)
   add_link_options(-fsanitize=address,undefined)
@@ -90,8 +90,8 @@ list(REMOVE_ITEM MSCORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
 add_library(mscore STATIC ${MSCORE_SOURCES})
 target_include_directories(mscore PUBLIC src)
 
-add_executable(modsynth src/main.cpp)
-target_link_libraries(modsynth PRIVATE mscore)
+add_executable(ratsnest src/main.cpp)
+target_link_libraries(ratsnest PRIVATE mscore)
 
 include(FetchContent)
 FetchContent_Declare(doctest
@@ -125,7 +125,7 @@ add_test(NAME unit COMMAND mstests)
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "MODSYNTH_WERROR": "ON"
+        "RATSNEST_WERROR": "ON"
       }
     },
     {
@@ -134,7 +134,7 @@ add_test(NAME unit COMMAND mstests)
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "MODSYNTH_SAN": "ON"
+        "RATSNEST_SAN": "ON"
       }
     }
   ]
@@ -183,12 +183,12 @@ depends = ["test-san"]
 [tasks.check]
 description = "Parse/validate a patch file. Usage: mise run check -- patches/first.patch"
 depends = ["build"]
-run = "./build/modsynth check"
+run = "./build/ratsnest check"
 
 [tasks.render]
 description = "Render a patch to WAV offline. Usage: mise run render -- patches/first.patch -d 10s -o take.wav"
 depends = ["build"]
-run = "./build/modsynth render"
+run = "./build/ratsnest render"
 ```
 
 `.clang-tidy`:
@@ -212,13 +212,13 @@ HeaderFilterRegex: '^src/'
 ```markdown
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# modsynth
+# ratsnest
 
 A software modular synthesizer for Linux where **the patch is a plain-text file**.
 Hand-written C++20 DSP, PipeWire out, hot-reload on save. Personal instrument;
 single author. Non-goals: DAW, plugin host, livecoding language, marketplace.
 
-Authoritative design: `docs/superpowers/specs/2026-07-10-modsynth-design.md`.
+Authoritative design: `docs/superpowers/specs/2026-07-10-ratsnest-design.md`.
 Implementation plans: `docs/superpowers/plans/` (checkbox tasks = status; a task
 is done only when its named tests pass — never hand-edit status).
 
@@ -2131,7 +2131,7 @@ git commit -m "feat: lfo with reset and phase offset"
 #include "io/wav.h"
 
 TEST_CASE("writes a valid float32 stereo wav") {
-  auto path = std::filesystem::temp_directory_path() / "modsynth_test.wav";
+  auto path = std::filesystem::temp_directory_path() / "ratsnest_test.wav";
   float data[8] = {0.f, 0.f, 0.5f, -0.5f, 1.f, -1.f, 0.25f, 0.25f};  // 4 frames
   REQUIRE(ms::io::write_wav_f32(path.string(), data, 4, 2, 48000));
 
@@ -2240,7 +2240,7 @@ git commit -m "feat: float32 wav writer"
 
 **Interfaces:**
 - Consumes: everything above.
-- Produces: `modsynth check <patch>` (exit 0 + `ok`, or exit 1 with `line:col: error: …` per diagnostic on stderr); `modsynth render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>]` (defaults: 10 s, `out.wav`, 48000).
+- Produces: `ratsnest check <patch>` (exit 0 + `ok`, or exit 1 with `line:col: error: …` per diagnostic on stderr); `ratsnest render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>]` (defaults: 10 s, `out.wav`, 48000).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2343,8 +2343,8 @@ namespace {
 int usage() {
   std::fprintf(stderr,
       "usage:\n"
-      "  modsynth check  <patch>\n"
-      "  modsynth render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>]\n");
+      "  ratsnest check  <patch>\n"
+      "  ratsnest render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>]\n");
   return 2;
 }
 
@@ -2433,12 +2433,12 @@ int main(int argc, char** argv) {
 Append to `CMakeLists.txt`:
 ```cmake
 add_test(NAME cli_check
-  COMMAND modsynth check ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch)
+  COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch)
 add_test(NAME cli_render
-  COMMAND modsynth render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first.wav)
 add_test(NAME cli_check_rejects_bad_patch
-  COMMAND modsynth check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
+  COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
 set_tests_properties(cli_check_rejects_bad_patch PROPERTIES WILL_FAIL TRUE)
 ```
 

@@ -1,6 +1,6 @@
 # Third-party notices
 
-modsynth is licensed under the MIT License. Portions derive from or are
+ratsnest is licensed under the MIT License. Portions derive from or are
 informed by the software below and remain subject to their original notices.
 Paper and algorithm acknowledgements that do not involve copied software are
 listed in `docs/attribution.md`.

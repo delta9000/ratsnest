@@ -1,4 +1,4 @@
-# modsynth — Design
+# ratsnest — Design
 
 **Date:** 2026-07-10
 **Status:** Approved design, pre-implementation
@@ -291,10 +291,10 @@ swap; old graph freed on the main thread.
 ### 7.4 CLI (the whole Phase 1 UX)
 
 ```
-modsynth play   drone.patch          # watch + play + meters
-modsynth render drone.patch -d 30s -o take.wav   # offline, faster than RT
-modsynth render drone.patch -d 300s --stats 8s   # + peak/RMS/DC level timeline
-modsynth check  drone.patch          # parse/validate — editor lint
+ratsnest play   drone.patch          # watch + play + meters
+ratsnest render drone.patch -d 30s -o take.wav   # offline, faster than RT
+ratsnest render drone.patch -d 300s --stats 8s   # + peak/RMS/DC level timeline
+ratsnest check  drone.patch          # parse/validate — editor lint
 ```
 
 ### 7.5 Error handling
@@ -323,7 +323,7 @@ C++20 · CMake · doctest · deps: PipeWire + doctest only · mise tasks wrappin
 configure/build/test/run.
 
 ```
-modsynth/
+ratsnest/
   src/{dsl,graph,dsp,engine,io}/   main.cpp
   tests/
   patches/            # examples = integration fixtures

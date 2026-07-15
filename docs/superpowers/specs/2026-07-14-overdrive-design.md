@@ -216,5 +216,5 @@ which blend a highpass + lowpass for the mid-scoop.
   (energy within tolerance across the swap); `model` change re-voices without a
   discontinuity blowup.
 - Sanitizers: suite passes under `mise run test-san`.
-- The demo patch gets its automatic `modsynth check` ctest; render is
+- The demo patch gets its automatic `ratsnest check` ctest; render is
   non-silent and non-clipping.

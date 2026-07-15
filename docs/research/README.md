@@ -2,7 +2,7 @@
 
 Web research conducted 2026-07-10 during the design phase, preserved verbatim.
 These reports are the evidence behind the design decisions in
-`docs/superpowers/specs/2026-07-10-modsynth-design.md`. Consult them when
+`docs/superpowers/specs/2026-07-10-ratsnest-design.md`. Consult them when
 designing modules in later phases — they contain per-module I/O tables,
 parameter semantics, and source links the spec only summarizes.
 

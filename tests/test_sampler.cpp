@@ -44,7 +44,7 @@ TEST_CASE("sampler: metadata") {
 }
 
 TEST_CASE("sampler: plays a mono buffer once and emits eos at the end") {
-  auto path = write_fixture("modsynth_ramp.wav", {0.1f, 0.2f, 0.3f, 0.4f}, 48000);
+  auto path = write_fixture("ratsnest_ramp.wav", {0.1f, 0.2f, 0.3f, 0.4f}, 48000);
   auto m = make_sampler(path.string(), "off");
   float ins[3] = {0.0f, 0.0f, 1.0f};  // trig, pitch, level
   float outs[2];
@@ -65,7 +65,7 @@ TEST_CASE("sampler: plays a mono buffer once and emits eos at the end") {
 }
 
 TEST_CASE("sampler: loop wraps around") {
-  auto path = write_fixture("modsynth_loop.wav", {0.1f, 0.2f, 0.3f, 0.4f}, 48000);
+  auto path = write_fixture("ratsnest_loop.wav", {0.1f, 0.2f, 0.3f, 0.4f}, 48000);
   auto m = make_sampler(path.string(), "on");
   float ins[3] = {0.0f, 0.0f, 1.0f};
   float outs[2];
@@ -80,7 +80,7 @@ TEST_CASE("sampler: loop wraps around") {
 }
 
 TEST_CASE("sampler: +1 v/oct pitch doubles playback rate") {
-  auto path = write_fixture("modsynth_pitch.wav", {0.1f, 0.2f, 0.3f, 0.4f}, 48000);
+  auto path = write_fixture("ratsnest_pitch.wav", {0.1f, 0.2f, 0.3f, 0.4f}, 48000);
   auto m = make_sampler(path.string(), "off");
   float ins[3] = {0.0f, 1.0f, 1.0f};  // pitch +1 octave
   float outs[2];
@@ -98,7 +98,7 @@ TEST_CASE("sampler: +1 v/oct pitch doubles playback rate") {
 }
 
 TEST_CASE("sampler: level scales output") {
-  auto path = write_fixture("modsynth_level.wav", {0.8f, 0.8f}, 48000);
+  auto path = write_fixture("ratsnest_level.wav", {0.8f, 0.8f}, 48000);
   auto m = make_sampler(path.string(), "off");
   float ins[3] = {0.0f, 0.0f, 0.5f};  // half level
   float outs[2];
@@ -108,7 +108,7 @@ TEST_CASE("sampler: level scales output") {
 }
 
 TEST_CASE("sampler: trig rising edge restarts from the beginning") {
-  auto path = write_fixture("modsynth_trig.wav", {0.1f, 0.2f, 0.3f, 0.4f}, 48000);
+  auto path = write_fixture("ratsnest_trig.wav", {0.1f, 0.2f, 0.3f, 0.4f}, 48000);
   auto m = make_sampler(path.string(), "off");
   float ins[3] = {0.0f, 0.0f, 1.0f};
   float outs[2];

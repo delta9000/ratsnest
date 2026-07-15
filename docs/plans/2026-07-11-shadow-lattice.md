@@ -6,7 +6,7 @@
 
 **Architecture:** A 122 BPM clock tree drives a 40-block tracker-style arrangement, three Euclidean rhythm families, and one seeded Turing pitch source. A four-voice `alloc`/`voice` group turns the mono generative note stream into overlapping polyphony; explicit percussion, ambience, effects, and arrangement-controlled gain stages form the rest of the song.
 
-**Tech Stack:** modsynth patch DSL, existing DSP modules documented in `docs/modules.md`, `mise` validation/test tasks, offline WAV renderer.
+**Tech Stack:** ratsnest patch DSL, existing DSP modules documented in `docs/modules.md`, `mise` validation/test tasks, offline WAV renderer.
 
 ---
 

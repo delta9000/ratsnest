@@ -16,7 +16,7 @@
 - Hostile inputs must not kill the session: NaN-proof clamps use the `!(x >= lo)` pattern (`delay.cpp:40`); sanitize audio entering feedback structures (`!(|x| < 1e6) -> 0`).
 - Offline render has no FTZ: flush decaying states below 1e-20 (block-rate flush is acceptable; see spec §6).
 - Docs are part of the diff: `docs/modules.md` has a registry-coverage test (`tests/test_docs.cpp`) requiring a `` ## `type` `` heading per registered module.
-- Build/test: `mise run build`, `mise run test`, `mise run test-san`, `mise run ci`. Sources and tests are CMake-globbed — new files need no CMakeLists edits. Every `patches/*.patch` gets an automatic `modsynth check` ctest.
+- Build/test: `mise run build`, `mise run test`, `mise run test-san`, `mise run ci`. Sources and tests are CMake-globbed — new files need no CMakeLists edits. Every `patches/*.patch` gets an automatic `ratsnest check` ctest.
 - Commits: conventional prefixes, no AI attribution.
 - Sample rate is a `double` passed to `init`; tests use 48000.
 
@@ -1446,7 +1446,7 @@ git commit -m "feat: string resonator module (Rings Karplus-Strong models)"
 **Files:**
 - Modify: `docs/modules.md` (Recipes section)
 - Create: `patches/rings.patch`
-- Modify: `docs/superpowers/specs/2026-07-10-modsynth-design.md:223-227` (out-of-scope list)
+- Modify: `docs/superpowers/specs/2026-07-10-ratsnest-design.md:223-227` (out-of-scope list)
 
 **Interfaces:**
 - Consumes: `modal` and `string` modules (Tasks 2–3) via the DSL.
@@ -1518,7 +1518,7 @@ verb.out_r -> out.right
 
 - [ ] **Step 3: Update the main design spec's scope list**
 
-In `docs/superpowers/specs/2026-07-10-modsynth-design.md`, the out-of-scope
+In `docs/superpowers/specs/2026-07-10-ratsnest-design.md`, the out-of-scope
 paragraph currently reads:
 
 ```text
@@ -1552,7 +1552,7 @@ Expected: all pass; render stats show non-silent, non-clipping output
 
 ```bash
 git add docs/modules.md patches/rings.patch \
-        docs/superpowers/specs/2026-07-10-modsynth-design.md
+        docs/superpowers/specs/2026-07-10-ratsnest-design.md
 git commit -m "docs: sympathetic-strings recipe, rings demo patch, scope update"
 ```
 

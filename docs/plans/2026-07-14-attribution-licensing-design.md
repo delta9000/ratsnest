@@ -5,12 +5,12 @@ Status: approved
 
 ## Goal
 
-License modsynth under the MIT License and make the work it builds on visible,
+License ratsnest under the MIT License and make the work it builds on visible,
 traceable, and legally reusable. The repository should acknowledge distinctive
 algorithms, papers, upstream implementations, and dependencies close to the
 code that uses them and in one central provenance map.
 
-The governing principle is that modsynth is a synthesis of others' work:
+The governing principle is that ratsnest is a synthesis of others' work:
 attribution is part of the implementation, not an optional historical note.
 
 ## Audit findings
@@ -20,7 +20,7 @@ Research documents cite many sources, but citations are inconsistent at the
 implementation sites and there is no single map from source files to their
 provenance.
 
-The known implementation licenses are compatible with releasing modsynth under
+The known implementation licenses are compatible with releasing ratsnest under
 MIT:
 
 - Mutable Instruments Rings and the STM32 code in `pichenettes/eurorack` are
@@ -29,7 +29,7 @@ MIT:
   stmlib, so Emilie Gillet's MIT notices must be retained.
 - The cached-index SPSC design is influenced by Cameron Desrochers'
   `readerwriterqueue`, which uses the BSD-2-Clause license. Its notice must be
-  retained conservatively even though modsynth's queue is a small independent
+  retained conservatively even though ratsnest's queue is a small independent
   implementation of the pattern.
 - PipeWire is an MIT-licensed runtime dependency, and doctest is an MIT-licensed
   test/build dependency. They are fetched or linked rather than vendored, but
@@ -39,7 +39,7 @@ MIT:
   Karplus-Strong synthesis, and xorshift generators are locally implemented
   from published descriptions or established algorithms. They require clear
   scholarly and technical attribution, not a claim that their papers license
-  the modsynth source.
+  the ratsnest source.
 
 No tracked audio, images, fonts, or other media assets require a separate
 license notice. Existing untracked files are outside this audit and will not be
@@ -56,7 +56,7 @@ Add a root `LICENSE` containing the standard MIT text for:
 
 > Copyright (c) 2026 Ben Sandbrook
 
-The project license covers original modsynth work. Third-party portions remain
+The project license covers original ratsnest work. Third-party portions remain
 under their respective notices.
 
 ### Legal notices
@@ -78,13 +78,13 @@ distributions. Source comments will point to this file where code is derived.
 Add `docs/attribution.md` as the human-readable source of truth. Each entry will
 identify:
 
-1. the modsynth source files or modules;
+1. the ratsnest source files or modules;
 2. whether the relationship is code-derived, paper-derived, concept-inspired,
    or an external dependency;
 3. the upstream author/project or paper citation and stable URL;
 4. the applicable software license when an upstream implementation informed
    the code;
-5. the nature of modsynth's adaptation.
+5. the nature of ratsnest's adaptation.
 
 The initial map will cover at least:
 

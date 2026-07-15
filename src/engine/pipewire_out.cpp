@@ -137,7 +137,7 @@ PipewireOut::PipewireOut(const char* app_name, RenderFn fn, void* user,
   impl_->fn = fn;
   impl_->user = user;
   pw_init(nullptr, nullptr);
-  impl_->loop = pw_thread_loop_new("modsynth-audio", nullptr);
+  impl_->loop = pw_thread_loop_new("ratsnest-audio", nullptr);
   if (impl_->loop == nullptr) {
     std::lock_guard<std::mutex> lk(impl_->err_mu);
     impl_->err = "pw_thread_loop_new failed";

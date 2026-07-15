@@ -6,9 +6,9 @@ Verified against local `libpipewire-0.3` **1.6.7** (`/usr/include/pipewire-0.3/p
 
 ```
 pw_init(&argc, &argv);
-loop = pw_thread_loop_new("modsynth-audio", NULL);
+loop = pw_thread_loop_new("ratsnest-audio", NULL);
 pw_thread_loop_lock(loop);
-filter = pw_filter_new_simple(pw_thread_loop_get_loop(loop), "modsynth",
+filter = pw_filter_new_simple(pw_thread_loop_get_loop(loop), "ratsnest",
     pw_properties_new(PW_KEY_MEDIA_TYPE, "Audio",
                        PW_KEY_MEDIA_CATEGORY, "Playback",
                        PW_KEY_MEDIA_ROLE, "Music",
@@ -134,11 +134,11 @@ const pw_filter_events kFilterEvents = {
 int main(int argc, char *argv[]) {
     Data data{};
     pw_init(&argc, &argv);
-    data.loop = pw_thread_loop_new("modsynth-audio", nullptr);
+    data.loop = pw_thread_loop_new("ratsnest-audio", nullptr);
 
     pw_thread_loop_lock(data.loop);
     data.filter = pw_filter_new_simple(
-        pw_thread_loop_get_loop(data.loop), "modsynth",
+        pw_thread_loop_get_loop(data.loop), "ratsnest",
         pw_properties_new(
             PW_KEY_MEDIA_TYPE, "Audio",
             PW_KEY_MEDIA_CATEGORY, "Playback",

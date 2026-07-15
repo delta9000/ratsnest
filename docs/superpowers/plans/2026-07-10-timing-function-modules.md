@@ -6,7 +6,7 @@
 
 **Architecture:** Each module is a self-contained `dsp::Module` with fixed input/output metadata and migratable scalar state. A fast master clock drives a hierarchy of dividers; triggered function generators replace discontinuous gain ramps.
 
-**Tech Stack:** C++20, doctest, modsynth patch DSL, CMake
+**Tech Stack:** C++20, doctest, ratsnest patch DSL, CMake
 
 ---
 

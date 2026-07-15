@@ -16,7 +16,7 @@
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "MODSYNTH_WERROR": "ON"
+        "RATSNEST_WERROR": "ON"
       }
     },
     {
@@ -25,7 +25,7 @@
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "MODSYNTH_SAN": "ON"
+        "RATSNEST_SAN": "ON"
       }
     }
   ]

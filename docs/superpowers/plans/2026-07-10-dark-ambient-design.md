@@ -51,5 +51,5 @@ combine low-pass and band-pass outputs for a resonant pluck, and sweep the
 supersaw lead from muted to bright across the full build. Preserve the unfiltered
 voice-led chord bed as the stable harmonic foundation.
 
-The patch lives at `patches/dark-ambient.patch`. It must pass `modsynth check`
+The patch lives at `patches/dark-ambient.patch`. It must pass `ratsnest check`
 before being launched with the live PipeWire player.

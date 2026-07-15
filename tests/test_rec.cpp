@@ -37,7 +37,7 @@ TEST_CASE("rec: metadata") {
 }
 
 TEST_CASE("rec: captures input and writes it to a wav on teardown") {
-  auto path = std::filesystem::temp_directory_path() / "modsynth_rec_take.wav";
+  auto path = std::filesystem::temp_directory_path() / "ratsnest_rec_take.wav";
   std::filesystem::remove(path);
   {
     auto m = make_rec(path.string());
@@ -62,7 +62,7 @@ TEST_CASE("rec: captures input and writes it to a wav on teardown") {
 }
 
 TEST_CASE("rec: gate low records nothing and writes no file") {
-  auto path = std::filesystem::temp_directory_path() / "modsynth_rec_silent.wav";
+  auto path = std::filesystem::temp_directory_path() / "ratsnest_rec_silent.wav";
   std::filesystem::remove(path);
   {
     auto m = make_rec(path.string());
@@ -76,7 +76,7 @@ TEST_CASE("rec: gate low records nothing and writes no file") {
 }
 
 TEST_CASE("rec: stops capturing at the secs cap") {
-  auto path = std::filesystem::temp_directory_path() / "modsynth_rec_cap.wav";
+  auto path = std::filesystem::temp_directory_path() / "ratsnest_rec_cap.wav";
   std::filesystem::remove(path);
   {
     // rate 100, secs 1 -> capacity 100 frames.

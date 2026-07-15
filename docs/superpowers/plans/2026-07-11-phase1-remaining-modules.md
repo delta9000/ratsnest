@@ -97,7 +97,7 @@ const std::vector<double>& cfg_arr(const Config& c, std::string_view name) {
 - Create: `src/dsp/modules/noise.cpp`
 - Modify: `src/dsp/modules.h` (add `extern const ModuleInfo noise_info;`)
 - Modify: `src/dsp/registry.cpp` (add `&noise_info` to `kRegistry`)
-- Modify: `docs/superpowers/specs/2026-07-10-modsynth-design.md:139` — change the noise row's Key params from `` `color` (white\|pink) `` to `` `color` (white\|pink), `seed` `` (seed is needed so two noise instances decorrelate; docs are part of the diff).
+- Modify: `docs/superpowers/specs/2026-07-10-ratsnest-design.md:139` — change the noise row's Key params from `` `color` (white\|pink) `` to `` `color` (white\|pink), `seed` `` (seed is needed so two noise instances decorrelate; docs are part of the diff).
 - Test: `tests/test_noise.cpp`, append one case to `tests/test_migrate.cpp`
 
 **Interfaces:**
@@ -260,7 +260,7 @@ TEST_CASE("noise migrates rng and pink filter state") {
 ```
 
 - [ ] **Step 5: Run tests** — `mise run build && ./build/mstests` — Expected: all PASS.
-- [ ] **Step 6: Commit** — `git add src/dsp/modules/noise.cpp src/dsp/modules.h src/dsp/registry.cpp tests/test_noise.cpp tests/test_migrate.cpp docs/superpowers/specs/2026-07-10-modsynth-design.md && git commit -m "feat: add noise module (white/pink, seedable)"`
+- [ ] **Step 6: Commit** — `git add src/dsp/modules/noise.cpp src/dsp/modules.h src/dsp/registry.cpp tests/test_noise.cpp tests/test_migrate.cpp docs/superpowers/specs/2026-07-10-ratsnest-design.md && git commit -m "feat: add noise module (white/pink, seedable)"`
 
 ---
 
@@ -1905,7 +1905,7 @@ Extern + registry entry.
 
 **Files:**
 - Create: `patches/west-coast.patch`
-- Test: existing CLI gates (`modsynth check`, `mise run render`)
+- Test: existing CLI gates (`ratsnest check`, `mise run render`)
 
 **Interfaces:**
 - Consumes: every module from Tasks 2–13 plus existing clock/div/func/vco.
@@ -1965,7 +1965,7 @@ mixer.out_r -> out.right
 -0.15 -> out.level
 ```
 
-- [ ] **Step 2: Validate** — `mise run build && ./build/modsynth check patches/west-coast.patch` — Expected: `ok`.
+- [ ] **Step 2: Validate** — `mise run build && ./build/ratsnest check patches/west-coast.patch` — Expected: `ok`.
 - [ ] **Step 3: Render** — `mise run render -- patches/west-coast.patch -d 5s -o /tmp/west-coast.wav` — Expected: exits 0, wav is nonzero size and contains audio (not digital silence): `python3 -c "import wave, audioop, sys; w = wave.open('/tmp/west-coast.wav'); f = w.readframes(w.getnframes()); print(audioop.rms(f, w.getsampwidth()))"` prints > 100.
 - [ ] **Step 4: Full gates** — `mise run test && mise run test-san && mise run ci` — Expected: all pass.
 - [ ] **Step 5: Commit** — `git add patches/west-coast.patch && git commit -m "feat: add west-coast demo patch exercising the full phase 1 palette"`

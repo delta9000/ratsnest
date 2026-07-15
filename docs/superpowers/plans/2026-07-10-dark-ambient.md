@@ -6,7 +6,7 @@
 
 **Architecture:** Compose the implemented oscillators, LFOs, and VCAs into a low drone with independent slow modulation. Route voices across the stereo output at conservative levels.
 
-**Tech Stack:** modsynth patch DSL, C++20 `modsynth` validator/player
+**Tech Stack:** ratsnest patch DSL, C++20 `ratsnest` validator/player
 
 ---
 

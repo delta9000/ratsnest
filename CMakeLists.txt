@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.25)
-project(modsynth CXX)
+project(ratsnest CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(MODSYNTH_WERROR "Treat warnings as errors" OFF)
-option(MODSYNTH_SAN "Enable ASan + UBSan for every target" OFF)
+option(RATSNEST_WERROR "Treat warnings as errors" OFF)
+option(RATSNEST_SAN "Enable ASan + UBSan for every target" OFF)
 
 add_compile_options(-Wall -Wextra -Wconversion)
-if(MODSYNTH_WERROR)
+if(RATSNEST_WERROR)
   add_compile_options(-Werror)
 endif()
-if(MODSYNTH_SAN)
+if(RATSNEST_SAN)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer
                       -fno-sanitize-recover=all)
   add_link_options(-fsanitize=address,undefined)
@@ -26,8 +26,8 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
 target_link_libraries(mscore PUBLIC PkgConfig::PIPEWIRE)
 
-add_executable(modsynth src/main.cpp)
-target_link_libraries(modsynth PRIVATE mscore)
+add_executable(ratsnest src/main.cpp)
+target_link_libraries(ratsnest PRIVATE mscore)
 
 include(FetchContent)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
@@ -44,12 +44,12 @@ add_test(NAME unit COMMAND mstests)
 file(GLOB MSPATCHES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/patches/*.patch)
 foreach(patch ${MSPATCHES})
   get_filename_component(patch_name ${patch} NAME_WE)
-  add_test(NAME cli_check_${patch_name} COMMAND modsynth check ${patch})
+  add_test(NAME cli_check_${patch_name} COMMAND ratsnest check ${patch})
 endforeach()
 
 add_test(NAME cli_render
-  COMMAND modsynth render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first.wav)
 add_test(NAME cli_check_rejects_bad_patch
-  COMMAND modsynth check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
+  COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
 set_tests_properties(cli_check_rejects_bad_patch PROPERTIES WILL_FAIL TRUE)

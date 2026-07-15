@@ -460,7 +460,7 @@ harp.pluck -> out.in : 0.45
 ```
 
 - [ ] **Step 2: Verify** — `mise run check -- patches/strum.patch`;
-  `./build/modsynth render patches/strum.patch -d 12s --stats 2s -o /tmp/strum.wav`:
+  `./build/ratsnest render patches/strum.patch -d 12s --stats 2s -o /tmp/strum.wav`:
   RMS must be nonzero in every window (overlapping decay-0.9 tails across
   330 ms steps prove voices genuinely overlap — the mono equivalent would
   choke each pluck).
@@ -566,7 +566,7 @@ TEST_CASE("midi passes bank conformance") { /* Task 3 suite; feed = inject */ }
 
 - [ ] **Step 3: Manual verification protocol** (no CI hardware): run
   `mise run play -- patches/keys.patch`, connect a controller or
-  `pw-cli`/`wpctl` a virtual keyboard to the `modsynth midi-in` port,
+  `pw-cli`/`wpctl` a virtual keyboard to the `ratsnest midi-in` port,
   confirm notes sound and `--watch mid.gate1` shows gates. Record the exact
   commands used in the commit message body.
 

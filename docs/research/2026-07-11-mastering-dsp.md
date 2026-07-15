@@ -79,7 +79,7 @@ and is not needed to validate the core stereo utility.
 
 `meter` should follow `scope`: it observes without altering the graph. Offline
 integrated LUFS, loudness range, normalization, and final true-peak scanning
-belong in `modsynth analyze`, because they require programme history and often
+belong in `ratsnest analyze`, because they require programme history and often
 two passes. EBU Tech 3341 defines 400 ms momentary and 3 s short-term windows;
 ITU-R BS.1770 defines K-weighting, channel weighting, gating, and true-peak
 reconstruction. These standards should be implemented literally and verified

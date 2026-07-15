@@ -1,9 +1,9 @@
 # Attribution and implementation provenance
 
-modsynth stands on the work of many researchers and open-source developers.
+ratsnest stands on the work of many researchers and open-source developers.
 This document maps distinctive implementations to their sources and describes
 how they were adapted. Legal notices for software-derived portions are retained
-in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md); modsynth's project
+in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md); ratsnest's project
 license is in [`LICENSE`](../LICENSE).
 
 Relationships are classified as:
@@ -19,7 +19,7 @@ Relationships are classified as:
 
 ## Implementation provenance
 
-| modsynth code | relationship | source | adaptation |
+| ratsnest code | relationship | source | adaptation |
 | --- | --- | --- | --- |
 | `src/dsp/resonate.h`, `src/dsp/modules/modal.cpp`, `src/dsp/modules/string.cpp` | **Code-derived**, MIT | Emilie Gillet's [Mutable Instruments Rings](https://github.com/pichenettes/eurorack) and [stmlib](https://github.com/pichenettes/stmlib), particularly Rings' [`resonator.cc`](https://github.com/pichenettes/eurorack/blob/master/rings/dsp/resonator.cc), [`string.cc`](https://github.com/pichenettes/eurorack/blob/master/rings/dsp/string.cc), [`plucker.h`](https://github.com/pichenettes/eurorack/blob/master/rings/dsp/plucker.h), and [`part.cc`](https://github.com/pichenettes/eurorack/blob/master/rings/dsp/part.cc) | Substantially adapted into a shared modal/string core: modal-resonator mappings, string dispersion and damping, plucker, SVF, cosine recurrence, and delay/allpass primitives. Full MIT notices are retained in `THIRD_PARTY_NOTICES.md`. |
 | `src/dsp/modules/string.cpp` | **Paper-derived in ancestry and code-derived through Rings** | Kevin Karplus and Alex Strong, “Digital Synthesis of Plucked-String and Drum Timbres,” *Computer Music Journal* 7(2), 1983, [DOI 10.2307/3680062](https://doi.org/10.2307/3680062) | Extends the Karplus–Strong feedback-delay family using the dispersion, damping, and excitation structure adapted through Rings. |
@@ -32,7 +32,7 @@ Relationships are classified as:
 | `src/dsp/modules/euclid.cpp` | **Concept/paper-derived** | Godfried Toussaint, “The Euclidean Algorithm Generates Traditional Musical Rhythms,” 2005 ([paper](http://cgm.cs.mcgill.ca/~godfried/publications/banff.pdf)) | Uses Toussaint's Euclidean-rhythm framing but implements a constant-time modular bucket/Bresenham-style test; it is not a port of Bjorklund code. |
 | `src/dsp/modules/noise.cpp`, `random.cpp`, `bern.cpp`, `turing.cpp`, `stepseq.cpp`, `grains.cpp`, and `src/dsp/resonate.h` | **Paper-derived** | George Marsaglia, [“Xorshift RNGs,” *Journal of Statistical Software* 8(14), 2003](https://www.jstatsoft.org/article/view/v008i14) | Each site contains a small local xorshift32 generator used for deterministic noise, probability, sequencing, grains, or excitation. |
 | `src/rt/spsc.h` | **Implementation-influenced**, BSD-2-Clause and MIT | Cameron Desrochers' [readerwriterqueue](https://github.com/cameron314/readerwriterqueue) cached peer indices and PipeWire's acquire/release ring-buffer protocol | Combines independently written fixed-capacity SPSC storage with cached peer-index and memory-ordering patterns; this is not a verbatim port. Conservative software notices are retained in `THIRD_PARTY_NOTICES.md`. |
-| `src/dsp/modules/bern.cpp` | **Concept-inspired** | Mutable Instruments [Branches](https://github.com/pichenettes/eurorack/tree/master/branches) Bernoulli gate routing | Adopts the probability-routed gate concept in the modsynth module model. No Branches firmware code was copied. |
+| `src/dsp/modules/bern.cpp` | **Concept-inspired** | Mutable Instruments [Branches](https://github.com/pichenettes/eurorack/tree/master/branches) Bernoulli gate routing | Adopts the probability-routed gate concept in the ratsnest module model. No Branches firmware code was copied. |
 | `src/dsp/modules/turing.cpp` | **Concept-inspired** | Tom Whitwell's [Music Thing Modular Turing Machine](https://www.musicthing.co.uk/Turing-Machine/) | Adopts the looping, probabilistically mutated shift-register sequencer concept. No Turing Machine firmware code was copied. |
 | Build and `src/engine/pipewire_out.cpp` | **External dependency**, MIT | [PipeWire](https://docs.pipewire.org/) `libpipewire-0.3` | The installed version is discovered through pkg-config and linked as `PkgConfig::PIPEWIRE`; PipeWire is not vendored. |
 | `mstests` in `CMakeLists.txt` | **External dependency**, MIT | [doctest v2.4.11](https://github.com/doctest/doctest/tree/2.4.11) | CMake fetches the pinned test framework at test-build time and links `doctest::doctest`; it is not vendored. |

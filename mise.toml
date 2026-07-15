@@ -38,14 +38,14 @@ depends = ["test-san"]
 [tasks.check]
 description = "Parse/validate a patch file. Usage: mise run check -- patches/first.patch"
 depends = ["build"]
-run = "./build/modsynth check"
+run = "./build/ratsnest check"
 
 [tasks.render]
 description = "Render a patch to WAV offline. Usage: mise run render -- patches/first.patch -d 10s -o take.wav"
 depends = ["build"]
-run = "./build/modsynth render"
+run = "./build/ratsnest render"
 
 [tasks.play]
 description = "Play a patch live with hot-reload. Usage: mise run play -- patches/first.patch"
 depends = ["build"]
-run = "./build/modsynth play"
+run = "./build/ratsnest play"

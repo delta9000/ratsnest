@@ -414,7 +414,7 @@ std::string write_ramp_wav(const char* name, int frames, int rate) {
 }  // namespace
 
 TEST_CASE("grains: file mode granulates the file; live input is inert") {
-  const std::string path = write_ramp_wav("modsynth_grains_ramp.wav", 9600, 48000);
+  const std::string path = write_ramp_wav("ratsnest_grains_ramp.wav", 9600, 48000);
   auto m = make_grains(48000.0, 1.0, 1.0, path.c_str());
   Ins ins;
   float outs[3] = {0.f, 0.f, 0.f};
@@ -442,7 +442,7 @@ TEST_CASE("grains: file mode granulates the file; live input is inert") {
 }
 
 TEST_CASE("grains: file at a different rate is resampled to engine rate") {
-  const std::string path = write_ramp_wav("modsynth_grains_ramp24.wav", 4800, 24000);
+  const std::string path = write_ramp_wav("ratsnest_grains_ramp24.wav", 4800, 24000);
   auto m = make_grains(48000.0, 1.0, 1.0, path.c_str());
   Ins ins;
   float outs[3] = {0.f, 0.f, 0.f};

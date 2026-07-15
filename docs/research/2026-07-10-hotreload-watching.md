@@ -39,7 +39,7 @@ loop poll(fd, timeout = deadline - now):
 
 **SuperCollider scsynth:** `/d_recv` replaces a SynthDef by name but running nodes keep their instantiated graph — no live swap, no crossfade; click-free transitions are the user's job (new synth + envelope + free old). Validates the new-graph/old-graph/fade/retire model over in-place mutation.
 
-**State migration precedent:** targeted search (Faust, gen~, Cardinal, Bespoke, SunVox, SuperDirt, shader hot-reload) found **no direct precedent** for automatically migrating per-module DSP state (oscillator phase, delay buffers) across a live graph recompile keyed by name+type. Closest analog: Erlang/OTP hot code swap's explicit `code_change(OldVsn, State, Extra)` per-process state adapter. modsynth's (name,type) migration is genuinely novel for modular audio.
+**State migration precedent:** targeted search (Faust, gen~, Cardinal, Bespoke, SunVox, SuperDirt, shader hot-reload) found **no direct precedent** for automatically migrating per-module DSP state (oscillator phase, delay buffers) across a live graph recompile keyed by name+type. Closest analog: Erlang/OTP hot code swap's explicit `code_change(OldVsn, State, Extra)` per-process state adapter. ratsnest's (name,type) migration is genuinely novel for modular audio.
 
 **Crossfade discipline:** equal-power via `gain_old = cos(θ)`, `gain_new = sin(θ)`, `θ = t·π/2` over the window (gain_old² + gain_new² = 1 throughout; avoids the perceptual dip of linear). Web Audio prior art for "run both paths briefly and crossfade": ConvolverNode buffer swap glitch workaround instantiates a second node and crossfades. 2× DSP for 50 ms is trivial.
 
