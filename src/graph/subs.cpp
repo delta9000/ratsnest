@@ -328,6 +328,7 @@ void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl&
 }
 
 void instantiate(Ctx& ctx, dsl::PatchAst& parent, size_t idx,
+                 const std::unordered_map<std::string, dsl::PatchAst>& templates,
                  const std::string& dir, const std::string& file) {
   const dsl::ModuleDecl decl = parent.modules[idx];
   const dsl::ParamDecl* pf = find_param(decl, "file");
@@ -338,7 +339,26 @@ void instantiate(Ctx& ctx, dsl::PatchAst& parent, size_t idx,
     return;
   }
   if (pd) {
-    ctx.err(file, pd->line, pd->col, "unknown subdef '" + pd->value.str + "'");
+    if (pd->value.kind != dsl::Value::Kind::Ident) {
+      ctx.err(file, pd->line, pd->col, "sub 'def:' expects a template name");
+      return;
+    }
+    auto it = templates.find(pd->value.str);
+    if (it == templates.end()) {
+      ctx.err(file, pd->line, pd->col, "unknown subdef '" + pd->value.str + "'");
+      return;
+    }
+    if (ctx.stack.size() >= kMaxDepth) {
+      ctx.err(file, decl.line, decl.col, "subpatch nesting deeper than 16");
+      return;
+    }
+    const std::string key = "def:" + pd->value.str + "@" + file;
+    ctx.stack.insert(key);
+    ctx.labels.push_back(decl.name + " at " + (file.empty() ? "patch" : file) + ":" +
+                         std::to_string(decl.line));
+    do_body(ctx, parent, idx, decl, file, it->second, dir, file);
+    ctx.labels.pop_back();
+    ctx.stack.erase(key);
     return;
   }
   if (pf->value.kind != dsl::Value::Kind::Str) {
@@ -383,14 +403,91 @@ void instantiate(Ctx& ctx, dsl::PatchAst& parent, size_t idx,
   ctx.stack.erase(key);
 }
 
+std::unordered_map<std::string, dsl::PatchAst> collect_subdefs(
+    Ctx& ctx, const std::string& file, dsl::PatchAst& ast) {
+  std::unordered_map<std::string, dsl::PatchAst> out;
+  std::vector<std::pair<std::string, int>> order;
+  for (const auto& m : ast.modules) {
+    if (m.type != "subdef") continue;
+    if (m.name.find('.') != std::string::npos) {
+      ctx.err(file, m.line, m.col, "subdef '" + m.name + "' may not be nested (dotted name)");
+      continue;
+    }
+    out.emplace(m.name, dsl::PatchAst{});
+    order.emplace_back(m.name, m.line);
+  }
+  if (out.empty() || ctx.failed()) return out;
+
+  auto owner = [&](const std::string& chain) -> std::string {
+    for (const auto& [name, line] : order)
+      if (chain_under(chain, name)) return name;
+    return "";
+  };
+  auto strip = [](const std::string& chain, const std::string& prefix) {
+    return chain.substr(prefix.size() + 1);
+  };
+
+  std::vector<dsl::ModuleDecl> keep_m;
+  for (auto& m : ast.modules) {
+    if (m.type == "subdef") continue;
+    std::string g = owner(m.name);
+    if (g.empty()) {
+      keep_m.push_back(std::move(m));
+      continue;
+    }
+    dsl::ModuleDecl copy = std::move(m);
+    copy.name = strip(copy.name, g);
+    for (auto& p : copy.params) {
+      if (p.value.kind == dsl::Value::Kind::Ident && chain_under(p.value.str, g))
+        p.value.str = strip(p.value.str, g);
+      if (p.value.kind == dsl::Value::Kind::Array)
+        for (auto& item : p.value.items)
+          if (item.kind == dsl::Value::Kind::Ident && chain_under(item.str, g))
+            item.str = strip(item.str, g);
+    }
+    out[g].modules.push_back(std::move(copy));
+  }
+  ast.modules = std::move(keep_m);
+
+  std::vector<dsl::CableDecl> keep_c;
+  for (auto& c : ast.cables) {
+    std::string sg = c.src.is_literal ? "" : owner(c.src.module);
+    std::string dg = owner(c.dst.module);
+    if (sg.empty() && dg.empty()) {
+      keep_c.push_back(std::move(c));
+      continue;
+    }
+    if (sg != dg && !(c.src.is_literal && !dg.empty())) {
+      ctx.err(file, c.line, c.col,
+              "cable crosses subdef '" + (sg.empty() ? dg : sg) + "' boundary");
+      continue;
+    }
+    dsl::CableDecl copy = std::move(c);
+    if (!copy.src.is_literal) copy.src.module = strip(copy.src.module, dg);
+    copy.dst.module = strip(copy.dst.module, dg);
+    if (!copy.depth_ident.empty() && chain_under(copy.depth_ident, dg))
+      copy.depth_ident = strip(copy.depth_ident, dg);
+    out[dg].cables.push_back(std::move(copy));
+  }
+  ast.cables = std::move(keep_c);
+
+  for (const auto& [name, line] : order)
+    if (out.count(name) && out[name].modules.empty())
+      ctx.err(file, line, 0, "subdef '" + name + "' has no members");
+  return out;
+}
+
 void expand_in(Ctx& ctx, dsl::PatchAst& ast, const std::string& dir,
                const std::string& file) {
+  std::unordered_map<std::string, dsl::PatchAst> templates =
+      collect_subdefs(ctx, file, ast);
+  if (ctx.failed()) return;
   for (size_t i = 0; i < ast.modules.size();) {
     if (ast.modules[i].type != "sub") {
       ++i;
       continue;
     }
-    instantiate(ctx, ast, i, dir, file);
+    instantiate(ctx, ast, i, templates, dir, file);
     if (ctx.failed()) return;
   }
 }

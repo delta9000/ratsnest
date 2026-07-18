@@ -258,3 +258,51 @@ TEST_CASE("escape hatch: cables into stamped internals pass through") {
   REQUIRE(c);
   CHECK(c->src.is_literal);
 }
+
+TEST_CASE("subdef: inline template instantiates twice with different params") {
+  auto e = expand(
+      "td = subdef {}\n"
+      "td.tune = param { default: 110 }\n"
+      "td.trig = input {}\n"
+      "td.main = output {}\n"
+      "td.osc = vco { wave: sine, freq: td.tune }\n"
+      "td.env = func { rise: 0.001s, fall: 0.2s }\n"
+      "td.trig -> td.env.trig\n"
+      "td.osc -> td.main.in\n"
+      "t1 = sub { def: td, tune: 220 }\n"
+      "t2 = sub { def: td }\n"
+      "t1.main -> out.in\n"
+      "t2.main -> out.in\n");
+  REQUIRE(e.errors.empty());
+  CHECK_FALSE(find_mod(e.ast, "td"));
+  CHECK_FALSE(find_mod(e.ast, "td.osc"));
+  CHECK(find_cfg(*find_mod(e.ast, "t1.osc"), "freq")->value.num == doctest::Approx(220.0));
+  CHECK(find_cfg(*find_mod(e.ast, "t2.osc"), "freq")->value.num == doctest::Approx(110.0));
+  CHECK(has_cable(e.ast, "t1.osc", "out.in"));
+  CHECK(has_cable(e.ast, "t2.osc", "out.in"));
+}
+
+TEST_CASE("subdef: errors") {
+  SUBCASE("unknown def name") {
+    auto e = expand("t = sub { def: nope }\n");
+    REQUIRE_FALSE(e.errors.empty());
+    CHECK(e.errors[0].msg.find("nope") != std::string::npos);
+  }
+  SUBCASE("dotted subdef name") {
+    auto e = expand("a.b = subdef {}\na.b.x = vco\n");
+    REQUIRE_FALSE(e.errors.empty());
+  }
+  SUBCASE("cable crossing the template boundary") {
+    auto e = expand(
+        "td = subdef {}\n"
+        "td.osc = vco\n"
+        "lfo1 = lfo\n"
+        "lfo1 -> td.osc.fm\n"
+        "t = sub { def: td }\n");
+    REQUIRE_FALSE(e.errors.empty());
+  }
+  SUBCASE("subdef with no members") {
+    auto e = expand("td = subdef {}\nt = sub { def: td }\n");
+    REQUIRE_FALSE(e.errors.empty());
+  }
+}

@@ -98,7 +98,16 @@ class Parser {
 
   bool value(Value& v) {
     if (at(Tok::Number)) { v.kind = Value::Kind::Num; v.num = next().num; return true; }
-    if (at(Tok::Ident))  { v.kind = Value::Kind::Ident; v.str = next().text; return true; }
+    if (at(Tok::Ident)) {
+      v.kind = Value::Kind::Ident;
+      v.str = next().text;
+      while (at(Tok::Dot) && i_ + 1 < toks_.size() && toks_[i_ + 1].kind == Tok::Ident) {
+        next();
+        v.str += '.';
+        v.str += next().text;
+      }
+      return true;
+    }
     if (at(Tok::Str))    { v.kind = Value::Kind::Str; v.str = next().text; return true; }
     if (at(Tok::LBracket)) {
       next();
