@@ -1,0 +1,36 @@
+# kick.sub -- the kick from kick-solo.patch as a reusable voice.
+# Sine thud with a fast pitch collapse, plus a filtered-noise beater click.
+tune  = param { default: 50hz }     # body pitch
+decay = param { default: 0.095s }   # body length
+click = param { default: 0.32 }     # beater click level
+trig  = input {}
+main  = output {}
+
+kaenv = func { rise: 0.001s, fall: decay }
+trig -> kaenv.trig
+kpenv = func { rise: 0.0003s, fall: 0.006s }
+trig -> kpenv.trig
+kosc = vco { wave: sine, freq: tune }
+kpenv -> kosc.v_oct : 3.2
+kbody = vca { gain: 0 }
+kosc -> kbody.in
+kaenv -> kbody.cv
+
+kclk_env = func { rise: 0.0002s, fall: 0.009s }
+trig -> kclk_env.trig
+kclk_n = noise { color: white, seed: 9 }
+kclk_hp = svf { cutoff: 1700hz, res: 0.2 }
+kclk_n -> kclk_hp.in
+kclk = vca { gain: 0 }
+kclk_hp.hp -> kclk.in
+kclk_env -> kclk.cv
+
+kmix = mix { levels: [1.0, 1.0] }
+kbody -> kmix.in1
+kclk -> kmix.in2 : click
+kmix.out_l -> main.in
+
+# Audition: `mise run play -- patches/lib/kick.sub`
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in

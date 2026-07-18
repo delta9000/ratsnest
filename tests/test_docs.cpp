@@ -34,6 +34,10 @@ TEST_CASE("module reference covers every registered module") {
     CHECK(text.find("## `" + std::string(info->type) + "`") !=
           std::string::npos);
   }
+  for (const char* pseudo : {"sub", "subdef", "param", "input", "output"}) {
+    CAPTURE(pseudo);
+    CHECK(text.find("## `" + std::string(pseudo) + "`") != std::string::npos);
+  }
 }
 
 TEST_CASE("license and attribution records cover implementation provenance") {

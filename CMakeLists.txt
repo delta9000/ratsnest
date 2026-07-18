@@ -50,6 +50,8 @@ endforeach()
 add_test(NAME cli_render
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first.wav)
+add_test(NAME cli_check_kick_sub
+  COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/patches/lib/kick.sub)
 add_test(NAME cli_check_rejects_bad_patch
   COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
 set_tests_properties(cli_check_rejects_bad_patch PROPERTIES WILL_FAIL TRUE)
