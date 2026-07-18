@@ -122,3 +122,39 @@ TEST_CASE("'out' is reserved") {
   REQUIRE(r.errors.size() == 1);
   CHECK(r.errors[0].msg.find("reserved") != std::string::npos);
 }
+
+TEST_CASE("note-name aliases resolve to Hz frequencies") {
+  auto freq_of = [](const char* src, const char* name) {
+    auto r = go(src);
+    REQUIRE(r.ok());
+    for (auto& n : r.graph->nodes)
+      if (n.name == name) return n.input_base[0];  // vco freq is slot 0
+    REQUIRE(false);
+    return 0.0f;
+  };
+  CHECK(freq_of("o = vco { freq: A4 }\no -> out.in\n", "o") == doctest::Approx(440.0f));
+  CHECK(freq_of("c = vco { freq: C4 }\nc -> out.in\n", "c") ==
+        doctest::Approx(261.6256f).epsilon(1e-4));
+  CHECK(freq_of("a = vco { freq: A1 }\na -> out.in\n", "a") ==
+        doctest::Approx(55.0f).epsilon(1e-4));
+  // enharmonic sharp/flat: Cs4 == Db4 == 277.18 Hz
+  CHECK(freq_of("s = vco { freq: Cs4 }\ns -> out.in\n", "s") ==
+        doctest::Approx(277.1826f).epsilon(1e-3));
+  CHECK(freq_of("f = vco { freq: Db4 }\nf -> out.in\n", "f") ==
+        doctest::Approx(277.1826f).epsilon(1e-3));
+  // lowercase enum barewords are NOT notes and pass through unchanged
+  auto re = go("w = vco { wave: saw }\nw -> out.in\n");
+  REQUIRE(re.ok());
+  for (auto& n : re.graph->nodes)
+    if (n.name == "w") CHECK(dsp::cfg_str(n.config, "wave", "") == "saw");
+}
+
+TEST_CASE("invalid note names report a clean error, not a crash") {
+  auto p = dsl::parse("o = vco { freq: Cx }\no -> out.in\n");   // no octave digit
+  CHECK(!p.ok());
+  auto p2 = dsl::parse("o = vco { freq: Cs }\no -> out.in\n");  // sharp but no octave
+  CHECK(!p2.ok());
+  // a note also works as a plain array element (lowered to a number)
+  auto r = go("o = vco { freq: A4 }\no -> out.in\n");
+  REQUIRE(r.ok());
+}

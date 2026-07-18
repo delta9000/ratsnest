@@ -29,6 +29,13 @@ Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output
 `ratsnest check patch.patch`; `ratsnest render ... --stats [Ns]` prints
 overall peak/RMS/DC plus a per-window level timeline for mix work.
 
+**Note names** are numeric literals in Hz, usable anywhere a number is
+(`freq: A4`, array elements, cable literals). Scientific pitch notation: an
+uppercase letter `A`–`G`, an optional accidental — `s` = sharp, `b` = flat
+(`#` can't be used, it starts a comment) — and one octave digit `0`–`9`, with
+`C4` = middle C and `A4` = 440 Hz. Examples: `A4` (440), `Cs4` = `Db4`
+(277.18), `A1` (55), `Bb2`. So `vco { freq: A2 }` is `vco { freq: 55hz }`.
+
 ### Voice groups
 
 Declared names may contain a dot (`lead.osc = vco { ... }`); no new statement

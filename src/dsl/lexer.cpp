@@ -1,12 +1,38 @@
 #include "dsl/lexer.h"
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
+#include <string_view>
 
 namespace ms::dsl {
 namespace {
 
 bool ident_start(char c) { return std::islower(static_cast<unsigned char>(c)) || c == '_'; }
 bool ident_char(char c) { return ident_start(c) || std::isdigit(static_cast<unsigned char>(c)); }
+
+// A note-name literal: uppercase letter A-G, optional accidental (s = sharp,
+// b = flat — '#' is unavailable, it starts a comment), one octave digit 0-9.
+// Scientific pitch notation (C4 = middle C, A4 = 440 Hz) -> frequency in Hz.
+// Uppercase letters are otherwise unused in the grammar, so this is
+// unambiguous with identifiers (which are lowercase).
+bool note_hz(std::string_view s, double& out) {
+  if (s.size() < 2 || s.size() > 3) return false;
+  int pc = 0;
+  switch (s[0]) {
+    case 'C': pc = 0;  break; case 'D': pc = 2;  break; case 'E': pc = 4;  break;
+    case 'F': pc = 5;  break; case 'G': pc = 7;  break; case 'A': pc = 9;  break;
+    case 'B': pc = 11; break; default: return false;
+  }
+  std::size_t idx = 1;
+  if (s[idx] == 's') { pc += 1; ++idx; }
+  else if (s[idx] == 'b') { pc -= 1; ++idx; }
+  if (idx != s.size() - 1) return false;
+  const char d = s[idx];
+  if (d < '0' || d > '9') return false;
+  const int midi = (d - '0' + 1) * 12 + pc;  // scientific: C4 -> MIDI 60
+  out = 440.0 * std::exp2(static_cast<double>(midi - 69) / 12.0);
+  return true;
+}
 
 bool unit_factor(std::string_view u, double& factor) {
   if (u == "hz" || u == "s" || u == "bpm") { factor = 1.0; return true; }
@@ -79,6 +105,23 @@ LexResult lex(std::string_view src) {
       size_t start = i;
       while (i < src.size() && ident_char(src[i])) advance(1);
       push(Tok::Ident, std::string(src.substr(start, i - start)), 0, tl, tc);
+      continue;
+    }
+
+    // Note-name literal (A4, Cs4, Bb2). Uppercase A-G is otherwise unused, so
+    // consume the run and validate it as a note -> a Number token in Hz.
+    if (c >= 'A' && c <= 'G') {
+      size_t start = i;
+      advance(1);
+      while (i < src.size() && ident_char(src[i])) advance(1);
+      std::string_view tok = src.substr(start, i - start);
+      double hz = 0.0;
+      if (note_hz(tok, hz)) {
+        push(Tok::Number, "", hz, tl, tc);
+      } else {
+        err(tl, tc, "invalid note name '" + std::string(tok) +
+                        "' (use e.g. A4, Cs4 for sharp, Bb2 for flat)");
+      }
       continue;
     }
 
