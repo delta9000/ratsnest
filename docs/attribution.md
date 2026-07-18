@@ -34,9 +34,37 @@ Relationships are classified as:
 | `src/rt/spsc.h` | **Implementation-influenced**, BSD-2-Clause and MIT | Cameron Desrochers' [readerwriterqueue](https://github.com/cameron314/readerwriterqueue) cached peer indices and PipeWire's acquire/release ring-buffer protocol | Combines independently written fixed-capacity SPSC storage with cached peer-index and memory-ordering patterns; this is not a verbatim port. Conservative software notices are retained in `THIRD_PARTY_NOTICES.md`. |
 | `src/dsp/modules/bern.cpp` | **Concept-inspired** | Mutable Instruments [Branches](https://github.com/pichenettes/eurorack/tree/master/branches) Bernoulli gate routing | Adopts the probability-routed gate concept in the ratsnest module model. No Branches firmware code was copied. |
 | `src/dsp/modules/turing.cpp` | **Concept-inspired** | Tom Whitwell's [Music Thing Modular Turing Machine](https://www.musicthing.co.uk/Turing-Machine/) | Adopts the looping, probabilistically mutated shift-register sequencer concept. No Turing Machine firmware code was copied. |
-| `src/dsp/modules/fm.cpp` | **Concept-inspired** | John M. Chowning, "The Synthesis of Complex Audio Spectra by Means of Frequency Modulation," *JASA* 54(2), 1973, [DOI 10.1121/1.1912800](https://doi.org/10.1121/1.1912800) (technique patent US 4,018,121, expired mid-1990s) | Locally implements the published phase-modulation formula with an original operator-routing model, algorithm set, and envelope design. Operator waveforms (rectified/windowed/folded sine) implement the TX81Z/DX11/FS1R operator-waveform concept locally from the mathematics; keyboard level/rate scaling is a standard technique in an original octave-exponent form. No Yamaha/DX data, layouts, or code, no GPL/emulator code (e.g. Dexed/MSFA), and no trademarks; written locally from the published formula. |
+| `src/dsp/modules/fm.cpp` | **Concept-inspired** | John M. Chowning, "The Synthesis of Complex Audio Spectra by Means of Frequency Modulation," *JASA* 54(2), 1973, [DOI 10.1121/1.1912800](https://doi.org/10.1121/1.1912800) (technique patent US 4,018,121, granted Apr 1977, expired 1995 — see Patent status below) | Locally implements the published phase-modulation formula with an original operator-routing model, algorithm set, and envelope design. Operator waveforms (rectified/windowed/folded sine) implement the TX81Z/DX11/FS1R operator-waveform concept locally from the mathematics; keyboard level/rate scaling is a standard technique in an original octave-exponent form. No Yamaha/DX data, layouts, or code, no GPL/emulator code (e.g. Dexed/MSFA), and no trademarks; written locally from the published formula. |
 | Build and `src/engine/pipewire_out.cpp` | **External dependency**, MIT | [PipeWire](https://docs.pipewire.org/) `libpipewire-0.3` | The installed version is discovered through pkg-config and linked as `PkgConfig::PIPEWIRE`; PipeWire is not vendored. |
 | `mstests` in `CMakeLists.txt` | **External dependency**, MIT | [doctest v2.4.11](https://github.com/doctest/doctest/tree/2.4.11) | CMake fetches the pinned test framework at test-build time and links `doctest::doctest`; it is not vendored. |
+
+## Patent status (`fm` module)
+
+Due-diligence research on the techniques used by `src/dsp/modules/fm.cpp`, as of
+2026-07-18. **This is a factual expiry check, not a freedom-to-operate legal
+opinion; it is not legal advice.** It covers the known *foundational* patents,
+not an exhaustive live-patent database search across jurisdictions.
+
+- **Phase-modulation core** — Chowning/Stanford US 4,018,121, granted April
+  1977, **expired 1995** (17 years from grant extended to 20 years from the
+  1975 filing under the GATT transition). This is the patent that covered
+  digital FM/PM synthesis; its expiry is why FM became freely implementable in
+  software. Phase modulation and Chowning's FM are mathematically equivalent, so
+  the module's exact method falls under this now-expired patent.
+- **Operator waveforms** (rectified/windowed/folded sine) — the multi-waveform
+  operator debuts with the Yamaha TX81Z (1987); any corresponding Yamaha patent
+  is a mid-1980s filing and **expired ~2004–2005** under the pre-1995 17-years-
+  from-grant term. A waveform function is also non-patentable mathematics and
+  decades-old prior art.
+- **Keyboard level/rate scaling** — a 1980s DX-era Yamaha improvement (and a
+  general synthesizer technique); same patent generation, **expired ~2005**.
+
+Any patent still in force in 2026 must have been filed after ~2006; none of
+these decades-old techniques can be validly claimed by such a patent. No live
+patent covering the implemented techniques was found. Caveat: this is not an
+FTO clearance — obtain patent counsel before any commercial distribution.
+Sources: [FM synthesis (Wikipedia)](https://en.wikipedia.org/wiki/Frequency_modulation_synthesis),
+[Yamaha TX81Z (Wikipedia)](https://en.wikipedia.org/wiki/Yamaha_TX81Z).
 
 ## Unresolved provenance
 
