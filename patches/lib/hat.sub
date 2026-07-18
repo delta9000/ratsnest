@@ -6,7 +6,7 @@ color = param { default: 0.15 }      # resonance / sharpness
 trig  = input {}
 main  = output {}
 
-env = func { rise: 0.0002s, fall: decay }
+env = func { rise: 0.001s, fall: decay }
 trig -> env.trig
 src = noise { color: white, seed: 3 }
 filt = svf { cutoff: pitch, res: color }
