@@ -600,6 +600,20 @@ l3; gate fall runs to 0 over t4, always from the current level. A level-1
 modulator at envelope peak drives ±4π radians (index ≈ 12.6). `fm {}` bare
 is a plain gated sine (op 1 only).
 
+Operator waveform per op, `waves` (bareword array, default `sine`): `half`
+(half-wave rectified), `abs` (full-wave rectified, octave-up), `quarter`
+(bright windowed pulse), `fold` (triangle-wavefolded). All are DC-centered;
+rich waves alias when pushed, by design. An unknown name falls back to
+`sine` — e.g. `waves: [sine, abs, fold, sine, abs, fold]`.
+
+Keyboard scaling, latched from `v_oct` at the gate's rising edge (so a
+mid-note pitch glide never warps level or envelope): `key_break` (scalar
+`v_oct` where scaling is neutral, default 0), `key_level` (per-op level
+octave-exponent, `level ×= 2^(key_level·(v_oct−break))` — negative thins
+modulators up high), `key_rate` (per-op envelope-time octave-exponent,
+`times ×= 2^(−key_rate·(v_oct−break))` — positive shortens decays up high).
+All default 0 (no scaling).
+
 ```text
 ep = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
           t2: [.5, .07, .06, .45, .06, .09], l2: [.55, .25, .2, .5, .2, .25],

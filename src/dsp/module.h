@@ -19,7 +19,9 @@ struct ConfigValue {
   double num = 0.0;
   std::vector<double> arr;
   bool is_num = false;
-  std::vector<std::string> strs;
+  // Default member initializer so existing positional ConfigValue{str,num,arr,
+  // is_num} aggregates stay valid under -Werror=missing-field-initializers.
+  std::vector<std::string> strs{};
 };
 using Config = std::vector<std::pair<std::string, ConfigValue>>;
 
