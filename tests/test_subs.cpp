@@ -159,3 +159,102 @@ TEST_CASE("patch without subs is untouched, zero file reads") {
   CHECK(r.files.empty());
   CHECK(p.ast.modules.size() == 1);
 }
+
+static const char* kVoiceSub = R"(
+gain = param { default: 0.5 }
+trig = input {}
+lvl  = input { default: 0.25 }
+main = output {}
+aux  = output {}
+env  = func { rise: 0.001s, fall: 0.1s }
+trig -> env.trig : 2.0
+osc  = vco { wave: sine, freq: 110 }
+amp  = vca { gain: 0 }
+osc -> amp.in
+env -> amp.cv
+lvl -> amp.cv : 0.5
+amp -> main.in : 0.9
+osc -> aux.in
+)";
+
+TEST_CASE("ports: outside feeds fan out, reads fan in, depths multiply") {
+  auto e = expand(
+      "clk = clock\n"
+      "v = sub { file: \"lib/v.sub\" }\n"
+      "clk -> v.trig : 3.0\n"
+      "v.main -> out.in : 2.0\n"
+      "v.aux -> out.in\n",
+      {{"patches/lib/v.sub", kVoiceSub}});
+  REQUIRE(e.errors.empty());
+  CHECK_FALSE(find_mod(e.ast, "v.trig"));
+  CHECK_FALSE(find_mod(e.ast, "v.main"));
+  const auto* feed = find_cable_to(e.ast, "v.env.trig");
+  REQUIRE(feed);
+  CHECK(feed->src.module == "clk");
+  CHECK(feed->depth == doctest::Approx(6.0));
+  bool found = false;
+  for (const auto& c : e.ast.cables)
+    if (!c.src.is_literal && c.src.module == "v.amp" && c.dst.module == "out.in") {
+      CHECK(c.depth == doctest::Approx(1.8));
+      found = true;
+    }
+  CHECK(found);
+  CHECK(has_cable(e.ast, "v.osc", "out.in"));
+}
+
+TEST_CASE("ports: unpatched input contributes its default as a literal") {
+  auto e = expand("v = sub { file: \"lib/v.sub\" }\nv.main -> out.in\n",
+                  {{"patches/lib/v.sub", kVoiceSub}});
+  REQUIRE(e.errors.empty());
+  bool found = false;
+  for (const auto& c : e.ast.cables)
+    if (c.src.is_literal && c.dst.module == "v.amp.cv") {
+      CHECK(c.src.literal == doctest::Approx(0.25));
+      CHECK(c.depth == doctest::Approx(0.5));
+      found = true;
+    }
+  CHECK(found);
+  CHECK_FALSE(find_cable_to(e.ast, "v.env.trig"));
+}
+
+TEST_CASE("ports: bare instance reads the first declared output") {
+  auto e = expand("v = sub { file: \"lib/v.sub\" }\nv -> out.in\n",
+                  {{"patches/lib/v.sub", kVoiceSub}});
+  REQUIRE(e.errors.empty());
+  CHECK(has_cable(e.ast, "v.amp", "out.in"));
+}
+
+TEST_CASE("ports: misuse is diagnosed") {
+  std::map<std::string, std::string> files{{"patches/lib/v.sub", kVoiceSub}};
+  SUBCASE("output as destination") {
+    auto e = expand("v = sub { file: \"lib/v.sub\" }\nclk = clock\nclk -> v.main\n", files);
+    REQUIRE_FALSE(e.errors.empty());
+    CHECK(e.errors[0].msg.find("main") != std::string::npos);
+  }
+  SUBCASE("input as source") {
+    auto e = expand("v = sub { file: \"lib/v.sub\" }\nv.trig -> out.in\n", files);
+    REQUIRE_FALSE(e.errors.empty());
+  }
+  SUBCASE("port has no members") {
+    auto e = expand("v = sub { file: \"lib/v.sub\" }\nclk = clock\nclk -> v.trig.x\n", files);
+    REQUIRE_FALSE(e.errors.empty());
+  }
+  SUBCASE("input wired straight to output inside the body") {
+    auto e = expand("v = sub { file: \"lib/w.sub\" }\n",
+                    {{"patches/lib/w.sub",
+                      "i = input {}\no = output {}\ni -> o.in\n"}});
+    REQUIRE_FALSE(e.errors.empty());
+  }
+}
+
+TEST_CASE("escape hatch: cables into stamped internals pass through") {
+  auto e = expand(
+      "v = sub { file: \"lib/v.sub\" }\n"
+      "0.1 -> v.osc.v_oct\n"
+      "v.main -> out.in\n",
+      {{"patches/lib/v.sub", kVoiceSub}});
+  REQUIRE(e.errors.empty());
+  const auto* c = find_cable_to(e.ast, "v.osc.v_oct");
+  REQUIRE(c);
+  CHECK(c->src.is_literal);
+}

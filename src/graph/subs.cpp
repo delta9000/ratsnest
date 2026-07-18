@@ -157,7 +157,126 @@ Interface scan_interface(Ctx& ctx, const std::string& file, const dsl::PatchAst&
 
 void splice_ports(Ctx& ctx, const std::string& file, dsl::PatchAst& parent,
                   const std::string& inst, dsl::PatchAst& body, const Interface& f) {
-  (void)ctx; (void)file; (void)parent; (void)inst; (void)f;
+  auto ref = [&](const std::string& port) {
+    return inst.empty() ? port : inst + "." + port;
+  };
+  auto is_input = [&](const std::string& n) { return f.input_def(n) != nullptr; };
+
+  std::unordered_map<std::string, std::vector<dsl::CableDecl>> in_targets;
+  std::unordered_map<std::string, std::vector<dsl::CableDecl>> out_sources;
+  {
+    std::vector<dsl::CableDecl> kept;
+    for (auto& c : body.cables) {
+      const bool src_is_input = !c.src.is_literal && is_input(c.src.module);
+      std::string out_name;
+      if (f.is_output(c.dst.module)) out_name = c.dst.module;
+      else if (c.dst.module.size() > 3 && c.dst.module.rfind(".in") == c.dst.module.size() - 3) {
+        std::string head = c.dst.module.substr(0, c.dst.module.size() - 3);
+        if (f.is_output(head)) out_name = head;
+      }
+      if (src_is_input && !out_name.empty()) {
+        ctx.err(file, c.line, c.col,
+                "cable may not connect input '" + c.src.module +
+                "' directly to output '" + out_name + "'");
+        return;
+      }
+      if (src_is_input) in_targets[c.src.module].push_back(c);
+      else if (!out_name.empty()) out_sources[out_name].push_back(c);
+      else kept.push_back(std::move(c));
+    }
+    body.cables = std::move(kept);
+  }
+  for (const auto& c : body.cables)
+    if (!c.src.is_literal && f.is_output(c.src.module) && !inst.empty())
+      ctx.err(file, c.src.line, c.src.col,
+              "output '" + c.src.module + "' cannot be read inside its own subpatch");
+  if (ctx.failed()) return;
+
+  auto stamp = [&](const std::string& chain) {
+    return inst.empty() ? chain : inst + "." + chain;
+  };
+  std::vector<dsl::CableDecl> out_cables;
+  std::unordered_set<std::string> fed_inputs;
+  for (const auto& c : parent.cables) {
+    std::vector<dsl::CableDecl> stage{c};
+    if (!c.src.is_literal) {
+      std::string out_name;
+      if (!inst.empty() && c.src.module == inst) {
+        if (f.outputs.empty()) {
+          ctx.err(file, c.src.line, c.src.col,
+                  "subpatch '" + inst + "' has no outputs");
+          return;
+        }
+        out_name = f.outputs[0];
+      } else {
+        for (const auto& o : f.outputs)
+          if (c.src.module == ref(o)) out_name = o;
+      }
+      for (const auto& i : f.inputs)
+        if (c.src.module == ref(i.first)) {
+          ctx.err(file, c.src.line, c.src.col,
+                  "input '" + i.first + "' of '" + inst + "' cannot be a source");
+          return;
+        }
+      if (!out_name.empty()) {
+        stage.clear();
+        for (const auto& s : out_sources[out_name]) {
+          dsl::CableDecl nc = c;
+          nc.src = s.src;
+          if (!nc.src.is_literal) nc.src.module = stamp(s.src.module);
+          nc.depth = c.depth * s.depth;
+          stage.push_back(std::move(nc));
+        }
+      }
+    }
+    for (const auto& sc : stage) {
+      std::string in_name;
+      for (const auto& i : f.inputs)
+        if (sc.dst.module == ref(i.first)) in_name = i.first;
+      for (const auto& o : f.outputs) {
+        if (sc.dst.module == ref(o)) {
+          ctx.err(file, sc.dst.line, sc.dst.col,
+                  "output '" + o + "' of '" + inst + "' cannot be a destination");
+          return;
+        }
+        if (chain_under(sc.dst.module, ref(o))) {
+          ctx.err(file, sc.dst.line, sc.dst.col, "port '" + o + "' has no members");
+          return;
+        }
+      }
+      for (const auto& i : f.inputs)
+        if (chain_under(sc.dst.module, ref(i.first))) {
+          ctx.err(file, sc.dst.line, sc.dst.col, "port '" + i.first + "' has no members");
+          return;
+        }
+      if (in_name.empty()) {
+        out_cables.push_back(sc);
+        continue;
+      }
+      fed_inputs.insert(in_name);
+      for (const auto& t : in_targets[in_name]) {
+        dsl::CableDecl nc = sc;
+        nc.dst = t.dst;
+        nc.dst.module = stamp(t.dst.module);
+        nc.depth = sc.depth * t.depth;
+        out_cables.push_back(std::move(nc));
+      }
+    }
+  }
+
+  for (const auto& [name, def] : f.inputs) {
+    if (fed_inputs.count(name) || def == 0.0) continue;
+    for (const auto& t : in_targets[name]) {
+      dsl::CableDecl nc = t;
+      nc.src = {};
+      nc.src.is_literal = true;
+      nc.src.literal = def;
+      nc.dst.module = stamp(t.dst.module);
+      out_cables.push_back(std::move(nc));
+    }
+  }
+  parent.cables = std::move(out_cables);
+
   std::vector<dsl::ModuleDecl> keep;
   for (auto& m : body.modules)
     if (!is_iface(m.type)) keep.push_back(std::move(m));
