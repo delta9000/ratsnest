@@ -360,10 +360,14 @@ void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl&
   splice_ports(ctx, body_file, parent, decl.name, body, f);
   if (ctx.failed()) return;
 
-  for (auto& m : body.modules) m.name = decl.name + "." + m.name;
+  for (auto& m : body.modules) {
+    m.name = decl.name + "." + m.name;
+    if (m.file.empty()) m.file = body_file;
+  }
   for (auto& c : body.cables) {
     if (!c.src.is_literal) c.src.module = decl.name + "." + c.src.module;
     c.dst.module = decl.name + "." + c.dst.module;
+    if (c.file.empty()) c.file = body_file;
   }
   parent.modules.erase(parent.modules.begin() + static_cast<long>(idx));
   parent.modules.insert(parent.modules.begin() + static_cast<long>(idx),

@@ -3,6 +3,7 @@
 #include <vector>
 #include <doctest/doctest.h>
 #include "dsl/parser.h"
+#include "graph/graph.h"
 #include "graph/subs.h"
 
 using namespace ms;
@@ -397,4 +398,17 @@ TEST_CASE("demo: out misuse in a subpatch file") {
     auto e = expand("main = output {}\ndemo.x = input {}\nosc = vco\nosc -> main.in\n");
     REQUIRE_FALSE(e.errors.empty());
   }
+}
+
+TEST_CASE("compile errors inside a sub file are attributed to it") {
+  auto e = expand("v = sub { file: \"lib/bad2.sub\" }\n",
+                  {{"patches/lib/bad2.sub",
+                    "main = output {}\n"
+                    "osc = vco { wat: 1 }\n"
+                    "osc -> main.in\n"}});
+  REQUIRE(e.errors.empty());
+  auto c = graph::compile(e.ast, 48000.0);
+  REQUIRE_FALSE(c.ok());
+  CHECK(c.errors[0].file == "patches/lib/bad2.sub");
+  CHECK(c.errors[0].line == 2);
 }
