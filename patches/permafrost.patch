@@ -1,0 +1,194 @@
+# permafrost -- freeze-relay kosmische techno at 118 BPM, ~2:45.
+#
+# The centerpiece is two frozen-cloud instances on one sym-drone bed,
+# alternating freeze every 4-bar block: while one holds the previous chord
+# as a locked pad, the other records the new one, and their lvl inputs
+# crossfade at the block boundary. The harmony moves but a frozen pad never
+# stops sounding — a relay a single Clouds can't do. Because each pad lags
+# one block behind the live drone, adjacent chords overlap as open dyad
+# polychords (Em+C, C+Am, Am+D, D+Em), all diatonic pairs.
+#
+# Harmony: Em | C | Am | D (i - VI - iv - VII), one chord per 4-bar block.
+# Arrangement (20 four-bar blocks, 8.14 s each):
+#   1-4    intro       drone + relay pads establish, hats fade in
+#   5-6    kick in     restrained four-on-floor
+#   7-12   groove      E-pedal dub bass joins, clouds thicken
+#   13-14  breakdown   drums out, relay blooms at full level
+#   15-18  drop 2      full groove returns
+#   19-20  outro       everything fades through out.level
+
+# ---- clock tree: sixteenths at 118 BPM ----
+master   = clock { bpm: 472 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> four_bar.in
+
+# ---- 20-block arrangement grid, slewed ----
+arr_drone = stepseq { steps: [.55,.65,.7,.7, .6,.6,.6,.6, .55,.55,.6,.6, .7,.75, .6,.6,.6,.55, .5,.35] }
+arr_cloud = stepseq { steps: [.35,.6,.75,.85, .7,.7,.75,.8, .75,.75,.8,.85, 1,1, .8,.85,.85,.8, .7,.45] }
+arr_kick  = stepseq { steps: [0,0,0,0, 1,1,1,1, 1,1,1,1, 0,0, 1,1,1,1, 0,0] }
+arr_hat   = stepseq { steps: [0,0,.25,.45, .55,.65,.7,.7, .65,.65,.7,.75, .25,.15, .65,.7,.75,.65, .25,0] }
+arr_bass  = stepseq { steps: [0,0,0,0, 0,0,.7,.8, .8,.85,.85,.9, 0,.3, .8,.85,.9,.8, 0,0] }
+arr_main  = stepseq { steps: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1, 1,1,1,1, .7,.3] }
+four_bar -> arr_drone.clock
+four_bar -> arr_cloud.clock
+four_bar -> arr_kick.clock
+four_bar -> arr_hat.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_main.clock
+
+drone_lvl = func { rise: 2, fall: 3 }
+cloud_lvl = func { rise: 2, fall: 3 }
+kick_lvl  = func { rise: 1, fall: 1.5 }
+hat_lvl   = func { rise: 2, fall: 2.5 }
+bass_lvl  = func { rise: 2, fall: 2.5 }
+main_lvl  = func { rise: 2, fall: 5 }
+arr_drone.cv -> drone_lvl.in
+arr_cloud.cv -> cloud_lvl.in
+arr_kick.cv -> kick_lvl.in
+arr_hat.cv -> hat_lvl.in
+arr_bass.cv -> bass_lvl.in
+arr_main.cv -> main_lvl.in
+
+# ---- drone bed: root+fifth sympathetic strings, chord roots per block ----
+# Offsets from sym-drone's E2 tune: E2, C2, A1, D2 — stepped bass-register
+# voice leading; the fifth string tracks a perfect fifth above each root.
+chords = stepseq { steps: [0, -0.33333, -0.58333, -0.16667] }
+four_bar -> chords.clock
+
+sd = sub { file: "lib/sym-drone.sub" }
+half -> sd.trig
+chords.cv -> sd.root
+
+# ---- freeze relay: two clouds trade record/hold every block ----
+# Freeze gates stay stepped (gates must be crisp); level crossfades slew.
+# Odd blocks: A holds frozen, B records. Even blocks: swap. Block 1 A holds
+# an empty buffer — silent, so the intro opens on B's live granulation.
+frz_a = stepseq { steps: [1, 0] }
+frz_b = stepseq { steps: [0, 1] }
+rel_a = stepseq { steps: [1, 0.3] }
+rel_b = stepseq { steps: [0.3, 1] }
+four_bar -> frz_a.clock
+four_bar -> frz_b.clock
+four_bar -> rel_a.clock
+four_bar -> rel_b.clock
+rel_a_s = func { rise: 2.5, fall: 3.5 }
+rel_b_s = func { rise: 2.5, fall: 3.5 }
+rel_a.cv -> rel_a_s.in
+rel_b.cv -> rel_b_s.in
+
+fc_a = sub { file: "lib/frozen-cloud.sub", seed: 7 }
+fc_b = sub { file: "lib/frozen-cloud.sub", seed: 11 }
+# Hot send: the sparse plucked bed sits well below the string level the
+# sub's staging was tuned for, so drive the buffers harder.
+sd.main -> fc_a.in : 2
+sd.main -> fc_b.in : 2
+frz_a.cv -> fc_a.freeze
+frz_b.cv -> fc_b.freeze
+
+# lvl = relay crossfade x arrangement lane (vca as CV multiplier)
+cld_a = vca { gain: 0 }
+cld_b = vca { gain: 0 }
+rel_a_s -> cld_a.in
+rel_b_s -> cld_b.in
+cloud_lvl -> cld_a.cv
+cloud_lvl -> cld_b.cv
+cld_a -> fc_a.lvl
+cld_b -> fc_b.lvl
+
+# ---- rhythm section from the lib ----
+kick = sub { file: "lib/kick.sub" }
+quarter -> kick.trig
+kick_amp = vca { gain: 0 }
+kick.main -> kick_amp.in
+kick_lvl -> kick_amp.cv
+
+bass = sub { file: "lib/bass.sub", pitch: E1, decay: 0.2s }
+# E-pedal dub figure: euclid(8,3) on eighths = beat 1, and-of-2, beat 4.
+bass_pat = euclid { steps: 8, hits: 3 }
+eighth -> bass_pat.clock
+bass_pat.trig -> bass.trig
+bass_amp = vca { gain: 0 }
+bass.main -> bass_amp.in
+bass_lvl -> bass_amp.cv
+
+chat = sub { file: "lib/hat.sub", pitch: 8.5khz, decay: 0.045s, color: 0.12 }
+ohat = sub { file: "lib/hat.sub", pitch: 5khz, decay: 0.16s, color: 0.3 }
+chat_pat = euclid { steps: 16, hits: 7, rot: 2 }
+master -> chat_pat.clock
+chat_coin = bern { prob: 0.8, seed: 47 }
+chat_pat.trig -> chat_coin.gate
+chat_coin.a -> chat.trig
+ohat_pat = euclid { steps: 2, hits: 1, rot: 1 }
+eighth -> ohat_pat.clock
+ohat_pat.trig -> ohat.trig
+chat_amp = vca { gain: 0 }
+ohat_amp = vca { gain: 0 }
+chat.main -> chat_amp.in
+ohat.main -> ohat_amp.in
+hat_lvl -> chat_amp.cv
+hat_lvl -> ohat_amp.cv : 0.6
+
+# ---- kick duck, gated by the kick lane so breakdowns don't pump ----
+duck_env = func { rise: 0.004, fall: 0.28, curve: exp }
+quarter -> duck_env.trig
+duck = vca { gain: 0 }
+duck_env -> duck.in
+kick_lvl -> duck.cv
+
+# ---- sends: dotted-eighth echo on the drone, shared plate for the halls ----
+sd_amp = vca { gain: 0 }
+sd.main -> sd_amp.in
+drone_lvl -> sd_amp.cv
+
+# 0.381 s = dotted eighth at 118 BPM
+echo = delay { time: 0.381, feedback: 0.5, mix: 1, tone: 3600 }
+sd.aux -> echo.in : 0.5
+
+space = reverb { decay: 0.78, damp: 0.4, mix: 1, predelay: 0.015,
+                 bandwidth: 0.87, mod_rate: 0.35, mod_depth: 10 }
+fc_a.hall -> space.in_l : 0.8
+fc_a.hall -> space.in_r : 0.55
+fc_b.hall -> space.in_l : 0.55
+fc_b.hall -> space.in_r : 0.8
+sd_amp -> space.in_l : 0.1
+sd_amp -> space.in_r : 0.1
+
+# ---- band: drums + bass + drone + echo ----
+band = mix { levels: [0.9, 0.6, 1.4, 0.85, 0.45, 0.3],
+             pans: [0, 0, 0.35, -0.3, -0.12, 0.45] }
+kick_amp -> band.in1
+bass_amp -> band.in2
+chat_amp -> band.in3
+ohat_amp -> band.in4
+sd_amp   -> band.in5
+echo     -> band.in6
+duck -> band.lvl6 : -0.12
+
+# ---- master: band + relay pads (panned apart) + verb returns ----
+master_mix = mix { levels: [1, 1, 1.1, 1.1, 0.65, 0.65],
+                   pans: [-1, 1, -0.45, 0.45, -0.85, 0.85] }
+band.out_l -> master_mix.in1
+band.out_r -> master_mix.in2
+fc_a.main -> master_mix.in3
+fc_b.main -> master_mix.in4
+space.out_l -> master_mix.in5
+space.out_r -> master_mix.in6
+duck -> master_mix.lvl3 : -0.14
+duck -> master_mix.lvl4 : -0.14
+duck -> master_mix.lvl5 : -0.18
+duck -> master_mix.lvl6 : -0.18
+
+master_mix.out_l -> out.left
+master_mix.out_r -> out.right
+
+# The last arrangement lane fades the whole track through out.level.
+-1 -> out.level
+main_lvl -> out.level : 0.78
