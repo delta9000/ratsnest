@@ -24,7 +24,10 @@ constexpr InputInfo kIns[] = {
     {"lvl1", 0.f},   {"lvl2", 0.f},   {"lvl3", 0.f},   {"lvl4", 0.f},
     {"lvl5", 0.f},   {"lvl6", 0.f},   {"ratio1", 0.f}, {"ratio2", 0.f},
     {"ratio3", 0.f}, {"ratio4", 0.f}, {"ratio5", 0.f}, {"ratio6", 0.f},
-    {"fb", 0.f}};
+    // Live broadcast: sums onto every op's `fb` config base. Named distinctly
+    // from the `fb` config array so the DSL can tell them apart (input names
+    // shadow config names at parse time; cf. levels/lvl, ratios/ratio).
+    {"fbmod", 0.f}};
 constexpr const char* kAlgos[] = {"free",  "triad", "dual", "cascade",
                                   "crown", "weave", "custom", nullptr};
 constexpr const char* kCurves[] = {"lin", "exp", "log", nullptr};

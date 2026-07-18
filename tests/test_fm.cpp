@@ -1,10 +1,15 @@
 #include <doctest/doctest.h>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <string>
 #include <vector>
+#include "dsl/parser.h"
 #include "dsp/modules.h"
+#include "engine/engine.h"
+#include "graph/graph.h"
 
+using namespace ms;
 using namespace ms::dsp;
 
 namespace {
@@ -59,7 +64,7 @@ TEST_CASE("fm: registered with the full port surface") {
   CHECK(info->input_index("lvl6") == 9);
   CHECK(info->input_index("ratio1") == 10);
   CHECK(info->input_index("ratio6") == 15);
-  CHECK(info->input_index("fb") == 16);
+  CHECK(info->input_index("fbmod") == 16);
   CHECK(info->output_index("out") == 0);
   CHECK(info->output_index("op6") == 6);
   CHECK(info->config("algo") != nullptr);
@@ -525,4 +530,72 @@ TEST_CASE("fm: sync off free-runs phases") {
     if (std::abs(off[0][static_cast<size_t>(i)] - off[1][static_cast<size_t>(i)]) > 1e-6f)
       differ = true;
   CHECK(differ);
+}
+
+TEST_CASE("fm: state migration continues identically") {
+  Config cfg;
+  cfg.push_back({"algo", str("dual")});
+  cfg.push_back({"levels", arr({.9, .4, .3, .5, .2, .6})});
+  cfg.push_back({"ratios", arr({1, 2, 3, 1.5, .5, .75})});
+  cfg.push_back({"fb", arr({0, 0, 0, .4, 0, 0})});
+  FmRig a(1000.0, cfg), b(1000.0, cfg);
+  for (int i = 0; i < 3000; ++i) a.tick((i % 500) < 400 ? 1.0f : 0.0f);
+  b.m->copy_state_from(*a.m);
+  for (int i = 0; i < 2000; ++i) {
+    const float g = (i % 500) < 400 ? 1.0f : 0.0f;
+    a.tick(g);
+    b.tick(g);
+    for (int o = 0; o < 7; ++o) CHECK(a.outs[o] == b.outs[o]);
+  }
+}
+
+TEST_CASE("fm: hostile inputs stay finite") {
+  FmRig rig(1000.0);
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+  rig.ins[1] = nan;   // freq
+  rig.ins[2] = nan;   // v_oct
+  rig.ins[3] = nan;   // vel
+  rig.ins[4] = nan;   // lvl1
+  rig.ins[10] = nan;  // ratio1
+  rig.ins[16] = nan;  // fb
+  for (int i = 0; i < 1000; ++i) {
+    rig.tick(1.0f);
+    for (float o : rig.outs) CHECK(std::isfinite(o));
+  }
+}
+
+TEST_CASE("fm: voice-group patch renders non-silent and bounded") {
+  const char* src = R"(
+clk = clock { bpm: 240 }
+wander = random { rate: 2.7, smooth: 0, seed: 21 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+key = quant { scale: [0, 3, 5, 7, 10] }
+notes -> key.in
+poly = alloc { n: 3 }
+clk -> poly.gate
+key -> poly.voct
+ep = voice { notes: poly }
+ep.fm = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15] }
+poly.voct -> ep.fm.v_oct
+poly.gate -> ep.fm.gate
+ep.fm -> out.in : 0.3
+)";
+  auto p = dsl::parse(src);
+  REQUIRE(p.ok());
+  auto c = graph::compile(p.ast, 48000.0);
+  REQUIRE(c.ok());
+  engine::Engine e(std::move(c.graph));
+  const size_t n = 48000;
+  std::vector<float> l(n), r(n);
+  e.process(l.data(), r.data(), n);
+  double sum2 = 0.0;
+  float peak = 0.0f;
+  for (size_t i = 0; i < n; ++i) {
+    sum2 += static_cast<double>(l[i]) * l[i];
+    peak = std::max(peak, std::abs(l[i]));
+  }
+  CHECK(std::sqrt(sum2 / static_cast<double>(n)) > 0.01);
+  CHECK(peak <= 1.0f);
 }

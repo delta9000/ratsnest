@@ -1,0 +1,34 @@
+# fm -- generative EP/bell: a seeded wanderer quantized to minor pentatonic,
+# strummed across four 6-operator voices (dual: two 3-op stacks).
+# Render: mise run render -- patches/fm.patch -d 30s -o fm-take.wav
+clk = clock { bpm: 260 }
+wander = random { rate: 2.7, smooth: 0, seed: 21 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+key = quant { scale: [0, 3, 5, 7, 10] }
+notes -> key.in
+
+poly = alloc { n: 4 }
+clk -> poly.gate
+key -> poly.voct
+
+ep = voice { notes: poly }
+ep.fm = fm { algo: dual,
+             ratios: [1, 1, 7, 1.002, 14, 1],
+             levels: [.5, .28, .12, .45, .1, .16],
+             fb: [0, 0, 0, 0, .45, 0],
+             vel_sens: [.4, .7, .7, .4, .7, .7],
+             t1: [.001, .001, .001, .001, .001, .001],
+             t2: [.5, .07, .06, .45, .06, .09],
+             t3: [1.2, .3, .2, 1.0, .25, .3],
+             t4: [.25, .25, .25, .25, .25, .25],
+             l1: [1, 1, 1, 1, 1, 1],
+             l2: [.55, .25, .2, .5, .2, .25],
+             l3: [.18, 0, 0, .15, 0, 0],
+             curve: log }
+poly.voct -> ep.fm.v_oct
+poly.vel -> ep.fm.vel
+poly.gate -> ep.fm.gate
+ep.fm -> out.in : 0.4
+-0.35 -> out.level

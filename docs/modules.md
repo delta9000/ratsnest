@@ -84,7 +84,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 
 | Area | Modules |
 |---|---|
-| Sources | `vco`, `lfo`, `noise`, `random`, `sampler`, `modal`, `string` |
+| Sources | `vco`, `lfo`, `noise`, `random`, `sampler`, `modal`, `string`, `fm` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
@@ -562,6 +562,52 @@ soft clipper). Anti-aliased by antiderivative anti-aliasing + 4× oversampling
 (reuses the clipper's oversampler), so even the hard-clip `rat` stays clean.
 Recommended `mix`: 0.5 for `tubescreamer`/`klon`, 1.0 for the rest. Cascade two
 for extra saturation, or use `model: muff`.
+
+## `fm`
+
+`fm { algo: dual, ratios: [...], levels: [...] }` — a 6-operator
+phase-modulation voice (classic operator-FM family, locally designed; see
+`docs/attribution.md`). Six sine operators with per-operator 4-segment
+time/level envelopes; routing from a named algorithm set or a custom edge
+list. Mono; polyphony via `voice` groups.
+
+Inputs: `gate` 0 (rising fires all envelopes and, with `sync: on`, resets
+phases; unpatched gate = silence), `freq` 440 Hz, `v_oct`, `vel` 1, per-op
+`lvl1..lvl6` 0, `ratio1..ratio6` 0, `fbmod` 0 (adds to every op's feedback;
+named apart from the `fb` config array so the DSL can tell them apart).
+Outputs: `out` (straight sum of the carriers — gain-stage at the cable) and
+post-envelope per-op taps `op1..op6` (pan/process carriers separately, or
+tap a modulator to drive another module's FM input).
+
+Routing: an edge a→b adds a's output to b's phase; ops with no outgoing
+edge are carriers. Named algorithms: `free` (no edges — additive sine
+stack), `triad` (2→1, 4→3, 6→5), `dual` (3→2→1, 6→5→4), `cascade`
+(6→5→4→3→2→1), `crown` (2..6→1), `weave` (6,5→4→2, 3→2, 2→1). `algo:
+custom` reads `route` as flat pairs — `route: [2,1, 3,2]` = 2→1, 3→2.
+Pairs must be integral 1..6, no self-edges, no duplicates, acyclic; a
+malformed route falls back to `free` (the session never dies).
+
+Configs (all arrays are per-op, padded with the slot default, extras
+ignored): `ratios` (all 1), `levels` (`[1,0,0,0,0,0]` — ops 2..6 stay off
+until asked), `fixed` (per-op Hz; >0 pins the op off `v_oct`/`ratio` for
+clicks and body resonances), `fb` (0..0.999; `fb[k] > 0` is itself the
+self-edge — never put self-edges in `route`), `vel_sens` (0..1; op level ×=
+(1−sens)+sens·vel), `t1..t4` segment seconds (0 = one-sample jump),
+`l1..l3` segment levels, `curve` (`lin`/`exp`/`log`, default `lin` — `log`
+is the natural percussive fall), `sync` (`on`/`off`, default `on`).
+Envelope: gate rise runs 0→l1 over t1 → l2 over t2 → l3 over t3 and holds
+l3; gate fall runs to 0 over t4, always from the current level. A level-1
+modulator at envelope peak drives ±4π radians (index ≈ 12.6). `fm {}` bare
+is a plain gated sine (op 1 only).
+
+```text
+ep = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
+          t2: [.5, .07, .06, .45, .06, .09], l2: [.55, .25, .2, .5, .2, .25],
+          l3: [.18, 0, 0, .15, 0, 0], fb: [0, 0, 0, 0, .45, 0], curve: log }
+mid = midi { voices: 4 }
+keys = voice { notes: mid }
+keys.ep = fm { ...same configs... }
+```
 
 ## Recipes
 
