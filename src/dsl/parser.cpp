@@ -38,7 +38,7 @@ class Parser {
   }
   bool at(Tok k) const { return cur().kind == k; }
   const Token& next() { const Token& t = cur(); if (!at(Tok::End)) ++i_; return t; }
-  void err(int l, int c, std::string msg) { r_.errors.push_back({l, c, std::move(msg)}); }
+  void err(int l, int c, std::string msg) { r_.errors.push_back({l, c, std::move(msg), {}}); }
   void sync() { while (!at(Tok::End) && !at(Tok::Newline)) next(); }
   bool expect(Tok k, const char* what) {
     if (at(k)) { next(); return true; }

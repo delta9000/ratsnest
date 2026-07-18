@@ -58,7 +58,7 @@ LexResult lex(std::string_view src) {
     r.tokens.push_back(Token{k, std::move(text), num, l, c});
   };
   auto err = [&](int l, int c, std::string msg) {
-    r.errors.push_back(Diag{l, c, std::move(msg)});
+    r.errors.push_back(Diag{l, c, std::move(msg), {}});
   };
   auto advance = [&](size_t n) {
     for (size_t k = 0; k < n && i < src.size(); ++k, ++i) {

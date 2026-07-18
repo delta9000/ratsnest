@@ -40,7 +40,7 @@ std::string inst_chain(const std::string& base, int i, const std::string& port) 
 void expand_voices(dsl::PatchAst& ast, Diags& errors) {
   const size_t err0 = errors.size();
   auto err = [&](int line, int col, std::string msg) {
-    errors.push_back({line, col, std::move(msg)});
+    errors.push_back({line, col, std::move(msg), {}});
   };
 
   // --- Index decls; identify voice groups (top-level, i.e. undotted) --------

@@ -15,47 +15,60 @@ constexpr uint32_t kDirMask =
     IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVE_SELF | IN_DELETE_SELF;
 }  // namespace
 
-PatchWatcher::PatchWatcher(const std::string& patch_path) {
-  std::filesystem::path p(patch_path);
-  dir_ = p.has_parent_path() ? p.parent_path().string() : ".";
-  base_ = p.filename().string();
-  fd_ = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
-  if (fd_ >= 0) arm();
-}
+PatchWatcher::PatchWatcher(const std::string& patch_path)
+    : PatchWatcher(std::vector<std::string>{patch_path}) {}
 
-void PatchWatcher::arm() {
-  if (wd_ >= 0) {
-    // inotify is inode-based: IN_MOVE_SELF/IN_DELETE_SELF don't remove the
-    // kernel-side watch on their own. Drop it explicitly before re-adding so
-    // a directory rename doesn't leave a second live watch on this fd.
-    // Return value ignored: for IN_DELETE_SELF the watch may already be gone.
-    inotify_rm_watch(fd_, wd_);
+PatchWatcher::PatchWatcher(std::vector<std::string> paths) {
+  fd_ = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+  for (const auto& path : paths) {
+    std::filesystem::path p(path);
+    const std::string dir = p.has_parent_path() ? p.parent_path().string() : ".";
+    const std::string base = p.filename().string();
+    DirWatch* w = nullptr;
+    for (auto& existing : watches_)
+      if (existing.dir == dir) w = &existing;
+    if (!w) {
+      watches_.push_back({-1, dir, {}});
+      w = &watches_.back();
+    }
+    w->bases.insert(base);
   }
-  wd_ = inotify_add_watch(fd_, dir_.c_str(), kDirMask);
+  if (fd_ >= 0)
+    for (auto& w : watches_) arm(w);
 }
 
 PatchWatcher::~PatchWatcher() {
   if (fd_ >= 0) close(fd_);
 }
 
+bool PatchWatcher::ok() const {
+  if (fd_ < 0 || watches_.empty()) return false;
+  for (const auto& w : watches_)
+    if (w.wd < 0) return false;
+  return true;
+}
+
+void PatchWatcher::arm(DirWatch& w) {
+  if (w.wd >= 0) inotify_rm_watch(fd_, w.wd);
+  w.wd = inotify_add_watch(fd_, w.dir.c_str(), kDirMask);
+}
+
 void PatchWatcher::drain() {
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays): kernel ABI buffer
   alignas(inotify_event) char buf[sizeof(inotify_event) + NAME_MAX + 1];
   ssize_t n = 0;
   while ((n = read(fd_, buf, sizeof(buf))) > 0) {
     for (char* ptr = buf; ptr < buf + n;) {
       const auto* ev = reinterpret_cast<const inotify_event*>(ptr);
-      // Only honor events for the watch currently live on wd_. Capture the
-      // wd this event belongs to before arm() (called below) can replace
-      // wd_ with a new watch descriptor.
-      if (ev->wd == wd_) {
+      for (auto& w : watches_) {
+        if (ev->wd != w.wd) continue;
         if (ev->mask & (IN_MOVE_SELF | IN_DELETE_SELF)) {
-          arm();  // directory itself replaced: re-watch
+          arm(w);
         } else if ((ev->mask & (IN_CLOSE_WRITE | IN_MOVED_TO)) && ev->len > 0 &&
-                   base_ == ev->name) {
+                   w.bases.count(ev->name)) {
           pending_ = true;
           deadline_ = std::chrono::steady_clock::now() + kDebounce;
         }
+        break;
       }
       ptr += sizeof(inotify_event) + ev->len;
     }
@@ -65,11 +78,6 @@ void PatchWatcher::drain() {
 bool PatchWatcher::poll_changed(int timeout_ms) {
   if (!ok()) return false;
 
-  // Drain whatever is already queued BEFORE evaluating the debounce
-  // deadline. Checking the deadline first (as the old code did) could fire
-  // on a stale deadline from an earlier write while a second write's event
-  // still sits unread in the kernel buffer, causing two notifications for
-  // one burst instead of one.
   drain();
 
   if (pending_ && std::chrono::steady_clock::now() >= deadline_) {
@@ -81,7 +89,6 @@ bool PatchWatcher::poll_changed(int timeout_ms) {
   if (pending_) {
     const auto until = std::chrono::duration_cast<std::chrono::milliseconds>(
         deadline_ - std::chrono::steady_clock::now()).count();
-    // NOLINTNEXTLINE(clang-diagnostic-sign-conversion)
     wait_ms = static_cast<int>(std::min(static_cast<long>(wait_ms), std::max(0L, until)));
   }
 
