@@ -306,3 +306,42 @@ TEST_CASE("subdef: errors") {
     REQUIRE_FALSE(e.errors.empty());
   }
 }
+
+TEST_CASE("nesting: sub files include subs, paths resolve per file") {
+  auto e = expand(
+      "k = sub { file: \"lib/kit.sub\", tune: 330 }\nk.main -> out.in\n",
+      {{"patches/lib/kit.sub",
+        "tune = param { default: 110 }\n"
+        "main = output {}\n"
+        "inner = sub { file: \"tone.sub\", tune: tune }\n"
+        "inner.main -> main.in\n"},
+       {"patches/lib/tone.sub",
+        "tune = param { default: 55 }\n"
+        "main = output {}\n"
+        "osc = vco { wave: sine, freq: tune }\n"
+        "osc -> main.in\n"}});
+  REQUIRE(e.errors.empty());
+  const auto* osc = find_mod(e.ast, "k.inner.osc");
+  REQUIRE(osc);
+  CHECK(find_cfg(*osc, "freq")->value.num == doctest::Approx(330.0));
+  CHECK(has_cable(e.ast, "k.inner.osc", "out.in"));
+  REQUIRE(e.files.size() == 2);
+  CHECK(e.files[0] == "patches/lib/kit.sub");
+  CHECK(e.files[1] == "patches/lib/tone.sub");
+}
+
+TEST_CASE("nesting: include cycle is a clean error with the chain") {
+  auto e = expand("a = sub { file: \"lib/a.sub\" }\n",
+                  {{"patches/lib/a.sub", "x = sub { file: \"b.sub\" }\n"},
+                   {"patches/lib/b.sub", "y = sub { file: \"a.sub\" }\n"}});
+  REQUIRE_FALSE(e.errors.empty());
+  CHECK(e.errors[0].msg.find("cycle") != std::string::npos);
+  CHECK(e.errors[0].msg.find("via") != std::string::npos);
+}
+
+TEST_CASE("nesting: self-include reports a cycle, depth cap holds") {
+  auto e = expand("a = sub { file: \"lib/loop.sub\" }\n",
+                  {{"patches/lib/loop.sub", "x = sub { file: \"loop.sub\" }\n"}});
+  REQUIRE_FALSE(e.errors.empty());
+  CHECK(e.errors[0].msg.find("cycle") != std::string::npos);
+}
