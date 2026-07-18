@@ -149,6 +149,14 @@ TEST_CASE("note-name aliases resolve to Hz frequencies") {
     if (n.name == "w") CHECK(dsp::cfg_str(n.config, "wave", "") == "saw");
 }
 
+TEST_CASE("unresolved identifier cable depth is a compile error") {
+  auto p = dsl::parse("a = vca\nb = vca\na -> b.in : click\n");
+  REQUIRE(p.ok());
+  auto c = graph::compile(p.ast, 48000.0);
+  REQUIRE_FALSE(c.ok());
+  CHECK(c.errors[0].msg.find("click") != std::string::npos);
+}
+
 TEST_CASE("invalid note names report a clean error, not a crash") {
   auto p = dsl::parse("o = vco { freq: Cx }\no -> out.in\n");   // no octave digit
   CHECK(!p.ok());

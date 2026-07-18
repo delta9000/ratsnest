@@ -135,12 +135,15 @@ class Parser {
     if (!endpoint(cbl.dst)) return;
     if (at(Tok::Colon)) {
       next();
-      if (!at(Tok::Number)) {
-        err(cur().line, cur().col, "expected a number for cable depth after ':'");
+      if (at(Tok::Number)) {
+        cbl.depth = next().num;
+      } else if (at(Tok::Ident)) {
+        cbl.depth_ident = next().text;
+      } else {
+        err(cur().line, cur().col, "expected a number or name for cable depth after ':'");
         sync();
         return;
       }
-      cbl.depth = next().num;
     }
     r_.ast.cables.push_back(std::move(cbl));
   }

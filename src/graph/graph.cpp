@@ -114,6 +114,11 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
   // --- Cables ------------------------------------------------------------
   std::vector<Cable> cables;
   for (const auto& c : ast.cables) {
+    if (!c.depth_ident.empty()) {
+      err(c.line, c.col, "unknown name '" + c.depth_ident +
+          "' for cable depth (params resolve only inside a subpatch)");
+      continue;
+    }
     int dst;
     std::string dport;
     {

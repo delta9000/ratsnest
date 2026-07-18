@@ -27,7 +27,12 @@ struct Endpoint {
   int line = 0, col = 0;
 };
 
-struct CableDecl { Endpoint src, dst; double depth = 1.0; int line = 0, col = 0; };
+struct CableDecl {
+  Endpoint src, dst;
+  double depth = 1.0;
+  std::string depth_ident;
+  int line = 0, col = 0;
+};
 
 struct PatchAst {
   std::vector<ModuleDecl> modules;

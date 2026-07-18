@@ -79,3 +79,18 @@ TEST_CASE("dotted cable endpoints keep the full chain") {
   CHECK(r.ast.cables[0].src.port.empty());
   CHECK(r.ast.cables[1].dst.module == "a.b.cv");  // graph splits, not parser
 }
+
+TEST_CASE("cable depth accepts an identifier") {
+  auto r = parse("a = vca\nb = vca\na -> b.in : click\n");
+  REQUIRE(r.ok());
+  REQUIRE(r.ast.cables.size() == 1);
+  CHECK(r.ast.cables[0].depth_ident == "click");
+  CHECK(r.ast.cables[0].depth == doctest::Approx(1.0));
+}
+
+TEST_CASE("numeric cable depth leaves depth_ident empty") {
+  auto r = parse("a = vca\nb = vca\na -> b.in : 0.5\n");
+  REQUIRE(r.ok());
+  CHECK(r.ast.cables[0].depth_ident.empty());
+  CHECK(r.ast.cables[0].depth == doctest::Approx(0.5));
+}
