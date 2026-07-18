@@ -412,3 +412,46 @@ TEST_CASE("compile errors inside a sub file are attributed to it") {
   CHECK(c.errors[0].file == "patches/lib/bad2.sub");
   CHECK(c.errors[0].line == 2);
 }
+
+TEST_CASE("composition: sub instance inside a voice group") {
+  auto e = expand(
+      "poly = alloc { n: 2 }\n"
+      "harp = voice { notes: poly }\n"
+      "harp.t = sub { file: \"lib/tone.sub\" }\n"
+      "poly.gate -> harp.t.trig\n"
+      "harp.t.main -> out.in\n",
+      {{"patches/lib/tone.sub",
+        "trig = input {}\nmain = output {}\n"
+        "env = func { rise: 0.001s, fall: 0.1s }\ntrig -> env.trig\n"
+        "osc = vco { wave: sine, freq: 220 }\nosc -> main.in\n"}});
+  REQUIRE(e.errors.empty());
+  REQUIRE(find_mod(e.ast, "harp.t.osc"));
+  auto c = graph::compile(e.ast, 48000.0);
+  REQUIRE(c.ok());
+  bool i0 = false, i1 = false;
+  for (const auto& n : c.graph->nodes) {
+    if (n.name == "harp.t.osc#0") i0 = true;
+    if (n.name == "harp.t.osc#1") i1 = true;
+  }
+  CHECK(i0);
+  CHECK(i1);
+}
+
+TEST_CASE("composition: voice group inside a sub file") {
+  auto e = expand(
+      "s = sub { file: \"lib/poly.sub\" }\ns.main -> out.in\n",
+      {{"patches/lib/poly.sub",
+        "main = output {}\n"
+        "poly = alloc { n: 2 }\n"
+        "v = voice { notes: poly }\n"
+        "v.osc = vco { wave: sine, freq: 220 }\n"
+        "poly.voct -> v.osc.v_oct\n"
+        "v.osc -> main.in\n"}});
+  REQUIRE(e.errors.empty());
+  auto c = graph::compile(e.ast, 48000.0);
+  REQUIRE(c.ok());
+  bool found = false;
+  for (const auto& n : c.graph->nodes)
+    if (n.name == "s.v.osc#0") found = true;
+  CHECK(found);
+}

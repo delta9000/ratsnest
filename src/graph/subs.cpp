@@ -360,6 +360,13 @@ void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl&
   splice_ports(ctx, body_file, parent, decl.name, body, f);
   if (ctx.failed()) return;
 
+  std::unordered_set<std::string> internal;
+  for (const auto& m : body.modules) internal.insert(m.name);
+  for (auto& m : body.modules)
+    for (auto& p : m.params)
+      if (p.value.kind == dsl::Value::Kind::Ident && internal.count(p.value.str))
+        p.value.str = decl.name + "." + p.value.str;
+
   for (auto& m : body.modules) {
     m.name = decl.name + "." + m.name;
     if (m.file.empty()) m.file = body_file;
