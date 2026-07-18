@@ -345,3 +345,56 @@ TEST_CASE("nesting: self-include reports a cycle, depth cap holds") {
   REQUIRE_FALSE(e.errors.empty());
   CHECK(e.errors[0].msg.find("cycle") != std::string::npos);
 }
+
+static const char* kDemoSub = R"(
+tune = param { default: 110 }
+trig = input {}
+main = output {}
+env = func { rise: 0.001s, fall: 0.1s }
+trig -> env.trig
+osc = vco { wave: sine, freq: tune }
+osc -> main.in
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in : 0.8
+)";
+
+TEST_CASE("demo: dropped on instantiation") {
+  auto e = expand("v = sub { file: \"lib/d.sub\" }\nv.main -> out.in\n",
+                  {{"patches/lib/d.sub", kDemoSub}});
+  REQUIRE(e.errors.empty());
+  CHECK_FALSE(find_mod(e.ast, "v.demo.clk"));
+  for (const auto& c : e.ast.cables) {
+    CHECK(c.dst.module.find("demo") == std::string::npos);
+    if (!c.src.is_literal) CHECK(c.src.module.find("demo") == std::string::npos);
+  }
+}
+
+TEST_CASE("demo: top-level compile is an implicit instantiation with defaults") {
+  auto e = expand(kDemoSub);
+  REQUIRE(e.errors.empty());
+  CHECK(find_cfg(*find_mod(e.ast, "osc"), "freq")->value.num == doctest::Approx(110.0));
+  CHECK_FALSE(find_mod(e.ast, "trig"));
+  CHECK_FALSE(find_mod(e.ast, "main"));
+  CHECK(find_mod(e.ast, "demo.clk"));
+  CHECK(has_cable(e.ast, "demo.clk", "env.trig"));
+  bool to_out = false;
+  for (const auto& c : e.ast.cables)
+    if (!c.src.is_literal && c.src.module == "osc" && c.dst.module == "out.in") {
+      CHECK(c.depth == doctest::Approx(0.8));
+      to_out = true;
+    }
+  CHECK(to_out);
+}
+
+TEST_CASE("demo: out misuse in a subpatch file") {
+  SUBCASE("non-demo out reference") {
+    auto e = expand("i = input {}\nosc = vco\nosc -> out.in\n");
+    REQUIRE_FALSE(e.errors.empty());
+    CHECK(e.errors[0].msg.find("out") != std::string::npos);
+  }
+  SUBCASE("interface pseudo-module under demo prefix") {
+    auto e = expand("main = output {}\ndemo.x = input {}\nosc = vco\nosc -> main.in\n");
+    REQUIRE_FALSE(e.errors.empty());
+  }
+}

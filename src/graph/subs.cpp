@@ -286,6 +286,50 @@ void splice_ports(Ctx& ctx, const std::string& file, dsl::PatchAst& parent,
 void expand_in(Ctx& ctx, dsl::PatchAst& ast, const std::string& dir,
                const std::string& file);
 
+void handle_demo(Ctx& ctx, const std::string& file, dsl::PatchAst& body, bool top) {
+  auto in_demo = [](const std::string& chain) {
+    return chain == "demo" || chain_under(chain, "demo");
+  };
+  for (const auto& m : body.modules)
+    if (is_iface(m.type) && in_demo(m.name))
+      ctx.err(file, m.line, m.col,
+              "'" + m.name + "': interface declarations may not live under demo.*");
+  for (const auto& c : body.cables) {
+    auto bad_out = [&](const dsl::Endpoint& e) {
+      if (e.is_literal) return false;
+      return e.module == "out" || chain_under(e.module, "out");
+    };
+    if (bad_out(c.src) || bad_out(c.dst))
+      ctx.err(file, c.line, c.col,
+              "subpatch bodies may not reference 'out' (use demo.out in a demo section)");
+  }
+  if (ctx.failed()) return;
+
+  if (top) {
+    for (auto& c : body.cables) {
+      auto rename_demo_out = [](dsl::Endpoint& e) {
+        if (e.is_literal) return;
+        if (e.module == "demo.out") e.module = "out";
+        else if (chain_under(e.module, "demo.out"))
+          e.module = "out" + e.module.substr(std::string("demo.out").size());
+      };
+      rename_demo_out(c.src);
+      rename_demo_out(c.dst);
+    }
+    return;
+  }
+  std::vector<dsl::ModuleDecl> keep_m;
+  for (auto& m : body.modules)
+    if (!in_demo(m.name)) keep_m.push_back(std::move(m));
+  body.modules = std::move(keep_m);
+  std::vector<dsl::CableDecl> keep_c;
+  for (auto& c : body.cables) {
+    const bool touches = (!c.src.is_literal && in_demo(c.src.module)) || in_demo(c.dst.module);
+    if (!touches) keep_c.push_back(std::move(c));
+  }
+  body.cables = std::move(keep_c);
+}
+
 void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl& decl,
              const std::string& parent_file, dsl::PatchAst body,
              const std::string& body_dir, const std::string& body_file) {
@@ -305,6 +349,9 @@ void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl&
   if (ctx.failed()) return;
 
   substitute(ctx, body_file, body, params);
+  if (ctx.failed()) return;
+
+  handle_demo(ctx, body_file, body, /*top=*/false);
   if (ctx.failed()) return;
 
   expand_in(ctx, body, body_dir, body_file);
@@ -507,7 +554,50 @@ SubExpansion expand_subs(dsl::PatchAst& ast, const std::string& patch_dir,
 
   Ctx ctx{read, errors, errors.size(), {}, {}, {}, {}, {}};
   dsl::PatchAst work = ast;
-  expand_in(ctx, work, patch_dir, "");
+
+  std::unordered_set<std::string> subdef_names;
+  for (const auto& m : work.modules)
+    if (m.type == "subdef" && m.name.find('.') == std::string::npos)
+      subdef_names.insert(m.name);
+
+  Interface top;
+  for (const auto& m : work.modules) {
+    bool owned = false;
+    for (const auto& sd : subdef_names)
+      if (chain_under(m.name, sd)) { owned = true; break; }
+    if (owned) continue;
+    if (!is_iface(m.type)) continue;
+    // Inline the scan_interface logic:
+    if (m.type == "param") {
+      const dsl::ParamDecl* d = find_param(m, "default");
+      if (!d) {
+        ctx.err("", m.line, m.col, "param '" + m.name + "' requires 'default:'");
+        continue;
+      }
+      top.params.emplace(m.name, d->value);
+    } else if (m.type == "input") {
+      double def = 0.0;
+      if (const dsl::ParamDecl* d = find_param(m, "default")) {
+        if (d->value.kind != dsl::Value::Kind::Num)
+          ctx.err("", d->line, d->col, "input '" + m.name + "' default must be a number");
+        else
+          def = d->value.num;
+      }
+      top.inputs.emplace_back(m.name, def);
+    } else if (m.type == "output") {
+      top.outputs.push_back(m.name);
+    }
+  }
+
+  if (top.any() && !ctx.failed()) substitute(ctx, "", work, top.params);
+
+  if (!ctx.failed()) expand_in(ctx, work, patch_dir, "");
+
+  if (top.any() && !ctx.failed()) {
+    handle_demo(ctx, "", work, /*top=*/true);
+    if (!ctx.failed()) splice_ports(ctx, "", work, "", work, top);
+  }
+
   if (!ctx.failed()) {
     ast = std::move(work);
     out.files = std::move(ctx.files);
