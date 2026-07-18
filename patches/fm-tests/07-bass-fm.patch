@@ -1,0 +1,26 @@
+# fm bass — a tight 2-op stack (custom 2->1) in the sub/low range, fast attack
+# and quick decay for punch. Tests: custom route, low register, short envelopes.
+clk = clock { bpm: 260 }
+wander = random { rate: 3.7, smooth: 0, seed: 4 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+key = quant { scale: [0, 3, 7, 10] }
+notes -> key.in
+poly = alloc { n: 2 }
+clk -> poly.gate
+key -> poly.voct
+ep = voice { notes: poly }
+ep.fm = fm { algo: custom, route: [2, 1], freq: 55hz,
+             ratios: [1, 1, 0, 0, 0, 0],
+             levels: [.6, .4, 0, 0, 0, 0],
+             fb: [0, .25, 0, 0, 0, 0],
+             t1: [.001, .001, .002, .002, .002, .002],
+             t2: [.08, .05, .1, .1, .1, .1],
+             t3: [.12, .08, .4, .4, .4, .4],
+             l2: [.5, .4, .75, .75, .75, .75], l3: [.25, .1, .5, .5, .5, .5],
+             t4: [.12, .1, .2, .2, .2, .2], curve: exp }
+poly.voct -> ep.fm.v_oct
+poly.gate -> ep.fm.gate
+ep.fm -> out.in : 0.45
+-0.3 -> out.level

@@ -1,0 +1,264 @@
+# "Steel Crusade" — epic power metal, take 3.
+# A natural minor, 168 BPM. A real song, not a loop: a 33-block arrangement
+# grid (one block = 4 bars = one Am-F-G-Am cycle ≈ 5.71 s) drives slewed
+# level lanes per instrument, a half-time selector for the intro/bridge, a
+# lead strike gate, and a solo octave lift.
+#
+# Form (33 blocks ≈ 3:08 + tail):
+#   0-1  Intro      half-time groove, drums + bass build
+#   2-5  Verse 1    full gallop, rhythm + bass + drums
+#   6-9  Chorus 1   lead enters
+#   10-13 Verse 2
+#   14-17 Bridge    half-time, sparse, drop the gallop
+#   18-21 Solo      lead up an octave, double-kick gallop
+#   22-25 Chorus 2
+#   26-29 Final     max energy
+#   30-31 Outro     fade
+#   32   Guard      silent, so a long render never wraps back to the intro
+
+# ===================== CLOCK TREE =====================
+# clk pulses on 16ths (672/min = 168 BPM in 16ths).
+clk = clock { bpm: 672 }
+beat   = div { by: 4 }   # quarter notes
+eighth = div { by: 2 }   # 8th notes
+bar    = div { by: 16 }  # bar downbeats
+four_bar = div { by: 4 } # one chord-progression cycle = one arrangement block
+clk -> beat.in
+clk -> eighth.in
+clk -> bar.in
+bar -> four_bar.in
+
+# ===================== ARRANGEMENT GRID =====================
+# Each lane is a 33-step stepseq clocked once per block. Level lanes (0..1)
+# slew through func for musical fades; selector lanes (0/1) stay stepped and
+# drive switches / gates directly. Block 32 is the silent guard.
+arr_drums = stepseq { steps: [
+  0.4, 0.7,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.6, 0.5, 0.5, 0.6,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.6, 0.0,  0 ] }
+arr_rhythm = stepseq { steps: [
+  0, 0,
+  0.7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.4, 0.35, 0.35, 0.45,
+  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  0.5, 0.0,  0 ] }
+arr_bass = stepseq { steps: [
+  0, 0.6,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.5, 0.45, 0.45, 0.55,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.5, 0.0,  0 ] }
+arr_lead = stepseq { steps: [
+  0, 0,
+  0, 0, 0, 0,   1, 1, 1, 1,   0, 0, 0, 0,   0, 0, 0, 0,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.4, 0.0,  0 ] }
+arr_main = stepseq { steps: [
+  1, 1,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0.6, 0.0,  0 ] }
+# Stepped 0/1 selector lanes.
+arr_halftime = stepseq { steps: [
+  1, 1,
+  0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,   1, 1, 1, 1,
+  0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,   0, 0,  0 ] }
+arr_solo = stepseq { steps: [
+  0, 0,
+  0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,
+  1, 1, 1, 1,   0, 0, 0, 0,   0, 0, 0, 0,   0, 0,  0 ] }
+arr_chorus = stepseq { steps: [
+  0, 0,
+  0, 0, 0, 0,   1, 1, 1, 1,   0, 0, 0, 0,   0, 0, 0, 0,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   0, 0,  0 ] }
+arr_leadgate = stepseq { steps: [
+  0, 0,
+  0, 0, 0, 0,   1, 1, 1, 1,   0, 0, 0, 0,   0, 0, 0, 0,
+  1, 1, 1, 1,   1, 1, 1, 1,   1, 1, 1, 1,   1, 0,  0 ] }
+four_bar -> arr_drums.clock
+four_bar -> arr_rhythm.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_lead.clock
+four_bar -> arr_main.clock
+four_bar -> arr_halftime.clock
+four_bar -> arr_solo.clock
+four_bar -> arr_chorus.clock
+four_bar -> arr_leadgate.clock
+
+# Slewed section faders (slow musical fades across block boundaries).
+drums_lvl  = func { rise: 1.5, fall: 2.5 }
+rhythm_lvl = func { rise: 2.0, fall: 3.0 }
+bass_lvl   = func { rise: 1.5, fall: 2.5 }
+lead_lvl   = func { rise: 2.0, fall: 3.0 }
+main_lvl   = func { rise: 1.0, fall: 5.0 }
+arr_drums.cv  -> drums_lvl.in
+arr_rhythm.cv -> rhythm_lvl.in
+arr_bass.cv   -> bass_lvl.in
+arr_lead.cv   -> lead_lvl.in
+arr_main.cv   -> main_lvl.in
+
+# ===================== HARMONY =====================
+# Am - F - G - Am, one per bar (root as v/oct, A = 0).
+chord = stepseq { steps: [0, -0.3333, -0.1667, 0], gates: [1, 1, 1, 1] }
+bar -> chord.clock
+
+# ===================== GALLOP + HALF-TIME SELECTOR =====================
+# Gallop: "dun - da-da" per beat. Half-time: kick/chug on beats 1 & 3 only,
+# used for the intro build and the bridge breakdown.
+gallop = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 1] }
+clk -> gallop.clock
+half = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 0] }
+beat -> half.clock
+strike_src = switch { mode: addr, n: 2 }
+gallop.trig -> strike_src.in1
+half.trig   -> strike_src.in2
+arr_halftime.cv -> strike_src.addr     # 0 = gallop, 1 = half-time
+
+# ===================== DRUMS =====================
+# Kick (double bass): sine body with a fast pitch punch + a noise beater click.
+kaenv = func { rise: 0.001s, fall: 0.14s }
+strike_src -> kaenv.trig
+kpenv = func { rise: 0.0004s, fall: 0.035s }
+strike_src -> kpenv.trig
+kosc = vco { wave: sine, freq: 55hz }
+kpenv -> kosc.v_oct : 2.8
+kbody = vca { gain: 0 }
+kosc -> kbody.in
+kaenv -> kbody.cv
+kclk_env = func { rise: 0.0002s, fall: 0.009s }
+strike_src -> kclk_env.trig
+kclk_n = noise { color: white, seed: 9 }
+kclk_hp = svf { cutoff: 2500hz, res: 0.2 }
+kclk_n -> kclk_hp.in
+kclk = vca { gain: 0 }
+kclk_hp.hp -> kclk.in
+kclk_env -> kclk.cv
+kick = mix { levels: [1.0, 0.55] }
+kbody -> kick.in1
+kclk -> kick.in2
+
+# Snare on beats 2 & 4: filtered noise crack.
+snseq = stepseq { steps: [0, 0, 0, 0], gates: [0, 1, 0, 1] }
+beat -> snseq.clock
+snenv = func { rise: 0.001s, fall: 0.13s }
+snseq.trig -> snenv.trig
+snz = noise { color: white, seed: 3 }
+snbp = svf { cutoff: 1800hz, res: 0.35 }
+snz -> snbp.in
+snare = vca { gain: 0 }
+snbp.bp -> snare.in
+snenv -> snare.cv
+
+# Hi-hats: steady 8ths, high-passed noise, short decay.
+henv = func { rise: 0.001s, fall: 0.035s }
+eighth -> henv.trig
+hz = noise { color: white, seed: 7 }
+hhp = svf { cutoff: 9000hz, res: 0.2 }
+hz -> hhp.in
+hats = vca { gain: 0 }
+hhp.hp -> hats.in
+henv -> hats.cv
+
+# ===================== RHYTHM GUITAR (string power chords) =====================
+# Root + fifth strings, palm-muted on the selected strike source, into a RAT.
+groot = string { seed: 11, damping: 0.34, position: 0.3, brightness: 0.55 }
+chord.cv -> groot.v_oct
+-2 -> groot.v_oct                 # A2 guitar register
+strike_src -> groot.strike
+gfifth = string { seed: 12, damping: 0.34, position: 0.3, brightness: 0.55 }
+chord.cv -> gfifth.v_oct
+-1 -> gfifth.v_oct
+0.5833 -> gfifth.v_oct            # + perfect fifth
+strike_src -> gfifth.strike
+gsum = mix { levels: [0.5, 0.5] }
+groot -> gsum.in1
+gfifth -> gsum.in2
+rhythm = overdrive { model: rat, drive: 0.64, tone: 0.5, mix: 1.0, level: 0.38 }
+gsum.out_l -> rhythm.in
+arr_chorus.cv -> rhythm.tone : 0.15   # brighten the chug in big sections
+
+# ===================== BASS (clean sub) =====================
+# Triangle sub an octave below the root, follows the selected strike source.
+bosc = vco { wave: tri, freq: 55hz }
+chord.cv -> bosc.v_oct
+benv = func { rise: 0.005s, fall: 0.1s }
+strike_src -> benv.trig
+bass = vca { gain: 0 }
+bosc -> bass.in
+benv -> bass.cv
+
+# ===================== LEAD (string, heroic quarter notes) =====================
+# 16 quarter notes = 4 bars, loops with the chords. Strike-gated by the
+# arrangement so it only speaks in chorus / solo / final; lifted an octave
+# for the solo.
+lseq = stepseq {
+  steps: [1.5833, 1.6667, 1.5833, 1.4167,  1.25, 1.4167, 1.5833, 2.0,
+          1.8333, 1.6667, 1.5833, 1.4167,  1.25, 1.4167, 1.5833, 1.0],
+  gates: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+}
+beat -> lseq.clock
+-1 -> lseq.transpose              # guitar lead register (A3-A4)
+arr_solo.cv -> lseq.transpose : 1.0   # +1 octave during the solo
+lead_gate = logic { op: and }
+lseq.trig -> lead_gate.a
+arr_leadgate.cv -> lead_gate.b     # only strike when the lead lane is open
+lstr = string { seed: 20, damping: 0.55, position: 0.22, brightness: 0.5 }
+lseq.cv -> lstr.v_oct
+lead_gate -> lstr.strike
+ldist = overdrive { model: tubescreamer, drive: 0.96, tone: 0.62, mix: 1.0, level: 0.4 }
+lstr.out -> ldist.in
+ldel = delay { time: 0.214s, feedback: 0.24, mix: 0.12, tone: 5000hz }
+ldist.out -> ldel.in
+
+# ===================== REVERB SEND (lead only) =====================
+hall = reverb { decay: 0.15, damp: 0.5, mix: 1.0 }
+ldel -> hall.in_l : 0.32
+ldel -> hall.in_r : 0.32
+
+# ===================== SONG MIX (levels driven by arrangement lanes) =====================
+# Config levels are zero; the slewed lane CVs carry each part's full level
+# and duck it in/out per section. Pans are fixed.
+premaster = mix {
+  levels: [0, 0, 0, 0, 0, 0, 0, 0],
+  pans:   [0, 0, 0.3, 0, 0, 0, -1, 1]
+}
+kick   -> premaster.in1
+snare  -> premaster.in2
+hats   -> premaster.in3
+rhythm -> premaster.in4
+bass   -> premaster.in5
+ldist  -> premaster.in6
+hall.out_l -> premaster.in7
+hall.out_r -> premaster.in8
+drums_lvl  -> premaster.lvl1 : 1.35
+drums_lvl  -> premaster.lvl2 : 0.72
+drums_lvl  -> premaster.lvl3 : 0.5
+rhythm_lvl -> premaster.lvl4 : 1.1
+bass_lvl   -> premaster.lvl5 : 0.8
+lead_lvl   -> premaster.lvl6 : 0.7
+lead_lvl   -> premaster.lvl7 : 0.8
+lead_lvl   -> premaster.lvl8 : 0.8
+
+# ===================== MASTER CHAIN + CAPTURE =====================
+# Master fade VCA, DC guard, light glue compression, limiter, out.
+master_l = vca { gain: 0 }
+master_r = vca { gain: 0 }
+premaster.out_l -> master_l.in
+premaster.out_r -> master_r.in
+main_lvl -> master_l.cv
+main_lvl -> master_r.cv
+
+master_dc = dcblock { cutoff: 12hz }
+master_l -> master_dc.in_l
+master_r -> master_dc.in_r
+master_comp = compressor { threshold: -14, ratio: 2.0, knee: 4,
+                           attack: 0.015, release: 0.12, makeup: 1.5, mix: 0.6 }
+master_dc.out_l -> master_comp.in_l
+master_dc.out_r -> master_comp.in_r
+
+lim = limiter { threshold: -0.5, release: 0.06 }
+master_comp.out_l -> lim.in_l
+master_comp.out_r -> lim.in_r
+lim.out_l -> out.left
+lim.out_r -> out.right
+
+# Capture a take alongside the mix; gated by the arrangement so the silent
+# guard block at the end is not recorded as a long tail.
+capture = rec { file: "steel-crusade-take.wav", secs: 200 }
+lim.out_l -> capture.in_l
+lim.out_r -> capture.in_r
+arr_main.cv -> capture.gate

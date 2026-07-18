@@ -1,0 +1,16 @@
+# feedback sweep — a held single-op drone whose feedback is swept 0..~0.9 by an
+# LFO on the live `fbmod` input: pure sine -> sawtooth -> noise and back.
+# Tests: fbmod broadcast input, full feedback range, constant + LFO summing.
+ep = fm { algo: free, freq: 110hz,
+          ratios: [1, 0, 0, 0, 0, 0],
+          levels: [.7, 0, 0, 0, 0, 0],
+          t1: [.02], t2: [.02], t3: [.02], t4: [.3],
+          l1: [1], l2: [1], l3: [1] }
+1 -> ep.gate
+# sweep feedback 0..~0.55: pure sine -> sawtooth -> gritty edge, stopping short
+# of the chaotic-static regime (fb ~0.7+ with this index goes to broadband noise).
+lfo = lfo { freq: 0.15hz }
+0.28 -> ep.fbmod
+lfo -> ep.fbmod : 0.28
+ep -> out.in : 0.3
+-0.3 -> out.level

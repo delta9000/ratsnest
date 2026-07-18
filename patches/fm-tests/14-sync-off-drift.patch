@@ -1,0 +1,16 @@
+# sync off — the same pitch struck repeatedly with `sync: off`, so each attack
+# starts at a free-running phase and its transient timbre varies subtly. Change
+# `sync: off` to `sync: on` to hear every strike become identical. Tests: sync.
+clk = clock { bpm: 260 }
+ep = fm { algo: cascade, freq: 220hz, sync: off,
+          ratios: [1, 2, 3, 1, 1, 1],
+          levels: [.5, .4, .3, 0, 0, 0],
+          fb: [0, 0, .3, 0, 0, 0],
+          t1: [.001, .001, .001, .002, .002, .002],
+          t2: [.06, .05, .04, .1, .1, .1],
+          t3: [.15, .12, .1, .4, .4, .4],
+          l2: [.6, .5, .4, .75, .75, .75], l3: [.2, .1, .05, .5, .5, .5],
+          t4: [.15, .13, .1, .2, .2, .2], curve: exp }
+clk -> ep.gate
+ep -> out.in : 0.35
+-0.35 -> out.level
