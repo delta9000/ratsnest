@@ -3,8 +3,6 @@
 # Euclidean rhythms and a bassline sequence keep it moving.
 #
 # Run:  mise run play -- patches/groove.patch
-# Audio-check:  mise run check -- patches/groove.patch
-# Render:  mise run render patches/groove.patch -d 30s -o groove.wav --stats
 
 # --- Clock ---
 clk = clock { bpm: 124 }
@@ -12,27 +10,34 @@ clk = clock { bpm: 124 }
 # --- Euclidean triggers ---
 hat_pat  = euclid { steps: 8,  hits: 5, rot: 0 }
 open_pat = euclid { steps: 8,  hits: 3, rot: 2 }
+bass_pat = euclid { steps: 16, hits: 7, rot: 0 }
 
 clk -> hat_pat.clock
 clk -> open_pat.clock
+clk -> bass_pat.clock
 
-# --- Voices (instantiated from lib/) ---
-
-# Kick on every beat — classic four-on-the-floor
+# --- Voices ---
 kick = sub { file: "lib/kick.sub" }
 clk -> kick.trig
 
-# Closed hat: short, bright (~8 kHz), tight decay
 hat = sub { file: "lib/hat.sub", pitch: 8khz, decay: 0.05s, color: 0.1 }
 hat_pat.trig -> hat.trig
 
-# Open hat: lower, longer decay, more resonance — open-filter feel
 open = sub { file: "lib/hat.sub", pitch: 5khz, decay: 0.18s, color: 0.3 }
 open_pat.trig -> open.trig
 
-# --- Mix and output ---
-m = mix { levels: [0.75, 0.5, 0.4] }
+bass = sub { file: "lib/bass.sub", pitch: G2, decay: 0.22s }
+bass_pat.trig -> bass.trig
+
+# --- Bassline sequence: G-minor loop — escape hatch straight into the VCO ---
+bass_seq = stepseq { steps: [G2v, A2v, C3v, G2v], gates: [1, 0, 0, 0] }
+clk -> bass_seq.clock
+bass_seq.cv -> bass.osc.v_oct
+
+# --- Mix ---
+m = mix { levels: [0.65, 0.5, 0.4, 0.55] }
 kick -> m.in1
 hat  -> m.in2
 open -> m.in3
+bass -> m.in4
 m.out_l -> out.in

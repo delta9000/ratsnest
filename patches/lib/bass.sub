@@ -1,24 +1,17 @@
-# bass.sub -- FM bass voice with a low-pass gate and envelope-controlled growl.
-# Saw core through an LPG with optional FM grit and filter envelope.
+# bass.sub -- clean saw bass with envelope-controlled VCA.
+# No FM, no LPG — just a saw through an amp.
 pitch = param { default: G1 }       # fundamental
 decay = param { default: 0.18s }    # envelope decay
-res   = param { default: 0.0 }      # unused (hook point for future filter)
-grit  = param { default: 0.1 }      # FM index (escape hatch: push into osc.fm directly)
 trig  = input {}
 main  = output {}
 
 env = func { rise: 0.003s, fall: decay }
 trig -> env.trig
 osc = vco { wave: saw, freq: pitch }
-fm_osc = vco { wave: sine, freq: pitch }
-1 -> fm_osc.v_oct
-env -> fm_osc.v_oct : 0.15
-fm_osc -> osc.fm : grit
-lpg = lpg { damp: 0.3, decay: decay }
-osc -> lpg.in
-trig -> lpg.strike
-env -> lpg.cv : 0.6
-lpg -> main.in
+amp = vca { gain: 0 }
+osc -> amp.in
+env -> amp.cv
+amp -> main.in
 
 # Audition: `mise run play -- patches/lib/bass.sub`
 demo.clk = clock { bpm: 120 }
