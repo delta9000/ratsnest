@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <vector>
 #include "dsp/modules.h"
 
 using namespace ms::dsp;
@@ -194,4 +195,108 @@ TEST_CASE("fm: ratio scales op frequency") {
     return count;
   }();
   CHECK(c2 == doctest::Approx(2.0 * c1).epsilon(4));
+}
+
+namespace {
+// One-sided DFT magnitude at an exact bin (coherent tones only).
+double dft_mag(const std::vector<float>& x, double freq, double rate) {
+  double re = 0.0, im = 0.0;
+  for (size_t n = 0; n < x.size(); ++n) {
+    const double a = 2.0 * M_PI * freq * static_cast<double>(n) / rate;
+    re += x[n] * std::cos(a);
+    im -= x[n] * std::sin(a);
+  }
+  return 2.0 / static_cast<double>(x.size()) * std::sqrt(re * re + im * im);
+}
+
+Config two_op_cfg() {
+  Config cfg;
+  cfg.push_back({"algo", str("custom")});
+  cfg.push_back({"route", arr({2, 1})});
+  cfg.push_back({"levels", arr({1, .25})});
+  cfg.push_back({"ratios", arr({1, .1})});
+  cfg.push_back({"t1", arr({0, 0})});
+  cfg.push_back({"t2", arr({0, 0})});
+  cfg.push_back({"t3", arr({0, 0})});
+  cfg.push_back({"t4", arr({.1, .1})});
+  cfg.push_back({"l2", arr({1, 1})});
+  cfg.push_back({"l3", arr({1, 1})});
+  return cfg;
+}
+}  // namespace
+
+TEST_CASE("fm: sideband magnitudes match Bessel functions of the index") {
+  const double rate = 48000.0;
+  FmRig rig(rate, two_op_cfg());
+  rig.ins[1] = 4800.0f;  // carrier; modulator ratio .1 -> 480 Hz spacing
+  const int N = 48000;
+  std::vector<float> x(static_cast<size_t>(N));
+  for (int i = 0; i < N; ++i) {
+    rig.tick(1.0f);
+    x[static_cast<size_t>(i)] = rig.outs[0];
+  }
+  // Index = kIndex * level * env = 4π * .25 * 1 = π.
+  for (int k = -3; k <= 3; ++k) {
+    CAPTURE(k);
+    const double bin = 4800.0 + 480.0 * k;
+    const double expect = std::abs(std::cyl_bessel_j(std::abs(k), M_PI));
+    CHECK(dft_mag(x, bin, rate) == doctest::Approx(expect).epsilon(0.05));
+  }
+  // and nothing where there should be nothing
+  CHECK(dft_mag(x, 4800.0 + 240.0, rate) < 0.01);
+}
+
+TEST_CASE("fm: carriers are the ops with no outgoing edge") {
+  Config cfg = two_op_cfg();
+  FmRig rig(1000.0, cfg);
+  float max_diff = 0.0f;
+  for (int i = 0; i < 200; ++i) {
+    rig.tick(1.0f);
+    CHECK(rig.outs[0] == doctest::Approx(rig.outs[1]).epsilon(1e-5));  // op1 is the sole carrier
+    max_diff = std::max(max_diff, std::abs(rig.outs[2] - rig.outs[1]));
+  }
+  CHECK(max_diff > 0.1f);  // op2 is a distinct modulator waveform, not the carrier
+}
+
+TEST_CASE("fm: a carrier at level 0 silences out while its modulator sounds") {
+  Config cfg;
+  cfg.push_back({"algo", str("custom")});
+  cfg.push_back({"route", arr({2, 1})});
+  cfg.push_back({"levels", arr({0, 1})});
+  FmRig rig(1000.0, cfg);
+  float mod_peak = 0.0f;
+  for (int i = 0; i < 40; ++i) {
+    rig.tick(1.0f);
+    CHECK(rig.outs[0] == 0.0f);
+    mod_peak = std::max(mod_peak, std::abs(rig.outs[2]));
+  }
+  CHECK(mod_peak > 0.4f);  // level 1 × l3 .5 × |sin| peak 1, with margin
+}
+
+TEST_CASE("fm: malformed route falls back to free") {
+  const std::vector<std::vector<double>> routes = {
+      {2},           // odd count
+      {7, 1},        // out of range
+      {2, 2},        // self-edge (belongs in fb)
+      {2, 1, 2, 1},  // duplicate
+      {2, 1, 1, 2},  // cycle
+  };
+  for (const auto& route : routes) {
+    CAPTURE(route.size());
+    Config bad;
+    bad.push_back({"algo", str("custom")});
+    bad.push_back({"levels", arr({1, 1, 1, 1, 1, 1})});
+    ConfigValue r;
+    r.arr = route;
+    bad.push_back({"route", r});
+    Config good;
+    good.push_back({"algo", str("free")});
+    good.push_back({"levels", arr({1, 1, 1, 1, 1, 1})});
+    FmRig a(1000.0, bad), b(1000.0, good);
+    for (int i = 0; i < 2000; ++i) {
+      a.tick(1.0f);
+      b.tick(1.0f);
+      for (int o = 0; o < 7; ++o) CHECK(a.outs[o] == b.outs[o]);
+    }
+  }
 }
