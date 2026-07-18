@@ -48,4 +48,5 @@ extern const ModuleInfo grains_info;
 extern const ModuleInfo modal_info;
 extern const ModuleInfo string_info;
 extern const ModuleInfo overdrive_info;
+extern const ModuleInfo fm_info;
 }  // namespace ms::dsp
