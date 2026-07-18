@@ -124,7 +124,12 @@ using Edge = std::pair<int, int>;  // (src, dst), 0-based; src modulates dst
 
 std::vector<Edge> named_edges(int algo) {
   switch (algo) {
-    default: return {};  // free (and custom until Task 4 fills the table)
+    case 1: return {{1, 0}, {3, 2}, {5, 4}};                     // triad
+    case 2: return {{2, 1}, {1, 0}, {5, 4}, {4, 3}};             // dual
+    case 3: return {{5, 4}, {4, 3}, {3, 2}, {2, 1}, {1, 0}};     // cascade
+    case 4: return {{1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0}};     // crown
+    case 5: return {{5, 3}, {4, 3}, {3, 1}, {2, 1}, {1, 0}};     // weave
+    default: return {};                                          // free/custom
   }
 }
 

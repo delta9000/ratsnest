@@ -361,3 +361,35 @@ TEST_CASE("fm: fb array slot selects the feedback op") {
   // op2 at ratio 1 (480 Hz): self-feedback must put energy at 3×480.
   CHECK(dft_mag(mod, 1440.0, 48000.0) > 0.01);
 }
+
+TEST_CASE("fm: named algorithms equal their custom expansions") {
+  const std::pair<const char*, std::vector<double>> kAlgosToTest[] = {
+      {"free", {}},
+      {"triad", {2, 1, 4, 3, 6, 5}},
+      {"dual", {3, 2, 2, 1, 6, 5, 5, 4}},
+      {"cascade", {6, 5, 5, 4, 4, 3, 3, 2, 2, 1}},
+      {"crown", {2, 1, 3, 1, 4, 1, 5, 1, 6, 1}},
+      {"weave", {6, 4, 5, 4, 4, 2, 3, 2, 2, 1}},
+  };
+  for (const auto& [name, route] : kAlgosToTest) {
+    CAPTURE(name);
+    Config a, b;
+    a.push_back({"algo", str(name)});
+    b.push_back({"algo", str("custom")});
+    ConfigValue r;
+    r.arr = route;
+    b.push_back({"route", r});
+    for (Config* c : {&a, &b}) {
+      c->push_back({"levels", arr({.9, .4, .3, .5, .2, .6})});
+      c->push_back({"ratios", arr({1, 2, 3, 1.5, .5, .75})});
+      c->push_back({"fb", arr({0, 0, 0, .3, 0, 0})});
+    }
+    FmRig ra(1000.0, a), rb(1000.0, b);
+    for (int i = 0; i < 5000; ++i) {
+      const float gate = (i % 1000) < 700 ? 1.0f : 0.0f;  // exercise retrigger
+      ra.tick(gate);
+      rb.tick(gate);
+      for (int o = 0; o < 7; ++o) CHECK(ra.outs[o] == rb.outs[o]);
+    }
+  }
+}
