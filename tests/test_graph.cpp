@@ -45,6 +45,33 @@ TEST_CASE("default ports resolve to in/out") {
   CHECK(found);
 }
 
+TEST_CASE("bareword arrays lower to strs; numeric arrays stay numeric") {
+  auto r = go("q = quant { scale: [sine, abs, fold] }\nq -> out.in\n");
+  REQUIRE(r.ok());
+  int qi = -1;
+  for (int i = 0; i < (int)r.graph->nodes.size(); ++i)
+    if (r.graph->nodes[i].name == "q") qi = i;
+  REQUIRE(qi >= 0);
+  const auto& strs = dsp::cfg_str_arr(r.graph->nodes[qi].config, "scale");
+  REQUIRE(strs.size() == 3);
+  CHECK(strs[0] == "sine");
+  CHECK(strs[1] == "abs");
+  CHECK(strs[2] == "fold");
+  CHECK(dsp::cfg_arr(r.graph->nodes[qi].config, "scale").empty());
+
+  auto r2 = go("p = quant { scale: [0, 3, 5] }\np -> out.in\n");
+  REQUIRE(r2.ok());
+  int pi = -1;
+  for (int i = 0; i < (int)r2.graph->nodes.size(); ++i)
+    if (r2.graph->nodes[i].name == "p") pi = i;
+  REQUIRE(pi >= 0);
+  const auto& a = dsp::cfg_arr(r2.graph->nodes[pi].config, "scale");
+  REQUIRE(a.size() == 3);
+  CHECK(a[0] == 0.0);
+  CHECK(a[2] == 5.0);
+  CHECK(dsp::cfg_str_arr(r2.graph->nodes[pi].config, "scale").empty());
+}
+
 TEST_CASE("literal source folds into base") {
   auto r = go("a = vca\n0.5 -> a.cv : 2\n");
   REQUIRE(r.ok());

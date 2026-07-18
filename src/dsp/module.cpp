@@ -21,6 +21,13 @@ const std::vector<double>& cfg_arr(const Config& c, std::string_view name) {
   return kEmpty;
 }
 
+const std::vector<std::string>& cfg_str_arr(const Config& c, std::string_view name) {
+  static const std::vector<std::string> kEmpty;
+  for (const auto& [k, v] : c)
+    if (k == name) return v.strs;
+  return kEmpty;
+}
+
 int ModuleInfo::input_index(std::string_view name) const {
   for (size_t i = 0; i < inputs.size(); ++i)
     if (name == inputs[i].name) return static_cast<int>(i);

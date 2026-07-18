@@ -19,12 +19,14 @@ struct ConfigValue {
   double num = 0.0;
   std::vector<double> arr;
   bool is_num = false;
+  std::vector<std::string> strs;
 };
 using Config = std::vector<std::pair<std::string, ConfigValue>>;
 
 std::string cfg_str(const Config& c, std::string_view name, std::string_view def);
 double cfg_num(const Config& c, std::string_view name, double def);
 const std::vector<double>& cfg_arr(const Config& c, std::string_view name);
+const std::vector<std::string>& cfg_str_arr(const Config& c, std::string_view name);
 
 // Raw MIDI event as delivered to on_midi: up to 4 status/data bytes (running
 // status is expanded by the producer, so len is 1..3 for channel voice

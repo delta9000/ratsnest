@@ -23,7 +23,10 @@ dsp::ConfigValue to_config_value(const dsl::Value& v) {
     case dsl::Value::Kind::Ident:
     case dsl::Value::Kind::Str:   cv.str = v.str; break;
     case dsl::Value::Kind::Array:
-      for (const auto& item : v.items) cv.arr.push_back(item.num);
+      for (const auto& item : v.items) {
+        if (item.kind == dsl::Value::Kind::Num) cv.arr.push_back(item.num);
+        else cv.strs.push_back(item.str);  // Ident or Str
+      }
       break;
   }
   return cv;
