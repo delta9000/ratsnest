@@ -49,4 +49,6 @@ extern const ModuleInfo modal_info;
 extern const ModuleInfo string_info;
 extern const ModuleInfo overdrive_info;
 extern const ModuleInfo fm_info;
+extern const ModuleInfo chorus_info;
+extern const ModuleInfo phaser_info;
 }  // namespace ms::dsp
