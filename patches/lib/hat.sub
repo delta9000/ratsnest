@@ -1,0 +1,22 @@
+# hat.sub -- filtered-noise hi-hat with configurable pitch and decay.
+# Short tuned noise burst through a bandpass filter.
+pitch = param { default: 8khz }      # filter centre
+decay = param { default: 0.05s }     # envelope length
+color = param { default: 0.15 }      # resonance / sharpness
+trig  = input {}
+main  = output {}
+
+env = func { rise: 0.0002s, fall: decay }
+trig -> env.trig
+src = noise { color: white, seed: 3 }
+filt = svf { cutoff: pitch, res: color }
+src -> filt.in
+v = vca { gain: 0 }
+filt.bp -> v.in
+env -> v.cv
+v -> main.in
+
+# Audition: `mise run play -- patches/lib/hat.sub`
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in : 0.6

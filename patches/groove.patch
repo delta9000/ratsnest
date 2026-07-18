@@ -1,0 +1,57 @@
+# groove -- four-voice minimal techno sketch using subpatches.
+# Kick, bass, closed hat, and open hat — each a separate .sub voice.
+# Euclidean rhythms and a slow filter sweep keep it moving.
+#
+# Run:  mise run play -- patches/groove.patch
+# Audio-check:  mise run check -- patches/groove.patch
+# Render:  mise run render patches/groove.patch -d 30s -o groove.wav --stats
+
+# --- Clock and divider ---
+clk = clock { bpm: 124 }
+q   = div   { by: 4 }    # quarter-note pulse for kick
+
+clk -> q.in
+
+# --- Euclidean triggers ---
+# Closed hat: 8 steps, 5 hits, a classic shuffle feel
+hat_pat = euclid { steps: 8, hits: 5, rot: 0 }
+# Open hat: 8 steps, 3 hits, offset to alternate with closed
+open_pat = euclid { steps: 8, hits: 3, rot: 2 }
+# Bass: 16 steps, 7 hits — drives the low-end groove
+bass_pat = euclid { steps: 16, hits: 7, rot: 0 }
+
+clk -> hat_pat.clock
+clk -> open_pat.clock
+clk -> bass_pat.clock
+
+# --- Voices (instantiated from lib/) ---
+
+# Kick: quarter-note pulse, default tuning
+kick = sub { file: "lib/kick.sub" }
+q.out -> kick.trig
+
+# Closed hat: short, bright (~8 kHz), tight decay
+hat = sub { file: "lib/hat.sub", pitch: 8khz, decay: 0.045s, color: 0.12 }
+hat_pat.trig -> hat.trig
+
+# Open hat: lower, longer decay, more resonance — open-filter feel
+open = sub { file: "lib/hat.sub", pitch: 5khz, decay: 0.18s, color: 0.35 }
+open_pat.trig -> open.trig
+
+# Bass: G1 fundamental, moderate decay, a touch of FM grit
+bass = sub { file: "lib/bass.sub", pitch: G1, decay: 0.16s, grit: 0.2 }
+bass_pat.trig -> bass.trig
+
+# --- Pitch modulation on the bass (slow filter sweep via a bassline seq) ---
+# Tune sequence: G1, A1, C2, G1 — simple G-minor loop
+bass_seq = stepseq { steps: [G1v, A1v, C2v, G1v], gates: [1, 0, 0, 0] }
+clk -> bass_seq.clock
+bass_seq.cv -> bass.osc.v_oct
+
+# --- Mix and output ---
+m = mix { levels: [0.7, 0.6, 0.45, 0.75] }
+kick -> m.in1
+hat  -> m.in2
+open -> m.in3
+bass -> m.in4
+m.out_l -> out.in
