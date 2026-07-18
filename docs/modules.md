@@ -88,7 +88,7 @@ random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `scope`, `stereo`, `out` |
+| Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `out` |
 
 ## `vca`
 
@@ -623,7 +623,49 @@ keys = voice { notes: mid }
 keys.ep = fm { ...same configs... }
 ```
 
+## `chorus`
+
+`chorus { voices: 3 }` — stereo multi-voice modulated-delay chorus. Several
+short delay taps with decorrelated LFO phases (L and R a half-cycle apart)
+spread across the stereo field and summed with the dry signal, for widening
+and thickening. Feed a mono source to both inputs to fan it into stereo.
+
+Inputs: `in_l`, `in_r`, `rate` .5 Hz (LFO speed), `depth` .5 (0..1, delay
+swing), `mix` .5 (dry↔wet). Outputs: `out_l`, `out_r`. Configs: `voices`
+(1..4, default 3), `delay` (base delay ms, default 12), `swing` (max swing ms
+at depth 1, default 6), `shape` (`tri`/`sine`, default `tri`). No feedback
+(that is the flanger regime — see Recipes).
+
+## `phaser`
+
+`phaser { stages: 6 }` — mono phaser: a cascade of first-order allpass stages
+whose break frequency is swept by an internal LFO, summed with the dry signal
+so moving notches sweep the spectrum. Feedback sharpens the notches.
+
+Inputs: `in`, `rate` .3 Hz, `depth` .6 (0..1, sweep width), `feedback` .3
+(0..0.95, resonance), `mix` .5 (dry↔wet; 0.5 is the deepest notches). Output:
+`out`. Configs: `stages` (2..12, default 6 — more stages = more notches),
+`spread` (0..1, default 0 — stage-frequency stagger: 0 keeps all stages
+coincident for tight Phase-90-style notches, higher fans them out around the
+swept centre for wider, more vocal notches), `shape` (`tri`/`sine`).
+
 ## Recipes
+
+### Flanger (`delay` + `lfo`)
+
+A flanger is a short modulated delay with feedback — cable it from `delay`:
+
+```text
+lfo = lfo { freq: 0.3hz }
+fl  = delay { time: 0.003, feedback: 0.55, mix: 0.5, slew: 0.0005, tone: 12000 }
+src -> fl.in
+lfo -> fl.time : 0.0025    # swing ~±2.5 ms around a 3 ms base
+fl  -> out.in : 0.5
+```
+
+Keep `slew` near 0, or the delay's time smoother smears the sweep. A single
+positive-feedback delay line has no true through-zero and no hollow
+negative-feedback flange; those would need a dedicated setup.
 
 ### Euclidean variation
 

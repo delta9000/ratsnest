@@ -1,0 +1,28 @@
+# modfx -- a plucky FM lead through phaser -> stereo chorus, to exercise both
+# modulation effects. Render: mise run render -- patches/modfx.patch -d 20s -o modfx.wav
+clk = clock { bpm: 200 }
+wander = random { rate: 2.3, smooth: 0, seed: 9 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+key = quant { scale: [0, 3, 5, 7, 10] }
+notes -> key.in
+poly = alloc { n: 3 }
+clk -> poly.gate
+key -> poly.voct
+
+voice = voice { notes: poly }
+voice.fm = fm { algo: dual, ratios: [1, 1, 3.5, 1, 7, 1], levels: [.5, .3, .12, .45, .1, .15] }
+poly.voct -> voice.fm.v_oct
+poly.gate -> voice.fm.gate
+
+ph = phaser { stages: 6, spread: 0.4, rate: 0.25, depth: 0.7, feedback: 0.4, mix: 0.5 }
+voice.fm -> ph.in : 0.5
+
+ch = chorus { voices: 3, rate: 0.4, depth: 0.5, mix: 0.45 }
+ph -> ch.in_l
+ph -> ch.in_r
+
+ch.out_l -> out.left : 0.7
+ch.out_r -> out.right : 0.7
+-0.3 -> out.level
