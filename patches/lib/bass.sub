@@ -1,22 +1,29 @@
-# bass.sub -- clean saw bass with envelope-controlled VCA.
-# No FM, no LPG — just a saw through an amp.
+# bass.sub -- FM bass voice with low-pass filter and tubescreamer-style overdrive.
+# 2-op FM (dual) into a ladder filter for warmth, then overdrive for grit.
 pitch = param { default: G1 }       # fundamental
-decay = param { default: 0.18s }    # envelope decay
+decay = param { default: 0.22s }    # envelope decay
 trig  = input {}
 main  = output {}
 
-env = func { rise: 0.003s, fall: decay }
-trig -> env.trig
-osc = vco { wave: saw, freq: pitch }
-amp = vca { gain: 0 }
-osc -> amp.in
-env -> amp.cv
-amp -> main.in
+# FM voice: 2-op, op2 modulates op1, op2 level shaped by the envelope
+fm = fm { algo: dual, freq: pitch,
+          ratios: [1, 2], levels: [0.6, 0.5], curve: exp }
+
+# Low-pass to roll off the FM brightness
+filt = ladder { cutoff: 1800hz, res: 0.3 }
+
+# Tubescreamer-style saturation: mid-focused drive
+od = overdrive { drive: 2.0, tone: 0.4, level: 0.6, mix: 0.8 }
+
+trig -> fm.gate
+fm -> filt.in
+filt.out -> od.in
+od -> main.in
 
 # Audition: `mise run play -- patches/lib/bass.sub`
 demo.clk = clock { bpm: 120 }
 demo.seq = stepseq { steps: [G1v, A1v, C2v, G1v], gates: [1, 0, 0, 0] }
 demo.clk -> demo.seq.clock
-demo.seq.cv -> osc.v_oct
-demo.clk -> trig : 2.0
+demo.seq.cv -> fm.v_oct
+demo.clk -> trig
 main -> demo.out.in : 0.5

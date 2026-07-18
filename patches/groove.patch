@@ -1,41 +1,36 @@
-# groove -- four-voice minimal techno sketch using subpatches.
-# Kick, bass, closed hat, and open hat — each a separate .sub voice.
-# Euclidean rhythms and a bassline sequence keep it moving.
+# groove -- minimal techno sketch using subpatches.
+# Kick, FM bass, closed hat, and open hat — euclidean-driven.
 #
 # Run:  mise run play -- patches/groove.patch
 
-# --- Clock ---
 clk = clock { bpm: 124 }
 
-# --- Euclidean triggers ---
 hat_pat  = euclid { steps: 8,  hits: 5, rot: 0 }
 open_pat = euclid { steps: 8,  hits: 3, rot: 2 }
-bass_pat = euclid { steps: 16, hits: 7, rot: 0 }
+bass_pat = euclid { steps: 8, hits: 4, rot: 0 }
 
 clk -> hat_pat.clock
 clk -> open_pat.clock
 clk -> bass_pat.clock
 
-# --- Voices ---
 kick = sub { file: "lib/kick.sub" }
 clk -> kick.trig
 
 hat = sub { file: "lib/hat.sub", pitch: 8khz, decay: 0.05s, color: 0.1 }
-hat_pat.trig -> hat.trig
+hat_pat.gate -> hat.trig
 
 open = sub { file: "lib/hat.sub", pitch: 5khz, decay: 0.18s, color: 0.3 }
-open_pat.trig -> open.trig
+open_pat.gate -> open.trig
 
-bass = sub { file: "lib/bass.sub", pitch: G2, decay: 0.22s }
-bass_pat.trig -> bass.trig
+bass = sub { file: "lib/bass.sub", pitch: G2, decay: 0.12s }
+bass_pat.gate -> bass.trig
 
-# --- Bassline sequence: G-minor loop — escape hatch straight into the VCO ---
+# Bassline: G-minor loop, escape-hatch into fm.v_oct
 bass_seq = stepseq { steps: [G2v, A2v, C3v, G2v], gates: [1, 0, 0, 0] }
 clk -> bass_seq.clock
-bass_seq.cv -> bass.osc.v_oct
+bass_seq.cv -> bass.fm.v_oct
 
-# --- Mix ---
-m = mix { levels: [0.65, 0.5, 0.4, 0.55] }
+m = mix { levels: [0.45, 0.35, 0.28, 0.4] }
 kick -> m.in1
 hat  -> m.in2
 open -> m.in3
