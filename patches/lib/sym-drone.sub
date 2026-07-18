@@ -1,0 +1,52 @@
+# sym-drone.sub -- dual sympathetic Karplus strings + slow phaser.
+# Root + fifth, coupled at 0.08, long tails: the kosmische floor.
+# Single pitch in, so frozen grains derived from it stay in tune.
+tune   = param { default: E2 }
+damp   = param { default: 0.84 }
+damp2  = param { default: 0.88 }
+pos    = param { default: 0.28 }
+pos2   = param { default: 0.35 }
+prate  = param { default: 0.18 }
+pdepth = param { default: 0.45 }
+pfb    = param { default: 0.15 }
+
+trig  = input {}
+root  = input { default: 0 }
+fifth = input { default: 0.58333 }
+phmix = input { default: 0.35 }
+main  = output {}
+aux   = output {}
+
+d = string { seed: 7, damping: damp, position: pos, freq: tune }
+d2 = string { seed: 11, damping: damp2, position: pos2, freq: tune }
+trig -> d.strike
+root -> d.v_oct
+0.008 -> d.v_oct
+trig -> d2.strike
+fifth -> d2.v_oct
+d.out -> d2.in : 0.08
+
+drift = lfo { freq: 0.04hz, wave: sine }
+drift -> d.v_oct : 0.004
+
+ph = phaser { stages: 6, spread: 0.3, shape: tri }
+d.out -> ph.in : 0.7
+d2.out -> ph.in : 0.4
+prate -> ph.rate
+pdepth -> ph.depth
+pfb -> ph.feedback
+phmix -> ph.mix
+ph_rate = lfo { freq: 0.05hz, wave: tri }
+ph_rate -> ph.rate : 0.12
+
+ph -> main.in
+d2.out -> aux.in
+
+# Audition
+demo.bar = div { by: 4 }
+demo.clk = clock { bpm: 122 }
+demo.clk -> demo.bar.in
+demo.bar -> trig
+demo.out = out { level: 0.6 }
+main -> demo.out.in
+aux -> demo.out.in : 0.35
