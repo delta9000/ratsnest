@@ -300,3 +300,64 @@ TEST_CASE("fm: malformed route falls back to free") {
     }
   }
 }
+
+TEST_CASE("fm: feedback brightens a lone carrier") {
+  auto third_harmonic_ratio = [](float fb) {
+    Config cfg;
+    cfg.push_back({"fb", arr({fb})});
+    cfg.push_back({"t1", arr({0.0})});
+    cfg.push_back({"t2", arr({0.0})});
+    cfg.push_back({"t3", arr({0.0})});
+    cfg.push_back({"l2", arr({1.0})});
+    cfg.push_back({"l3", arr({1.0})});
+    FmRig rig(48000.0, cfg);
+    rig.ins[1] = 480.0f;
+    const int N = 48000;
+    std::vector<float> x(static_cast<size_t>(N));
+    for (int i = 0; i < N; ++i) {
+      rig.tick(1.0f);
+      x[static_cast<size_t>(i)] = rig.outs[0];
+    }
+    return dft_mag(x, 1440.0, 48000.0) / dft_mag(x, 480.0, 48000.0);
+  };
+  CHECK(third_harmonic_ratio(0.6f) > 0.02f);
+  CHECK(third_harmonic_ratio(0.0f) < 1e-4f);
+  CHECK(third_harmonic_ratio(0.6f) > 10.0f * third_harmonic_ratio(0.0f));
+}
+
+TEST_CASE("fm: feedback stays bounded at maximum") {
+  Config cfg;
+  cfg.push_back({"fb", arr({.999})});
+  FmRig rig(48000.0, cfg);
+  rig.ins[1] = 480.0f;
+  float peak = 0.0f;
+  for (int i = 0; i < 48000; ++i) {
+    rig.tick(1.0f);
+    CHECK(std::isfinite(rig.outs[0]));
+    peak = std::max(peak, std::abs(rig.outs[0]));
+  }
+  CHECK(peak <= 1.0001f);
+}
+
+TEST_CASE("fm: fb array slot selects the feedback op") {
+  Config cfg;
+  cfg.push_back({"algo", str("custom")});
+  cfg.push_back({"route", arr({2, 1})});
+  cfg.push_back({"levels", arr({1, 1})});
+  cfg.push_back({"fb", arr({0, .3})});  // op2 self-edge
+  cfg.push_back({"t1", arr({0, 0})});
+  cfg.push_back({"t2", arr({0, 0})});
+  cfg.push_back({"t3", arr({0, 0})});
+  cfg.push_back({"l2", arr({1, 1})});
+  cfg.push_back({"l3", arr({1, 1})});
+  FmRig rig(48000.0, cfg);
+  rig.ins[1] = 480.0f;
+  const int N = 48000;
+  std::vector<float> mod(static_cast<size_t>(N));
+  for (int i = 0; i < N; ++i) {
+    rig.tick(1.0f);
+    mod[static_cast<size_t>(i)] = rig.outs[2];  // op2 tap
+  }
+  // op2 at ratio 1 (480 Hz): self-feedback must put energy at 3×480.
+  CHECK(dft_mag(mod, 1440.0, 48000.0) > 0.01);
+}

@@ -224,7 +224,10 @@ class Fm final : public Module {
       const double lvl = levels_[static_cast<size_t>(k)];
       env_tick(envs_[static_cast<size_t>(k)], env_cfg_[static_cast<size_t>(k)],
                curve_, rate_);
-      double mod = 0.0;
+      double mod = fb_[static_cast<size_t>(k)] > 0.0
+                       ? fb_[static_cast<size_t>(k)] *
+                             static_cast<double>(prev_post_[static_cast<size_t>(k)])
+                       : 0.0;
       for (int p : preds_[static_cast<size_t>(k)]) mod += post[static_cast<size_t>(p)];
       const float s =
           std::sin(kTwoPi * static_cast<float>(phase_[static_cast<size_t>(k)]) +
