@@ -54,8 +54,9 @@ std::unique_ptr<ms::graph::Graph> load(const std::string& path, double rate) {
   auto p = ms::dsl::parse(src);
   auto report = [&](const ms::Diags& ds) {
     for (const auto& d : ds)
-      std::fprintf(stderr, "%s:%d:%d: error: %s\n", path.c_str(), d.line, d.col,
-                   d.msg.c_str());
+      std::fprintf(stderr, "%s:%d:%d: error: %s\n",
+                   d.file.empty() ? path.c_str() : d.file.c_str(),
+                   d.line, d.col, d.msg.c_str());
   };
   if (!p.ok()) { report(p.errors); return nullptr; }
   auto c = ms::graph::compile(p.ast, rate);
@@ -115,8 +116,9 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
   auto report = [&](const ms::Diags& ds) {
     std::fputs("\n", stderr);
     for (const auto& d : ds)
-      std::fprintf(stderr, "%s:%d:%d: error: %s\n", patch.c_str(), d.line,
-                   d.col, d.msg.c_str());
+      std::fprintf(stderr, "%s:%d:%d: error: %s\n",
+                   d.file.empty() ? patch.c_str() : d.file.c_str(),
+                   d.line, d.col, d.msg.c_str());
   };
 
   auto first = ctl.load(src);
