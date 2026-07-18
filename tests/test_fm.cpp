@@ -663,3 +663,86 @@ TEST_CASE("fm: waves default and unknown names are sine, bit-identical") {
     }
   }
 }
+
+TEST_CASE("fm: key_level scales op level by 2^(exp*(voct-break))") {
+  Config cfg;
+  cfg.push_back({"key_level", arr({-1})});     // op1 halves per octave up
+  cfg.push_back({"fixed", arr({300})});        // pin pitch; voct feeds scaling only
+  cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})}); cfg.push_back({"t3", arr({0})});
+  cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({1})});
+  auto rms = [&](float voct) {
+    FmRig rig(48000.0, cfg);
+    rig.ins[2] = voct;
+    double s2 = 0.0;
+    for (int i = 0; i < 48000; ++i) { rig.tick(1.0f); s2 += static_cast<double>(rig.outs[1]) * rig.outs[1]; }
+    return std::sqrt(s2 / 48000.0);
+  };
+  CHECK(rms(1.0f) == doctest::Approx(0.5 * rms(0.0f)).epsilon(0.04));
+  CHECK(rms(-1.0f) == doctest::Approx(2.0 * rms(0.0f)).epsilon(0.04));
+}
+
+TEST_CASE("fm: key_rate shortens envelopes up high (less total energy)") {
+  Config cfg;
+  cfg.push_back({"key_rate", arr({1})});       // times halve per octave up
+  cfg.push_back({"fixed", arr({300})});
+  cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})});
+  cfg.push_back({"t3", arr({0.2})});           // decay l2->l3 over 0.2s at voct 0
+  cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({0})});
+  auto energy = [&](float voct) {
+    FmRig rig(1000.0, cfg);                     // 1 kHz: 0.2s = 200 samples
+    rig.ins[2] = voct;
+    double e = 0.0;
+    for (int i = 0; i < 400; ++i) { rig.tick(1.0f); e += static_cast<double>(rig.outs[1]) * rig.outs[1]; }
+    return e;
+  };
+  CHECK(energy(1.0f) < 0.75 * energy(0.0f));    // faster decay -> less energy
+}
+
+TEST_CASE("fm: key scaling latches at gate rise (mid-note voct change is inert)") {
+  Config cfg;
+  cfg.push_back({"key_level", arr({-2})});
+  cfg.push_back({"fixed", arr({300})});
+  cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})}); cfg.push_back({"t3", arr({0})});
+  cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({1})});
+  FmRig rig(48000.0, cfg);
+  rig.ins[2] = 0.0f;                            // latch at scale 1
+  double a = 0.0;
+  for (int i = 0; i < 4800; ++i) { rig.tick(1.0f); a += static_cast<double>(rig.outs[1]) * rig.outs[1]; }
+  rig.ins[2] = 3.0f;                            // change mid-note: no new rising edge
+  double b = 0.0;
+  for (int i = 0; i < 4800; ++i) { rig.tick(1.0f); b += static_cast<double>(rig.outs[1]) * rig.outs[1]; }
+  CHECK(std::sqrt(b / 4800.0) == doctest::Approx(std::sqrt(a / 4800.0)).epsilon(0.02));
+}
+
+TEST_CASE("fm: key_break moves the neutral point") {
+  Config cfg;
+  cfg.push_back({"key_level", arr({-1})});
+  cfg.push_back({"key_break", cnum(1.0)});      // neutral at voct 1
+  cfg.push_back({"fixed", arr({300})});
+  cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})}); cfg.push_back({"t3", arr({0})});
+  cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({1})});
+  auto rms = [&](float voct) {
+    FmRig rig(48000.0, cfg);
+    rig.ins[2] = voct;
+    double s2 = 0.0;
+    for (int i = 0; i < 24000; ++i) { rig.tick(1.0f); s2 += static_cast<double>(rig.outs[1]) * rig.outs[1]; }
+    return std::sqrt(s2 / 24000.0);
+  };
+  // voct 1 == break -> Δ 0 -> scale 1; voct 0 -> Δ -1 -> scale 2 (louder)
+  CHECK(rms(1.0f) == doctest::Approx(0.5 * rms(0.0f)).epsilon(0.04));
+}
+
+TEST_CASE("fm: key scaling defaults are a no-op (bit-identical)") {
+  Config base;
+  Config withzeros;
+  withzeros.push_back({"key_level", arr({0,0,0,0,0,0})});
+  withzeros.push_back({"key_rate", arr({0,0,0,0,0,0})});
+  withzeros.push_back({"key_break", cnum(0.0)});
+  FmRig rb(48000.0, base), rz(48000.0, withzeros);
+  rb.ins[2] = 1.5f; rz.ins[2] = 1.5f;           // nonzero voct must not matter
+  for (int i = 0; i < 4000; ++i) {
+    const float g = (i % 500) < 400 ? 1.0f : 0.0f;
+    rb.tick(g); rz.tick(g);
+    for (int o = 0; o < 7; ++o) CHECK(rz.outs[o] == rb.outs[o]);
+  }
+}

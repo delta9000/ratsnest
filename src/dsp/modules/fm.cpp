@@ -122,23 +122,23 @@ bool env_segment(OpEnv& e, double target, double seconds, int curve,
   e.progress = 0.0;
   return true;
 }
-void env_tick(OpEnv& e, const EnvCfg& c, int curve, double rate) {
+void env_tick(OpEnv& e, const EnvCfg& c, int curve, double rate, double tscale) {
   using S = OpEnv::Stage;
   switch (e.stage) {
     case S::S1:
-      if (env_segment(e, c.l[0], c.t[0], curve, rate)) e.stage = S::S2;
+      if (env_segment(e, c.l[0], c.t[0] * tscale, curve, rate)) e.stage = S::S2;
       break;
     case S::S2:
-      if (env_segment(e, c.l[1], c.t[1], curve, rate)) e.stage = S::S3;
+      if (env_segment(e, c.l[1], c.t[1] * tscale, curve, rate)) e.stage = S::S3;
       break;
     case S::S3:
-      if (env_segment(e, c.l[2], c.t[2], curve, rate)) e.stage = S::Hold;
+      if (env_segment(e, c.l[2], c.t[2] * tscale, curve, rate)) e.stage = S::Hold;
       break;
     case S::Hold:
       e.level = c.l[2];
       break;
     case S::Rel:
-      if (env_segment(e, 0.0, c.t[3], curve, rate)) {
+      if (env_segment(e, 0.0, c.t[3] * tscale, curve, rate)) {
         e.stage = S::Idle;
         e.level = 0.0;
       }
@@ -231,6 +231,12 @@ class Fm final : public Module {
           if (wv[static_cast<size_t>(k)] == kWaves[i]) waves_[static_cast<size_t>(k)] = i;
     }
 
+    key_break_ = cfg_num(cfg, "key_break", 0.0);
+    fill(cfg, "key_level", key_level_, 0.0, -8.0, 8.0);
+    fill(cfg, "key_rate", key_rate_, 0.0, -8.0, 8.0);
+    level_scale_.fill(1.0);
+    time_scale_.fill(1.0);
+
     edges_ = algo_ == 6 ? parse_route(cfg_arr(cfg, "route")) : named_edges(algo_);
     build_order();
 
@@ -246,7 +252,19 @@ class Fm final : public Module {
     const bool rising = high && prev_gate_ <= 0.5f;
     const bool falling = !high && prev_gate_ > 0.5f;
     prev_gate_ = gate;
-    if (rising && sync_) phase_.fill(0.0);
+    if (rising) {
+      if (sync_) phase_.fill(0.0);
+      // Latch keyboard scaling from v_oct for the whole note (DX-style): a
+      // mid-note pitch glide bends pitch without warping level or envelope.
+      const double d =
+          static_cast<double>(clampn(ins[2], -24.f, 24.f)) - key_break_;
+      for (int k = 0; k < kOps; ++k) {
+        level_scale_[static_cast<size_t>(k)] =
+            clampd(std::exp2(key_level_[static_cast<size_t>(k)] * d), 0.0, 16.0);
+        time_scale_[static_cast<size_t>(k)] =
+            clampd(std::exp2(-key_rate_[static_cast<size_t>(k)] * d), 1e-3, 1e3);
+      }
+    }
     for (auto& e : envs_) env_gate(e, rising, falling);
 
     const double base =
@@ -275,9 +293,10 @@ class Fm final : public Module {
               static_cast<float>(levels_[static_cast<size_t>(k)]) + ins[4 + k],
               0.0f, 1.0f)) *
           (1.0 - vel_sens_[static_cast<size_t>(k)] +
-           vel_sens_[static_cast<size_t>(k)] * static_cast<double>(vel));
+           vel_sens_[static_cast<size_t>(k)] * static_cast<double>(vel)) *
+          level_scale_[static_cast<size_t>(k)];
       env_tick(envs_[static_cast<size_t>(k)], env_cfg_[static_cast<size_t>(k)],
-               curve_, rate_);
+               curve_, rate_, time_scale_[static_cast<size_t>(k)]);
       const double fb_amt = static_cast<double>(
           clampn(static_cast<float>(fb_[static_cast<size_t>(k)]) + fb_cv, 0.0f, 0.999f));
       double mod = fb_amt > 0.0
@@ -313,6 +332,8 @@ class Fm final : public Module {
     phase_ = o.phase_;
     prev_post_ = o.prev_post_;
     prev_gate_ = o.prev_gate_;
+    level_scale_ = o.level_scale_;
+    time_scale_ = o.time_scale_;
   }
 
  private:
@@ -366,6 +387,9 @@ class Fm final : public Module {
   bool sync_ = true;
   std::array<double, kOps> ratios_{}, levels_{}, fixed_{}, fb_{}, vel_sens_{};
   std::array<int, kOps> waves_{};
+  double key_break_ = 0.0;
+  std::array<double, kOps> key_level_{}, key_rate_{};
+  std::array<double, kOps> level_scale_{}, time_scale_{};  // latched per note (migrated)
   std::array<EnvCfg, kOps> env_cfg_{};
   std::array<int, kOps> order_{};
   std::array<bool, kOps> carrier_{};
