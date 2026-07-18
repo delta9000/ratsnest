@@ -393,3 +393,136 @@ TEST_CASE("fm: named algorithms equal their custom expansions") {
     }
   }
 }
+
+TEST_CASE("fm: vel scales op levels by vel_sens") {
+  Config cfg;
+  cfg.push_back({"vel_sens", arr({1})});
+  FmRig rig(1000.0, cfg);
+  float silent = 0.0f;
+  for (int i = 0; i < 2000; ++i) {
+    rig.ins[3] = 0.0f;  // vel 0, sens 1 -> op1 closed
+    rig.tick(1.0f);
+    silent = std::max(silent, std::abs(rig.outs[0]));
+  }
+  CHECK(silent == 0.0f);
+  float half = 0.0f;
+  for (int i = 0; i < 2000; ++i) {
+    rig.ins[3] = 0.5f;
+    rig.tick(1.0f);
+    half = std::max(half, std::abs(rig.outs[0]));
+  }
+  CHECK(half == doctest::Approx(0.25).epsilon(0.05));  // .5 vel × l3 .5
+}
+
+TEST_CASE("fm: sens 0 leaves vel inert") {
+  FmRig rig(1000.0);  // vel_sens defaults all 0
+  float peak = 0.0f;
+  for (int i = 0; i < 400; ++i) {
+    rig.ins[3] = 0.0f;
+    rig.tick(1.0f);
+    peak = std::max(peak, std::abs(rig.outs[0]));
+  }
+  CHECK(peak > 0.4f);
+}
+
+TEST_CASE("fm: lvl inputs sum onto op levels") {
+  Config cfg = two_op_cfg();  // route 2->1, levels [1, .25]
+  FmRig rig(48000.0, cfg);
+  rig.ins[5] = 0.5f;  // lvl2: .25 + .5 = .75
+  double sum2 = 0.0;
+  for (int i = 0; i < 4800; ++i) {
+    rig.tick(1.0f);
+    sum2 += static_cast<double>(rig.outs[2]) * rig.outs[2];
+  }
+  const double rms = std::sqrt(sum2 / 4800.0);
+  CHECK(rms == doctest::Approx(0.75 / std::sqrt(2.0)).epsilon(0.03));
+}
+
+TEST_CASE("fm: ratio inputs sum onto ratios") {
+  Config cfg;
+  cfg.push_back({"levels", arr({1, 1})});
+  cfg.push_back({"ratios", arr({1, 1})});
+  FmRig rig(1000.0, cfg);
+  rig.ins[11] = 1.0f;  // ratio2: 1 + 1 = 2 -> op2 at 2x op1
+  int c1 = 0, c2 = 0;
+  float p1 = 0.0f, p2 = 0.0f;
+  for (int i = 0; i < 1000; ++i) {
+    rig.tick(1.0f);
+    if (p1 < 0.0f && rig.outs[1] >= 0.0f) ++c1;
+    if (p2 < 0.0f && rig.outs[2] >= 0.0f) ++c2;
+    p1 = rig.outs[1];
+    p2 = rig.outs[2];
+  }
+  CHECK(c2 == doctest::Approx(2.0 * c1).epsilon(4));
+}
+
+TEST_CASE("fm: fb input adds to every op's feedback") {
+  auto third = [](float fb_cv) {
+    FmRig rig(48000.0);
+    rig.ins[1] = 480.0f;
+    rig.ins[16] = fb_cv;
+    const int N = 48000;
+    std::vector<float> x(static_cast<size_t>(N));
+    for (int i = 0; i < N; ++i) {
+      rig.tick(1.0f);
+      x[static_cast<size_t>(i)] = rig.outs[0];
+    }
+    return dft_mag(x, 1440.0, 48000.0);
+  };
+  CHECK(third(0.6f) > 10.0f * third(0.0f));
+}
+
+TEST_CASE("fm: fixed ops ignore v_oct and ratio") {
+  Config cfg;
+  cfg.push_back({"algo", str("custom")});
+  cfg.push_back({"route", arr({2, 1})});
+  cfg.push_back({"levels", arr({1, 1})});
+  cfg.push_back({"fixed", arr({0, 55})});
+  auto crossings = [&](float voct, int tap) {
+    FmRig rig(48000.0, cfg);
+    rig.ins[1] = 440.0f;
+    rig.ins[2] = voct;
+    int count = 0;
+    float prev = 0.0f;
+    for (int i = 0; i < 48000; ++i) {
+      rig.tick(1.0f);
+      const float s = rig.outs[tap];
+      if (prev < 0.0f && s >= 0.0f) ++count;
+      prev = s;
+    }
+    return count;
+  };
+  CHECK(crossings(0.0f, 2) == doctest::Approx(55).epsilon(3));
+  CHECK(crossings(1.0f, 2) == doctest::Approx(55).epsilon(3));  // pinned
+  const double c1lo = crossings(0.0f, 1), c1hi = crossings(1.0f, 1);
+  CHECK(c1hi == doctest::Approx(2.0 * c1lo).epsilon(8));  // carrier still tracks
+}
+
+TEST_CASE("fm: sync off free-runs phases") {
+  auto attacks = [](const char* sync) {
+    Config cfg;
+    cfg.push_back({"sync", str(sync)});
+    cfg.push_back({"t4", arr({.01})});  // release fully completes within the 2400-sample gap,
+                                        // so both pulses' envelopes start from idle 0
+    FmRig rig(48000.0, cfg);
+    rig.ins[1] = 1000.0f;  // not period-aligned with the pulse spacing
+    std::array<std::array<float, 32>, 2> w{};
+    for (int pulse = 0; pulse < 2; ++pulse) {
+      for (int i = 0; i < 2400; ++i) rig.tick(0.0f);
+      for (int i = 0; i < 32; ++i) {
+        rig.tick(1.0f);
+        w[static_cast<size_t>(pulse)][static_cast<size_t>(i)] = rig.outs[1];
+      }
+      for (int i = 0; i < 32; ++i) rig.tick(1.0f);
+    }
+    return w;
+  };
+  const auto on = attacks("on");
+  const auto off = attacks("off");
+  for (int i = 0; i < 32; ++i) CHECK(on[0][static_cast<size_t>(i)] == doctest::Approx(on[1][static_cast<size_t>(i)]).epsilon(1e-6));
+  bool differ = false;
+  for (int i = 0; i < 32; ++i)
+    if (std::abs(off[0][static_cast<size_t>(i)] - off[1][static_cast<size_t>(i)]) > 1e-6f)
+      differ = true;
+  CHECK(differ);
+}

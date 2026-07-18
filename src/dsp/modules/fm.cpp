@@ -215,23 +215,36 @@ class Fm final : public Module {
     const double base =
         static_cast<double>(clampn(ins[1], 0.0f, 0.45f * static_cast<float>(rate_))) *
         std::exp2(static_cast<double>(clampn(ins[2], -24.f, 24.f)));
+    const float vel = clampn(ins[3], 0.0f, 1.0f);
+    const float fb_cv = ins[16];
 
     std::array<double, kOps> post{};
     for (int oi = 0; oi < kOps; ++oi) {
       const int k = order_[static_cast<size_t>(oi)];
-      const double ratio = ratios_[static_cast<size_t>(k)];
+      const double ratio =
+          fixed_[static_cast<size_t>(k)] > 0.0
+              ? 0.0
+              : static_cast<double>(clampn(
+                    static_cast<float>(ratios_[static_cast<size_t>(k)]) + ins[10 + k],
+                    0.0f, 1e9f));
       const double f = fixed_[static_cast<size_t>(k)] > 0.0
                            ? std::min(fixed_[static_cast<size_t>(k)], 0.45 * rate_)
                            : base * ratio;
       phase_[static_cast<size_t>(k)] += f / rate_;
       phase_[static_cast<size_t>(k)] -= std::floor(phase_[static_cast<size_t>(k)]);
 
-      const double lvl = levels_[static_cast<size_t>(k)];
+      const double lvl =
+          static_cast<double>(clampn(
+              static_cast<float>(levels_[static_cast<size_t>(k)]) + ins[4 + k],
+              0.0f, 1.0f)) *
+          (1.0 - vel_sens_[static_cast<size_t>(k)] +
+           vel_sens_[static_cast<size_t>(k)] * static_cast<double>(vel));
       env_tick(envs_[static_cast<size_t>(k)], env_cfg_[static_cast<size_t>(k)],
                curve_, rate_);
-      double mod = fb_[static_cast<size_t>(k)] > 0.0
-                       ? fb_[static_cast<size_t>(k)] *
-                             static_cast<double>(prev_post_[static_cast<size_t>(k)])
+      const double fb_amt = static_cast<double>(
+          clampn(static_cast<float>(fb_[static_cast<size_t>(k)]) + fb_cv, 0.0f, 0.999f));
+      double mod = fb_amt > 0.0
+                       ? fb_amt * static_cast<double>(prev_post_[static_cast<size_t>(k)])
                        : 0.0;
       for (int p : preds_[static_cast<size_t>(k)]) mod += post[static_cast<size_t>(p)];
       const float s =
