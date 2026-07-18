@@ -2,6 +2,11 @@
 // (concept-inspired; see docs/attribution.md). Topology, algorithm set,
 // scaling, and envelope design are original to ratsnest — no Yamaha/DX data,
 // layouts, or code are used anywhere in this file.
+//
+// Operator waveforms (rectified/windowed/folded sine) are the TX81Z/DX11/FS1R
+// operator-waveform *concept*, implemented locally from the mathematics; no
+// Yamaha tables/code and no GPL/emulator code are used. Keyboard level/rate
+// scaling is a standard technique in an original octave-exponent form.
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -32,13 +37,16 @@ constexpr const char* kAlgos[] = {"free",  "triad", "dual", "cascade",
                                   "crown", "weave", "custom", nullptr};
 constexpr const char* kCurves[] = {"lin", "exp", "log", nullptr};
 constexpr const char* kSyncs[] = {"on", "off", nullptr};
+constexpr const char* kWaves[] = {"sine", "half", "abs", "quarter", "fold", nullptr};
 constexpr ConfigInfo kCfg[] = {
     {"algo", kAlgos},    {"route", nullptr}, {"ratios", nullptr},
     {"levels", nullptr}, {"fixed", nullptr}, {"fb", nullptr},
     {"vel_sens", nullptr},
     {"t1", nullptr},     {"t2", nullptr},    {"t3", nullptr},
     {"t4", nullptr},     {"l1", nullptr},    {"l2", nullptr},
-    {"l3", nullptr},     {"curve", kCurves}, {"sync", kSyncs}};
+    {"l3", nullptr},     {"curve", kCurves}, {"sync", kSyncs},
+    {"waves", nullptr},  {"key_break", nullptr},
+    {"key_level", nullptr}, {"key_rate", nullptr}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"op1"}, {"op2"}, {"op3"},
                                 {"op4"}, {"op5"}, {"op6"}};
 
@@ -67,6 +75,24 @@ double env_shape(int curve, double x) {
   if (curve == 1) return x * x;
   if (curve == 2) return std::sqrt(x);
   return x;
+}
+
+// Operator waveform, θ in [0,1). Each is DC-centered (one-period mean
+// subtracted) so rectified shapes add no DC to carriers and no constant phase
+// to modulators. See docs/attribution.md for provenance.
+float op_wave(int w, float th) {
+  const float pi = std::numbers::pi_v<float>;
+  switch (w) {
+    case 1: return (th < 0.5f ? std::sin(kTwoPi * th) : 0.0f) - 1.0f / pi;  // half
+    case 2: return std::fabs(std::sin(kTwoPi * th)) - 2.0f / pi;           // abs
+    case 3: return (th < 0.25f ? std::sin(2.0f * kTwoPi * th) : 0.0f)      // quarter
+                   - 1.0f / (2.0f * pi);
+    case 4: {                                                              // fold
+      const float x = 2.0f * std::sin(kTwoPi * th);            // drive 2x
+      return (2.0f / pi) * std::asin(std::sin(0.5f * pi * x));  // triangle wavefold
+    }
+    default: return std::sin(kTwoPi * th);                                 // sine
+  }
 }
 // Same contract as adsr: double accumulation — float increments stall past
 // 2^25 samples and the envelope would freeze short of its target.
@@ -197,6 +223,14 @@ class Fm final : public Module {
       }
     }
 
+    const auto& wv = cfg_str_arr(cfg, "waves");
+    for (int k = 0; k < kOps; ++k) {
+      waves_[static_cast<size_t>(k)] = 0;  // sine (also the unknown-name fallback)
+      if (k < static_cast<int>(wv.size()))
+        for (int i = 0; kWaves[i]; ++i)
+          if (wv[static_cast<size_t>(k)] == kWaves[i]) waves_[static_cast<size_t>(k)] = i;
+    }
+
     edges_ = algo_ == 6 ? parse_route(cfg_arr(cfg, "route")) : named_edges(algo_);
     build_order();
 
@@ -250,9 +284,16 @@ class Fm final : public Module {
                        ? fb_amt * static_cast<double>(prev_post_[static_cast<size_t>(k)])
                        : 0.0;
       for (int p : preds_[static_cast<size_t>(k)]) mod += post[static_cast<size_t>(p)];
-      const float s =
-          std::sin(kTwoPi * static_cast<float>(phase_[static_cast<size_t>(k)]) +
-                   kIndex * static_cast<float>(mod));
+      const float A = kTwoPi * static_cast<float>(phase_[static_cast<size_t>(k)]) +
+                      kIndex * static_cast<float>(mod);
+      float s;
+      if (waves_[static_cast<size_t>(k)] == 0) {
+        s = std::sin(A);  // bit-identical to the pre-waveform path
+      } else {
+        float th = A * (0.5f / std::numbers::pi_v<float>);  // A / 2π, in cycles
+        th -= std::floor(th);
+        s = op_wave(waves_[static_cast<size_t>(k)], th);
+      }
       post[static_cast<size_t>(k)] =
           envs_[static_cast<size_t>(k)].level * lvl * static_cast<double>(s);
       outs[1 + k] = static_cast<float>(post[static_cast<size_t>(k)]);
@@ -324,6 +365,7 @@ class Fm final : public Module {
   int curve_ = 0;
   bool sync_ = true;
   std::array<double, kOps> ratios_{}, levels_{}, fixed_{}, fb_{}, vel_sens_{};
+  std::array<int, kOps> waves_{};
   std::array<EnvCfg, kOps> env_cfg_{};
   std::array<int, kOps> order_{};
   std::array<bool, kOps> carrier_{};

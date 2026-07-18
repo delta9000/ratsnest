@@ -19,6 +19,12 @@ ConfigValue arr(std::initializer_list<double> v) {
   return c;
 }
 ConfigValue str(const char* s) { ConfigValue c; c.str = s; return c; }
+ConfigValue warr(std::initializer_list<const char*> v) {
+  ConfigValue c;
+  for (const char* s : v) c.strs.emplace_back(s);
+  return c;
+}
+ConfigValue cnum(double x) { ConfigValue c; c.is_num = true; c.num = x; return c; }
 
 struct FmRig {
   std::unique_ptr<Module> m;
@@ -70,6 +76,10 @@ TEST_CASE("fm: registered with the full port surface") {
   CHECK(info->config("algo") != nullptr);
   CHECK(info->config("route") != nullptr);
   CHECK(info->config("vel_sens") != nullptr);
+  CHECK(info->config("waves") != nullptr);
+  CHECK(info->config("key_break") != nullptr);
+  CHECK(info->config("key_level") != nullptr);
+  CHECK(info->config("key_rate") != nullptr);
 }
 
 TEST_CASE("fm: bare default sounds only op1 as a plain gated sine") {
@@ -598,4 +608,58 @@ ep.fm -> out.in : 0.3
   }
   CHECK(std::sqrt(sum2 / static_cast<double>(n)) > 0.01);
   CHECK(peak <= 1.0f);
+}
+
+TEST_CASE("fm: abs waveform is octave-up (2x, no fundamental) and DC-free") {
+  Config cfg;
+  cfg.push_back({"waves", warr({"abs"})});
+  cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})}); cfg.push_back({"t3", arr({0})});
+  cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({1})});
+  FmRig rig(48000.0, cfg);
+  rig.ins[1] = 480.0f;
+  const int N = 48000;
+  std::vector<float> x(static_cast<size_t>(N));
+  for (int i = 0; i < N; ++i) { rig.tick(1.0f); x[static_cast<size_t>(i)] = rig.outs[1]; }
+  CHECK(dft_mag(x, 960.0, 48000.0) > 0.1);     // strong 2x
+  CHECK(dft_mag(x, 480.0, 48000.0) < 0.02);    // full-rectified: no fundamental
+  CHECK(dft_mag(x, 0.0, 48000.0) < 0.02);      // DC ~ 0 after centering
+}
+
+TEST_CASE("fm: each non-sine waveform is denser than sine and DC-free") {
+  // half has fundamental + even harmonics; fold is odd-symmetric (odd only);
+  // quarter is mixed. Sum several harmonics above the fundamental so the check
+  // is robust to which harmonics each wave actually carries.
+  for (const char* w : {"half", "quarter", "fold"}) {
+    INFO("wave=" << w);
+    Config cfg;
+    cfg.push_back({"waves", warr({w})});
+    cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})}); cfg.push_back({"t3", arr({0})});
+    cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({1})});
+    FmRig rig(48000.0, cfg);
+    rig.ins[1] = 480.0f;
+    const int N = 48000;
+    std::vector<float> x(static_cast<size_t>(N));
+    for (int i = 0; i < N; ++i) { rig.tick(1.0f); x[static_cast<size_t>(i)] = rig.outs[1]; }
+    const double above = dft_mag(x, 960.0, 48000.0) + dft_mag(x, 1440.0, 48000.0) +
+                         dft_mag(x, 1920.0, 48000.0) + dft_mag(x, 2400.0, 48000.0);
+    CHECK(above > 0.05);                     // harmonic content above the fundamental
+    CHECK(dft_mag(x, 0.0, 48000.0) < 0.03);  // DC-centered
+  }
+}
+
+TEST_CASE("fm: waves default and unknown names are sine, bit-identical") {
+  Config base;
+  Config allsine;
+  allsine.push_back({"waves", warr({"sine","sine","sine","sine","sine","sine"})});
+  Config unknown;
+  unknown.push_back({"waves", warr({"wobble"})});  // unknown -> sine
+  FmRig rb(48000.0, base), rs(48000.0, allsine), ru(48000.0, unknown);
+  for (int i = 0; i < 4000; ++i) {
+    const float g = (i % 500) < 400 ? 1.0f : 0.0f;
+    rb.tick(g); rs.tick(g); ru.tick(g);
+    for (int o = 0; o < 7; ++o) {
+      CHECK(rs.outs[o] == rb.outs[o]);
+      CHECK(ru.outs[o] == rb.outs[o]);
+    }
+  }
 }
