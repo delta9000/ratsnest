@@ -11,11 +11,15 @@ bool ident_start(char c) { return std::islower(static_cast<unsigned char>(c)) ||
 bool ident_char(char c) { return ident_start(c) || std::isdigit(static_cast<unsigned char>(c)); }
 
 // A note-name literal: uppercase letter A-G, optional accidental (s = sharp,
-// b = flat — '#' is unavailable, it starts a comment), one octave digit 0-9.
-// Scientific pitch notation (C4 = middle C, A4 = 440 Hz) -> frequency in Hz.
-// Uppercase letters are otherwise unused in the grammar, so this is
-// unambiguous with identifiers (which are lowercase).
-bool note_hz(std::string_view s, double& out) {
+// b = flat — '#' is unavailable, it starts a comment), one octave digit 0-9,
+// and an optional trailing 'v'. Scientific pitch notation (C4 = middle C,
+// A4 = 440 Hz) -> a number. Bare (`A4`) yields frequency in Hz; the 'v'
+// suffix (`A4v`) yields v/oct — octaves from A3 = 0.0, so pitch composes under
+// summed modulation. Uppercase letters are otherwise unused in the grammar, so
+// this is unambiguous with identifiers (which are lowercase).
+bool note_num(std::string_view s, double& out) {
+  bool voct = false;
+  if (!s.empty() && s.back() == 'v') { voct = true; s.remove_suffix(1); }
   if (s.size() < 2 || s.size() > 3) return false;
   int pc = 0;
   switch (s[0]) {
@@ -30,7 +34,8 @@ bool note_hz(std::string_view s, double& out) {
   const char d = s[idx];
   if (d < '0' || d > '9') return false;
   const int midi = (d - '0' + 1) * 12 + pc;  // scientific: C4 -> MIDI 60
-  out = 440.0 * std::exp2(static_cast<double>(midi - 69) / 12.0);
+  out = voct ? static_cast<double>(midi - 57) / 12.0            // A3 = 0.0
+             : 440.0 * std::exp2(static_cast<double>(midi - 69) / 12.0);
   return true;
 }
 
@@ -115,12 +120,12 @@ LexResult lex(std::string_view src) {
       advance(1);
       while (i < src.size() && ident_char(src[i])) advance(1);
       std::string_view tok = src.substr(start, i - start);
-      double hz = 0.0;
-      if (note_hz(tok, hz)) {
-        push(Tok::Number, "", hz, tl, tc);
+      double val = 0.0;
+      if (note_num(tok, val)) {
+        push(Tok::Number, "", val, tl, tc);
       } else {
         err(tl, tc, "invalid note name '" + std::string(tok) +
-                        "' (use e.g. A4, Cs4 for sharp, Bb2 for flat)");
+                        "' (use e.g. A4, Cs4 for sharp, Bb2 for flat, A4v for v/oct)");
       }
       continue;
     }

@@ -29,12 +29,25 @@ Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output
 `ratsnest check patch.patch`; `ratsnest render ... --stats [Ns]` prints
 overall peak/RMS/DC plus a per-window level timeline for mix work.
 
-**Note names** are numeric literals in Hz, usable anywhere a number is
-(`freq: A4`, array elements, cable literals). Scientific pitch notation: an
-uppercase letter `A`–`G`, an optional accidental — `s` = sharp, `b` = flat
-(`#` can't be used, it starts a comment) — and one octave digit `0`–`9`, with
-`C4` = middle C and `A4` = 440 Hz. Examples: `A4` (440), `Cs4` = `Db4`
-(277.18), `A1` (55), `Bb2`. So `vco { freq: A2 }` is `vco { freq: 55hz }`.
+**Note names** are numeric literals, usable anywhere a number is (`freq: A4`,
+array elements, cable literals). Scientific pitch notation: an uppercase letter
+`A`–`G`, an optional accidental — `s` = sharp, `b` = flat (`#` can't be used, it
+starts a comment) — and one octave digit `0`–`9`, with `C4` = middle C and
+`A4` = 440 Hz. A bare note is a **frequency in Hz**: `A4` (440), `Cs4` = `Db4`
+(277.18), `A1` (55). So `vco { freq: A1 }` is `vco { freq: 55hz }`.
+
+A trailing **`v` makes it v/oct** instead — octaves from `A3` = 0.0
+(`voct = (midi − 57) / 12`), the domain where summed modulation transposes
+musically. So `A4v` = `1.0`, `A3v` = `0.0`, `C4v` = `0.25`, `Bb2v` = `−0.9167`.
+Feed a pitch straight into an oscillator (`A4v -> osc.v_oct`) or write melodies
+as `stepseq { steps: [C4v, E4v, G4v] }` — the sequence carries pitch, not Hz,
+so it tracks transposition and lands in tune through a `quant`.
+
+A `…v` note is an **absolute** 12-TET pitch, not an interval. An offset summed
+onto a `v_oct` input stays a bare fraction: `0.08333 -> osc.v_oct` is up a
+semitone, `1 -> osc.v_oct` up an octave — no note-name form (the reference for
+those is the base pitch, not `A3`). Use `…v` for the pitch itself, fractions for
+the distance you move it.
 
 ### Voice groups
 

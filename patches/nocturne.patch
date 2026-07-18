@@ -1,0 +1,170 @@
+# nocturne -- a still, warm 4-bar loop in A minor at 84 BPM, ~40 s.
+#
+# Written to show off note-name literals: the entire harmony and melody are
+# spelled as PITCHES, not floats. Compare halcyon's `[0, -0.33333, ...]`.
+#
+# The idiom: anchor every pitched oscillator at `freq: A3` (220 Hz, which IS
+# the v/oct zero -- voct = (midi-57)/12, A3 = 0.0), then drive its `v_oct`
+# with `...v` note literals. Because freq = base * 2^(v_oct), a base of A3
+# makes each written note sound at exactly its own frequency: `C4v -> osc.v_oct`
+# with a 220 Hz base gives 220 * 2^0.25 = 261.63 Hz = C4. The bass anchors an
+# octave lower at A2 (110 Hz), so the same root lane voices it one octave down.
+#
+# Progression (one chord per bar, looping): Am - F - C - G  (i - VI - III - VII
+# in A minor). Three voice lanes -- root / third / fifth -- spell close triads:
+#   Am = A3 C4 E4    F = F3 A3 C4    C = C4 E4 G4    G = G3 B3 D4
+# Pad and bass read those lanes; a music-box pluck traces a chord-tone melody
+# over the top. Everything is a deterministic stepseq locked to the bar, so the
+# loop repeats seamlessly -- no drift, no dead air.
+
+# ---- clock tree: sixteenths at 84 BPM (336 gates/min) ----
+master  = clock { bpm: 336 }
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+half    = div { by: 2 }
+bar     = div { by: 2 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+
+# ---- harmony: Am - F - C - G, one chord per bar, spelled as note literals ----
+ch_root  = stepseq { steps: [A3v, F3v, C4v, G3v] }
+ch_third = stepseq { steps: [C4v, A3v, E4v, B3v] }
+ch_fifth = stepseq { steps: [E4v, C4v, G4v, D4v] }
+bar -> ch_root.clock
+bar -> ch_third.clock
+bar -> ch_fifth.clock
+
+# ---- melody: a chord-tone line, one note per beat, spanning the 4-bar loop.
+# Every note belongs to the chord under it, so it stays consonant all the way
+# round. Reads like a tune, because it is one. ----
+melody = stepseq { steps: [A4v, C5v, E5v, C5v,
+                           A4v, F4v, A4v, C5v,
+                           G4v, C5v, E5v, G5v,
+                           D5v, B4v, G4v, D5v] }
+quarter -> melody.clock
+
+# ---- pad: a triad of detuned saws (root/third/fifth), each anchored at A3 and
+# pitched by its lane. Slow breath on the lowpass, long swell per bar. ----
+pad_root  = vco { freq: A3, wave: saw }
+pad_third = vco { freq: A3, wave: saw }
+pad_fifth = vco { freq: A3, wave: tri }
+ch_root.cv  -> pad_root.v_oct
+ch_third.cv -> pad_third.v_oct
+ch_fifth.cv -> pad_fifth.v_oct
+0.005 -> pad_third.v_oct        # a few cents of detune for width
+-0.004 -> pad_fifth.v_oct
+pad_drift = lfo { freq: 0.06hz, wave: tri }
+pad_drift -> pad_third.v_oct : 0.004
+
+pad_filt = ladder { cutoff: 1200, res: 0.14, drive: 0.4 }
+pad_root  -> pad_filt.in : 0.4
+pad_third -> pad_filt.in : 0.35
+pad_fifth -> pad_filt.in : 0.35
+pad_breath = lfo { freq: 0.05hz, wave: sine }
+pad_breath -> pad_filt.cutoff : 350
+
+pad_env = adsr { attack: 0.7, decay: 0.5, sustain: 0.8, release: 1.6, curve: exp }
+bar -> pad_env.gate
+pad_amp = vca { gain: 0 }
+pad_filt -> pad_amp.in
+pad_env -> pad_amp.cv : 0.5
+
+# ---- sub bass: a clean sine on the root, anchored an octave below at A2. ----
+bass_osc = vco { freq: A2, wave: sine }
+ch_root.cv -> bass_osc.v_oct
+bass_env = adsr { attack: 0.08, decay: 0.4, sustain: 0.9, release: 0.8, curve: exp }
+bar -> bass_env.gate
+bass_amp = vca { gain: 0, response: exp }
+bass_osc -> bass_amp.in
+bass_env -> bass_amp.cv : 0.7
+
+# ---- music-box pluck: a triangle + saw bite through a low-pass gate, struck
+# each beat, tracing the melody lane. This is the tune, so it sits forward and
+# bright; LPG gives the bell-like decay. ----
+lead_osc = vco { freq: A3, wave: tri }
+lead_bite = vco { freq: A3, wave: saw }
+melody.cv -> lead_osc.v_oct
+melody.cv -> lead_bite.v_oct
+lead_pluck = lpg { damp: 0.25, decay: 0.5 }
+lead_osc  -> lead_pluck.in : 0.6
+lead_bite -> lead_pluck.in : 0.4
+quarter -> lead_pluck.strike
+lead_amp = vca { gain: 1.1 }
+lead_pluck -> lead_amp.in
+
+# ---- sparkle: the melody an octave up as a soft glassy bell, struck every
+# other beat so it twinkles rather than doubles. Anchoring at A4 (instead of
+# A3) lifts the same melody lane exactly one octave -- no separate note data. ----
+spark_osc = vco { freq: A4, wave: tri }
+melody.cv -> spark_osc.v_oct
+spark_pluck = lpg { damp: 0.15, decay: 0.35 }
+spark_osc -> spark_pluck.in
+half -> spark_pluck.strike
+spark_amp = vca { gain: 0.3 }
+spark_pluck -> spark_amp.in
+
+# ---- dry band: bass center, pad soft center (chorus/reverb widen it), pluck
+# just left of center (the delay throws widen it back out). ----
+band = mix { levels: [0.6, 0.6, 0.85, 0.4], pans: [0, 0, -0.15, 0.3] }
+bass_amp  -> band.in1
+pad_amp   -> band.in2
+lead_amp  -> band.in3
+spark_amp -> band.in4
+
+# ---- FX: chorus thickens the pad into stereo; a pair of eighth/dotted-eighth
+# delays throw the pluck across the field; a long plate reverb holds it all in
+# one room. ----
+pad_chorus = chorus { voices: 3, rate: 0.4hz, depth: 0.5, mix: 0.45 }
+pad_amp -> pad_chorus.in_l
+pad_amp -> pad_chorus.in_r
+
+dly_l = delay { time: 357ms, feedback: 0.38, tone: 3600, mix: 1 }
+dly_r = delay { time: 536ms, feedback: 0.42, tone: 3200, mix: 1 }
+lead_amp -> dly_l.in : 0.5
+lead_amp -> dly_r.in : 0.4
+
+space = reverb { decay: 0.82, damp: 0.3, mix: 1, predelay: 0.02,
+                 bandwidth: 0.92, mod_rate: 0.5, mod_depth: 18 }
+pad_chorus.out_l -> space.in_l : 0.28
+pad_chorus.out_r -> space.in_r : 0.28
+lead_amp -> space.in_l : 0.16
+lead_amp -> space.in_r : 0.16
+spark_amp -> space.in_l : 0.25
+spark_amp -> space.in_r : 0.25
+
+# ---- master sum: dry band + chorus pad + delay throws + reverb tail ----
+master_mix = mix { levels: [1.8, 1.8, 0.9, 0.9, 0.8, 0.8, 0.9, 0.9],
+                   pans: [-1, 1, -1, 1, -0.7, 0.7, -1, 1] }
+band.out_l       -> master_mix.in1
+band.out_r       -> master_mix.in2
+pad_chorus.out_l -> master_mix.in3
+pad_chorus.out_r -> master_mix.in4
+dly_l            -> master_mix.in5
+dly_r            -> master_mix.in6
+space.out_l      -> master_mix.in7
+space.out_r      -> master_mix.in8
+
+# ---- mastering: DC block -> gentle EQ -> stereo width -> brickwall limit ----
+master_dc = dcblock { cutoff: 14hz }
+master_mix.out_l -> master_dc.in_l
+master_mix.out_r -> master_dc.in_r
+
+master_eq = eq { hp_freq: 32, low_freq: 220, low_gain: -1.5,
+                 mid1_freq: 900, mid1_gain: 0.4, mid1_q: 0.7,
+                 mid2_freq: 3500, mid2_gain: 1.5, mid2_q: 0.8,
+                 high_freq: 9000, high_gain: 2.0 }
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+master_field = stereo { width: 1.15, balance: 0 }
+master_eq.out_l -> master_field.in_l
+master_eq.out_r -> master_field.in_r
+
+master_limit = limiter { threshold: -1.5, release: 0.12 }
+master_field.out_l -> master_limit.in_l
+master_field.out_r -> master_limit.in_r
+
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
