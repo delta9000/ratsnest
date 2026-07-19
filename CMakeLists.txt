@@ -52,6 +52,13 @@ add_test(NAME cli_render
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first.wav)
 add_test(NAME cli_check_kick_sub
   COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/patches/lib/kick.sub)
+
+file(GLOB MSKITSUBS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/patches/lib/kit/*.sub)
+foreach(subfile ${MSKITSUBS})
+  get_filename_component(sub_name ${subfile} NAME_WE)
+  add_test(NAME cli_check_kit_${sub_name} COMMAND ratsnest check ${subfile})
+endforeach()
+
 add_test(NAME cli_check_rejects_bad_patch
   COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
 set_tests_properties(cli_check_rejects_bad_patch PROPERTIES WILL_FAIL TRUE)
