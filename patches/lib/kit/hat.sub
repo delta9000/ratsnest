@@ -1,13 +1,14 @@
-# kit/hat.sub -- struck-metal hat: TR-808-cluster modal bank flashed by a
-# 40 ms noise burst, under a bandpassed noise sizzle layer. The sizzle is
-# the body and the bank is the colour: six clean sine modes alone read as a
-# glass clink, so the burst is long (stochastic excitation smears the ring),
-# the ring is short, and the noise carries the "tss". One file, both hats:
-# instance with short decay for closed, long for open, and cable the closed
-# hat's trig into the open instance's choke. Ratios: docs/attribution.md.
-tune   = param { default: 1.8khz }  # cluster base; bank spans ~1.8-7 kHz
-decay  = param { default: 0.15 }    # 0..1 ring amount onto modal.damping
-tone   = param { default: 6khz }    # sizzle bandpass centre
+# kit/hat.sub -- struck-metal hat, 808-architecture: the six 808 oscillator
+# ratios expanded by their odd harmonics (each source is square-ish, so its
+# partial stack comes too — 40 modes of dense inharmonic hash, not six bare
+# sines) through a high bandpass, plus a noise-spit layer. Sparse sine banks
+# read as a struck rod; density is what makes metal shimmer. One file, both
+# hats: instance with short decay for closed, long for open, and cable the
+# closed hat's trig into the open instance's choke. Ratios:
+# docs/attribution.md (808 bases x odd multiples 1..13, ceiling 44).
+tune   = param { default: 450hz }   # hash base; audible content set by tone
+decay  = param { default: 0.2 }     # 0..1 ring amount onto modal.damping
+tone   = param { default: 8khz }    # output bandpass centre (the swish)
 trig   = input {}
 accent = input { default: 0.7 }
 choke  = input {}
@@ -18,25 +19,32 @@ accent -> acc.in
 trig -> acc.trig
 
 # Effective brightness = 0.44 + acc * 0.3 (0.65 at default accent).
-# position 0.12 tilts the comb down across the cluster with no nulled mode
-# (0.25 zeroes mode index 2 outright).
-metal = modal { ratios: [1, 1.483, 1.8, 2.546, 2.63, 3.897],
-                freq: tune, damping: decay, brightness: 0.44, position: 0.12 }
+metal = modal { ratios: [1, 1.483, 1.8, 2.546, 2.63, 3, 3.897, 4.449, 5,
+                         5.4, 7, 7.415, 7.638, 7.89, 9, 10.381, 11, 11.691,
+                         12.6, 12.73, 13, 13.15, 13.347, 16.2, 16.313,
+                         17.822, 18.41, 19.279, 19.485, 19.8, 22.914, 23.4,
+                         23.67, 27.279, 28.006, 28.93, 33.098, 34.19,
+                         35.073, 42.867],
+                freq: tune, damping: decay, brightness: 0.44, position: 0.25 }
 acc -> metal.brightness : 0.3
 
-# Excitation: 40 ms noise burst into the bank's exciter input; the same
-# burst feeds the sizzle path below.
+# Excitation: 25 ms noise burst into the bank; the same burst feeds the
+# spit layer below.
 xn = noise { color: white, seed: 23 }
-benv = func { rise: 0.0002, fall: 0.04 }
+benv = func { rise: 0.0002, fall: 0.025 }
 trig -> benv.trig
 bamp = vca { gain: 0 }
 xn -> bamp.in
 benv -> bamp.cv
 bamp -> metal.in
 
-# Sizzle: the burst through its own bandpass — the snare's body+noise
-# architecture, inverted: here noise dominates and metal colours it.
-szf = svf { cutoff: tone, res: 0.1 }
+# The swish: hash through a high bandpass (the 808 keeps only the upper
+# harmonic interference of its oscillator bank).
+post = svf { cutoff: tone, res: 0.15 }
+metal -> post.in
+
+# Attack spit: a little bandpassed noise on top.
+szf = svf { cutoff: 9khz, res: 0.1 }
 bamp -> szf.in
 
 # Choke: slam the accent VCA shut (cv sums, gain clamps at 0) and let it
@@ -45,11 +53,11 @@ chk = func { rise: 0.0005, fall: 0.02 }
 choke -> chk.trig
 
 lvl = vca { gain: 0.5 }
-metal -> lvl.in : 0.45
-szf.bp -> lvl.in : 1.1
+post.bp -> lvl.in : 1.0
+szf.bp -> lvl.in : 0.5
 acc -> lvl.cv : 0.5
 chk -> lvl.cv : -8
-lvl -> main.in : 1.0
+lvl -> main.in : 1.35
 
 # Audition: `mise run play -- patches/lib/kit/hat.sub`
 demo.clk = clock { bpm: 240 }

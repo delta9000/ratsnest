@@ -117,18 +117,18 @@ noise burst is the attack snap. `snap` balances wires+snap against body.
 `tune: 480hz`, very low damping base, hard bright strike through a fast VCA
 crack. The woody clonk.
 
-**`kit/hat.sub`** — one file, both hats. `modal` on the metal cluster at
-`tune: 1.8khz` (bank spans ≈ 1.8–7 kHz), flashed by a 40 ms noise burst
-through `in`, under a noise sizzle layer: the same burst through its own
-`svf` bandpass at `tone` (≈ 6 kHz). The sizzle is the body and the bank is
-the colour — six clean sine modes alone read as a glass clink (amended
-2026-07-19 after audition; the original design high-passed the bank at
-4 kHz, which gutted the cluster body and left bare high modes ringing).
-`position` sits at 0.12: the comb tilts down across the cluster without
-nulling a mode (0.25 zeroes mode index 2). `choke` input: rising edge fires
-a fast cut envelope multiplied into the amp CV. Closed vs. open is
-patch-side: two instances with different `decay`, and `chat.trig` also cabled
-to `ohat.choke`.
+**`kit/hat.sub`** — one file, both hats. Amended 2026-07-19 after two
+audition rounds: six bare sine modes read as glass/struck-rod no matter how
+they are tuned — sparseness, not tuning, was the problem, because the 808's
+sources are square-ish and carry dense harmonic stacks. Final architecture
+mirrors the 808: `modal` on the six 808 base ratios **expanded by their odd
+harmonics** (multiples 1..13, ratio ceiling 44 — 40 modes of dense
+inharmonic hash) at `tune: 450hz`, excited by a 25 ms noise burst, then a
+high `svf` **bandpass** at `tone` (≈ 8 kHz) keeps only the upper harmonic
+interference (the swish), plus a small bandpassed noise spit layer from the
+same burst. `choke` input: rising edge fires a fast cut envelope multiplied
+into the amp CV. Closed vs. open is patch-side: two instances with different
+`decay`, and `chat.trig` also cabled to `ohat.choke`.
 
 **`kit/clap.sub`** — trig through two `delay` taps (≈ 11 and 23 ms); original
 plus taps retrigger one fast `func` (the three-burst flam), summed with a
