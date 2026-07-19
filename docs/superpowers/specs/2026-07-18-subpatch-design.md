@@ -3,7 +3,7 @@
 2026-07-18. Status: designed. Refines §3 of `2026-07-10-ratsnest-design.md`
 (the patch file is the source of truth; compile-time expansion precedent set
 by `2026-07-11-voice-alloc-design.md`). Motivating consumer: the physical-
-modeling drumkit (spec to follow) — a kit is 5–7 voices of ~10 modules each,
+modeling drumkit (now `2026-07-18-drumkit-design.md`) — a kit is 5–7 voices of ~10 modules each,
 untenable to copy into every song patch. Decision recorded there: subpatches
 land first; the drumkit ships as includable subpatch files.
 

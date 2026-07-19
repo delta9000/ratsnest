@@ -557,8 +557,16 @@ impulse), `structure` 0.25 (partial spacing: below 0.25 compressed/drum-like,
 (decay time, exponential across ~4 decades of Q), `position` 0.25
 (strike-position comb; 0.5 nulls the even partials, the fundamental always
 sounds). Outputs `out` plus `odd`/`even` partial groups (`out = odd + even`).
-Config `modes` 2..128, rounded to even — the voice-quality/CPU knob. Bowed
-and blown textures come from `noise -> vca -> m.in` with slow `vca.cv`.
+Config `modes` 2..128, rounded to even — the voice-quality/CPU knob — or
+`ratios: [1, 1.594, 2.136, ...]` (mutually exclusive with `modes`): explicit
+mode placement at multiples of the fundamental, list order = mode index
+(list the fundamental first; the position comb and odd/even split follow list
+order). With `ratios` given, `structure` becomes a stretch/compress warp
+`w = 2^((structure - 0.25) * 2)` on the listed ratios — exact as written at
+the 0.25 default. Entries clamp to at most 64; an empty list, a non-positive
+entry, or combining with `modes:` is a patch error. The drumkit voices in
+`patches/lib/kit/` are built on this (membrane and metal ratio sets; see
+docs/attribution.md). Bowed and blown textures come from `noise -> vca -> m.in` with slow `vca.cv`.
 
 ## `string`
 

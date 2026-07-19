@@ -47,9 +47,18 @@ class Modal final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = static_cast<float>(rate);
-    int m = static_cast<int>(cfg_num(cfg, "modes", 64.0));
-    m = std::clamp(m, 2, 128);
-    m += m & 1;  // Rings requires an even resolution.
+    ratios_.clear();
+    for (double v : cfg_arr(cfg, "ratios"))
+      ratios_.push_back(std::min(static_cast<float>(v), 64.0f));
+    int m;
+    if (ratios_.empty()) {
+      m = static_cast<int>(cfg_num(cfg, "modes", 64.0));
+      m = std::clamp(m, 2, 128);
+    } else {
+      m = static_cast<int>(ratios_.size());
+    }
+    m += m & 1;  // Rings requires an even resolution; an odd ratios count
+                 // pads with an inert mode parked at the 0.49 ceiling.
     modes_.assign(static_cast<std::size_t>(m), resonate::Svf{});
     exciter_.reset();
     num_active_ = 0;
@@ -134,8 +143,20 @@ class Modal final : public Module {
     const float q_loss_rate = structure * (2.0f - structure) * 0.1f;
     int num = 0;
     const int m = static_cast<int>(modes_.size());
+    const int nr = static_cast<int>(ratios_.size());
+    // With explicit ratios, structure stretches/compresses the listed
+    // series: f_i = f0 * ratios[i]^w, w = 1 at the 0.25 default so the
+    // ratios sound exactly as written (spec 2026-07-18-drumkit §2).
+    const float warp = std::exp2((structure - 0.25f) * 2.0f);
     for (int i = 0; i < m; ++i) {
-      float pf = harmonic * stretch;
+      float pf;
+      if (nr > 0) {
+        pf = i < nr
+                 ? f * std::pow(ratios_[static_cast<std::size_t>(i)], warp)
+                 : 0.49f;
+      } else {
+        pf = harmonic * stretch;
+      }
       if (pf >= 0.49f) {
         pf = 0.49f;
       } else {
@@ -164,6 +185,7 @@ class Modal final : public Module {
   }
 
   float rate_ = 48000.0f;
+  std::vector<float> ratios_;
   std::vector<resonate::Svf> modes_;
   resonate::Svf exciter_;
   int num_active_ = 0;
