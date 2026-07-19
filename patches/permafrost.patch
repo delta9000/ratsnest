@@ -12,7 +12,7 @@
 # Arrangement (20 four-bar blocks, 8.14 s each):
 #   1-4    intro       drone + relay pads establish, hats fade in
 #   5-6    kick in     restrained four-on-floor
-#   7-12   groove      E-pedal dub bass joins, clouds thicken
+#   7-12   groove      root-tracking dub bass joins, clouds thicken
 #   13-14  breakdown   drums out, relay blooms at full level
 #   15-18  drop 2      full groove returns
 #   19-20  outro       everything fades through out.level
@@ -110,13 +110,31 @@ kick_amp = vca { gain: 0 }
 kick.main -> kick_amp.in
 kick_lvl -> kick_amp.cv
 
-bass = sub { file: "lib/bass.sub", pitch: E1, decay: 0.2s }
-# E-pedal dub figure: euclid(8,3) on eighths = beat 1, and-of-2, beat 4.
+# Dub bass, motorik-style voice: detuned saws + sine sub through a low
+# ladder, tracking the chord roots folded into one octave (E1 C2 A1 D1).
+# euclid(8,3) gates pulse the sustained voice: beat 1, and-of-2, beat 4.
+bass_root = stepseq { steps: [0, 0.6667, 0.4167, -0.1667] }
+four_bar -> bass_root.clock
+bass_a = vco { freq: E1, wave: saw }
+bass_b = vco { freq: 41.5hz, wave: saw }
+bass_s = vco { freq: E1, wave: sine }
+bass_root.cv -> bass_a.v_oct
+bass_root.cv -> bass_b.v_oct
+bass_root.cv -> bass_s.v_oct
+bass_filt = ladder { cutoff: 240, res: 0.15, drive: 0.4 }
+bass_a -> bass_filt.in : 0.45
+bass_b -> bass_filt.in : 0.45
 bass_pat = euclid { steps: 8, hits: 3 }
 eighth -> bass_pat.clock
-bass_pat.trig -> bass.trig
+bass_env = func { rise: 0.01, fall: 0.4, curve: log }
+bass_pat.gate -> bass_env.trig
+bass_env -> bass_filt.cutoff : 160
+bass_v = vca { gain: 0 }
+bass_filt.out -> bass_v.in
+bass_s -> bass_v.in : 0.5
+bass_env -> bass_v.cv
 bass_amp = vca { gain: 0 }
-bass.main -> bass_amp.in
+bass_v -> bass_amp.in
 bass_lvl -> bass_amp.cv
 
 chat = sub { file: "lib/hat.sub", pitch: 8.5khz, decay: 0.045s, color: 0.12 }
@@ -162,7 +180,7 @@ sd_amp -> space.in_l : 0.1
 sd_amp -> space.in_r : 0.1
 
 # ---- band: drums + bass + drone + echo ----
-band = mix { levels: [0.9, 0.6, 1.4, 0.85, 0.45, 0.3],
+band = mix { levels: [0.9, 0.65, 1.4, 0.85, 0.45, 0.3],
              pans: [0, 0, 0.35, -0.3, -0.12, 0.45] }
 kick_amp -> band.in1
 bass_amp -> band.in2
@@ -191,4 +209,4 @@ master_mix.out_r -> out.right
 
 # The last arrangement lane fades the whole track through out.level.
 -1 -> out.level
-main_lvl -> out.level : 0.78
+main_lvl -> out.level : 0.72
