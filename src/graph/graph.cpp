@@ -108,6 +108,10 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
       err(p.line, p.col, "module type '" + m.type + "' has no parameter '" + p.name +
           "' (inputs: " + join_names(info->inputs, [](auto& i) { return i.name; }) + ")", m.file);
     }
+    if (info->validate) {
+      std::string msg = info->validate(n.config);
+      if (!msg.empty()) err(m.line, m.col, std::move(msg), m.file);
+    }
   }
   add_node("out", dsp::find_module("out"));
 

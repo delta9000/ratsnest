@@ -14,7 +14,7 @@ constexpr InputInfo kIns[] = {{"in", 0.f},          {"freq", 220.f},
                               {"v_oct", 0.f},       {"strike", 0.f},
                               {"structure", 0.25f}, {"brightness", 0.5f},
                               {"damping", 0.5f},    {"position", 0.25f}};
-constexpr ConfigInfo kCfgs[] = {{"modes", nullptr}};
+constexpr ConfigInfo kCfgs[] = {{"modes", nullptr}, {"ratios", nullptr}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"odd"}, {"even"}};
 // Coefficients refresh at block rate, Rings-style (24-sample blocks there).
 constexpr int kBlock = 32;
@@ -23,6 +23,24 @@ constexpr int kBlock = 32;
 float sane(float x, float lo, float hi) {
   if (!(x >= lo)) return lo;
   return x > hi ? hi : x;
+}
+
+bool has_cfg(const Config& cfg, std::string_view name) {
+  for (const auto& [k, v] : cfg)
+    if (k == name) return true;
+  return false;
+}
+
+std::string validate_cfg(const Config& cfg) {
+  if (!has_cfg(cfg, "ratios")) return {};
+  if (has_cfg(cfg, "modes"))
+    return "specify one of 'modes:' or 'ratios:', not both";
+  const auto& r = cfg_arr(cfg, "ratios");
+  if (r.empty()) return "'ratios:' needs a list with at least one entry";
+  if (r.size() > 128) return "'ratios:' accepts at most 128 entries";
+  for (double v : r)
+    if (!(v > 0.0)) return "'ratios:' entries must be positive";
+  return {};
 }
 
 class Modal final : public Module {
@@ -159,5 +177,6 @@ class Modal final : public Module {
 std::unique_ptr<Module> make() { return std::make_unique<Modal>(); }
 }  // namespace
 
-const ModuleInfo modal_info{"modal", kIns, kCfgs, kOuts, &make};
+const ModuleInfo modal_info{"modal", kIns, kCfgs, kOuts,
+                            &make, false, false, &validate_cfg};
 }  // namespace ms::dsp

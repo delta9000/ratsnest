@@ -166,3 +166,33 @@ TEST_CASE("invalid note names report a clean error, not a crash") {
   auto r = go("o = vco { freq: A4 }\no -> out.in\n");
   REQUIRE(r.ok());
 }
+
+TEST_CASE("modal rejects modes together with ratios") {
+  auto p = dsl::parse("m = modal { modes: 8, ratios: [1, 1.5] }\nm -> out.in\n");
+  REQUIRE(p.ok());
+  auto c = graph::compile(p.ast, 48000.0);
+  REQUIRE_FALSE(c.ok());
+  CHECK(c.errors[0].msg.find("not both") != std::string::npos);
+}
+
+TEST_CASE("modal rejects an empty ratios list") {
+  auto p = dsl::parse("m = modal { ratios: [] }\nm -> out.in\n");
+  REQUIRE(p.ok());
+  auto c = graph::compile(p.ast, 48000.0);
+  REQUIRE_FALSE(c.ok());
+  CHECK(c.errors[0].msg.find("ratios") != std::string::npos);
+}
+
+TEST_CASE("modal rejects non-positive ratios entries") {
+  auto p = dsl::parse("m = modal { ratios: [1, -2] }\nm -> out.in\n");
+  REQUIRE(p.ok());
+  auto c = graph::compile(p.ast, 48000.0);
+  REQUIRE_FALSE(c.ok());
+  CHECK(c.errors[0].msg.find("positive") != std::string::npos);
+}
+
+TEST_CASE("modal accepts a plain ratios list") {
+  auto p = dsl::parse("m = modal { ratios: [1, 1.594, 2.136] }\nm -> out.in\n");
+  REQUIRE(p.ok());
+  CHECK(graph::compile(p.ast, 48000.0).ok());
+}

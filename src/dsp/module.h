@@ -72,6 +72,10 @@ struct ModuleInfo {
   // Opts into on_audio_in delivery; the runner fans captured external audio to
   // every node with wants_audio_in set, at block start, before processing.
   bool wants_audio_in = false;
+  // Optional graph-compile-time config validation. Returns "" to accept,
+  // else the message reported at the declaration's line:col. Config
+  // hostility is a compile-time concern; init() only sees validated configs.
+  std::string (*validate)(const Config&) = nullptr;
 
   int input_index(std::string_view name) const;
   int output_index(std::string_view name) const;
