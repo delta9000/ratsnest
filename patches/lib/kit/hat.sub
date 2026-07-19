@@ -1,0 +1,49 @@
+# kit/hat.sub -- struck-metal hat: TR-808-cluster modal bank excited by a
+# short noise burst (noise through the bank is the sizzle; a bare impulse
+# rings too cleanly), high-passed out. One file, both hats: instance with
+# short decay for closed, long for open, and cable the closed hat's trig
+# into the open instance's choke. Ratios: docs/attribution.md.
+tune   = param { default: 2.6khz }  # cluster base; bank spans ~2.6-10 kHz
+decay  = param { default: 0.25 }    # 0..1 ring amount onto modal.damping
+tone   = param { default: 4khz }    # output high-pass corner
+trig   = input {}
+accent = input { default: 0.7 }
+choke  = input {}
+main   = output {}
+
+acc = sh {}
+accent -> acc.in
+trig -> acc.trig
+
+# Effective brightness = 0.44 + acc * 0.3 (0.65 at default accent).
+metal = modal { ratios: [1, 1.483, 1.8, 2.546, 2.63, 3.897],
+                freq: tune, damping: decay, brightness: 0.44, position: 0.25 }
+acc -> metal.brightness : 0.3
+
+# Excitation: 8 ms noise burst into the bank's exciter input.
+xn = noise { color: white, seed: 23 }
+benv = func { rise: 0.0002, fall: 0.008 }
+trig -> benv.trig
+bamp = vca { gain: 0 }
+xn -> bamp.in
+benv -> bamp.cv
+bamp -> metal.in
+
+post = svf { cutoff: tone, res: 0.1 }
+metal -> post.in
+
+# Choke: slam the accent VCA shut (cv sums, gain clamps at 0) and let it
+# recover as the 20 ms cut envelope falls.
+chk = func { rise: 0.0005, fall: 0.02 }
+choke -> chk.trig
+
+lvl = vca { gain: 0.5 }
+post.hp -> lvl.in
+acc -> lvl.cv : 0.5
+chk -> lvl.cv : -8
+lvl -> main.in : 0.52
+
+# Audition: `mise run play -- patches/lib/kit/hat.sub`
+demo.clk = clock { bpm: 240 }
+demo.clk -> trig
+main -> demo.out.in : 0.7
