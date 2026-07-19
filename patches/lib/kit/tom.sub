@@ -1,0 +1,33 @@
+# kit/tom.sub -- physically-modeled tom: the kick.sub membrane tuned up,
+# gentler pitch bend (skin tension), struck off-center. Same Bessel ratios
+# (Fletcher & Rossing; docs/attribution.md) and kit voice contract.
+tune   = param { default: 140hz }   # fundamental; instance per tom
+decay  = param { default: 0.6 }     # 0..1 ring amount onto modal.damping
+bend   = param { default: 0.3 }     # skin-tension bloop, octaves
+trig   = input {}
+accent = input { default: 0.7 }
+main   = output {}
+
+acc = sh {}
+accent -> acc.in
+trig -> acc.trig
+
+# Effective brightness = 0.24 + acc * 0.3 (0.45 at default accent).
+body = modal { ratios: [1, 1.594, 2.136, 2.296, 2.653, 2.918],
+               freq: tune, damping: decay, brightness: 0.24, position: 0.35 }
+trig -> body.strike
+acc -> body.brightness : 0.3
+
+penv = func { rise: 0.0003, fall: 0.08 }
+trig -> penv.trig
+penv -> body.v_oct : bend
+
+lvl = vca { gain: 0.5 }
+body -> lvl.in
+acc -> lvl.cv : 0.5
+lvl -> main.in : 1.7
+
+# Audition: `mise run play -- patches/lib/kit/tom.sub`
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in
