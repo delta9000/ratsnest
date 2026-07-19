@@ -1,0 +1,68 @@
+# kit -- physical-modeling drumkit demo groove.
+# Every pattern period divides the 16-step bar; the accent lfo locks to
+# 4 bars (bar at 126 bpm = 60/126*4 s -> 1/4-bar freq 0.13125 hz), so the
+# whole groove loops exactly.
+#
+# Run:  mise run play -- patches/kit.patch
+
+master  = clock { bpm: 504 }   # sixteenths at 126
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+master -> eighth.in
+eighth -> quarter.in
+
+kick = sub { file: "lib/kit/kick.sub" }
+quarter -> kick.trig
+
+sn_pat = euclid { steps: 4, hits: 2, rot: 1 }
+quarter -> sn_pat.clock
+snare = sub { file: "lib/kit/snare.sub" }
+sn_pat.trig -> snare.trig
+clap = sub { file: "lib/kit/clap.sub" }
+sn_pat.trig -> clap.trig
+
+# Hats: sixteenth ride, bern-thinned; opens on offbeat eighths, choked by
+# every closed hit.
+hat_pat = euclid { steps: 16, hits: 11, rot: 2 }
+master -> hat_pat.clock
+hat_coin = bern { prob: 0.8, seed: 7 }
+hat_pat.trig -> hat_coin.gate
+chat = sub { file: "lib/kit/hat.sub", decay: 0.22 }
+hat_coin.a -> chat.trig
+open_pat = euclid { steps: 2, hits: 1, rot: 1 }
+eighth -> open_pat.clock
+ohat = sub { file: "lib/kit/hat.sub", decay: 0.45 }
+open_pat.trig -> ohat.trig
+hat_coin.a -> ohat.choke
+
+# Accent movement, 4-bar locked. Cabling accent replaces the sub's 0.7
+# default, so the base rides in as a constant cable and the lfo sums on.
+acc_lfo = lfo { freq: 0.13125hz }
+0.7 -> chat.accent
+acc_lfo -> chat.accent : 0.25
+0.7 -> kick.accent
+acc_lfo -> kick.accent : 0.1
+
+# Toms answer at the bar tail; rim sparse off-grid clicks.
+tom_pat = euclid { steps: 16, hits: 2, rot: 13 }
+master -> tom_pat.clock
+tom = sub { file: "lib/kit/tom.sub", tune: 110hz }
+tom_pat.trig -> tom.trig
+rim_pat = euclid { steps: 8, hits: 3, rot: 5 }
+eighth -> rim_pat.clock
+rim_coin = bern { prob: 0.6, seed: 11 }
+rim_pat.trig -> rim_coin.gate
+rim = sub { file: "lib/kit/rim.sub" }
+rim_coin.a -> rim.trig
+
+m = mix { levels: [0.9, 0.55, 0.3, 0.4, 0.35, 0.4, 0.35],
+          pans: [0, 0, 0.15, 0.25, -0.25, -0.3, 0.35] }
+kick  -> m.in1
+snare -> m.in2
+clap  -> m.in3
+chat  -> m.in4
+ohat  -> m.in5
+tom   -> m.in6
+rim   -> m.in7
+m.out_l -> out.left
+m.out_r -> out.right

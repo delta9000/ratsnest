@@ -832,3 +832,21 @@ Several classic pedals need no new module — they compose from what's here:
   rectifier; note it aliases on bright input).
 - **Big Muff fuzz:** `overdrive { model: muff }`, or cascade two `overdrive`
   stages with a filter between them.
+
+### Physical drumkit (`lib/kit/*.sub`)
+
+Seven physically-modeled voices sharing one contract: `trig` fires, `accent`
+(0..1, latched per hit) drives level and strike brightness, `tune`/`decay`
+shape the body (`decay` is 0..1 ring on the modal voices, seconds on the
+clap). Closed/open hats are two instances of one file, choke-coupled:
+
+```text
+chat = sub { file: "lib/kit/hat.sub", decay: 0.22 }
+ohat = sub { file: "lib/kit/hat.sub", decay: 0.45 }
+pat.trig -> chat.trig
+open_pat.trig -> ohat.trig
+pat.trig -> ohat.choke       # every closed hit chokes the open ring
+bern.a -> chat.accent        # per-hit dynamics from any 0..1 source
+```
+
+Full groove: `patches/kit.patch`.
