@@ -117,17 +117,21 @@ noise burst is the attack snap. `snap` balances wires+snap against body.
 `tune: 480hz`, very low damping base, hard bright strike through a fast VCA
 crack. The woody clonk.
 
-**`kit/hat.sub`** — one file, both hats. Amended 2026-07-19 after two
-audition rounds: six bare sine modes read as glass/struck-rod no matter how
-they are tuned — sparseness, not tuning, was the problem, because the 808's
-sources are square-ish and carry dense harmonic stacks. Final architecture
-mirrors the 808: `modal` on the six 808 base ratios **expanded by their odd
-harmonics** (multiples 1..13, ratio ceiling 44 — 40 modes of dense
-inharmonic hash) at `tune: 450hz`, excited by a 25 ms noise burst, then a
-high `svf` **bandpass** at `tone` (≈ 8 kHz) keeps only the upper harmonic
-interference (the swish), plus a small bandpassed noise spit layer from the
-same burst. `choke` input: rising edge fires a fast cut envelope multiplied
-into the amp CV. Closed vs. open is patch-side: two instances with different
+**`kit/hat.sub`** — one file, both hats. Amended 2026-07-19 twice after
+audition, finally calibrated against real samples (acoustic kit + TR-808):
+a real closed hat measures as a 150–800 ms broadband noise wash — spectral
+flatness 0.2–0.55 over 2–16 kHz, mild metallic peaks (~8–12× the median
+bin), uniform per-band decay — where every mode-cluster attempt (six sines,
+sizzle blends, even a 40-mode odd-harmonic hash) measured as a ≤ 21 ms
+line-spectrum tick and sounded like glass/rod. Final architecture: the
+40-mode 808 hash bank (six base ratios × odd multiples 1..13, `tune:
+450hz`) is **continuously driven** by two-stage-enveloped noise — a driven
+resonator outputs colored noise, never a clean ring — mixed under a `svf`
+bandpass wash of the same driver at `tone` (≈ 6.5 kHz). `decay` doubles as
+tail seconds (`func` fall) and modal damping. Measured result sits inside
+the sampled-hat envelope: flatness 0.24, 240 ms tail, centroid 4.6 kHz.
+`choke` input: rising edge fires a fast cut envelope multiplied into the
+amp CV. Closed vs. open is patch-side: two instances with different
 `decay`, and `chat.trig` also cabled to `ohat.choke`.
 
 **`kit/clap.sub`** — trig through two `delay` taps (≈ 11 and 23 ms); original

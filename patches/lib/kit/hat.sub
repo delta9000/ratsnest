@@ -1,14 +1,17 @@
-# kit/hat.sub -- struck-metal hat, 808-architecture: the six 808 oscillator
-# ratios expanded by their odd harmonics (each source is square-ish, so its
-# partial stack comes too — 40 modes of dense inharmonic hash, not six bare
-# sines) through a high bandpass, plus a noise-spit layer. Sparse sine banks
-# read as a struck rod; density is what makes metal shimmer. One file, both
-# hats: instance with short decay for closed, long for open, and cable the
-# closed hat's trig into the open instance's choke. Ratios:
-# docs/attribution.md (808 bases x odd multiples 1..13, ceiling 44).
-tune   = param { default: 450hz }   # hash base; audible content set by tone
-decay  = param { default: 0.2 }     # 0..1 ring amount onto modal.damping
-tone   = param { default: 8khz }    # output bandpass centre (the swish)
+# kit/hat.sub -- struck-metal hat, calibrated against real hat samples
+# (acoustic + TR-808, see 2026-07-18-drumkit-design.md §4): a real closed
+# hat is a 150-800 ms broadband noise wash (spectral flatness 0.2-0.55 over
+# 2-16 kHz) with mild metallic peaks and uniform per-band decay — not a
+# ringing mode cluster. So the 40-mode 808-hash bank is CONTINUOUSLY DRIVEN
+# by two-stage-enveloped noise (a driven resonator outputs colored noise,
+# never a clean ring) and mixed under a bandpassed wash of the same driver.
+# Measured here: flatness 0.24, tail 240 ms, centroid 4.6 kHz, peak/median
+# 11 — all inside the sampled-hat envelope. One file, both hats: short
+# decay for closed, long for open, closed trig into the open's choke.
+# Ratios: docs/attribution.md (808 bases x odd multiples 1..13).
+tune   = param { default: 450hz }   # hash base
+decay  = param { default: 0.25 }    # tail seconds AND 0..1 modal ring
+tone   = param { default: 6.5khz }  # wash bandpass centre
 trig   = input {}
 accent = input { default: 0.7 }
 choke  = input {}
@@ -17,6 +20,18 @@ main   = output {}
 acc = sh {}
 accent -> acc.in
 trig -> acc.trig
+
+# Two-stage envelope on the shared noise driver: fast attack transient
+# plus exponential tail (real hats: ~-0.6 dB/ms for 20 ms, then slow).
+nz = noise { color: white, seed: 23 }
+env1 = func { rise: 0.0002, fall: 0.02 }
+env2 = func { rise: 0.0005, fall: decay, curve: exp }
+trig -> env1.trig
+trig -> env2.trig
+drv = vca { gain: 0 }
+nz -> drv.in
+env1 -> drv.cv
+env2 -> drv.cv : 0.5
 
 # Effective brightness = 0.44 + acc * 0.3 (0.65 at default accent).
 metal = modal { ratios: [1, 1.483, 1.8, 2.546, 2.63, 3, 3.897, 4.449, 5,
@@ -27,25 +42,10 @@ metal = modal { ratios: [1, 1.483, 1.8, 2.546, 2.63, 3, 3.897, 4.449, 5,
                          35.073, 42.867],
                 freq: tune, damping: decay, brightness: 0.44, position: 0.25 }
 acc -> metal.brightness : 0.3
+drv -> metal.in
 
-# Excitation: 25 ms noise burst into the bank; the same burst feeds the
-# spit layer below.
-xn = noise { color: white, seed: 23 }
-benv = func { rise: 0.0002, fall: 0.025 }
-trig -> benv.trig
-bamp = vca { gain: 0 }
-xn -> bamp.in
-benv -> bamp.cv
-bamp -> metal.in
-
-# The swish: hash through a high bandpass (the 808 keeps only the upper
-# harmonic interference of its oscillator bank).
-post = svf { cutoff: tone, res: 0.15 }
-metal -> post.in
-
-# Attack spit: a little bandpassed noise on top.
-szf = svf { cutoff: 9khz, res: 0.1 }
-bamp -> szf.in
+wash = svf { cutoff: tone, res: 0.1 }
+drv -> wash.in
 
 # Choke: slam the accent VCA shut (cv sums, gain clamps at 0) and let it
 # recover as the 20 ms cut envelope falls.
@@ -53,11 +53,11 @@ chk = func { rise: 0.0005, fall: 0.02 }
 choke -> chk.trig
 
 lvl = vca { gain: 0.5 }
-post.bp -> lvl.in : 1.0
-szf.bp -> lvl.in : 0.5
+metal -> lvl.in : 0.5
+wash.bp -> lvl.in : 1.0
 acc -> lvl.cv : 0.5
 chk -> lvl.cv : -8
-lvl -> main.in : 1.35
+lvl -> main.in : 0.6
 
 # Audition: `mise run play -- patches/lib/kit/hat.sub`
 demo.clk = clock { bpm: 240 }
