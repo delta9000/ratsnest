@@ -835,10 +835,14 @@ Several classic pedals need no new module — they compose from what's here:
 
 ### Physical drumkit (`lib/kit/*.sub`)
 
-Seven kit voices (six physically modeled, one noise clap) sharing one contract: `trig` fires, `accent`
+Eight kit voices (six physically modeled, one noise clap, one ring-modulated
+hat) sharing one contract: `trig` fires, `accent`
 (0..1, latched per hit) drives level and strike brightness, `tune`/`decay`
 shape the body (`decay` is 0..1 ring on the modal voices, seconds on the
-clap). Closed/open hats are two instances of one file, choke-coupled:
+clap and the ring-mod hat). Two hat flavours: `hat.sub` (darker, acoustic-
+leaning, driven modal bank) and `hat_model.sub` (brighter, TR-808/electronic,
+ring-modulated square pairs under a noise wash). Closed/open hats are two
+instances of one file, choke-coupled:
 
 ```text
 chat = sub { file: "lib/kit/hat.sub", decay: 0.22 }
