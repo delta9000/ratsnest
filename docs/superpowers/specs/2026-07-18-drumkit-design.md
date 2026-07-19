@@ -37,11 +37,12 @@ fundamental `f0` (freq/v_oct-derived as today).
   order exactly as they follow the harmonic walk today (index 0 always gets
   comb weight 1 — list the fundamental first; ascending order recommended,
   not required). Modes above 0.49 normalized still drop.
-- **Mutually exclusive with `modes:`** — specifying both is a parse error at
-  the config's line:col (session keeps the last good graph, rule 6).
-- **Validation is parse-time**: an empty list or any non-numeric, NaN, or
-  ≤ 0 entry is a parse error; entries above 64 clamp to 64. Config is text,
-  so hostility is a parser concern, never an RT one.
+- **Mutually exclusive with `modes:`** — specifying both is a compile error at
+  the declaration's line:col (session keeps the last good graph, rule 6).
+- **Validation is graph-compile-time**: an empty list or any non-numeric, NaN, or
+  ≤ 0 entry is a compile error reported at the module declaration's line:col
+  (`ModuleInfo::validate`, called by the graph compiler); entries above 64 clamp to 64.
+  Config is text, so hostility is a compile-time concern, never an RT one.
 - **`structure` reinterprets as a warp** on the listed ratios:
   `w = 2^((structure - 0.25) * 2)`, recomputed at block rate like all mode
   placement. At the default `structure = 0.25`, `w = 1` — exactly the listed

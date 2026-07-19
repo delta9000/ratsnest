@@ -835,7 +835,7 @@ Several classic pedals need no new module — they compose from what's here:
 
 ### Physical drumkit (`lib/kit/*.sub`)
 
-Seven physically-modeled voices sharing one contract: `trig` fires, `accent`
+Seven kit voices (six physically modeled, one noise clap) sharing one contract: `trig` fires, `accent`
 (0..1, latched per hit) drives level and strike brightness, `tune`/`decay`
 shape the body (`decay` is 0..1 ring on the modal voices, seconds on the
 clap). Closed/open hats are two instances of one file, choke-coupled:
@@ -846,7 +846,7 @@ ohat = sub { file: "lib/kit/hat.sub", decay: 0.45 }
 pat.trig -> chat.trig
 open_pat.trig -> ohat.trig
 pat.trig -> ohat.choke       # every closed hit chokes the open ring
-bern.a -> chat.accent        # per-hit dynamics from any 0..1 source
+bern.a -> chat.accent        # per-hit dynamics from any 0..1 source (cabling accent replaces the sub's 0.7 default — add a constant base cable to keep one)
 ```
 
 Full groove: `patches/kit.patch`.

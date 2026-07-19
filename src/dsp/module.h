@@ -73,8 +73,10 @@ struct ModuleInfo {
   // every node with wants_audio_in set, at block start, before processing.
   bool wants_audio_in = false;
   // Optional graph-compile-time config validation. Returns "" to accept,
-  // else the message reported at the declaration's line:col. Config
-  // hostility is a compile-time concern; init() only sees validated configs.
+  // else the message reported at the declaration's line:col. The controller
+  // discards graphs with validation errors, so compiled graphs only carry
+  // validated configs; init() still clamps defensively (tests hand it raw
+  // configs directly).
   std::string (*validate)(const Config&) = nullptr;
 
   int input_index(std::string_view name) const;

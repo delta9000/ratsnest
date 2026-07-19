@@ -27,6 +27,8 @@ cenv -> camp.cv
 lvl = vca { gain: 0.5 }
 camp -> lvl.in
 acc -> lvl.cv : 0.5
+# 15x makeup: three sparse modes through two multiplied vca stages leave
+# the raw voice ~24 dB quieter than its siblings.
 lvl -> main.in : 15
 
 # Audition: `mise run play -- patches/lib/kit/rim.sub`
