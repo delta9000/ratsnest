@@ -1,0 +1,51 @@
+# kit/snare.sub -- membrane body + wire buzz coupled through a follower:
+# the noise VCA is driven by how hard the head is still vibrating, which is
+# what makes a snare read as a snare. Bessel membrane ratios (Fletcher &
+# Rossing; docs/attribution.md); kit voice contract (trig/accent/tune/decay).
+tune   = param { default: 190hz }   # batter head fundamental
+decay  = param { default: 0.35 }    # 0..1 ring amount onto modal.damping
+snap   = param { default: 0.5 }     # wires + attack snap vs body
+trig   = input {}
+accent = input { default: 0.7 }
+main   = output {}
+
+acc = sh {}
+accent -> acc.in
+trig -> acc.trig
+
+# Effective brightness = 0.29 + acc * 0.3 (0.50 at default accent).
+body = modal { ratios: [1, 1.594, 2.136, 2.296, 2.653, 2.918],
+               freq: tune, damping: decay, brightness: 0.29, position: 0.35 }
+trig -> body.strike
+acc -> body.brightness : 0.3
+
+# Wires: high-passed noise, gated by the head's actual envelope.
+wn = noise { color: white, seed: 17 }
+whp = svf { cutoff: 5khz, res: 0.15 }
+wn -> whp.in
+fol = follow { mode: peak, attack: 0.001, release: 0.08 }
+body -> fol.in
+wamp = vca { gain: 0 }
+whp.hp -> wamp.in
+fol.env -> wamp.cv : 2.5
+
+# Attack snap: a separate 10 ms burst of the same noise.
+senv = func { rise: 0.0002, fall: 0.01 }
+trig -> senv.trig
+samp = vca { gain: 0 }
+whp.hp -> samp.in
+senv -> samp.cv
+
+km = mix { levels: [1.0, 1.0, 1.0] }
+body -> km.in1
+wamp -> km.in2 : snap
+samp -> km.in3 : snap
+lvl = vca { gain: 0.5 }
+km.out_l -> lvl.in
+acc -> lvl.cv : 0.5
+lvl -> main.in : 1.1
+
+# Audition: `mise run play -- patches/lib/kit/snare.sub`
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in
