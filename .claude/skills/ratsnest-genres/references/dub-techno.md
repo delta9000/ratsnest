@@ -147,11 +147,13 @@ tail_drift -> tail_r.cutoff : 280
 
 sub_track = follow { mode: rms, attack: 0.08, release: 0.4 }
 tail_l.lp -> sub_track.in
-sub_osc = vco { freq: 55hz, wave: sine }
-D2v -> sub_osc.v_oct
+sub_osc = vco { freq: 220hz, wave: sine }
+D2v -> sub_osc.v_oct              # 73.4 Hz. The base MUST be 220 --
+                                  # note names are relative to A3 = 220 Hz
 sub_amp = vca { gain: 0 }
 sub_osc -> sub_amp.in
-sub_track.env -> sub_amp.cv : 0.9
+sub_track.env -> sub_amp.cv : 4.0   # env off a low-passed tail peaks near
+                                    # 0.12, not 1.0 -- see mixing.md
 ```
 
 ### 5. Drums you could remove without ruining the track

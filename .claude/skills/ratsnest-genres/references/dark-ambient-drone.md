@@ -76,9 +76,15 @@ howl = delay { time: 0.0091, feedback: 0.93, mix: 1, tone: 2200, slew: 0.002 }
 grit -> howl.in : 0.06
 sweep = lfo { wave: tri, freq: 0.0077hz }
 sweep -> howl.time : 0.0035
+howl_dc = dcblock { cutoff: 18hz }
+howl -> howl_dc.in_l
+howl_dc.out_l -> howl_amp.in
 howl_amp = vca { gain: 0.18 }
-howl -> howl_amp.in
 ```
+
+`dcblock` is not optional at this feedback — a saturating recirculating comb
+accumulates offset, and at 0.93 it will drift. `noise-texture.md` says the
+same for its 0.97 howl; treat anything above ~0.9 the same way.
 
 9.1 ms rings at ~110 Hz. Tune it against your sub deliberately: an octave
 locks and thickens, a tritone snarls.
@@ -157,10 +163,15 @@ No blocks. The architecture is **buried layers plus one unmasking envelope**.
 #   the move one phrygian step, slewed over 12 s, once
 ```
 
-Render 10–14 minutes. In `--stats`, the tell for a working unmask is RMS that
-climbs 6–8 dB over minutes while **peak barely moves** — you are revealing
-sustained energy, not adding transients. If peak climbs with RMS you added a
-layer instead of unveiling one.
+Render 10–14 minutes. For a **broadband** layer (noise beds, smears, pads) the
+tell for a working unmask is RMS climbing 6–8 dB while peak barely moves — you
+are revealing sustained energy, not adding transients.
+
+**This test does not apply to resonant layers.** Unmasking a comb, a
+high-`res` filter or a `modal` bank raises peak *faster* than RMS, because the
+thing you unveiled is peaky by construction. Rising peak there is correct, not
+a symptom. For those, verify with the band-split check in `docs/patch-craft.md`
+instead — a level meter cannot tell you what a drone is doing.
 
 ## Mix targets
 
@@ -172,14 +183,17 @@ layer instead of unveiling one.
 | 700–4k | metallic partials, wind | keep dull; `reverb { damp: 0.55 }`+ |
 | 4k+ | grain hash only | if it sparkles, you made ambient instead |
 
-RMS **−22 to −26 dB**, crest 18 dB+. `dcblock` is mandatory (`drive` and
+RMS **−22 to −26 dB**, crest 15 dB+ (18 is typical for a pure drone; a piece
+with resonant events lands lower and that is fine — 15.2 dB measured on a
+verified five-minute piece). `dcblock` is mandatory (`drive` and
 `fold` both push DC). A limiter at −1 dBFS as a seatbelt; no clipper, no glue
 compressor — a compressor is exactly the thing that will flatten your slow
 crescendo back into a plateau.
 
 ## In this repo
 
-- `patches/dark-ambient.patch` — misnamed (it's a 124 BPM chord piece), but
+- `patches/dark-ambient.patch` — **misnamed**: it is a 124 BPM chord piece, not
+  a drone. Do not open it expecting this genre. It is still worth reading for
   steal its **four phase-offset triangle LFOs crossfading four fixed
   oscillator banks**: a progression with no sequencer and no note events, and
   the smoothest chord-change mechanism in the repo.

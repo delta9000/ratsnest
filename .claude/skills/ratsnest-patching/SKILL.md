@@ -23,9 +23,17 @@ Then load the skill that matches the job:
 | a named genre, a track "like X", a groove | `ratsnest-genres` |
 | structure, harmony, arrangement, mixing, mastering | `ratsnest-composition` |
 | "surprise me", a starting point, a way out of a rut | `ratsnest-inspiration` |
+| MIDI, polyphony, chords, live play, capture, writing a `.sub` | `ratsnest-instrument` |
 
-Worked examples with verified numbers live in `patches/etudes/` — each is
-short, commented, and demonstrates exactly one idea.
+Worked examples with verified numbers live in `patches/etudes/`:
+
+| Etude | The one idea |
+|---|---|
+| `incommensurate` | five glacial LFOs on five destinations; no grid at all |
+| `battement` | a drone built from beating; no triggers anywhere in the patch |
+| `locked-loop` | one `turing` register drives pitch, rhythm *and* timbre |
+| `coprime` | 5/7/11/13 Euclids; a 5-step pitch seq against a 7-step gate seq |
+| `feedback-garden` | a dub ecosystem where every effect has a path home |
 
 ## The loop
 
@@ -49,10 +57,13 @@ Iterate on numbers, not vibes. Two or three passes converges.
 1. **Cables sum onto bases.** `time: 0.4` plus a `tempo` cable is 0.4 + tempo.
    Zero the base (`time: 0ms`) when a cable should own the input. A filter's
    `cutoff:` config is the *floor* of the sweep, not the amount.
-2. **Note names are Hz; `…v` names are v/oct.** `A3v = 0.0`. Note-name pitch
-   only lands correctly on oscillators whose `freq` base is an A (55/110/220/
-   440). Intervals are bare fractions — `0.5833 -> osc.v_oct` is a fifth up.
-   There is no note-name form for an interval.
+2. **Note names are Hz; `…v` names are v/oct.** `A3v = 0.0`, and a `vco`
+   computes `freq_base × 2^v_oct` — so a note name lands at its written pitch
+   **only on a 220 Hz base**. 110 is an octave down, 55 is two octaves down
+   (inaudible, and `--stats` reads identical), 440 is an octave up. Reaching
+   for `freq: 55hz` on a sub voice is the classic silent-bass bug. Intervals
+   are bare fractions — `0.5833 -> osc.v_oct` is a fifth up. There is no
+   note-name form for an interval.
 3. **Nothing is normalled.** An unpatched input reads its declared default and
    nothing else. No hidden mixing, no hidden gain-staging, no `1/n`.
 4. **Free-ringing voices ghost.** `string`, `lpg`, `modal`, `grains` keep
@@ -73,7 +84,8 @@ Iterate on numbers, not vibes. Two or three passes converges.
   re-harmonizes by editing three arrays.
 - **Subpatches for voices.** `patches/lib/*.sub` already has kick, bass, hats,
   a full physical kit, a sympathetic drone, and a freeze-cloud. Instantiate
-  before you rebuild.
+  before you rebuild — their params, ports and *measured levels* are in
+  `ratsnest-synthesis/references/lib-voices.md`.
 
 ## Common mistakes
 
@@ -81,11 +93,14 @@ Iterate on numbers, not vibes. Two or three passes converges.
 |---|---|
 | Track comes back ~2 dB quiet | `out.level` scaled below 1; let the limiter own the ceiling |
 | Delay time is wrong | forgot to zero the `time:` base before the `tempo` cable |
-| Everything transposed | oscillator `freq:` base isn't an A, but you fed note names |
+| Everything transposed by octaves | note names on a `freq:` base that isn't 220 Hz |
 | Note retunes during its own tail | no `sh` holding pitch after the switch/quantizer |
 | Reverb ghosts of a muted part | send tapped pre-mute; tap it from the post-fader `vca` |
 | Intro reappears at the end | the arrangement grid wrapped; render shorter than `steps × block` |
 | `quant` output missing | it's `quant.out`; only `stepseq` has `.cv` |
+| Voice muted for a whole section | `logic{and}` thresholds at 0.5 and your lane sits below it — compare against a floor with `logic{op:cmp}` instead |
+| Bass inaudible, `--stats` looks fine | note name on a `freq: 55hz` base — see rule 2 |
+| Mix distorts for no reason | `bass.sub` clips at unity; stage it at 0.4–0.5 |
 
 ## Ship it
 

@@ -22,6 +22,8 @@ every recipe here assumes you have it open.
 | `references/noise-texture.md` | wind, rain, hiss, crackle, static beds, field-recording fakes |
 | `references/bass.md` | sub, reese, acid, neuro, 808 glide, dub bass |
 | `references/space.md` | delay, reverb, chorus, phaser, shimmer, dub chains, feedback nets |
+| `references/lib-voices.md` | the `patches/lib/*.sub` voices: interfaces, the kit contract, **measured output levels** |
+| `references/writing-subs.md` | packaging a voice as a `.sub`: `param`/`input`/`output`, the demo section, interface design |
 
 ## The one idea underneath all of them
 

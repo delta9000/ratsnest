@@ -25,6 +25,7 @@ Invoke `ratsnest-patching` for any patch work; it routes to the rest:
 | `ratsnest-genres` | twelve genre cards, each a departure point with a "how to break it" section |
 | `ratsnest-composition` | form, harmony, mixing, mastering — with the calibration numbers |
 | `ratsnest-inspiration` | provocations, artist lenses, seed sketches, starting from nothing |
+| `ratsnest-instrument` | playing it: MIDI, polyphony, live hot-reload, capture, writing subpatches |
 
 Worked, verified examples live in `patches/etudes/`. The evidence behind the
 skills is in `docs/research/2026-07-20-*.md`. `docs/patch-craft.md` remains the

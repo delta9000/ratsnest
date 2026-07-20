@@ -27,6 +27,8 @@ master_comp.out_l -> master_field.in_l
 master_comp.out_r -> master_field.in_r
 
 master_clip = clipper { mode: soft, threshold: -2.5, drive: 1.2, mix: 0.32 }
+# drive is in dB. 1.2 is a gentle album setting; 4-6.5 is the loud end of the
+# range. Raise it only while watching crest stay above ~10 dB.
 master_field.out_l -> master_clip.in_l
 master_field.out_r -> master_clip.in_r
 
@@ -51,7 +53,7 @@ Working backwards from a loudness target:
 |---|---|
 | premaster peak | ≈ −3 dBFS |
 | glue comp makeup | +1.5 .. +3 dB |
-| clipper drive | 4 .. 6.5 dB, parallel `mix` ~0.3 |
+| clipper drive | 1 .. 6.5 dB (it is **dB**), parallel `mix` ~0.3 |
 | limiter threshold | −0.4 .. −0.5 dBFS |
 | drop-window RMS (club) | ≈ −12 dBFS, peaks −0.4 → crest ~11 dB |
 | breakdown | 6–8 dB below the drops |

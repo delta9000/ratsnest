@@ -3,6 +3,30 @@
 Draw one. Apply it literally before you decide whether it was a good idea.
 If it felt comfortable, draw a second and apply both.
 
+**Draw honestly.** A long deck is easy to game — you scan until you find the
+card that endorses what you already meant to do, and then nothing changed.
+That is the failure mode this file is most prone to. If you are choosing rather
+than drawing, use the ten below and take the first one you dislike.
+
+## The sharp ten
+
+These bite hardest, in testing and in practice. Start here.
+
+1. **Everything mono until the last two modules.** Stereo is born in the
+   reverb, not in the voices. Forces you to earn width.
+2. **No `vco`.** Only `modal`, `string`, `noise`, `grains`.
+3. **Five modules. Not six.**
+4. **The delay is the instrument.** The dry signal sits at 0.15.
+5. **Delete the arrangement grid.** Whatever change survives is the piece.
+6. **Five notes, not six.** Shrink the `quant` scale until it hurts.
+7. **Modulate a modulation depth**, not a parameter.
+8. **Nothing enters after the first thirty seconds.** Only things leave.
+9. **Set every envelope to the wrong shape** — slow attack on the drum, snap
+   on the pad.
+10. **Take the best-sounding element out.**
+
+## The full deck
+
 ## Structure
 
 1. Delete the arrangement grid. Whatever change survives is the piece.
@@ -72,7 +96,7 @@ If it felt comfortable, draw a second and apply both.
 
 51. Five modules. Not six.
 52. Every input that can be modulated must be modulated.
-53. No cable may have a depth of exactly 1.
+53. Every cable depth must be written explicitly, and none may be 1.
 54. Use a module you've never used. Build the patch around it.
 55. Change one seed. Render both. Keep the one you didn't expect.
 56. Copy a patch you like, delete half of it, finish it differently.

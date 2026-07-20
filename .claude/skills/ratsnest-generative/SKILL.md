@@ -39,6 +39,12 @@ d3 = lfo { wave: sine, freq: 0.0071hz }    # 141 s
 d4 = lfo { wave: tri,  freq: 0.0033hz }    # 303 s
 ```
 
+**Waveform choice sets the shape of the arc**, and the start phase is not
+obvious: at `phase: 0` a `saw` starts at −1, `tri` and `square` at +1, `sine`
+at 0. So one `saw` at 0.0033 Hz is a clean monotonic −1 → +1 ramp across five
+minutes — the cheapest "one thing changes slowly" there is. A `tri` at the
+same rate travels the wrong way first.
+
 Route each to a *different* destination — filter cutoff, `fm` operator level,
 `delay.feedback`, `reverb.decay`, `grains.position`, `fold.fold`, a pan. Never
 two to the same destination; that just makes a slower LFO.
@@ -127,8 +133,10 @@ coin.a -> bell.strike
 ```
 
 `lpg` is the vactrol version — `strike` gives the soft attack and non-linear
-decay that a `vca` + envelope cannot. `string` with `damping: 0.95` crosses over
-to infinite sustain and becomes a drone rather than a pluck. Both `modal` and
+decay that a `vca` + envelope cannot. `string` with high `damping` crosses toward
+infinite sustain and becomes a drone rather than a pluck — but the crossfade
+only *begins* at 0.95; at 0.99 an A1 still loses ~0.8 dB/s, and only
+`damping: 1.0` is genuinely lossless (measured flat over 20 s). Both `modal` and
 `string` also accept audio on `in`: a slow `noise -> vca -> m.in` is a bowed or
 blown texture instead of a struck one.
 

@@ -62,6 +62,20 @@ quarter clock — not the kick audio. That gives you a clean, adjustable shape
 and no bleed. If the arrangement drops the kick, gate the duck envelope with
 the kick's arrangement lane or the breakdown will pump against nothing.
 
+### How loud is `follow.env`, actually?
+
+`env` is a linear amplitude, so its magnitude is whatever you fed it — and
+that is almost never near 1. Measured:
+
+| Source into `follow` | `env` peak |
+|---|---|
+| `kick.sub` at unity (−0.6 dBFS), `mode: peak`, 5 ms attack | **0.50** |
+| low-passed reverb tail, `mode: rms`, 80 ms attack | **0.12** |
+
+So a cable depth of `0.9` off a reverb tail buys you 0.11 of VCA gain — the
+classic "my follower-driven sub is inaudible" bug. Scale at the cable and
+verify by rendering; there is no sensitivity knob by design.
+
 Alternatively derive it honestly from audio:
 
 ```text
