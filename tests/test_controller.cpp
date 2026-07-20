@@ -1,4 +1,7 @@
 #include <doctest/doctest.h>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <vector>
 #include "engine/controller.h"
 #include "engine/rt_runner.h"
@@ -118,4 +121,24 @@ TEST_CASE("watch resolves dotted, instanced voice member names") {
   CHECK(rig.ctl.set_watch("lead.osc#1.out"));
   rig.spin(64);
   REQUIRE(rig.run.try_watch_value(v));
+}
+
+TEST_CASE("controller expands subs relative to the patch path") {
+  namespace fs = std::filesystem;
+  const fs::path dir = fs::temp_directory_path() / "ms_sub_ctl";
+  fs::create_directories(dir / "lib");
+  {
+    std::ofstream f(dir / "lib" / "tone.sub");
+    f << "tune = param { default: 220 }\nmain = output {}\n"
+         "osc = vco { wave: sine, freq: tune }\nosc -> main.in\n";
+  }
+  ms::engine::RtRunner runner(48000.0);
+  ms::engine::Controller ctl(runner, 48000.0);
+  auto res = ctl.load(
+      "t = sub { file: \"lib/tone.sub\", tune: 440 }\nt.main -> out.in\n",
+      (dir / "song.patch").string());
+  REQUIRE(res.ok);
+  REQUIRE(res.files.size() == 1);
+  CHECK(res.files[0] == (dir / "lib" / "tone.sub").lexically_normal().string());
+  fs::remove_all(dir);
 }

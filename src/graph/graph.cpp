@@ -54,8 +54,8 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
 
   auto g = std::make_unique<Graph>();
   g->sample_rate = sample_rate;
-  auto err = [&](int line, int col, std::string msg) {
-    r.errors.push_back({line, col, std::move(msg)});
+  auto err = [&](int line, int col, std::string msg, const std::string& file = {}) {
+    r.errors.push_back({line, col, std::move(msg), file});
   };
 
   // --- Nodes: declared modules + implicit `out` -------------------------
@@ -71,16 +71,16 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
   };
 
   for (const auto& m : ast.modules) {
-    if (m.name == "out") { err(m.line, m.col, "'out' is a reserved built-in module name"); continue; }
+    if (m.name == "out") { err(m.line, m.col, "'out' is a reserved built-in module name", m.file); continue; }
     const dsp::ModuleInfo* info = dsp::find_module(m.type);
-    if (!info) { err(m.line, m.col, "unknown module type '" + m.type + "'"); continue; }
+    if (!info) { err(m.line, m.col, "unknown module type '" + m.type + "'", m.file); continue; }
     add_node(m.name, info);
     Node& n = g->nodes.back();
     for (const auto& p : m.params) {
       int slot = info->input_index(p.name);
       if (slot >= 0) {
         if (p.value.kind != dsl::Value::Kind::Num) {
-          err(p.line, p.col, "parameter '" + p.name + "' expects a number");
+          err(p.line, p.col, "parameter '" + p.name + "' expects a number", m.file);
         } else {
           n.input_base[static_cast<size_t>(slot)] = static_cast<float>(p.value.num);
         }
@@ -98,7 +98,7 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
               if (!opts.empty()) opts += ", ";
               opts += *e;
             }
-            err(p.line, p.col, "invalid value for '" + p.name + "' (one of: " + opts + ")");
+            err(p.line, p.col, "invalid value for '" + p.name + "' (one of: " + opts + ")", m.file);
             continue;
           }
         }
@@ -106,7 +106,11 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
         continue;
       }
       err(p.line, p.col, "module type '" + m.type + "' has no parameter '" + p.name +
-          "' (inputs: " + join_names(info->inputs, [](auto& i) { return i.name; }) + ")");
+          "' (inputs: " + join_names(info->inputs, [](auto& i) { return i.name; }) + ")", m.file);
+    }
+    if (info->validate) {
+      std::string msg = info->validate(n.config);
+      if (!msg.empty()) err(m.line, m.col, std::move(msg), m.file);
     }
   }
   add_node("out", dsp::find_module("out"));
@@ -114,11 +118,16 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
   // --- Cables ------------------------------------------------------------
   std::vector<Cable> cables;
   for (const auto& c : ast.cables) {
+    if (!c.depth_ident.empty()) {
+      err(c.line, c.col, "unknown name '" + c.depth_ident +
+          "' for cable depth (params resolve only inside a subpatch)", c.file);
+      continue;
+    }
     int dst;
     std::string dport;
     {
       Resolved rd = resolve(index_of, c.dst.module);
-      if (rd.node < 0) { err(c.dst.line, c.dst.col, "unknown module '" + c.dst.module + "'"); continue; }
+      if (rd.node < 0) { err(c.dst.line, c.dst.col, "unknown module '" + c.dst.module + "'", c.file); continue; }
       dst = rd.node;
       dport = rd.port.empty() ? "in" : rd.port;
     }
@@ -126,7 +135,7 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
     int dslot = dn.info->input_index(dport);
     if (dslot < 0) {
       err(c.dst.line, c.dst.col, "module '" + dn.name + "' has no input '" + dport +
-          "' (inputs: " + join_names(dn.info->inputs, [](auto& i) { return i.name; }) + ")");
+          "' (inputs: " + join_names(dn.info->inputs, [](auto& i) { return i.name; }) + ")", c.file);
       continue;
     }
     if (c.src.is_literal) {
@@ -135,7 +144,7 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
       continue;
     }
     Resolved rs = resolve(index_of, c.src.module);
-    if (rs.node < 0) { err(c.src.line, c.src.col, "unknown module '" + c.src.module + "'"); continue; }
+    if (rs.node < 0) { err(c.src.line, c.src.col, "unknown module '" + c.src.module + "'", c.file); continue; }
     int src = rs.node;
     const Node& sn = g->nodes[static_cast<size_t>(src)];
     // A bare module name means its first output (spec §DSL; e.g. `seq -> ...`
@@ -146,7 +155,7 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
     int sslot = sn.info->output_index(sport);
     if (sslot < 0) {
       err(c.src.line, c.src.col, "module '" + sn.name + "' has no output '" + sport +
-          "' (outputs: " + join_names(sn.info->outputs, [](auto& o) { return o.name; }) + ")");
+          "' (outputs: " + join_names(sn.info->outputs, [](auto& o) { return o.name; }) + ")", c.file);
       continue;
     }
     cables.push_back({src, sslot, dst, dslot, static_cast<float>(c.depth)});

@@ -1,0 +1,95 @@
+# frozen-cloud.sub -- Clouds freeze locked to one chord.
+# Records a mono drone bed into a 2.5 s grains buffer; freeze=high locks
+# a kosmische pad. Source must be single-pitch (no moving melody), buffer
+# < arrangement block so no chord smear, position at newest edge, pitch=0.
+#
+# Params encapsulate the tuning fix from motorik: tight scatter/jitter,
+# stereo spread, denser grains for the boosted texture.
+
+secs = param { default: 2.5 }
+seed = param { default: 7 }
+
+in     = input {}
+freeze = input {}
+lvl    = input { default: 1 }
+main   = output {}
+dry    = output {}
+hall   = output {}
+
+gr_pos = lfo { freq: 0.06hz, wave: sine }
+
+cl = grains { secs: secs, seed: seed }
+in -> cl.in
+freeze -> cl.freeze
+0.08 -> cl.position
+gr_pos -> cl.position : 0.06
+0.06 -> cl.scatter
+0.28 -> cl.size
+16 -> cl.density
+0.18 -> cl.jitter
+0.5 -> cl.shape
+0.88 -> cl.spread
+0 -> cl.pitch
+
+amp_l = vca { gain: 0 }
+amp_r = vca { gain: 0 }
+cl.out_l -> amp_l.in
+cl.out_r -> amp_r.in
+lvl -> amp_l.cv : 1.5
+lvl -> amp_r.cv : 1.5
+
+filt = svf { cutoff: 1800, res: 0.22 }
+amp_l -> filt.in
+lvl -> filt.cutoff : 1400
+gr_pos -> filt.cutoff : 180
+
+dry_l = vca { gain: 0 }
+dry_r = vca { gain: 0 }
+filt.lp -> dry_l.in
+cl.out_r -> dry_r.in : 0.5
+filt.lp -> dry_r.in : 0.5
+lvl -> dry_l.cv : 0.6
+lvl -> dry_r.cv : 0.6
+
+# 3 outs: filtered dry (lead pad), secondary dry, verb send (filtered).
+# Hall's raw-grain sparkle goes through amp_r so the send obeys lvl —
+# no cloud leaking into the verb when the arrangement has it muted.
+dry_l -> main.in : 0.72
+dry_r -> main.in : 0.72
+dry_l -> dry.in
+dry_r -> dry.in
+filt.lp -> hall.in : 0.75
+amp_r -> hall.in : 0.15
+
+# Audition — 4 bars of string strikes fill the buffer at modest level, then
+# freeze locks for 4 bars. Level rises through the frozen section (slewed,
+# as motorik does with cloud_lvl) so the locked pad blooms as the payoff.
+demo.clk = clock { bpm: 244 }
+demo.quarter = div { by: 2 }
+demo.bar = div { by: 4 }
+demo.arr = stepseq { steps: [0.3, 0.5, 0.6, 0.6,  0.7, 0.85, 1, 1] }
+demo.frz = stepseq { steps: [0, 0,   0,   0,  1, 1, 1,   1  ] }
+demo.clk -> demo.quarter.in
+demo.quarter -> demo.bar.in
+demo.bar -> demo.arr.clock
+demo.bar -> demo.frz.clock
+demo.dr = string { seed: 7, damping: 0.88, position: 0.28, freq: A2 }
+demo.quarter -> demo.dr.strike
+demo.dr -> in : 1.0
+demo.lvl = func { rise: 1.5, fall: 2.5 }
+demo.arr.cv -> demo.lvl.in
+demo.lvl -> lvl
+demo.frz.cv -> freeze
+demo.out = out { level: 0.6 }
+main -> demo.out.in
+dry -> demo.out.in : 0.4
+
+# Audition the hall send too — the frozen pad into a lossy plate is the
+# thick-texture payoff (motorik's space settings). Verb returns carry the
+# stereo; main/dry sum mono into both sides.
+demo.verb = reverb { decay: 0.75, damp: 0.45, mix: 1, predelay: 0.01,
+                     bandwidth: 0.87, mod_rate: 0.35, mod_depth: 10 }
+hall -> demo.verb.in_l
+hall -> demo.verb.in_r
+demo.verb.out_l -> demo.out.left : 0.55
+demo.verb.out_r -> demo.out.right : 0.55

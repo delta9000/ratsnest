@@ -9,6 +9,14 @@
 using namespace ms::dsp;
 
 namespace {
+Config ratios_cfg(std::initializer_list<double> rs) {
+  ConfigValue v;
+  v.arr.assign(rs.begin(), rs.end());
+  Config c;
+  c.push_back({"ratios", std::move(v)});
+  return c;
+}
+
 // in, freq, v_oct, strike, structure, brightness, damping, position
 struct ModalRig {
   std::unique_ptr<Module> module;
@@ -184,4 +192,77 @@ TEST_CASE("modal migration across a modes-config change keeps ringing") {
     sum += static_cast<double>(y) * y;
   }
   CHECK(std::sqrt(sum / 4800.0) > 1e-5);  // the tail carried over
+}
+
+TEST_CASE("modal ratios places modes at explicit multiples of f0") {
+  ModalRig r(ratios_cfg({1.0, 1.594, 2.136}));
+  r.ins[6] = 0.8f;  // long ring for narrow spectral peaks
+  r.ins[7] = 0.1f;  // off the comb null: position 0.25 zeroes mode index 2
+  auto x = r.pluck_and_collect(48000);
+  // Listed ratio rings; the harmonic-walk position (2*f0) does not.
+  CHECK(goertzel(x, 220.0 * 1.594) > 10.0 * goertzel(x, 220.0 * 1.8));
+  CHECK(goertzel(x, 220.0 * 2.136) > 10.0 * goertzel(x, 440.0));
+}
+
+TEST_CASE("modal structure warps listed ratios, neutral at 0.25") {
+  // w = 2^((s-0.25)*2): s = 0.25 -> exact; s = 0.9 -> w ~ 2.462,
+  // 1.594^2.462 * 220 ~ 693.5 Hz.
+  ModalRig a(ratios_cfg({1.0, 1.594}));
+  a.ins[6] = 0.8f;
+  auto xa = a.pluck_and_collect(48000);
+  CHECK(goertzel(xa, 220.0 * 1.594) > 10.0 * goertzel(xa, 693.5));
+
+  ModalRig b(ratios_cfg({1.0, 1.594}));
+  b.ins[6] = 0.8f;
+  b.ins[4] = 0.9f;
+  auto xb = b.pluck_and_collect(48000);
+  CHECK(goertzel(xb, 693.5) > 10.0 * goertzel(xb, 220.0 * 1.594));
+}
+
+TEST_CASE("modal ratios entries above 64 clamp and stay finite") {
+  // ratio 100.0 clamps to 64.0: mode 1 rings at freq * 64 = 240 * 64 =
+  // 15360 Hz. If the clamp were removed, ratio 100 * freq 240 = pf 0.5 ->
+  // parked at the 0.49 ceiling instead (23520 Hz), so it would NOT ring at
+  // 15360 Hz and this peak would collapse into the noise floor.
+  ModalRig r(ratios_cfg({1.0, 100.0}));
+  r.ins[1] = 240.0f;
+  r.ins[5] = 1.0f;  // brightness: widen the exciter so the high mode gets hit
+  r.ins[6] = 0.8f;  // long ring for a narrow spectral peak
+  r.ins[7] = 0.1f;  // off the comb null
+  auto x = r.pluck_and_collect(48000);
+  for (float v : x) CHECK(std::isfinite(v));
+  CHECK(goertzel(x, 15360.0) > 10.0 * goertzel(x, 10000.0));
+}
+
+TEST_CASE("modal odd ratio count pads without ringing at the pad") {
+  ModalRig r(ratios_cfg({1.0, 1.594, 2.136}));  // 3 entries -> bank of 4
+  r.ins[7] = 0.1f;  // off the comb null: position 0.25 zeroes mode index 2
+  auto x = r.pluck_and_collect(24000);
+  CHECK(goertzel(x, 220.0) > 0.0);
+  for (float v : x) CHECK(std::isfinite(v));
+  // The padded 4th mode is parked at ~23520 Hz (0.49 normalized @ 48 kHz)
+  // and should contribute essentially nothing next to the fundamental.
+  CHECK(goertzel(x, 23520.0) < 0.1 * goertzel(x, 220.0));
+}
+
+TEST_CASE("modal init clamps non-positive ratios defensively (no NaN)") {
+  // validate_cfg rejects these at compile time, but init() is handed raw
+  // configs directly here. structure != 0.25 makes the mode warp exponent
+  // fractional, so a non-positive ratio base to pow() would be NaN.
+  ModalRig r(ratios_cfg({1.0, -2.0, 0.0}));
+  r.ins[4] = 0.9f;  // structure -> fractional warp exponent
+  r.ins[6] = 0.8f;
+  auto x = r.pluck_and_collect(4800);
+  for (float v : x) CHECK(std::isfinite(v));
+}
+
+TEST_CASE("modal migration across a ratios change keeps ringing") {
+  ModalRig a(ratios_cfg({1.0, 1.594, 2.136, 2.296}));
+  a.pluck_and_collect(2000);
+  ModalRig b(ratios_cfg({1.0, 1.594}));
+  b.module->copy_state_from(*a.module);
+  std::vector<float> tail(4800);
+  for (auto& v : tail) v = b.tick();
+  CHECK(rms(tail, 0, tail.size()) > 0.0);
+  for (float v : tail) CHECK(std::isfinite(v));
 }

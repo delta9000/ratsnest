@@ -1,0 +1,361 @@
+# motorik -- krautrock / kosmische drone at 122 BPM, ~2:00.
+# Now with granular freeze: the drone+overdrive bed is recorded into a 5s
+# `grains` buffer and frozen mid-song to lock a Clouds-style soundscape,
+# which then feeds the plate verb. Live bed keeps moving underneath.
+#
+# Harmony: Em | D | C | Em (i - VII - VI - i), one chord per bar.
+# Arrangement (16 four-bar blocks, 7.87 s each at 122 BPM):
+#   0-1   intro       drone alone, hats whisper, grains recording
+#   2-3   motorik     freeze engages — locked texture emerges
+#   4-5   guitar in   live guitar over frozen cloud
+#   6-7   DROP 1      full groove, delay throws, cloud held
+#   8     unfreeze    buffer re-records fresh chord
+#   9-13  DROP 2      re-frozen shimmer verb bed
+#   14-15 outro       cloud + drone tail
+
+# ---- clock tree: sixteenths at 122 BPM ----
+master   = clock { bpm: 488 }
+eighth   = div { by: 2 }
+quarter  = div { by: 2 }
+half     = div { by: 2 }
+bar      = div { by: 2 }
+two_bar  = div { by: 2 }
+four_bar = div { by: 4 }
+master -> eighth.in
+eighth -> quarter.in
+quarter -> half.in
+half -> bar.in
+bar -> two_bar.in
+bar -> four_bar.in
+
+# ---- 16-block arrangement grid ----
+arr_kick   = stepseq { steps: [0,0,1,1, 1,1,1,1, 0,0,1,1, 1,1,0,0] }
+arr_bass   = stepseq { steps: [0,0,.3,.6, .7,.8,.9,.9, .25,.25,.85,.9, .8,.45,.15,0] }
+arr_hats   = stepseq { steps: [0,.1,.25,.4, .5,.6,.7,.7, .1,.1,.7,.75, .65,.3,.05,0] }
+arr_drone  = stepseq { steps: [.5,.55,.6,.65, .65,.6,.6,.55, .8,.85,.6,.6, .5,.4,.25,.05] }
+arr_gtr    = stepseq { steps: [0,0,0,.15, .3,.55,.7,.7, .35,.4,.8,.85, .8,.35,.1,0] }
+arr_cloud  = stepseq { steps: [0,.4,.75,.9, .85,.8,.75,.65, .8,.9,.8,.7, .55,.35,.15,0] }
+arr_freeze = stepseq { steps: [0,0,1,1, 1,1,1,1, 0,1,1,1, 1,1,0,0] }
+arr_main   = stepseq { steps: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,.55,.1] }
+four_bar -> arr_kick.clock
+four_bar -> arr_bass.clock
+four_bar -> arr_hats.clock
+four_bar -> arr_drone.clock
+four_bar -> arr_gtr.clock
+four_bar -> arr_cloud.clock
+four_bar -> arr_freeze.clock
+four_bar -> arr_main.clock
+
+bass_lvl  = func { rise: 2.5, fall: 2.5 }
+hats_lvl  = func { rise: 2, fall: 2 }
+drone_lvl = func { rise: 4, fall: 4 }
+gtr_lvl   = func { rise: 3, fall: 3 }
+cloud_lvl = func { rise: 1.5, fall: 2.5 }
+main_out  = func { rise: 2, fall: 6 }
+arr_bass.cv -> bass_lvl.in
+arr_hats.cv -> hats_lvl.in
+arr_drone.cv -> drone_lvl.in
+arr_gtr.cv -> gtr_lvl.in
+arr_cloud.cv -> cloud_lvl.in
+arr_main.cv -> main_out.in
+
+# ---- harmony: Em | D | C | Em ----
+ch_root  = stepseq { steps: [0, -0.16667, -0.33333, 0] }
+ch_third = stepseq { steps: [0.25, 0.08333, 0, 0.25] }
+ch_fifth = stepseq { steps: [0.58333, 0.41667, 0.25, 0.58333] }
+bar -> ch_root.clock
+bar -> ch_third.clock
+bar -> ch_fifth.clock
+
+# ---- kick ----
+kick_gate = logic { op: and }
+quarter -> kick_gate.a
+arr_kick.cv -> kick_gate.b
+kick_env = func { rise: 0.0008s, fall: 0.22s, curve: log }
+kick_gate -> kick_env.trig
+kick_osc = vco { freq: 50hz, wave: sine }
+kick_gate -> kick_osc.sync
+kick_env -> kick_osc.v_oct : 2.0
+kick_amp = vca { gain: 0 }
+kick_osc -> kick_amp.in
+kick_env -> kick_amp.cv : 0.95
+kick_drive = drive { amount: 0.18, mode: soft }
+kick_amp -> kick_drive.in
+
+# ---- clap on 2 & 4 ----
+clap_pat = stepseq { steps: [0,0,0,0], gates: [0,1,0,1] }
+quarter -> clap_pat.clock
+clap_gate = logic { op: and }
+clap_pat.trig -> clap_gate.a
+arr_kick.cv -> clap_gate.b
+clap_env = func { rise: 0.001s, fall: 0.16s, curve: exp }
+clap_gate -> clap_env.trig
+clap_n = noise { color: white, seed: 5 }
+clap_filt = svf { cutoff: 1500, res: 0.4 }
+clap_n -> clap_filt.in
+clap_amp = vca { gain: 0 }
+clap_filt.bp -> clap_amp.in
+clap_env -> clap_amp.cv : 0.6
+
+# ---- hats ----
+hat_pat = euclid { steps: 16, hits: 2, rot: 3 }
+master -> hat_pat.clock
+hats_lvl -> hat_pat.hits : 5
+hat_env = func { rise: 0.0005s, fall: 0.035s, curve: exp }
+hat_pat.trig -> hat_env.trig
+hat_n = noise { color: white, seed: 19 }
+hat_filt = svf { cutoff: 8500, res: 0.2 }
+hat_n -> hat_filt.in
+hat_amp = vca { gain: 0 }
+hat_filt.hp -> hat_amp.in
+hat_env -> hat_amp.cv : 0.4
+quarter -> hat_amp.cv : -0.1
+
+# ---- bass ----
+bass_a = vco { freq: 82.41hz, wave: saw }
+bass_b = vco { freq: 82.7hz, wave: saw }
+bass_sub = vco { freq: 41.20hz, wave: sine }
+ch_root.cv -> bass_a.v_oct
+ch_root.cv -> bass_b.v_oct
+ch_root.cv -> bass_sub.v_oct
+bass_filt = ladder { cutoff: 280, res: 0.12, drive: 0.4 }
+bass_a -> bass_filt.in : 0.5
+bass_b -> bass_filt.in : 0.5
+bass_wob = lfo { freq: 0.06hz, wave: tri }
+bass_wob -> bass_filt.cutoff : 60
+bass_lvl -> bass_filt.cutoff : 140
+bass_amp = vca { gain: 0 }
+bass_filt.out -> bass_amp.in
+bass_lvl -> bass_amp.cv : 0.75
+sub_filt = ladder { cutoff: 120, res: 0.08, drive: 0.2 }
+bass_sub -> sub_filt.in
+sub_amp = vca { gain: 0 }
+sub_filt.out -> sub_amp.in
+bass_lvl -> sub_amp.cv : 0.6
+
+# ---- drone: Karplus strings ----
+drone = string { seed: 7, damping: 0.84, position: 0.28 }
+bar -> drone.strike
+ch_root.cv -> drone.v_oct
+0.008 -> drone.v_oct
+drone_lfo = lfo { freq: 0.04hz, wave: sine }
+drone_lfo -> drone.v_oct : 0.004
+drone2 = string { seed: 11, damping: 0.88, position: 0.35 }
+bar -> drone2.strike
+ch_fifth.cv -> drone2.v_oct
+drone.out -> drone2.in : 0.08
+
+drone_ph = phaser { stages: 6, spread: 0.3, shape: tri }
+drone.out -> drone_ph.in : 0.7
+drone2.out -> drone_ph.in : 0.4
+drone_ph_rate = lfo { freq: 0.05hz, wave: tri }
+0.18 -> drone_ph.rate
+drone_ph_rate -> drone_ph.rate : 0.12
+0.45 -> drone_ph.depth
+0.15 -> drone_ph.feedback
+drone_lvl -> drone_ph.mix : 0.35
+
+drone_amp = vca { gain: 0 }
+drone_ph.out -> drone_amp.in
+drone_lvl -> drone_amp.cv : 0.55
+drone2_amp = vca { gain: 0 }
+drone2.out -> drone2_amp.in
+drone_lvl -> drone2_amp.cv : 0.3
+
+# ---- guitar lead ----
+gtr_lift_r = math { op: add }
+ch_root.cv -> gtr_lift_r.a
+1 -> gtr_lift_r.b
+gtr_lift_f = math { op: add }
+ch_fifth.cv -> gtr_lift_f.a
+1 -> gtr_lift_f.b
+gtr_lift_t = math { op: add }
+ch_third.cv -> gtr_lift_t.a
+1 -> gtr_lift_t.b
+
+gtr_switch = switch { mode: seq, n: 8 }
+eighth -> gtr_switch.clock
+ch_root.cv  -> gtr_switch.in1
+ch_third.cv -> gtr_switch.in2
+gtr_lift_f  -> gtr_switch.in3
+gtr_lift_r  -> gtr_switch.in4
+ch_fifth.cv -> gtr_switch.in5
+gtr_lift_t  -> gtr_switch.in6
+gtr_lift_r  -> gtr_switch.in7
+gtr_lift_f  -> gtr_switch.in8
+
+gtr_euclid = euclid { steps: 16, hits: 5, rot: 0 }
+eighth -> gtr_euclid.clock
+two_bar -> gtr_euclid.reset
+gtr_lvl -> gtr_euclid.hits : 3
+
+gtr_note = sh { mode: sample }
+gtr_switch -> gtr_note.in
+gtr_euclid.trig -> gtr_note.trig
+
+gtr_str = string { seed: 3, damping: 0.72, position: 0.22 }
+gtr_note -> gtr_str.v_oct
+gtr_euclid.trig -> gtr_str.strike
+
+gtr_od = overdrive { model: klon, drive: 2.2, tone: 0.6, level: 0.5, mix: 0.65 }
+gtr_str.out -> gtr_od.in : 0.6
+
+gtr_filt = svf { cutoff: 2200, res: 0.25 }
+gtr_od.out -> gtr_filt.in
+gtr_lfo = lfo { freq: 0.06hz, wave: tri }
+gtr_lfo -> gtr_filt.cutoff : 400
+gtr_lvl -> gtr_filt.cutoff : 800
+
+gtr_env = func { rise: 0.008s, fall: 0.35s, curve: exp }
+gtr_euclid.trig -> gtr_env.trig
+
+gtr_amp = vca { gain: 0 }
+gtr_filt.lp -> gtr_amp.in
+gtr_env -> gtr_amp.cv : 0.55
+gtr_lvl -> gtr_amp.cv : 0.6
+
+# ---- granular freeze: records drone+overdrive bed, locks when freeze=1 ----
+# The mutable bed keeps evolving underneath; the frozen grain cloud IS the
+# kosmische pad — textbook Clouds: record 5 s, freeze, slow position drift.
+# Only drone bed — single harmony, so freeze stays in tune.
+# Excluded guitar: different pitch each eighth = polyphonic smear.
+cloud_feed = mix { levels: [0.85, 0.45] }
+drone_ph.out -> cloud_feed.in1 : 1.2
+drone2.out   -> cloud_feed.in2 : 1.2
+
+gr_pos = lfo { freq: 0.06hz, wave: sine }
+
+clouds = grains { secs: 2.5, seed: 7 }
+cloud_feed.out_l -> clouds.in
+arr_freeze.cv -> clouds.freeze
+# newest edge (0 = newest): current chord, not 2 bars ago. 2.5 s < 4-bar block.
+0.08 -> clouds.position
+gr_pos -> clouds.position : 0.06
+0.06 -> clouds.scatter
+0.28 -> clouds.size
+16 -> clouds.density
+0.18 -> clouds.jitter
+0.5 -> clouds.shape
+0.88 -> clouds.spread
+0 -> clouds.pitch
+
+cloud_amp_l = vca { gain: 0 }
+cloud_amp_r = vca { gain: 0 }
+clouds.out_l -> cloud_amp_l.in
+clouds.out_r -> cloud_amp_r.in
+cloud_lvl -> cloud_amp_l.cv : 1.1
+cloud_lvl -> cloud_amp_r.cv : 1.1
+
+# Make the frozen cloud read as instrument, not just verb glue:
+# dedicated filter that blooms with arrangement, bright enough to sit.
+cloud_filt = svf { cutoff: 1800, res: 0.22 }
+cloud_amp_l -> cloud_filt.in
+cloud_lvl -> cloud_filt.cutoff : 1400
+gr_pos -> cloud_filt.cutoff : 180
+cloud_dry_l = vca { gain: 0 }
+cloud_dry_r = vca { gain: 0 }
+cloud_filt.lp -> cloud_dry_l.in
+clouds.out_r -> cloud_dry_r.in : 0.5
+cloud_filt.lp -> cloud_dry_r.in : 0.5
+cloud_lvl -> cloud_dry_l.cv : 0.45
+cloud_lvl -> cloud_dry_r.cv : 0.45
+
+# ---- dry band mix ----
+band = mix { levels: [0.85, 0.55, 0.5, 0.5, 0.3, 0.35, 0.42, 0.6],
+             pans: [0, 0, 0, 0.3, 0, -0.15, 0.15, 0.05] }
+kick_drive -> band.in1
+bass_amp   -> band.in2
+sub_amp    -> band.in2 : 0.7
+clap_amp   -> band.in3
+hat_amp    -> band.in4
+drone_amp  -> band.in5
+drone2_amp -> band.in6
+gtr_amp    -> band.in7
+kick_env -> band.lvl2 : -0.32
+kick_env -> band.lvl5 : -0.14
+kick_env -> band.lvl6 : -0.14
+kick_env -> band.lvl7 : -0.12
+
+# ---- FX: tempo-synced delays (controlled) ----
+sync_de = tempo { bpm: 122, beats: 0.75 }
+sync_e  = tempo { bpm: 122, beats: 0.5 }
+dly_l = delay { time: 0ms, feedback: 0.36, tone: 3800, mix: 1, slew: 0.1 }
+dly_r = delay { time: 0ms, feedback: 0.38, tone: 3400, mix: 1, slew: 0.1 }
+sync_de.seconds -> dly_l.time
+sync_e.seconds  -> dly_r.time
+gtr_amp -> dly_l.in : 0.32
+gtr_amp -> dly_r.in : 0.30
+drone_amp -> dly_l.in : 0.06
+drone_amp -> dly_r.in : 0.06
+
+# ---- plate verb: clouds feed it hard, live sends small ----
+space = reverb { decay: 0.75, damp: 0.45, mix: 1, predelay: 0.01, bandwidth: 0.87,
+                 mod_rate: 0.35, mod_depth: 10 }
+cloud_filt.lp  -> space.in_l : 0.75
+cloud_filt.lp  -> space.in_r : 0.75
+clouds.out_r   -> space.in_l : 0.15
+clouds.out_r   -> space.in_r : 0.15
+# small live sends for movement
+drone_amp -> space.in_l : 0.08
+drone_amp -> space.in_r : 0.08
+gtr_amp   -> space.in_l : 0.08
+gtr_amp   -> space.in_r : 0.08
+clap_amp  -> space.in_l : 0.04
+clap_amp  -> space.in_r : 0.05
+
+# ---- master: dry band + granular + FX returns ----
+# boost cloud returns: frozen texture now leads the kosmische pad
+master_mix = mix { levels: [1, 1, 0.55, 0.55, 0.38, 0.38, 0.72, 0.72],
+                   pans: [-1, 1, -1, 1, -0.6, 0.6, -0.85, 0.85] }
+band.out_l    -> master_mix.in1
+band.out_r    -> master_mix.in2
+space.out_l   -> master_mix.in3
+space.out_r   -> master_mix.in4
+dly_l         -> master_mix.in5
+dly_r         -> master_mix.in6
+cloud_dry_l   -> master_mix.in7
+cloud_dry_r   -> master_mix.in8
+# duck verb/delay/cloud lightly under kick
+kick_env -> master_mix.lvl3 : -0.14
+kick_env -> master_mix.lvl4 : -0.14
+kick_env -> master_mix.lvl5 : -0.10
+kick_env -> master_mix.lvl6 : -0.10
+kick_env -> master_mix.lvl7 : -0.08
+kick_env -> master_mix.lvl8 : -0.08
+
+# ---- mastering ----
+master_dc = dcblock { cutoff: 12hz }
+master_mix.out_l -> master_dc.in_l
+master_mix.out_r -> master_dc.in_r
+
+master_eq = eq { hp_freq: 28, low_freq: 90, low_gain: -0.5,
+                 mid1_freq: 380, mid1_gain: -0.8, mid1_q: 0.9,
+                 mid2_freq: 2800, mid2_gain: 0.5, mid2_q: 0.8,
+                 high_freq: 9000, high_gain: 0.4 }
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+master_comp = compressor { sidechain: external, threshold: -18, ratio: 2.4,
+                           knee: 6, attack: 0.01, release: 0.18,
+                           makeup: 1.2, mix: 0.8 }
+master_eq.out_l -> master_comp.in_l
+master_eq.out_r -> master_comp.in_r
+kick_drive -> master_comp.side_l : 0.65
+kick_drive -> master_comp.side_r : 0.65
+
+master_field = stereo { width: 1.15, balance: 0 }
+master_comp.out_l -> master_field.in_l
+master_comp.out_r -> master_field.in_r
+
+master_clip = clipper { mode: soft, threshold: -2.0, drive: 0.8, mix: 0.25 }
+master_field.out_l -> master_clip.in_l
+master_field.out_r -> master_clip.in_r
+
+master_limit = limiter { threshold: -0.5, release: 0.08 }
+master_clip.out_l -> master_limit.in_l
+master_clip.out_r -> master_limit.in_r
+
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
+-1 -> out.level
+main_out -> out.level : 0.85

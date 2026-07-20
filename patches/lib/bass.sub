@@ -1,0 +1,44 @@
+# bass.sub -- FM bass voice with low-pass filter and tubescreamer-style overdrive.
+# 2-op FM (dual) into a ladder filter for warmth, then overdrive for grit.
+pitch = param { default: G1 }       # fundamental
+decay = param { default: 0.22s }    # envelope decay
+trig  = input {}
+main  = output {}
+
+# FM voice: 2-op, op2 modulates op1, op2 level shaped by the envelope
+fm = fm { algo: dual, freq: pitch,
+          ratios: [1, 2], levels: [0.6, 0.5], curve: exp }
+
+# Low-pass to roll off the FM brightness
+filt = ladder { cutoff: 1800hz, res: 0.3 }
+
+# Tubescreamer-style saturation: mid-focused drive
+od = overdrive { drive: 2.0, tone: 0.4, level: 0.6, mix: 0.8 }
+
+# Stretch any trigger into a decay-length gate so the operator envelopes
+# see a real note: one-sample trigs and clock-width gates both work.
+stretch = func { rise: 0.0005, fall: decay }
+trig -> stretch.trig
+stretch -> fm.gate
+
+fm -> filt.in
+filt.out -> od.in
+
+# Amplitude envelope — `decay` shapes the pluck (post-overdrive, so the
+# tail decays instead of buzzing at the saturation ceiling) and mutes the
+# ring-out before the sequencer steps the pitch under it.
+env = func { rise: 0.002, fall: decay, curve: exp }
+trig -> env.trig
+amp = vca { gain: 0 }
+od -> amp.in
+env -> amp.cv
+amp -> main.in
+
+# Audition: `mise run play -- patches/lib/bass.sub`
+# Steps are octave offsets from the `pitch` base (G, A, C, G).
+demo.clk = clock { bpm: 120 }
+demo.seq = stepseq { steps: [0, 0.1667, 0.4167, 0], gates: [1, 0, 0, 0] }
+demo.clk -> demo.seq.clock
+demo.seq.cv -> fm.v_oct
+demo.clk -> trig
+main -> demo.out.in : 0.5

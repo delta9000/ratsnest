@@ -126,3 +126,27 @@ TEST_CASE("watched directory being moved away does not crash or spuriously fire"
   std::error_code ec;
   fs::rename(moved, t.dir, ec);
 }
+
+TEST_CASE("watcher fires for any of several files") {
+  namespace fs = std::filesystem;
+  const fs::path dir = fs::temp_directory_path() / "ms_watch_multi";
+  fs::create_directories(dir / "lib");
+  const auto touch = [](const fs::path& p) {
+    std::ofstream f(p);
+    f << "# x\n";
+  };
+  touch(dir / "song.patch");
+  touch(dir / "lib" / "kick.sub");
+  ms::io::PatchWatcher w(std::vector<std::string>{
+      (dir / "song.patch").string(), (dir / "lib" / "kick.sub").string()});
+  REQUIRE(w.ok());
+  CHECK_FALSE(w.poll_changed(0));
+  touch(dir / "lib" / "kick.sub");
+  bool fired = false;
+  for (int i = 0; i < 80 && !fired; ++i) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    fired = w.poll_changed(0);
+  }
+  CHECK(fired);
+  fs::remove_all(dir);
+}

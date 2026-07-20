@@ -38,7 +38,7 @@ class Parser {
   }
   bool at(Tok k) const { return cur().kind == k; }
   const Token& next() { const Token& t = cur(); if (!at(Tok::End)) ++i_; return t; }
-  void err(int l, int c, std::string msg) { r_.errors.push_back({l, c, std::move(msg)}); }
+  void err(int l, int c, std::string msg) { r_.errors.push_back({l, c, std::move(msg), {}}); }
   void sync() { while (!at(Tok::End) && !at(Tok::Newline)) next(); }
   bool expect(Tok k, const char* what) {
     if (at(k)) { next(); return true; }
@@ -98,7 +98,16 @@ class Parser {
 
   bool value(Value& v) {
     if (at(Tok::Number)) { v.kind = Value::Kind::Num; v.num = next().num; return true; }
-    if (at(Tok::Ident))  { v.kind = Value::Kind::Ident; v.str = next().text; return true; }
+    if (at(Tok::Ident)) {
+      v.kind = Value::Kind::Ident;
+      v.str = next().text;
+      while (at(Tok::Dot) && i_ + 1 < toks_.size() && toks_[i_ + 1].kind == Tok::Ident) {
+        next();
+        v.str += '.';
+        v.str += next().text;
+      }
+      return true;
+    }
     if (at(Tok::Str))    { v.kind = Value::Kind::Str; v.str = next().text; return true; }
     if (at(Tok::LBracket)) {
       next();
@@ -135,12 +144,15 @@ class Parser {
     if (!endpoint(cbl.dst)) return;
     if (at(Tok::Colon)) {
       next();
-      if (!at(Tok::Number)) {
-        err(cur().line, cur().col, "expected a number for cable depth after ':'");
+      if (at(Tok::Number)) {
+        cbl.depth = next().num;
+      } else if (at(Tok::Ident)) {
+        cbl.depth_ident = next().text;
+      } else {
+        err(cur().line, cur().col, "expected a number or name for cable depth after ':'");
         sync();
         return;
       }
-      cbl.depth = next().num;
     }
     r_.ast.cables.push_back(std::move(cbl));
   }

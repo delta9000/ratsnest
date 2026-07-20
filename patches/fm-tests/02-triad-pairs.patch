@@ -1,0 +1,23 @@
+# triad — three C:M pairs (2->1, 4->3, 6->5), carriers 1/3/5 slightly detuned
+# for a chorused stack. Tests: algo triad, three simultaneous 2-op timbres.
+clk = clock { bpm: 240 }
+wander = random { rate: 3.1, smooth: 0, seed: 8 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+key = quant { scale: [0, 3, 5, 7, 10] }
+notes -> key.in
+poly = alloc { n: 4 }
+clk -> poly.gate
+key -> poly.voct
+ep = voice { notes: poly }
+ep.fm = fm { algo: triad, freq: 220hz,
+             ratios: [1, 3, 1.005, 2, 0.995, 5],
+             levels: [.4, .5, .4, .45, .4, .35],
+             t2: [.25, .12, .25, .12, .25, .1], t3: [.3, .2, .3, .2, .3, .2],
+             l2: [.6, .4, .6, .4, .6, .35], l3: [.3, .1, .3, .1, .3, .1],
+             curve: log }
+poly.voct -> ep.fm.v_oct
+poly.gate -> ep.fm.gate
+ep.fm -> out.in : 0.3
+-0.35 -> out.level

@@ -100,6 +100,14 @@ See `patches/strum.patch` for a complete three-voice recipe (clocked
 random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 `docs/superpowers/specs/2026-07-11-voice-alloc-design.md` for the full design.
 
+### Subpatches
+
+A subpatch is a reusable voice in its own file (convention:
+`patches/lib/*.sub`) or an inline `subdef` template; instantiating one
+stamps a namespaced copy at compile time, like voice groups. See `sub`,
+`subdef`, `param`, `input`, `output` below and the kick recipe under
+Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
+
 ## Quick palette
 
 | Area | Modules |
@@ -549,8 +557,16 @@ impulse), `structure` 0.25 (partial spacing: below 0.25 compressed/drum-like,
 (decay time, exponential across ~4 decades of Q), `position` 0.25
 (strike-position comb; 0.5 nulls the even partials, the fundamental always
 sounds). Outputs `out` plus `odd`/`even` partial groups (`out = odd + even`).
-Config `modes` 2..128, rounded to even — the voice-quality/CPU knob. Bowed
-and blown textures come from `noise -> vca -> m.in` with slow `vca.cv`.
+Config `modes` 2..128, rounded to even — the voice-quality/CPU knob — or
+`ratios: [1, 1.594, 2.136, ...]` (mutually exclusive with `modes`): explicit
+mode placement at multiples of the fundamental, list order = mode index
+(list the fundamental first; the position comb and odd/even split follow list
+order). With `ratios` given, `structure` becomes a stretch/compress warp
+`w = 2^((structure - 0.25) * 2)` on the listed ratios — exact as written at
+the 0.25 default. Entries clamp to at most 64; an empty list, a non-positive
+entry, or combining with `modes:` is a patch error. The drumkit voices in
+`patches/lib/kit/` are built on this (membrane and metal ratio sets; see
+docs/attribution.md). Bowed and blown textures come from `noise -> vca -> m.in` with slow `vca.cv`.
 
 ## `string`
 
@@ -669,6 +685,57 @@ Inputs: `in`, `rate` .3 Hz, `depth` .6 (0..1, sweep width), `feedback` .3
 coincident for tight Phase-90-style notches, higher fans them out around the
 swept centre for wider, more vocal notches), `shape` (`tri`/`sine`).
 
+## `sub`
+
+`k = sub { file: "lib/kick.sub", tune: G1 }` — instantiate a subpatch.
+Exactly one of `file:` (quoted path, relative to the file containing the
+`sub`) or `def:` (an in-file `subdef` name); every other key overrides a
+`param` of that template (unknown keys are errors). Instance ports patch
+like module ports (`clk -> k.trig`, `k.main -> mix.in1`; bare `k` reads the
+first declared output). Stamped internals stay addressable
+(`0.1 -> k.kosc.v_oct`) — the declared interface is the stable surface, not
+a wall. Same file, different params: separate instances, one parse.
+Nesting is fine (16 deep, cycles rejected); `sub` composes with `voice`
+groups in both directions. Saving an included `.sub` hot-reloads every
+patch using it.
+
+## `subdef`
+
+`td = subdef {}` — mark the `td.*` declarations that follow as an inline
+template: they never run themselves, and `t = sub { def: td, tune: A2 }`
+stamps them. Inside the body, params and ports are referenced with the
+prefix (`freq: td.tune`); cables may not cross the template boundary. The
+`demo.*` convention does not apply to inline templates. A `subdef` body may
+not reference another `subdef` by `def:` (templates resolve only at the level
+they are declared) — nest with file-based `sub { file: ... }` instead.
+
+## `param`
+
+`tune = param { default: F1 }` — a subpatch parameter (config `default:`
+required). Referenced by bare name in any config value, as a constant cable
+source (`tune -> osc.v_oct`), or as a cable depth (`a -> b.in : tune`).
+Instantiation overrides replace the default before the body compiles; a
+`param` is a compile-time value, not a signal.
+
+## `input`
+
+`trig = input {}` — a subpatch input port (optional numeric `default:`,
+read when no outside cable feeds the port — rule 4, nothing implicit
+beyond the declaration). Inside the body it is a source
+(`trig -> env.trig`); outside, a destination (`clk -> k.trig`). Multiple
+outside cables sum; depths multiply through the splice.
+
+## `output`
+
+`main = output {}` — a subpatch output port. Inside, a destination
+(`amp -> main.in`); outside, a source (`k.main -> mix.in1`). The first
+declared output is the instance's default (`k -> mix.in1`). Declaring
+`param`/`input`/`output` makes the file a subpatch: it cannot reference
+`out` outside a `demo.*` section, and compiled directly it plays as an
+implicit instantiation with defaults — `demo.*` declarations (with
+`demo.out` as the device sink) run only then, so every `.sub` can audition
+itself: `mise run play -- patches/lib/kick.sub`.
+
 ## Recipes
 
 ### Flanger (`delay` + `lfo`)
@@ -741,6 +808,19 @@ s2.out -> m.in3 : 0.6
 
 Detune shimmer: duplicate a string and add `0.001 -> dup.v_oct`.
 
+### A drum voice as a subpatch
+
+`patches/lib/kick.sub` packages the kick-solo recipe behind three params
+and two ports:
+
+```text
+clk = clock { bpm: 120 }
+k  = sub { file: "lib/kick.sub" }             # from patches/
+k2 = sub { file: "lib/kick.sub", tune: G1, click: 0.5 }
+clk -> k.trig
+k -> out.in
+```
+
 ### Guitar pedals from existing modules
 
 Several classic pedals need no new module — they compose from what's here:
@@ -754,3 +834,25 @@ Several classic pedals need no new module — they compose from what's here:
   rectifier; note it aliases on bright input).
 - **Big Muff fuzz:** `overdrive { model: muff }`, or cascade two `overdrive`
   stages with a filter between them.
+
+### Physical drumkit (`lib/kit/*.sub`)
+
+Eight kit voices (six physically modeled, one noise clap, one ring-modulated
+hat) sharing one contract: `trig` fires, `accent`
+(0..1, latched per hit) drives level and strike brightness, `tune`/`decay`
+shape the body (`decay` is 0..1 ring on the modal voices, seconds on the
+clap and the ring-mod hat). Two hat flavours: `hat.sub` (darker, acoustic-
+leaning, driven modal bank) and `hat_model.sub` (brighter, TR-808/electronic,
+ring-modulated square pairs under a noise wash). Closed/open hats are two
+instances of one file, choke-coupled:
+
+```text
+chat = sub { file: "lib/kit/hat.sub", decay: 0.22 }
+ohat = sub { file: "lib/kit/hat.sub", decay: 0.45 }
+pat.trig -> chat.trig
+open_pat.trig -> ohat.trig
+pat.trig -> ohat.choke       # every closed hit chokes the open ring
+bern.a -> chat.accent        # per-hit dynamics from any 0..1 source (cabling accent replaces the sub's 0.7 default — add a constant base cable to keep one)
+```
+
+Full groove: `patches/kit.patch`.

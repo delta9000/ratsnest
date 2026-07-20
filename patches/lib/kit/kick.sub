@@ -1,0 +1,36 @@
+# kit/kick.sub -- physically-modeled kick: membrane modal bank + pitch collapse.
+# Mode ratios are the ideal circular-membrane Bessel zeros (Fletcher &
+# Rossing; docs/attribution.md). Kit voice contract: trig + accent in,
+# accent latched at the hit drives level (0.5 + 0.5*acc) and brightness.
+tune   = param { default: 48hz }    # fundamental
+decay  = param { default: 0.45 }    # 0..1 ring amount onto modal.damping
+bend   = param { default: 2.5 }     # pitch-collapse depth, octaves
+trig   = input {}
+accent = input { default: 0.7 }
+main   = output {}
+
+acc = sh {}
+accent -> acc.in
+trig -> acc.trig
+
+# Brightness base sits 0.21 low so the 0.7 accent default is neutral:
+# effective brightness = 0.19 + acc * 0.3 (0.40 at default accent).
+body = modal { ratios: [1, 1.594, 2.136, 2.296, 2.653, 2.918],
+               freq: tune, damping: decay, brightness: 0.19, position: 0.5 }
+trig -> body.strike
+acc -> body.brightness : 0.3
+
+# The head tightens at the hit and relaxes: fast collapse into v_oct.
+penv = func { rise: 0.0003, fall: 0.03 }
+trig -> penv.trig
+penv -> body.v_oct : bend
+
+lvl = vca { gain: 0.5 }
+body -> lvl.in
+acc -> lvl.cv : 0.5
+lvl -> main.in : 1.8
+
+# Audition: `mise run play -- patches/lib/kit/kick.sub`
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in

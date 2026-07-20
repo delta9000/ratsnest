@@ -1,0 +1,49 @@
+# groove -- minimal techno sketch using subpatches.
+# Kick, FM bass, closed hat, and open hat over a sixteenth-note grid.
+# Every pattern length divides the 16-step bar, so the loop locks tight.
+#
+# Run:  mise run play -- patches/groove.patch
+
+master  = clock { bpm: 496 }   # sixteenths at 124
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+master -> eighth.in
+eighth -> quarter.in
+
+kick = sub { file: "lib/kick.sub" }
+quarter -> kick.trig
+
+# Closed hats ride the sixteenth grid, offbeat-leaning; bernoulli holes
+# keep the bar from becoming mechanical. Opens sit on the offbeat eighths.
+hat_pat = euclid { steps: 16, hits: 7, rot: 2 }
+master -> hat_pat.clock
+hat_coin = bern { prob: 0.85, seed: 12 }
+hat_pat.trig -> hat_coin.gate
+hat = sub { file: "lib/hat.sub", pitch: 8khz, decay: 0.05s, color: 0.1 }
+hat_coin.a -> hat.trig
+
+open_pat = euclid { steps: 2, hits: 1, rot: 1 }
+eighth -> open_pat.clock
+open = sub { file: "lib/hat.sub", pitch: 5khz, decay: 0.18s, color: 0.3 }
+open_pat.trig -> open.trig
+
+# Rolling G-minor riff on eighths: root pedal with Bb/D/F color tones.
+# Steps are octave offsets from the sub's G1 base (escape-hatch into
+# fm.v_oct sums onto it), so the riff stays put if the base pitch moves.
+bass = sub { file: "lib/bass.sub", pitch: G1, decay: 0.14s }
+bass_seq = stepseq { steps: [0, 0, 0.25, 0,  0.5833, 0, 0.25, -0.1667],
+                     gates: [1, 0, 1, 1,  0, 1, 0, 1] }
+eighth -> bass_seq.clock
+bass_seq.cv -> bass.fm.v_oct
+# fm.gate behind bass.trig needs a held gate, not a one-sample trig
+# (see 313083b) — use the clock-width gate output.
+bass_seq.gate -> bass.trig
+
+m = mix { levels: [0.5, 0.3, 0.25, 0.3],
+          pans: [0, 0.3, -0.3, 0] }
+kick -> m.in1
+hat  -> m.in2
+open -> m.in3
+bass -> m.in4
+m.out_l -> out.left
+m.out_r -> out.right

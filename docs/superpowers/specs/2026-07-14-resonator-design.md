@@ -71,6 +71,9 @@ poison persistent state (delay-module precedent: `!(x >= lo)` clamps).
 - Config `modes`: 2..128, rounded to even (Rings requires even resolution),
   default 64. Mode filters whose frequency would exceed `0.49` normalized are
   dropped (high notes run fewer filters).
+- Extended 2026-07-18: optional `ratios:` config pins mode placement to
+  explicit multiples of f0 and reinterprets `structure` as a warp — see
+  `2026-07-18-drumkit-design.md` §2.
 - **Topology**: parallel `stmlib`-style Simper trapezoidal SVFs, bandpass
   outputs summed; input pre-attenuated by 0.125 (Rings' scaling).
 - **Mode placement** (per block): `stiffness = stiffness_curve(structure)`;

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <sstream>
@@ -20,6 +21,7 @@
 #include "engine/pipewire_out.h"
 #include "engine/rt_runner.h"
 #include "graph/graph.h"
+#include "graph/subs.h"
 #include "io/wav.h"
 #include "io/watcher.h"
 #include "rt/denormal.h"
@@ -54,10 +56,16 @@ std::unique_ptr<ms::graph::Graph> load(const std::string& path, double rate) {
   auto p = ms::dsl::parse(src);
   auto report = [&](const ms::Diags& ds) {
     for (const auto& d : ds)
-      std::fprintf(stderr, "%s:%d:%d: error: %s\n", path.c_str(), d.line, d.col,
-                   d.msg.c_str());
+      std::fprintf(stderr, "%s:%d:%d: error: %s\n",
+                   d.file.empty() ? path.c_str() : d.file.c_str(),
+                   d.line, d.col, d.msg.c_str());
   };
   if (!p.ok()) { report(p.errors); return nullptr; }
+  std::filesystem::path pp(path);
+  const std::string dir = pp.has_parent_path() ? pp.parent_path().string() : ".";
+  auto sx = ms::graph::expand_subs(p.ast, dir, ms::graph::read_text_file, p.errors);
+  if (!p.errors.empty()) { report(p.errors); return nullptr; }
+  (void)sx;
   auto c = ms::graph::compile(p.ast, rate);
   if (!c.ok()) { report(c.errors); return nullptr; }
   return std::move(c.graph);
@@ -115,11 +123,12 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
   auto report = [&](const ms::Diags& ds) {
     std::fputs("\n", stderr);
     for (const auto& d : ds)
-      std::fprintf(stderr, "%s:%d:%d: error: %s\n", patch.c_str(), d.line,
-                   d.col, d.msg.c_str());
+      std::fprintf(stderr, "%s:%d:%d: error: %s\n",
+                   d.file.empty() ? patch.c_str() : d.file.c_str(),
+                   d.line, d.col, d.msg.c_str());
   };
 
-  auto first = ctl.load(src);
+  auto first = ctl.load(src, patch);
   if (!first.ok) { report(first.errors); return 1; }
   if (watch != nullptr && !ctl.set_watch(watch)) {
     std::fprintf(stderr, "error: cannot watch '%s' (unknown module or port)\n", watch);
@@ -164,6 +173,15 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
                patch.c_str());
 
   bool warned_rate = false;
+
+  // sub files to watch alongside the patch itself
+  std::vector<std::string> watched{patch};
+  watched.insert(watched.end(), first.files.begin(), first.files.end());
+  auto pwatcher = std::make_unique<ms::io::PatchWatcher>(watched);
+  bool watching = pwatcher->ok();
+  if (!watching)
+    std::fprintf(stderr, "warning: cannot watch '%s'; hot-reload disabled\n",
+                 patch.c_str());
   // Deviation (owner-approved, see task-9 context): PW_STREAM_STATE_UNCONNECTED
   // does not surface through pw->error() -- it's a silent disconnect. Track
   // "was ok, now isn't" so a >2s silent outage also triggers the reconnect
@@ -172,15 +190,24 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
   bool down_since_set = false;
   std::chrono::steady_clock::time_point down_since{};
   while (!g_stop.load()) {
-    if (watcher.ok()) {
-      if (watcher.poll_changed(100)) {
+    if (watching) {
+      if (pwatcher->poll_changed(100)) {
         if (!read_file(patch, src)) {
           std::fprintf(stderr, "\nerror: cannot re-read '%s'\n", patch.c_str());
         } else {
-          auto res = ctl.load(src);
+          auto res = ctl.load(src, patch);
           if (!res.ok) report(res.errors);
-          else std::fprintf(stderr, "\nreloaded (%s)\n",
-                            res.topology ? "topology" : "params");
+          else {
+            std::fprintf(stderr, "\nreloaded (%s)\n",
+                         res.topology ? "topology" : "params");
+            std::vector<std::string> want{patch};
+            want.insert(want.end(), res.files.begin(), res.files.end());
+            if (want != watched) {
+              watched = std::move(want);
+              pwatcher = std::make_unique<ms::io::PatchWatcher>(watched);
+              watching = pwatcher->ok();
+            }
+          }
         }
       }
     } else {

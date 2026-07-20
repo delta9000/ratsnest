@@ -18,6 +18,7 @@ struct ModuleDecl {
   std::string name, type;
   std::vector<ParamDecl> params;
   int line = 0, col = 0;
+  std::string file;
 };
 
 struct Endpoint {
@@ -27,7 +28,13 @@ struct Endpoint {
   int line = 0, col = 0;
 };
 
-struct CableDecl { Endpoint src, dst; double depth = 1.0; int line = 0, col = 0; };
+struct CableDecl {
+  Endpoint src, dst;
+  double depth = 1.0;
+  std::string depth_ident;
+  std::string file;
+  int line = 0, col = 0;
+};
 
 struct PatchAst {
   std::vector<ModuleDecl> modules;

@@ -1,0 +1,27 @@
+# metallic perc — wildly inharmonic ratios into one carrier plus feedback on the
+# first two ops, with a snappy log decay: gongs, cowbells, cymbal shards.
+# Tests: fb array (multiple ops), extreme inharmonicity, percussive envelope.
+clk = clock { bpm: 280 }
+wander = random { rate: 5.0, smooth: 0, seed: 33 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+key = quant { scale: [0, 2, 7, 9] }
+notes -> key.in
+poly = alloc { n: 4 }
+clk -> poly.gate
+key -> poly.voct
+ep = voice { notes: poly }
+ep.fm = fm { algo: crown, freq: 440hz,
+             ratios: [1, 3.7, 5.3, 7.1, 9.2, 11.3],
+             levels: [.5, .2, .16, .13, .1, .08],
+             fb: [.35, .3, 0, 0, 0, 0],
+             t1: [.0005, .0005, .0005, .0005, .0005, .0005],
+             t2: [.006, .006, .006, .006, .006, .006],
+             t3: [.5, .4, .35, .3, .25, .2],
+             l2: [.9, .9, .9, .9, .9, .9], l3: [0, 0, 0, 0, 0, 0],
+             t4: [.15, .12, .1, .09, .08, .07], curve: log }
+poly.voct -> ep.fm.v_oct
+poly.gate -> ep.fm.gate
+ep.fm -> out.in : 0.4
+-0.35 -> out.level

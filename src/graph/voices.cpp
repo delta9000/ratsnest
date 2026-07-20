@@ -40,7 +40,7 @@ std::string inst_chain(const std::string& base, int i, const std::string& port) 
 void expand_voices(dsl::PatchAst& ast, Diags& errors) {
   const size_t err0 = errors.size();
   auto err = [&](int line, int col, std::string msg) {
-    errors.push_back({line, col, std::move(msg)});
+    errors.push_back({line, col, std::move(msg), {}});
   };
 
   // --- Index decls; identify voice groups (top-level, i.e. undotted) --------
@@ -48,11 +48,13 @@ void expand_voices(dsl::PatchAst& ast, Diags& errors) {
   for (const auto& m : ast.modules) by_name[m.name] = &m;
 
   std::unordered_map<std::string, Group> groups;
-  std::vector<std::string> group_order;  // deterministic diagnostics/order
+  std::vector<std::string> group_order;
   for (const auto& m : ast.modules) {
     if (m.type != "voice") continue;
-    // A dotted voice decl is a nested-voice member; handled in the member pass.
-    if (m.name.find('.') != std::string::npos) continue;
+    if (m.name.find('.') != std::string::npos) {
+      std::string prefix = m.name.substr(0, m.name.find('.'));
+      if (by_name.count(prefix) && by_name.at(prefix)->type == "voice") continue;
+    }
 
     Group g;
     g.name = m.name;

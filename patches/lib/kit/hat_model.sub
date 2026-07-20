@@ -1,0 +1,123 @@
+# kit/hat_model.sub -- ring-modulated hi-hat (brighter, TR-808/electronic
+# flavour; complements the darker, acoustic-leaning hat.sub).
+#
+# Model: five pairs of pulse oscillators ring-modulated together
+# (math{op:mult}) emit dense INHARMONIC sidebands -- a metallic hash that
+# reads as a hat, not the resolvable tones a sparse mode cluster gives.
+# The hash is high-passed by a CASCADED (24 dB/oct) pair to strip fundamentals
+# AND the low-mid ring-mod difference tones -- a single 12 dB/oct high-pass
+# left a sustained ~1.3 kHz pitched partial that read as woody/wood-block; the
+# steeper slope kills it. Mixed UNDER a louder broadband white-noise wash (a
+# real hat is mostly noise); a two-stage envelope gates both, and a
+# non-resonant lowpass ceiling sets brightness. Built and measured against
+# real hat samples (acoustic + TR-808): flatness ~0.30, peak/median 7, centroid
+# 7-9 kHz, no pitched low-mid peak -- all inside the sampled range. See
+# docs/research/2026-07-19-hihat-synthesis-recovered.md (Recipe 1) for the
+# derivation and the measurement trail.
+#
+# Concept-inspired by Plaits' AUX/FM hi-hat (ring-modulated square pairs);
+# carrier set from published Plaits source. See docs/attribution.md. One
+# file, both hats: short decay for closed, long for open; closed trig into
+# the open instance's choke (same contract as hat.sub).
+tune   = param { default: 0.0 }     # pitch, v/oct shift on all carriers
+decay  = param { default: 0.3s }    # tail length, seconds
+tone   = param { default: 7khz }    # brightness: non-resonant lowpass ceiling
+trig   = input {}
+accent = input { default: 0.7 }
+choke  = input {}
+main   = output {}
+
+acc = sh {}
+accent -> acc.in
+trig -> acc.trig
+
+# Five ring-mod pairs. Carriers spread 3.5-9 kHz (spread, NOT clustered:
+# clustering piles the sidebands into a resonant peak and the hat reads as a
+# tone again). Plaits FM-hat carrier lineage.
+a1 = vco { wave: pulse, freq: 200hz }
+b1 = vco { wave: pulse, freq: 3510hz }
+a2 = vco { wave: pulse, freq: 517hz }
+b2 = vco { wave: pulse, freq: 4830hz }
+a3 = vco { wave: pulse, freq: 730hz }
+b3 = vco { wave: pulse, freq: 6250hz }
+a4 = vco { wave: pulse, freq: 941hz }
+b4 = vco { wave: pulse, freq: 7570hz }
+a5 = vco { wave: pulse, freq: 1273hz }
+b5 = vco { wave: pulse, freq: 9110hz }
+tune -> a1.v_oct
+tune -> b1.v_oct
+tune -> a2.v_oct
+tune -> b2.v_oct
+tune -> a3.v_oct
+tune -> b3.v_oct
+tune -> a4.v_oct
+tune -> b4.v_oct
+tune -> a5.v_oct
+tune -> b5.v_oct
+r1 = math { op: mult }
+r2 = math { op: mult }
+r3 = math { op: mult }
+r4 = math { op: mult }
+r5 = math { op: mult }
+a1 -> r1.a
+b1 -> r1.b
+a2 -> r2.a
+b2 -> r2.b
+a3 -> r3.a
+b3 -> r3.b
+a4 -> r4.a
+b4 -> r4.b
+a5 -> r5.a
+b5 -> r5.b
+
+# Metal: sum the ring pairs, then a CASCADED low-res high-pass (two 12 dB/oct
+# stages = 24 dB/oct) to strip fundamentals and the low-mid difference tones
+# that otherwise ring as a woody ~1.3 kHz pitch. Any resonant filter here
+# reintroduces resolvable peaks -- keep res low.
+metal = svf { cutoff: 5khz, res: 0.05 }
+r1 -> metal.in
+r2 -> metal.in
+r3 -> metal.in
+r4 -> metal.in
+r5 -> metal.in
+metal2 = svf { cutoff: 5khz, res: 0.05 }
+metal.hp -> metal2.in
+
+# Broadband white-noise wash, louder than the metal. White (not pink): its
+# flat high end MASKS the metal sidebands; pink starves the top and the metal
+# sticks out as tones.
+nz = noise { color: white, seed: 23 }
+wash = svf { cutoff: 5khz, res: 0.05 }
+nz -> wash.in
+
+# Two-stage envelope: fast transient stage, then exponential tail.
+env1 = func { rise: 0.0002, fall: 0.015 }
+env2 = func { rise: 0.0005, fall: decay, curve: exp }
+trig -> env1.trig
+trig -> env2.trig
+
+drv = vca { gain: 0 }
+metal2.hp -> drv.in : 0.30
+wash.hp -> drv.in : 1.25
+env1 -> drv.cv
+env2 -> drv.cv : 0.5
+
+# Brightness ceiling: non-resonant lowpass pulls the centroid without adding
+# a peak (res 0 -- a tilt, not a resonance).
+lp = svf { cutoff: tone, res: 0.0 }
+drv -> lp.in
+
+# Choke: slam the level VCA shut (cv sums, gain clamps at 0), recover over 20 ms.
+chk = func { rise: 0.0005, fall: 0.02 }
+choke -> chk.trig
+
+lvl = vca { gain: 0.5 }
+lp.lp -> lvl.in
+acc -> lvl.cv : 0.5
+chk -> lvl.cv : -8
+lvl -> main.in : 0.6
+
+# Audition: `mise run play -- patches/lib/kit/hat_model.sub`
+demo.clk = clock { bpm: 240 }
+demo.clk -> trig
+main -> demo.out.in : 0.7

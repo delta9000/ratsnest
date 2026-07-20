@@ -14,7 +14,7 @@ constexpr InputInfo kIns[] = {{"in", 0.f},          {"freq", 220.f},
                               {"v_oct", 0.f},       {"strike", 0.f},
                               {"structure", 0.25f}, {"brightness", 0.5f},
                               {"damping", 0.5f},    {"position", 0.25f}};
-constexpr ConfigInfo kCfgs[] = {{"modes", nullptr}};
+constexpr ConfigInfo kCfgs[] = {{"modes", nullptr}, {"ratios", nullptr}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"odd"}, {"even"}};
 // Coefficients refresh at block rate, Rings-style (24-sample blocks there).
 constexpr int kBlock = 32;
@@ -25,13 +25,42 @@ float sane(float x, float lo, float hi) {
   return x > hi ? hi : x;
 }
 
+bool has_cfg(const Config& cfg, std::string_view name) {
+  for (const auto& [k, v] : cfg)
+    if (k == name) return true;
+  return false;
+}
+
+std::string validate_cfg(const Config& cfg) {
+  if (!has_cfg(cfg, "ratios")) return {};
+  if (has_cfg(cfg, "modes"))
+    return "specify one of 'modes:' or 'ratios:', not both";
+  const auto& r = cfg_arr(cfg, "ratios");
+  if (r.empty()) return "'ratios:' needs a list with at least one entry";
+  if (r.size() > 128) return "'ratios:' accepts at most 128 entries";
+  for (double v : r)
+    if (!(v > 0.0)) return "'ratios:' entries must be positive";
+  return {};
+}
+
 class Modal final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = static_cast<float>(rate);
-    int m = static_cast<int>(cfg_num(cfg, "modes", 64.0));
-    m = std::clamp(m, 2, 128);
-    m += m & 1;  // Rings requires an even resolution.
+    ratios_.clear();
+    // validate_cfg rejects non-positive ratios at compile time; clamp here too
+    // so init() stays finite when handed a raw config directly (e.g. tests).
+    for (double v : cfg_arr(cfg, "ratios"))
+      ratios_.push_back(std::clamp(static_cast<float>(v), 1e-4f, 64.0f));
+    int m;
+    if (ratios_.empty()) {
+      m = static_cast<int>(cfg_num(cfg, "modes", 64.0));
+      m = std::clamp(m, 2, 128);
+    } else {
+      m = static_cast<int>(ratios_.size());
+    }
+    m += m & 1;  // Rings requires an even resolution; an odd ratios count
+                 // pads with an inert mode parked at the 0.49 ceiling.
     modes_.assign(static_cast<std::size_t>(m), resonate::Svf{});
     exciter_.reset();
     num_active_ = 0;
@@ -116,8 +145,20 @@ class Modal final : public Module {
     const float q_loss_rate = structure * (2.0f - structure) * 0.1f;
     int num = 0;
     const int m = static_cast<int>(modes_.size());
+    const int nr = static_cast<int>(ratios_.size());
+    // With explicit ratios, structure stretches/compresses the listed
+    // series: f_i = f0 * ratios[i]^w, w = 1 at the 0.25 default so the
+    // ratios sound exactly as written (spec 2026-07-18-drumkit §2).
+    const float warp = std::exp2((structure - 0.25f) * 2.0f);
     for (int i = 0; i < m; ++i) {
-      float pf = harmonic * stretch;
+      float pf;
+      if (nr > 0) {
+        pf = i < nr
+                 ? f * std::pow(ratios_[static_cast<std::size_t>(i)], warp)
+                 : 0.49f;
+      } else {
+        pf = harmonic * stretch;
+      }
       if (pf >= 0.49f) {
         pf = 0.49f;
       } else {
@@ -146,6 +187,7 @@ class Modal final : public Module {
   }
 
   float rate_ = 48000.0f;
+  std::vector<float> ratios_;
   std::vector<resonate::Svf> modes_;
   resonate::Svf exciter_;
   int num_active_ = 0;
@@ -159,5 +201,6 @@ class Modal final : public Module {
 std::unique_ptr<Module> make() { return std::make_unique<Modal>(); }
 }  // namespace
 
-const ModuleInfo modal_info{"modal", kIns, kCfgs, kOuts, &make};
+const ModuleInfo modal_info{"modal", kIns, kCfgs, kOuts,
+                            &make, false, false, &validate_cfg};
 }  // namespace ms::dsp

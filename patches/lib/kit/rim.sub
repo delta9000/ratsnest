@@ -1,0 +1,37 @@
+# kit/rim.sub -- woody rimshot clonk: a sparse three-mode bank, bright hard
+# strike through a fast VCA crack. Sparse-cluster placement per the metal
+# ratio approach (docs/attribution.md); kit voice contract.
+tune   = param { default: 480hz }
+decay  = param { default: 0.3 }     # 0..1 ring amount onto modal.damping
+trig   = input {}
+accent = input { default: 0.7 }
+main   = output {}
+
+acc = sh {}
+accent -> acc.in
+trig -> acc.trig
+
+# Effective brightness = 0.5 + acc * 0.3 (0.71 at default accent).
+body = modal { ratios: [1, 2.66, 5.4],
+               freq: tune, damping: decay, brightness: 0.5, position: 0.25 }
+trig -> body.strike
+acc -> body.brightness : 0.3
+
+# Crack: clamp the ring into a tight percussive envelope.
+cenv = func { rise: 0.0002, fall: 0.06, curve: exp }
+trig -> cenv.trig
+camp = vca { gain: 0 }
+body -> camp.in
+cenv -> camp.cv
+
+lvl = vca { gain: 0.5 }
+camp -> lvl.in
+acc -> lvl.cv : 0.5
+# 15x makeup: three sparse modes through two multiplied vca stages leave
+# the raw voice ~24 dB quieter than its siblings.
+lvl -> main.in : 15
+
+# Audition: `mise run play -- patches/lib/kit/rim.sub`
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in

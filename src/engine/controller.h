@@ -19,9 +19,10 @@ class Controller {
     bool ok = false;
     bool topology = false;
     Diags errors;
+    std::vector<std::string> files;
   };
 
-  LoadResult load(std::string_view src);
+  LoadResult load(std::string_view src, const std::string& patch_path = {});
   bool set_watch(std::string_view spec);
   void clear_watch();
   void drain_retired();

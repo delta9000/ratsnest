@@ -1,6 +1,8 @@
 #include "engine/controller.h"
+#include <filesystem>
 #include "dsl/parser.h"
 #include "graph/reload.h"
+#include "graph/subs.h"
 #include "graph/voices.h"
 
 namespace ms::engine {
@@ -8,7 +10,7 @@ namespace ms::engine {
 Controller::Controller(RtRunner& runner, double sample_rate)
     : runner_(runner), rate_(sample_rate) {}
 
-Controller::LoadResult Controller::load(std::string_view src) {
+Controller::LoadResult Controller::load(std::string_view src, const std::string& patch_path) {
   LoadResult res;
   drain_retired();
 
@@ -17,6 +19,16 @@ Controller::LoadResult Controller::load(std::string_view src) {
     res.errors = std::move(p.errors);
     return res;
   }
+
+  std::string dir = ".";
+  if (!patch_path.empty()) {
+    std::filesystem::path pp(patch_path);
+    if (pp.has_parent_path()) dir = pp.parent_path().string();
+  }
+  auto sx = graph::expand_subs(p.ast, dir, graph::read_text_file, res.errors);
+  if (!res.errors.empty()) return res;
+  res.files = std::move(sx.files);
+
   auto c = graph::compile(p.ast, rate_);
   if (!c.ok()) {
     res.errors = std::move(c.errors);
@@ -42,7 +54,7 @@ Controller::LoadResult Controller::load(std::string_view src) {
 
   // Topology path (or first load). Gate: keep the retire queue unfillable.
   if (engines_in_flight() >= 2) {
-    res.errors.push_back({0, 0, "reload still in flight; save again in a moment"});
+    res.errors.push_back({0, 0, "reload still in flight; save again in a moment", {}});
     return res;
   }
 
@@ -53,7 +65,7 @@ Controller::LoadResult Controller::load(std::string_view src) {
   cmd.engine = new Engine(std::move(c.graph));
   if (!runner_.push(cmd)) {
     delete cmd.engine;
-    res.errors.push_back({0, 0, "engine command queue full; try again"});
+    res.errors.push_back({0, 0, "engine command queue full; try again", {}});
     return res;
   }
   ++pushed_;

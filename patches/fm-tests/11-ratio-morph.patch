@@ -1,0 +1,14 @@
+# ratio morph — a held 2-op voice (2->1) whose modulator ratio is swept 1..6 by
+# an LFO on the live `ratio2` input, gliding through harmonic and inharmonic
+# spectra. Tests: ratioN live input summing onto the config base.
+ep = fm { algo: custom, route: [2, 1], freq: 110hz,
+          ratios: [1, 1, 0, 0, 0, 0],
+          levels: [.6, .4, 0, 0, 0, 0],
+          t1: [.02, .02], t2: [.02, .02], t3: [.02, .02], t4: [.3, .3],
+          l1: [1, 1], l2: [1, 1], l3: [1, 1] }
+1 -> ep.gate
+lfo = lfo { freq: 0.07hz }
+2.5 -> ep.ratio2
+lfo -> ep.ratio2 : 2.5
+ep -> out.in : 0.3
+-0.3 -> out.level

@@ -1,0 +1,26 @@
+# crown — five modulators (2..6) all converging on carrier 1, at inharmonic
+# ratios: struck-metal bells with a long log tail. Tests: algo crown, summed
+# modulation into one op, inharmonic FM, long envelopes.
+clk = clock { bpm: 120 }
+wander = random { rate: 1.3, smooth: 0, seed: 17 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+key = quant { scale: [0, 5, 7, 12] }
+notes -> key.in
+poly = alloc { n: 5 }
+clk -> poly.gate
+key -> poly.voct
+ep = voice { notes: poly }
+ep.fm = fm { algo: crown, freq: 330hz,
+             ratios: [1, 1.41, 2.83, 3.14, 4.24, 5.65],
+             levels: [.5, .18, .14, .11, .09, .07],
+             t1: [.001, .001, .001, .001, .001, .001],
+             t2: [.02, .02, .02, .02, .02, .02],
+             t3: [3.0, 2.4, 2.0, 1.7, 1.4, 1.1],
+             l2: [.9, .9, .9, .9, .9, .9], l3: [0, 0, 0, 0, 0, 0],
+             t4: [1.5, 1.2, 1.0, .8, .6, .5], curve: log }
+poly.voct -> ep.fm.v_oct
+poly.gate -> ep.fm.gate
+ep.fm -> out.in : 0.4
+-0.3 -> out.level

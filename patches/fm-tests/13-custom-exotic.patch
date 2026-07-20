@@ -1,0 +1,25 @@
+# custom exotic — a hand-wired graph (6->5->4->1 and 3->2->1) where two separate
+# modulator chains converge on carrier 1. Tests: custom route parsing, Kahn topo
+# order across multiple paths, carrier inference.
+clk = clock { bpm: 170 }
+wander = random { rate: 2.1, smooth: 0, seed: 51 }
+notes = sh { mode: sample }
+wander -> notes.in
+clk -> notes.trig
+key = quant { scale: [0, 2, 3, 7, 8] }
+notes -> key.in
+poly = alloc { n: 3 }
+clk -> poly.gate
+key -> poly.voct
+ep = voice { notes: poly }
+ep.fm = fm { algo: custom, route: [6, 5, 5, 4, 4, 1, 3, 2, 2, 1], freq: 220hz,
+             ratios: [1, 2, 5, 3, 1.01, 7],
+             levels: [.5, .3, .2, .3, .25, .15],
+             fb: [0, 0, 0, 0, .3, 0],
+             t2: [.3, .5, .2, .6, .3, .15], t3: [.5, .4, .3, .5, .3, .2],
+             l2: [.6, .5, .4, .5, .4, .3], l3: [.35, .2, .1, .2, .1, .05],
+             t4: [.35, .35, .35, .35, .35, .35], curve: log }
+poly.voct -> ep.fm.v_oct
+poly.gate -> ep.fm.gate
+ep.fm -> out.in : 0.3
+-0.35 -> out.level
