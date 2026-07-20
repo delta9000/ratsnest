@@ -246,6 +246,16 @@ TEST_CASE("ports: misuse is diagnosed") {
                       "i = input {}\no = output {}\ni -> o.in\n"}});
     REQUIRE_FALSE(e.errors.empty());
   }
+  SUBCASE("reading an output nothing drives is an error, not a silent drop") {
+    auto e = expand("v = sub { file: \"lib/u.sub\" }\nv.main -> out.in\n",
+                    {{"patches/lib/u.sub", "main = output {}\nosc = vco\n"}});
+    REQUIRE_FALSE(e.errors.empty());
+    CHECK(e.errors[0].msg.find("main") != std::string::npos);
+    CHECK(e.errors[0].msg.find("never driven") != std::string::npos);
+    // Attribute to the parent cable (the read), not the sub body.
+    CHECK(e.errors[0].line == 2);
+    CHECK(e.errors[0].file.empty());
+  }
 }
 
 TEST_CASE("escape hatch: cables into stamped internals pass through") {

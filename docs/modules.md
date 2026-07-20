@@ -705,7 +705,9 @@ patch using it.
 template: they never run themselves, and `t = sub { def: td, tune: A2 }`
 stamps them. Inside the body, params and ports are referenced with the
 prefix (`freq: td.tune`); cables may not cross the template boundary. The
-`demo.*` convention does not apply to inline templates.
+`demo.*` convention does not apply to inline templates. A `subdef` body may
+not reference another `subdef` by `def:` (templates resolve only at the level
+they are declared) — nest with file-based `sub { file: ... }` instead.
 
 ## `param`
 

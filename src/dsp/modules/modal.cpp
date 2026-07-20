@@ -48,8 +48,10 @@ class Modal final : public Module {
   void init(double rate, const Config& cfg) override {
     rate_ = static_cast<float>(rate);
     ratios_.clear();
+    // validate_cfg rejects non-positive ratios at compile time; clamp here too
+    // so init() stays finite when handed a raw config directly (e.g. tests).
     for (double v : cfg_arr(cfg, "ratios"))
-      ratios_.push_back(std::min(static_cast<float>(v), 64.0f));
+      ratios_.push_back(std::clamp(static_cast<float>(v), 1e-4f, 64.0f));
     int m;
     if (ratios_.empty()) {
       m = static_cast<int>(cfg_num(cfg, "modes", 64.0));

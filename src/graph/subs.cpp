@@ -219,8 +219,18 @@ void splice_ports(Ctx& ctx, const std::string& file, dsl::PatchAst& parent,
           return;
         }
       if (!out_name.empty()) {
+        auto srcs = out_sources.find(out_name);
+        if (srcs == out_sources.end() || srcs->second.empty()) {
+          // The offending read lives in the parent cable, so attribute to its
+          // own file, not this body's (body_file is `file` here).
+          ctx.err(c.file, c.src.line, c.src.col,
+                  "output '" + out_name + "'" +
+                      (inst.empty() ? "" : " of '" + inst + "'") +
+                      " is never driven inside the subpatch");
+          return;
+        }
         stage.clear();
-        for (const auto& s : out_sources[out_name]) {
+        for (const auto& s : srcs->second) {
           dsl::CableDecl nc = c;
           nc.src = s.src;
           if (!nc.src.is_literal) nc.src.module = stamp(s.src.module);

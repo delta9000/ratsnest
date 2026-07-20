@@ -245,6 +245,17 @@ TEST_CASE("modal odd ratio count pads without ringing at the pad") {
   CHECK(goertzel(x, 23520.0) < 0.1 * goertzel(x, 220.0));
 }
 
+TEST_CASE("modal init clamps non-positive ratios defensively (no NaN)") {
+  // validate_cfg rejects these at compile time, but init() is handed raw
+  // configs directly here. structure != 0.25 makes the mode warp exponent
+  // fractional, so a non-positive ratio base to pow() would be NaN.
+  ModalRig r(ratios_cfg({1.0, -2.0, 0.0}));
+  r.ins[4] = 0.9f;  // structure -> fractional warp exponent
+  r.ins[6] = 0.8f;
+  auto x = r.pluck_and_collect(4800);
+  for (float v : x) CHECK(std::isfinite(v));
+}
+
 TEST_CASE("modal migration across a ratios change keeps ringing") {
   ModalRig a(ratios_cfg({1.0, 1.594, 2.136, 2.296}));
   a.pluck_and_collect(2000);
