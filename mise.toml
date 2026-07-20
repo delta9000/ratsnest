@@ -40,6 +40,22 @@ description = "Parse/validate a patch file. Usage: mise run check -- patches/fir
 depends = ["build"]
 run = "./build/ratsnest check"
 
+[tasks.check-all]
+description = "Validate every patch and subpatch under patches/."
+depends = ["build"]
+run = """
+fail=0
+for p in $(find patches -name '*.patch' -o -name '*.sub' | sort); do
+  if out=$(./build/ratsnest check "$p" 2>&1); then
+    printf 'ok    %s\\n' "$p"
+  else
+    printf 'FAIL  %s\\n%s\\n' "$p" "$out"
+    fail=1
+  fi
+done
+exit $fail
+"""
+
 [tasks.render]
 description = "Render a patch to WAV offline. Usage: mise run render -- patches/first.patch -d 10s -o take.wav"
 depends = ["build"]

@@ -12,6 +12,27 @@ authoring or reviewing patches; its registry-coverage test prevents omissions).
 Implementation plans: `docs/superpowers/plans/` (checkbox tasks = status; a task
 is done only when its named tests pass — never hand-edit status).
 
+## Making music with it
+
+`.claude/skills/` is a project-scoped skill library for authoring patches.
+Invoke `ratsnest-patching` for any patch work; it routes to the rest:
+
+| Skill | For |
+|---|---|
+| `ratsnest-patching` | the authoring loop, signal conventions, the gotchas that break patches |
+| `ratsnest-synthesis` | voices: subtractive, west coast, FM, physical, granular, percussion, bass, noise, space |
+| `ratsnest-generative` | self-playing patches: incommensurate periods, locked-vs-fresh randomness, drift |
+| `ratsnest-genres` | twelve genre cards, each a departure point with a "how to break it" section |
+| `ratsnest-composition` | form, harmony, mixing, mastering — with the calibration numbers |
+| `ratsnest-inspiration` | provocations, artist lenses, seed sketches, starting from nothing |
+
+Worked, verified examples live in `patches/etudes/`. The evidence behind the
+skills is in `docs/research/2026-07-20-*.md`. `docs/patch-craft.md` remains the
+authoritative list of hard-won gotchas; the skills cite it rather than
+duplicating it.
+
+Validate every patch in the repo with `mise run check-all`.
+
 ## Build / test
 
 Prefer mise tasks (see `mise tasks`):

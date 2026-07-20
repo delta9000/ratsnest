@@ -1,0 +1,76 @@
+# battement -- three intervals, six oscillators, no triggers at all.
+#
+# The Radigue lens: the music is the beating between near-unisons. Each pair
+# is detuned so its difference frequency is a chosen tempo, and one very slow
+# LFO nudges a single detune so the beat rate itself breathes.
+#
+#   octave pair   55 Hz    ~0.09 Hz beat -- an 11-second swell
+#   root pair    110 Hz    ~0.21 Hz beat -- a 5-second pulse
+#   fifth pair   165 Hz    ~0.34 Hz beat -- a 3-second flutter
+#
+# Nothing here is clocked. Nothing is struck. Render 8-12 minutes; the only
+# events are the ones your ear invents. Fade in post.
+#
+# Companion to .claude/skills/ratsnest-inspiration (artist-lenses: Radigue).
+
+# ---- the octave: slowest beat, carries the weight ----
+o1 = vco { freq: 55hz, wave: tri }
+o2 = vco { freq: 55hz, wave: tri }
+0.00236 -> o2.v_oct
+
+# ---- the root ----
+r1 = vco { freq: 110hz, wave: tri }
+r2 = vco { freq: 110hz, wave: tri }
+0.00276 -> r2.v_oct
+
+# ---- the just fifth (3/2) ----
+f1 = vco { freq: 110hz, wave: tri }
+f2 = vco { freq: 110hz, wave: tri }
+0.58496 -> f1.v_oct
+0.58496 -> f2.v_oct
+0.00298 -> f2.v_oct
+
+# ---- the hair the potentiometer moves by ----
+# 24 minutes. The root pair's beat rate wanders between roughly 0.15 and
+# 0.27 Hz, so the five-second pulse is never quite five seconds.
+hair = lfo { wave: sine, freq: 0.0007hz }
+hair -> r2.v_oct : 0.0008
+
+# ---- one gentle filter, opening across nine minutes ----
+bed = svf { cutoff: 240, res: 0.08 }
+o1 -> bed.in : 0.22
+o2 -> bed.in : 0.22
+r1 -> bed.in : 0.15
+r2 -> bed.in : 0.15
+f1 -> bed.in : 0.09
+f2 -> bed.in : 0.09
+
+dawn = lfo { wave: tri, freq: 0.0018hz }
+dawn -> bed.cutoff : 620
+
+# ---- a room, not an effect ----
+hall = reverb { decay: 0.9, damp: 0.28, mix: 1, predelay: 0.04,
+                bandwidth: 0.93, mod_rate: 0.21, mod_depth: 16 }
+bed.lp -> hall.in_l : 0.5
+bed.lp -> hall.in_r : 0.5
+
+m = mix { levels: [0.7, 0.55, 0.55], pans: [0, -0.85, 0.85] }
+bed.lp -> m.in1
+hall.out_l -> m.in2
+hall.out_r -> m.in3
+
+dc = dcblock { cutoff: 10hz }
+m.out_l -> dc.in_l
+m.out_r -> dc.in_r
+dc.out_l -> out.left
+dc.out_r -> out.right
+-0.65 -> out.level
+
+# The discipline: if this is boring, the modulation is too fast, not too
+# small. Halve `hair`'s frequency before you add anything.
+#
+# Try next:
+#   * retune the fifth to 0.58333 (tempered) and hear the stillness leave
+#   * remove the fifth pair entirely for the first four minutes
+#   * replace one tri with a `sine` -- the beat survives, the body goes
+#   * add a third interval at 0.80735 (7/4) and take the fifth out
