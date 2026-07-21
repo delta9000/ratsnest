@@ -1,0 +1,343 @@
+# nightbus -- half-time UK bass at 140 BPM, D minor, ~3:12.
+#
+# Built from the `bass-music` genre card, with its central discipline kept:
+# the bass is split in two and never mixed into one oscillator. A pure sine
+# sub carries 30-100 Hz and never moves; everything above 150 Hz does all the
+# modulating. Half-time drums (kick on 1 and the "a" of 3, snare on 3) leave
+# the space and the bass fills it.
+#
+# THE RULE BROKEN ON PURPOSE (card move 1): the wobble drives the ladder's
+# RESONANCE, not its cutoff. Cutoff sits still at 420 Hz and the peak snarls
+# in one place instead of sweeping. Nastier, and rarely done.
+#
+# Leaning Burial rather than Rusko: vinyl-ish noise bed, pad in the gaps,
+# space over aggression. The growl only replaces the wobble at DROP 2.
+#
+# Drum voices are the physical kit subpatches (`patches/lib/kit/*.sub`), one
+# `sub` instance each -- no drum synthesis in this file.
+#
+# NOTE-NAME DISCIPLINE (docs/patch-craft.md, ratsnest-patching rule 2):
+# `D1v` is v/oct and lands at its written pitch ONLY on a 220 Hz base.
+# Every pitched voice here is `freq: 220hz` for that reason. On `freq: 55hz`
+# the same lane renders 9 Hz -- inaudible, and --stats reads identical.
+#
+# Arrangement (28 four-bar blocks at 140 BPM, 6.857 s each = 192 s):
+#   0-1   intro    atmos + pad, filtered growl breathing, no drums
+#   2-3   build    half-time drums enter
+#   4-11  DROP 1   sub + wobble; resonance snarl; formants morph slowly
+#   12-13 break    bass gone, pad and plate only
+#   14-15 rebuild  growl fades up, wobble subdivision doubles
+#   16-23 DROP 2   FM growl replaces the wobble; formants stepped per bar
+#   24-25 half     half density, sub carries it
+#   26-27 fade     guard
+#
+#   ratsnest render patches/nightbus.patch -d 188s -o nightbus.wav --stats 6.857s
+
+# === CLOCK TREE ===
+master  = clock { bpm: 560 }     # 140 BPM sixteenths
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+bar     = div { by: 4 }
+blk     = div { by: 4 }
+master  -> eighth.in
+eighth  -> quarter.in
+quarter -> bar.in
+bar     -> blk.in
+
+# === ARRANGEMENT: 28 four-bar blocks ===
+#          | intro | build |        DROP 1         | break |rebuild|         DROP 2        | half  | fade  |
+arr_drum = stepseq { steps: [0,0, 0.6,0.85, 1,1,1,1,1,1,1,1, 0,0, 0.5,0.75, 1,1,1,1,1,1,1,1, 0.55,0.5, 0,0] }
+arr_sub  = stepseq { steps: [0,0, 0,0.3, 1,1,1,1,1,1,1,1, 0,0, 0.4,0.65, 1,1,1,1,1,1,1,1, 0.8,0.6, 0,0] }
+arr_wob  = stepseq { steps: [0.15,0.25, 0.35,0.5, 1,1,1,1,1,1,1,1, 0,0, 0.5,0.85, 0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2, 0,0, 0,0] }
+arr_grwl = stepseq { steps: [0.3,0.35, 0.2,0.15, 0,0,0,0,0,0,0,0, 0,0, 0.3,0.6, 1,1,1,1,1,1,1,1, 0.3,0.2, 0,0] }
+arr_pad  = stepseq { steps: [0.55,0.6, 0.5,0.4, 0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3, 0.9,0.9, 0.7,0.5, 0.3,0.3,0.3,0.3,0.3,0.3,0.3,0.3, 0.5,0.6, 0.4,0.15] }
+arr_atms = stepseq { steps: [0.7,0.7, 0.6,0.6, 0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4, 0.8,0.8, 0.6,0.5, 0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4, 0.6,0.7, 0.5,0.25] }
+arr_main = stepseq { steps: [1,1, 1,1, 1,1,1,1,1,1,1,1, 1,1, 1,1, 1,1,1,1,1,1,1,1, 1,1, 0.45,0] }
+blk -> arr_drum.clock
+blk -> arr_sub.clock
+blk -> arr_wob.clock
+blk -> arr_grwl.clock
+blk -> arr_pad.clock
+blk -> arr_atms.clock
+blk -> arr_main.clock
+
+# Slew: nothing on `trig`, so `func` slews toward `in`. Asymmetric — parts
+# arrive over a bar and leave fast so the drop edges stay hard.
+l_drum = func { rise: 1.2, fall: 0.35 }
+l_sub  = func { rise: 1.0, fall: 0.30 }
+l_wob  = func { rise: 1.4, fall: 0.35 }
+l_grwl = func { rise: 1.6, fall: 0.40 }
+l_pad  = func { rise: 2.5, fall: 1.2 }
+l_atms = func { rise: 2.5, fall: 1.5 }
+l_main = func { rise: 0.5, fall: 2.5 }
+arr_drum.cv -> l_drum.in
+arr_sub.cv  -> l_sub.in
+arr_wob.cv  -> l_wob.in
+arr_grwl.cv -> l_grwl.in
+arr_pad.cv  -> l_pad.in
+arr_atms.cv -> l_atms.in
+arr_main.cv -> l_main.in
+
+# === NOTE LANE — one pitch per bar, D minor, gates carry the rhythm ===
+note = stepseq { gates: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,1,0,0],
+                 steps: [D1v, D1v, D1v, D1v, D1v, D1v, F1v, F1v,
+                         D1v, D1v, D1v, D1v, C1v, C1v, C1v, C1v] }
+master -> note.clock
+
+# === DRUM PATTERNS (16 sixteenths per bar, half-time) ===
+p_kick  = stepseq { gates: [1,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0] }
+p_snare = stepseq { gates: [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0] }
+p_hat   = stepseq { gates: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0] }
+p_rim   = stepseq { gates: [0,0,0,0, 0,1,0,0, 0,0,0,0, 0,0,1,0] }
+master -> p_kick.clock
+master -> p_snare.clock
+master -> p_hat.clock
+master -> p_rim.clock
+
+# === DRUM VOICES — physical kit subpatches ===
+kick  = sub { file: "lib/kit/kick.sub",  tune: 46hz,  decay: 0.42, bend: 2.4 }
+snare = sub { file: "lib/kit/snare.sub", tune: 195hz, decay: 0.30, snap: 0.55 }
+hat   = sub { file: "lib/kit/hat.sub",   tune: 460hz, decay: 0.10, tone: 8.5khz }
+rim   = sub { file: "lib/kit/rim.sub",   tune: 520hz, decay: 0.22 }
+p_kick.gate  -> kick.trig
+p_snare.gate -> snare.trig
+p_hat.gate   -> hat.trig
+p_rim.gate   -> rim.trig
+0.85 -> kick.accent
+0.80 -> snare.accent
+0.45 -> hat.accent
+0.35 -> rim.accent
+
+# Kick envelope for the three-depth duck (channel, FX return, bus glue).
+kduck = func { rise: 0.004, fall: 0.20, curve: exp }
+p_kick.trig -> kduck.trig
+
+# === SUB — sine only, mono, never modulated (card rule) ===
+sub_osc = vco { wave: sine, freq: 220hz }
+note.cv -> sub_osc.v_oct
+sub_env = adsr { attack: 0.004, decay: 0.05, sustain: 0.95, release: 0.06 }
+note.gate -> sub_env.gate
+sub_vca = vca { gain: 0 }
+sub_osc -> sub_vca.in
+sub_env -> sub_vca.cv
+sub_lp = svf { cutoff: 95hz, res: 0 }
+sub_vca -> sub_lp.in
+sub_out = vca { gain: 0 }
+sub_lp.lp -> sub_out.in
+l_sub -> sub_out.cv : 0.85
+kduck -> sub_out.cv : -0.25
+
+# === WOBBLE LAYER — two detuned saws; the BREAK lives here ===
+# Cutoff is static. The wobble opens the RESONANCE, so the filter snarls at
+# one frequency instead of sweeping through the spectrum.
+wrate = tempo { bpm: 140, beats: 0 }        # beats base zeroed: the cable owns it
+wsub  = stepseq { steps: [0.25, 0.25, 0.5, 0.125] }
+bar -> wsub.clock
+wsub.cv -> wrate.beats
+
+wob = lfo { freq: 0hz, wave: tri }          # freq base zeroed: cables SUM
+wrate.hz -> wob.freq
+note.trig -> wob.reset
+wdep = func { rise: 0.42, fall: 0.12, curve: exp }
+note.trig -> wdep.trig
+wdepth = vca { gain: 0 }
+wob  -> wdepth.in
+wdep -> wdepth.cv
+
+saw1 = vco { wave: saw, freq: 220hz }
+saw2 = vco { wave: saw, freq: 220hz }
+note.cv -> saw1.v_oct
+note.cv -> saw2.v_oct
+0.008 -> saw2.v_oct
+wfilt = ladder { cutoff: 420hz, res: 0.20, drive: 0.4 }
+saw1 -> wfilt.in : 0.5
+saw2 -> wfilt.in : 0.5
+wdepth -> wfilt.res : 0.55                  # <-- the break: resonance, not cutoff
+
+# High-pass the growl band so it never fights the sub below 120 Hz.
+whp = svf { cutoff: 125hz, res: 0.1 }
+wfilt -> whp.in
+wob_out = vca { gain: 0 }
+whp.hp -> wob_out.in
+l_wob -> wob_out.cv : 0.55
+kduck -> wob_out.cv : -0.18
+
+# === FM GROWL — DROP 2's voice ===
+growl = fm { algo: dual, freq: 220hz,
+             ratios: [1, 1, 3.5, 1, 7, 2],
+             levels: [0.9, 0.35, 0.2, 0.6, 0.15, 0.25],
+             fb: [0, 0.3, 0, 0, 0.45, 0], curve: log,
+             t4: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05] }
+note.gate -> growl.gate
+note.cv   -> growl.v_oct
+idx  = lfo { freq: 62hz, wave: tri }        # audio-rate index mod = the vowel
+idx  -> growl.lvl3 : 0.35
+idx2 = lfo { freq: 3.1hz }
+idx2 -> growl.lvl5 : 0.12
+
+# Formants: three resonant bandpasses crossfaded by one slow LFO.
+f1 = svf { cutoff: 700hz,  res: 0.85 }
+f2 = svf { cutoff: 1150hz, res: 0.85 }
+f3 = svf { cutoff: 2400hz, res: 0.80 }
+growl -> f1.in
+growl -> f2.in
+growl -> f3.in
+vow = lfo { freq: 0.6hz, wave: tri }
+x1 = xfade { mix: 0.5 }
+f1.bp -> x1.a
+f2.bp -> x1.b
+vow -> x1.mix : 0.5
+x2 = xfade { mix: 0.35 }
+x1    -> x2.a
+f3.bp -> x2.b
+vow -> x2.mix : 0.25
+
+# Dirt last, then DC-block it.
+grind = overdrive { model: rat, drive: 0.45, tone: 0.55, mix: 1 }
+x2 -> grind.in
+gdc = dcblock { cutoff: 25hz }
+grind -> gdc.in_l
+grind -> gdc.in_r
+ghp = svf { cutoff: 130hz, res: 0.1 }
+gdc.out_l -> ghp.in
+grwl_out = vca { gain: 0 }
+ghp.hp -> grwl_out.in
+l_grwl -> grwl_out.cv : 0.42
+kduck  -> grwl_out.cv : -0.15
+
+# === PAD — the space between the hits ===
+pad_a = vco { wave: saw, freq: 220hz }
+pad_b = vco { wave: saw, freq: 220hz }
+note.cv -> pad_a.v_oct
+note.cv -> pad_b.v_oct
+1.0   -> pad_a.v_oct                       # up two octaves from the bass note
+1.007 -> pad_b.v_oct                       # ...and detuned
+pad_lp = ladder { cutoff: 700hz, res: 0.25 }
+pad_a -> pad_lp.in : 0.4
+pad_b -> pad_lp.in : 0.4
+pslow = lfo { freq: 0.07hz }
+pslow -> pad_lp.cutoff : 450
+pad_out = vca { gain: 0 }
+pad_lp -> pad_out.in
+l_pad -> pad_out.cv : 0.30
+kduck -> pad_out.cv : -0.10
+
+# === ATMOS — the vinyl-ish bed ===
+atm_n  = noise { color: pink, seed: 19 }
+atm_bp = svf { cutoff: 2600hz, res: 0.25 }
+atm_n -> atm_bp.in
+aslow = lfo { freq: 0.045hz }
+aslow -> atm_bp.cutoff : 1200
+atms_out = vca { gain: 0 }
+atm_bp.bp -> atms_out.in
+l_atms -> atms_out.cv : 0.16
+
+# === DRUM BUS ===
+drums = mix { levels: [0, 0, 0, 0], pans: [0, 0.05, -0.45, 0.35] }
+kick  -> drums.in1
+snare -> drums.in2
+hat   -> drums.in3
+rim   -> drums.in4
+l_drum -> drums.lvl1 : 0.90
+l_drum -> drums.lvl2 : 0.62
+l_drum -> drums.lvl3 : 0.34
+l_drum -> drums.lvl4 : 0.26
+
+# === FX — dub plate + a tempo-synced echo on the growl band ===
+edly = tempo { bpm: 140, beats: 0.75 }      # dotted eighth
+dly = delay { time: 0ms, feedback: 0.42, tone: 2600, mix: 1, slew: 0.2 }
+edly.seconds -> dly.time
+wob_out  -> dly.in : 0.22
+grwl_out -> dly.in : 0.26
+rim      -> dly.in : 0.30
+
+plate = reverb { decay: 0.80, damp: 0.38, mix: 1, predelay: 0.02,
+                 bandwidth: 0.9, mod_rate: 0.4, mod_depth: 14 }
+pad_out  -> plate.in_l : 0.55
+pad_out  -> plate.in_r : 0.55
+snare    -> plate.in_l : 0.30
+snare    -> plate.in_r : 0.30
+atms_out -> plate.in_l : 0.30
+atms_out -> plate.in_r : 0.30
+dly      -> plate.in_l : 0.25
+dly      -> plate.in_r : 0.25
+
+# FX returns duck too (depth two of three).
+fx = mix { levels: [0.34, 0.34, 0.30], pans: [-0.6, 0.6, 0] }
+plate.out_l -> fx.in1
+plate.out_r -> fx.in2
+dly -> fx.in3
+kduck -> fx.lvl1 : -0.12
+kduck -> fx.lvl2 : -0.12
+kduck -> fx.lvl3 : -0.10
+
+# === BUSES ===
+# The growl bus is compressed hard; the sub stays out of it entirely and
+# rejoins after, so nothing modulates the weight.
+grwlbus = mix { levels: [0.85, 0.80, 0.55, 0.60] }
+wob_out  -> grwlbus.in1
+grwl_out -> grwlbus.in2
+pad_out  -> grwlbus.in3
+atms_out -> grwlbus.in4
+
+gcomp = compressor { threshold: -16, ratio: 6, knee: 6,
+                     attack: 0.005, release: 0.08, makeup: 2.0, mix: 0.7 }
+grwlbus.out_l -> gcomp.in_l
+grwlbus.out_r -> gcomp.in_r
+
+# Sub bus: mono, no compression, no width.
+submono = stereo { width: 0, mono: 1 }
+sub_out -> submono.in_l
+sub_out -> submono.in_r
+
+premaster = mix { levels: [1.65, 1.65, 1.30, 1.30, 1.55, 1.55, 1.45],
+                  pans: [-1, 1, -1, 1, -1, 1, 0] }
+gcomp.out_l -> premaster.in1
+gcomp.out_r -> premaster.in2
+fx.out_l    -> premaster.in3
+fx.out_r    -> premaster.in4
+drums.out_l -> premaster.in5
+drums.out_r -> premaster.in6
+submono.out_l -> premaster.in7
+
+# Arrangement fade guard on the whole mix.
+mainl = vca { gain: 0 }
+mainr = vca { gain: 0 }
+premaster.out_l -> mainl.in
+premaster.out_r -> mainr.in
+l_main -> mainl.cv : 1.0
+l_main -> mainr.cv : 1.0
+
+# === MASTERING ===
+dc = dcblock { cutoff: 20hz }
+mainl -> dc.in_l
+mainr -> dc.in_r
+
+eq_m = eq { hp_freq: 26, low_freq: 90, low_gain: 0.4,
+            mid1_freq: 320, mid1_gain: -1.2, mid1_q: 0.9,
+            mid2_freq: 3200, mid2_gain: 0.8, mid2_q: 0.8,
+            high_freq: 9000, high_gain: 0.5 }
+dc.out_l -> eq_m.in_l
+dc.out_r -> eq_m.in_r
+
+glue = compressor { sidechain: external, threshold: -14, ratio: 2.4, knee: 6,
+                    attack: 0.012, release: 0.14, makeup: 1.6, mix: 1 }
+eq_m.out_l -> glue.in_l
+eq_m.out_r -> glue.in_r
+kick -> glue.side_l : 0.9                   # depth three: external-sidechain glue
+kick -> glue.side_r : 0.9
+
+field = stereo { width: 1.15, balance: 0 }
+glue.out_l -> field.in_l
+glue.out_r -> field.in_r
+
+clip = clipper { mode: soft, threshold: -3, drive: 4.5, mix: 0.3 }
+field.out_l -> clip.in_l
+field.out_r -> clip.in_r
+
+lim = limiter { threshold: -0.4, release: 0.12 }
+clip.out_l -> lim.in_l
+clip.out_r -> lim.in_r
+
+lim.out_l -> out.left
+lim.out_r -> out.right

@@ -1,0 +1,428 @@
+# estuary — a 60-minute euclidean ambient life-cycle
+#
+# Where the other five meet. Idioms pulled from each:
+#   vapor      — pink/white noise weather (rain, wind) + pitched-noise "water"
+#                bands whose centre tracks the quantizer; saw drone stack
+#   tide       — three sub voices breathing together on one glacial tidal LFO
+#   harbor     — a choir of four modal bells, quant-voiced, long celestial ring
+#   ember      — sympathetic Karplus-Strong strings (one struck, two coupled)
+#                and a bowed pink-noise pad through a driven ladder
+#   driftwood  — a granular haze re-processing the drone bus
+#
+# ---------------------------------------------------------------------------
+# THE ARC — eight ages, 7:30 each, 60:00 total
+#
+# A 24-step tracker grid (150 s per step, three steps per age) conducts the
+# whole piece. Lane steps are slewed by `func` into 60 s crossfades, so nothing
+# switches — it grows and recedes.
+#
+#   0:00  BIRTH       one sub heartbeat, a single bell, almost nothing else
+#   7:30  LEARNING    strings enter and teach each other (sympathetic coupling);
+#                     euclid patterns thicken as complexity is acquired
+#  15:00  GRADUATION  the brightest moment of the life. Bells at full voice,
+#                     top of the brightness lane — everything is ahead of it
+#  22:30  LIFE        fullest density; all voices, widest field, steady
+#  30:00  MID-LIFE    still full but turning inward: the granular haze rises,
+#                     brightness starts its long retreat
+#  37:30  AGEING      thinning. Highs roll off, density falls, reverb lengthens
+#                     — memory (the grain bus) overtakes the present
+#  45:00  DEATH       voices fall away into the plate; only sub and tail remain
+#  52:30  REBIRTH     the first bell motif returns, quiet, swelling toward 0:00
+#
+# The grid wraps at exactly 24 x 150 s = 3600 s, so the last step hands back to
+# BIRTH: the wrap IS the rebirth. The four glacial LFOs are 120/180/240/300 s,
+# whose LCM is also 3600 s — so modulators and arrangement both come home at
+# 60:00 and the hour closes on itself. Only the euclid rhythm (~6.2 h) and the
+# turing/bern draws carry over, so the next cycle is the same life, not the
+# same performance.
+# ---------------------------------------------------------------------------
+#
+# Euclid replaces the div/bern strike chains: five generators at irregular step
+# counts (16/12/9/7/11) off one 30 BPM clock. LCM(16,12,9,7,11) = 11088 steps
+# at 2 s = ~6.2 h, so the combined rhythm never repeats inside the hour. The
+# glacial LFOs rotate the patterns (`rot`) while the arrangement sets how full
+# they are (`hits`) — density is the story, rotation is the exploration.
+#
+# Pitch is D minor pentatonic throughout, drifted by a low-probability turing.
+#
+#   ratsnest render patches/estuary.patch -d 3600s -o estuary.wav --stats 150s
+#   ffmpeg -i estuary.wav -af "afade=t=in:st=0:d=12,afade=t=out:st=3576:d=24" estuary-final.wav
+#
+# Fades belong in post (docs/patch-craft.md "Infinite scenes"), not here.
+
+# === CLOCK ===
+# 30 BPM = one euclid step every 2 s; 75 steps = one arrangement step (150 s).
+clock = clock { bpm: 30 }
+life  = div { by: 75 }
+clock -> life.in
+
+# === GLACIAL LFOs — 2 / 3 / 4 / 5 minutes, LCM = the full hour ===
+l1 = lfo { freq: 0.0083333hz }   # 120 s
+l2 = lfo { freq: 0.0055556hz }   # 180 s
+l3 = lfo { freq: 0.0041667hz }   # 240 s
+l4 = lfo { freq: 0.0033333hz }   # 300 s — the tidal one
+
+# === THE EIGHT AGES — 24 steps, 3 per age ===
+#            |    BIRTH     |   LEARNING   |  GRADUATION  |     LIFE     |   MID-LIFE   |    AGEING    |    DEATH     |   REBIRTH    |
+arr_body = stepseq { steps: [0.15, 0.25, 0.35, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.80, 0.80, 0.78, 0.75, 0.65, 0.55, 0.45, 0.35,0.22,0.12, 0.13,0.15,0.18] }
+arr_bell = stepseq { steps: [0.10, 0.18, 0.28, 0.40, 0.50, 0.60, 0.85, 0.95, 1.00, 0.90, 0.85, 0.90, 0.75, 0.70, 0.65, 0.55, 0.45, 0.35, 0.25,0.14,0.05, 0.06,0.11,0.18] }
+arr_strs = stepseq { steps: [0.05, 0.10, 0.18, 0.40, 0.60, 0.75, 0.85, 0.90, 0.85, 0.80, 0.78, 0.80, 0.72, 0.68, 0.62, 0.50, 0.40, 0.30, 0.20,0.10,0.03, 0.04,0.09,0.16] }
+arr_dens = stepseq { steps: [0.05, 0.12, 0.20, 0.35, 0.50, 0.62, 0.70, 0.78, 0.80, 0.90, 1.00, 0.95, 0.85, 0.80, 0.72, 0.60, 0.48, 0.36, 0.24,0.12,0.03, 0.04,0.08,0.14] }
+arr_brgt = stepseq { steps: [0.12, 0.20, 0.30, 0.45, 0.58, 0.68, 0.85, 1.00, 0.95, 0.85, 0.80, 0.78, 0.68, 0.60, 0.55, 0.45, 0.35, 0.26, 0.18,0.09,0.03, 0.05,0.10,0.16] }
+arr_air  = stepseq { steps: [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.50, 0.50, 0.55, 0.60, 0.60, 0.70, 0.78, 0.85, 0.90, 0.95, 1.00, 0.85,0.60,0.35, 0.28,0.26,0.24] }
+arr_spce = stepseq { steps: [0.30, 0.32, 0.35, 0.38, 0.40, 0.42, 0.45, 0.48, 0.50, 0.50, 0.52, 0.55, 0.60, 0.65, 0.70, 0.78, 0.85, 0.90, 0.95,1.00,1.00, 0.85,0.65,0.50] }
+
+life -> arr_body.clock
+life -> arr_bell.clock
+life -> arr_strs.clock
+life -> arr_dens.clock
+life -> arr_brgt.clock
+life -> arr_air.clock
+life -> arr_spce.clock
+
+# Slew limiters: 60 s each way turns a 150 s step into a crossfade, so the
+# ages bleed into one another instead of switching.
+body = func { rise: 60, fall: 60 }
+bell = func { rise: 60, fall: 60 }
+strs = func { rise: 60, fall: 60 }
+dens = func { rise: 45, fall: 45 }
+brgt = func { rise: 60, fall: 60 }
+airl = func { rise: 60, fall: 60 }
+spce = func { rise: 70, fall: 70 }
+arr_body.cv -> body.in
+arr_bell.cv -> bell.in
+arr_strs.cv -> strs.in
+arr_dens.cv -> dens.in
+arr_brgt.cv -> brgt.in
+arr_air.cv  -> airl.in
+arr_spce.cv -> spce.in
+
+# === GENERATIVE PITCH REGISTER (D minor pentatonic) ===
+# Depth 1.0 everywhere off q1: quant's out is v/oct, and scaling a v/oct
+# signal detunes the temperament.
+t1 = turing { len: 8, prob: 0.08, seed: 37 }
+q1 = quant { scale: [0, 3, 5, 7, 10] }
+clock -> t1.clock
+t1 -> q1.in
+
+# === EUCLIDEAN ENGINE ===
+# Irregular step counts; every generator must be clocked or nothing ever fires.
+# hits base 1 = the sparse birth state; the density lane fills them in.
+eu_bell = euclid { steps: 16, hits: 1, rot: 0 }
+eu_bel2 = euclid { steps: 12, hits: 1, rot: 5 }
+eu_str  = euclid { steps: 9,  hits: 1, rot: 0 }
+eu_ev   = euclid { steps: 7,  hits: 1, rot: 3 }
+eu_wat  = euclid { steps: 11, hits: 1, rot: 0 }
+clock -> eu_bell.clock
+clock -> eu_bel2.clock
+clock -> eu_str.clock
+clock -> eu_ev.clock
+clock -> eu_wat.clock
+
+# Density is the arc; rotation is the exploration.
+dens -> eu_bell.hits : 7
+dens -> eu_bel2.hits : 5
+dens -> eu_str.hits  : 3
+dens -> eu_ev.hits   : 2
+dens -> eu_wat.hits  : 3
+l1 -> eu_bell.hits : 2
+l3 -> eu_bel2.hits : 1.5
+l2 -> eu_str.hits  : 1
+l1 -> eu_wat.hits  : 1.5
+l2 -> eu_bell.rot : 8
+l4 -> eu_bel2.rot : 6
+l3 -> eu_ev.rot   : 3
+l4 -> eu_wat.rot  : 5
+
+# === SUB (tide): three voices breathing on the 5-minute tidal LFO ===
+sub_d1 = vco { freq: 36.71hz, wave: sine }
+sub_a1 = vco { freq: 55hz,    wave: sine }
+sub_d2 = vco { freq: 73.42hz, wave: saw  }
+sub_lp = ladder { cutoff: 200hz, res: 0.1 }
+sub_d2 -> sub_lp.in
+
+sub_v1 = vca { gain: 0 }
+sub_v2 = vca { gain: 0 }
+sub_v3 = vca { gain: 0 }
+sub_d1 -> sub_v1.in
+sub_a1 -> sub_v2.in
+sub_lp -> sub_v3.in
+0.55 -> sub_v1.gain
+l4   -> sub_v1.gain : 0.40
+0.45 -> sub_v2.gain
+l4   -> sub_v2.gain : 0.32
+0.38 -> sub_v3.gain
+l4   -> sub_v3.gain : 0.26
+
+# === DRONE (vapor): Dsus stack through a ladder that opens with the life ===
+# Base cutoff is the darkest the voice ever gets (birth); brightness adds up.
+dr_a = vco { freq: 73.42hz,  wave: saw }
+dr_b = vco { freq: 110hz,    wave: saw }
+dr_c = vco { freq: 146.83hz, wave: tri }
+dr_d = vco { freq: 164.81hz, wave: saw }
+dr_filt = ladder { cutoff: 180hz, res: 0.18, drive: 0.25 }
+dr_a -> dr_filt.in : 0.30
+dr_b -> dr_filt.in : 0.30
+dr_c -> dr_filt.in : 0.26
+dr_d -> dr_filt.in : 0.20
+brgt -> dr_filt.cutoff : 900
+l1 -> dr_filt.cutoff : 220
+l3 -> dr_filt.cutoff : -120
+dr_amp = vca { gain: 0.18 }
+dr_filt -> dr_amp.in
+l2 -> dr_amp.cv : 0.07
+
+# === BELLS (harbor): the character's voice ===
+# bern splits each euclid hit between two bells, so the choir voices itself.
+bell_a3 = modal { modes: 32, freq: 220hz,    damping: 0.82, brightness: 0.35 }
+bell_d4 = modal { modes: 32, freq: 293.66hz, damping: 0.80, brightness: 0.37 }
+bell_f4 = modal { modes: 32, freq: 369.99hz, damping: 0.85, brightness: 0.39 }
+bell_a4 = modal { modes: 32, freq: 440hz,    damping: 0.85, brightness: 0.41 }
+brgt -> bell_a3.brightness : 0.45
+brgt -> bell_d4.brightness : 0.45
+brgt -> bell_f4.brightness : 0.43
+brgt -> bell_a4.brightness : 0.41
+
+bn1 = bern { prob: 0.60, seed: 11 }
+bn2 = bern { prob: 0.55, seed: 23 }
+eu_bell.trig -> bn1.gate
+eu_bel2.trig -> bn2.gate
+bn1.a -> bell_a3.strike
+bn1.b -> bell_f4.strike
+bn2.a -> bell_d4.strike
+bn2.b -> bell_a4.strike
+
+q1 -> bell_a3.v_oct
+q1 -> bell_d4.v_oct
+q1 -> bell_f4.v_oct
+q1 -> bell_a4.v_oct
+
+# === STRINGS (ember): learning — strike D2, let A2 and D3 ring in sympathy ===
+str_d2 = string { seed: 7,  freq: 73.42hz,  structure: 0.25,
+                  brightness: 0.55, damping: 0.94, position: 0.30 }
+str_a2 = string { seed: 11, freq: 110hz,    structure: 0.25,
+                  brightness: 0.50, damping: 0.96, position: 0.28 }
+str_d3 = string { seed: 13, freq: 146.83hz, structure: 0.25,
+                  brightness: 0.55, damping: 0.92, position: 0.32 }
+eu_str.trig -> str_d2.strike
+str_d2.out -> str_a2.in : 0.05
+str_d2.out -> str_d3.in : 0.05
+# Subtle chorus drift (fractions of an octave, not quantized pitch).
+l2 -> str_d2.v_oct : 0.04
+l3 -> str_a2.v_oct : 0.04
+l4 -> str_d3.v_oct : 0.04
+
+# === PAD (ember): bowed pink noise through a driven ladder ===
+pn = noise { color: pink, seed: 5 }
+pad_vca = vca { gain: 0 }
+pad_lp = ladder { cutoff: 400hz, res: 0.2, drive: 0.6 }
+0.38 -> pad_vca.gain
+l1 -> pad_vca.gain : 0.32
+pn -> pad_vca.in
+pad_vca -> pad_lp.in
+brgt -> pad_lp.cutoff : 900
+l3 -> pad_lp.cutoff : 400
+
+# === WATER (vapor): narrow pitched-noise band, euclid-swelled ===
+wat_n  = noise { color: pink, seed: 17 }
+wat_bp = svf { cutoff: 700hz, res: 0.92 }
+wat_n -> wat_bp.in
+q1 -> wat_bp.cutoff : 1500
+wat_env = func { rise: 1.6s, fall: 5s }
+eu_wat.trig -> wat_env.trig
+wat_amp = vca { gain: 0 }
+wat_bp.bp -> wat_amp.in
+wat_env -> wat_amp.cv : 0.50
+
+# === WEATHER (vapor): rain and wind beds ===
+rain_n  = noise { color: pink, seed: 29 }
+rain_bp = svf { cutoff: 1200hz, res: 0.4 }
+rain_lp = svf { cutoff: 900hz,  res: 0.18 }
+rain_n -> rain_bp.in
+rain_bp.bp -> rain_lp.in
+l1 -> rain_bp.cutoff : 700
+brgt -> rain_lp.cutoff : 1500
+l2 -> rain_lp.cutoff : 500
+rain_amp = vca { gain: 0.16 }
+rain_lp.lp -> rain_amp.in
+l3 -> rain_amp.cv : 0.05
+
+wind_n  = noise { color: white, seed: 31 }
+wind_hp = svf { cutoff: 500hz,  res: 0.25 }
+wind_bp = svf { cutoff: 1500hz, res: 0.5 }
+wind_n -> wind_hp.in
+wind_hp.hp -> wind_bp.in
+brgt -> wind_hp.cutoff : 1200
+l4 -> wind_hp.cutoff : 900
+l1 -> wind_bp.cutoff : 800
+wind_amp = vca { gain: 0.09 }
+wind_bp.bp -> wind_amp.in
+l2 -> wind_amp.cv : 0.03
+
+# === EVENTS (vapor/harbor): quant-voiced sine, euclid-gated ===
+ev_osc = vco { freq: 220hz, wave: sine }
+q1 -> ev_osc.v_oct
+ev_env = adsr { attack: 2, decay: 6, sustain: 0.3, release: 8 }
+ev_vca = vca { gain: 0 }
+eu_ev.gate -> ev_env.gate
+ev_osc -> ev_vca.in
+ev_env -> ev_vca.gain
+
+# === GRAINS (driftwood): memory. Re-reads the drone; rises through mid-life ===
+gr = grains { secs: 6, seed: 17 }
+dr_amp -> gr.in : 0.70
+dens -> gr.density : 10
+l3 -> gr.density : 6
+l4 -> gr.position : 0.35
+0.25 -> gr.size
+0.55 -> gr.jitter
+0.65 -> gr.spread
+
+# === BUSES ===
+# Config levels are zeroed: the arrangement lanes ARE the levels (mix lvlN CVs
+# are additive to config levels). Sends are tapped from the bus outputs, so a
+# lane that closes a bus closes its reverb/delay feed too — no ghost tails.
+bus_low = mix { levels: [0, 0, 0, 0] }
+sub_v1 -> bus_low.in1
+sub_v2 -> bus_low.in2
+sub_v3 -> bus_low.in3
+dr_amp -> bus_low.in4
+body -> bus_low.lvl1 : 0.55
+body -> bus_low.lvl2 : 0.45
+body -> bus_low.lvl3 : 0.40
+body -> bus_low.lvl4 : 0.50
+
+bus_mid = mix { levels: [0, 0, 0, 0, 0],
+                pans:   [-0.25, 0.30, -0.15, 0, 0.20] }
+str_d2 -> bus_mid.in1
+str_a2 -> bus_mid.in2
+str_d3 -> bus_mid.in3
+pad_lp -> bus_mid.in4
+ev_vca -> bus_mid.in5
+strs -> bus_mid.lvl1 : 0.45
+strs -> bus_mid.lvl2 : 0.40
+strs -> bus_mid.lvl3 : 0.40
+strs -> bus_mid.lvl4 : 0.45
+strs -> bus_mid.lvl5 : 0.40
+
+bus_bell = mix { levels: [0, 0, 0, 0, 0],
+                 pans:   [-0.45, 0.35, 0.50, -0.30, 0] }
+bell_a3 -> bus_bell.in1
+bell_d4 -> bus_bell.in2
+bell_f4 -> bus_bell.in3
+bell_a4 -> bus_bell.in4
+wat_amp -> bus_bell.in5
+bell -> bus_bell.lvl1 : 0.80
+bell -> bus_bell.lvl2 : 0.80
+bell -> bus_bell.lvl3 : 0.75
+bell -> bus_bell.lvl4 : 0.75
+bell -> bus_bell.lvl5 : 0.55
+
+bus_air = mix { levels: [0, 0, 0, 0],
+                pans:   [0.15, -0.20, -0.65, 0.65] }
+rain_amp -> bus_air.in1
+wind_amp -> bus_air.in2
+gr.out_l -> bus_air.in3
+gr.out_r -> bus_air.in4
+airl -> bus_air.lvl1 : 0.35
+airl -> bus_air.lvl2 : 0.25
+airl -> bus_air.lvl3 : 0.50
+airl -> bus_air.lvl4 : 0.50
+
+# === FX: two tempo-offset delays + long plate ===
+sync_a = tempo { bpm: 30, beats: 0.75 }   # 1.5 s
+sync_b = tempo { bpm: 30, beats: 1.0 }    # 2.0 s
+dly_l = delay { time: 0ms, feedback: 0.48, tone: 2400, mix: 1, slew: 0.3 }
+dly_r = delay { time: 0ms, feedback: 0.52, tone: 1800, mix: 1, slew: 0.3 }
+sync_a.seconds -> dly_l.time
+sync_b.seconds -> dly_r.time
+l3 -> dly_l.feedback : 0.12
+l4 -> dly_r.feedback : 0.10
+l1 -> dly_l.tone : 1500
+l2 -> dly_r.tone : 1200
+
+# Decay grows through ageing and death: the world gets more reverberant as the
+# voices leave it. Ceiling stays under 0.95 so the tank never runs away.
+space = reverb { decay: 0.78, damp: 0.32, mix: 1, predelay: 0.03,
+                 bandwidth: 0.92, mod_rate: 0.3, mod_depth: 20 }
+spce -> space.decay : 0.10
+l3 -> space.decay : 0.05
+l4 -> space.damp  : -0.10
+
+bus_low.out_l  -> space.in_l : 0.18
+bus_low.out_r  -> space.in_r : 0.18
+bus_mid.out_l  -> space.in_l : 0.45
+bus_mid.out_r  -> space.in_r : 0.45
+bus_bell.out_l -> space.in_l : 0.55
+bus_bell.out_r -> space.in_r : 0.55
+bus_air.out_l  -> space.in_l : 0.30
+bus_air.out_r  -> space.in_r : 0.30
+
+bus_bell.out_l -> dly_l.in : 0.35
+bus_bell.out_r -> dly_r.in : 0.30
+bus_mid.out_l  -> dly_l.in : 0.25
+bus_mid.out_r  -> dly_r.in : 0.20
+
+# === SUM ===
+dry = mix { levels: [1, 1, 1, 1, 1, 1, 1, 1],
+            pans:   [-1, 1, -1, 1, -1, 1, -1, 1] }
+bus_low.out_l  -> dry.in1
+bus_low.out_r  -> dry.in2
+bus_mid.out_l  -> dry.in3
+bus_mid.out_r  -> dry.in4
+bus_bell.out_l -> dry.in5
+bus_bell.out_r -> dry.in6
+bus_air.out_l  -> dry.in7
+bus_air.out_r  -> dry.in8
+
+wet = mix { levels: [0.30, 0.30, 0.30, 0.30],
+            pans:   [-1, 1, -0.7, 0.7] }
+space.out_l -> wet.in1
+space.out_r -> wet.in2
+dly_l -> wet.in3
+dly_r -> wet.in4
+spce -> wet.lvl1 : 0.35
+spce -> wet.lvl2 : 0.35
+spce -> wet.lvl3 : 0.20
+spce -> wet.lvl4 : 0.20
+
+master = mix { levels: [1, 1, 0.85, 0.85],
+               pans:   [-1, 1, -1, 1] }
+dry.out_l -> master.in1
+dry.out_r -> master.in2
+wet.out_l -> master.in3
+wet.out_r -> master.in4
+
+# === MASTERING ===
+# out.level is left at its 1.0 default: a post-limiter attenuation just
+# scales the ceiling down and costs ~2 dB (docs/patch-craft.md).
+dc = dcblock { cutoff: 15hz }
+master.out_l -> dc.in_l
+master.out_r -> dc.in_r
+
+eq_m = eq { hp_freq: 28, low_freq: 100, low_gain: -0.4,
+            mid1_freq: 500, mid1_gain: -0.3, mid1_q: 0.8,
+            mid2_freq: 4000, mid2_gain: 0.5, mid2_q: 0.8,
+            high_freq: 10000, high_gain: 0.6 }
+dc.out_l -> eq_m.in_l
+dc.out_r -> eq_m.in_r
+
+comp_m = compressor { threshold: -20, ratio: 2.0, knee: 8,
+                      attack: 0.05, release: 0.4, makeup: 1.5, mix: 1 }
+eq_m.out_l -> comp_m.in_l
+eq_m.out_r -> comp_m.in_r
+
+field = stereo { width: 1.25, balance: 0 }
+comp_m.out_l -> field.in_l
+comp_m.out_r -> field.in_r
+
+clip = clipper { mode: soft, threshold: -3, drive: 0.5, mix: 0.4 }
+field.out_l -> clip.in_l
+field.out_r -> clip.in_r
+
+lim = limiter { threshold: -1.0, release: 0.2 }
+clip.out_l -> lim.in_l
+clip.out_r -> lim.in_r
+
+lim.out_l -> out.left
+lim.out_r -> out.right

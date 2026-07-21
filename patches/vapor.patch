@@ -1,0 +1,264 @@
+# vapor -- generative ambient in D minor pentatonic, ~3:20.
+#
+# The track is a self-breathing texture rather than an arrangement. No
+# tracker grid, no drum, no section lanes. A single 60 BPM metronome feeds
+# three stochastic bern gates that strike distant water tones, bell hits,
+# and sparse sine events. A turing register (prob 0.12) drifts the harmonic
+# material through a D minor pentatonic quantizer that voices the bells,
+# the events, and a narrow bandpass that sweeps the water noise.
+#
+# Four glacial LFOs at incommensurate periods (73 / 127 / 200 / 313 s)
+# drift filter cutoffs, amp envelopes, delay feedback/tone, and reverb
+# decay/damp. Because the periods share no common denominator, the texture
+# never exactly repeats within a single render -- the piece's variation is
+# emergent, not scripted.
+#
+# Voices:
+#   * RAIN: pink noise -> bandpass + lowpass, slow cutoff motion
+#   * WIND: white noise -> highpass + bandpass, glacial sweep
+#   * DRONE: D2 saw + A2 saw + D3 tri + E3 saw, ladder with breathing cut
+#   * SUB: D1 sine, slow tremolo
+#   * WATER: pink noise -> narrow bandpass centered at quant pitch,
+#            bern-gated every 6 s (prob 0.5) -- pitched-noise bands
+#   * BELLS: modal resonator at A4 base, quant-voiced, bern-gated every 8 s
+#            (prob 0.25) -- sparse long-tailed bell hits
+#   * EVENTS: quant-voiced sine pulses, bern-gated every 4 s (prob 0.15)
+#
+# FX: tempo-synced dotted-eighth delay (0.75 s @ 60 BPM) and a long plate
+# reverb with LFO-modulated decay/damp. Mastering chain: dcblock -> eq ->
+# gentle compressor -> stereo width -> soft clipper -> limiter.
+#
+# Render and apply fade in/out in post (see docs/patch-craft.md):
+#   ratsnest render patches/vapor.patch -d 200s -o vapor.wav
+#   ffmpeg -i vapor.wav -af "afade=t=in:st=0:d=4,afade=t=out:st=189:d=11" vapor-final.wav
+
+# === METRONOME (drives stochastic events only) ===
+master = clock { bpm: 60 }
+gate4  = div { by: 4 }
+gate6  = div { by: 6 }
+gate8  = div { by: 8 }
+master -> gate4.in
+master -> gate6.in
+master -> gate8.in
+
+# === GLACIAL LFOs (incommensurate periods) ===
+lfo_a = lfo { freq: 0.0137hz, wave: sine }   # 73 s
+lfo_b = lfo { freq: 0.0079hz, wave: sine }   # 127 s
+lfo_c = lfo { freq: 0.005hz,  wave: sine }   # 200 s
+lfo_d = lfo { freq: 0.0032hz, wave: sine }   # 313 s
+
+# === GENERATIVE PITCH REGISTER ===
+# Turing drives a D minor pentatonic quantizer. Low mutation (0.12) keeps
+# the pitch material coherent over long stretches. The quantizer feeds
+# three voices: bell, events, water bandpass.
+turing_pitch = turing { len: 8, prob: 0.12, seed: 23 }
+quant_minor  = quant { scale: [0, 3, 5, 7, 10] }
+master -> turing_pitch.clock
+turing_pitch.out -> quant_minor.in : 1.0
+
+# === RAIN: pink noise -> bandpass -> lowpass, slow cutoff motion ===
+rain_n = noise { color: pink, seed: 5 }
+rain_bp = svf { cutoff: 1200, res: 0.4 }
+rain_lp = svf { cutoff: 2200, res: 0.18 }
+rain_n -> rain_bp.in
+rain_bp.bp -> rain_lp.in
+lfo_a -> rain_bp.cutoff : 700
+lfo_b -> rain_lp.cutoff : 900
+rain_amp = vca { gain: 0.18 }
+rain_lp.lp -> rain_amp.in
+lfo_c -> rain_amp.cv : 0.06
+rain_dry = vca { gain: 1 }
+rain_amp -> rain_dry.in
+rain_wet = vca { gain: 1 }
+rain_amp -> rain_wet.in
+
+# === WIND: white noise -> highpass -> bandpass, glacial sweep ===
+wind_n = noise { color: white, seed: 11 }
+wind_hp = svf { cutoff: 800, res: 0.25 }
+wind_bp = svf { cutoff: 1500, res: 0.5 }
+wind_n -> wind_hp.in
+wind_hp.hp -> wind_bp.in
+lfo_d -> wind_hp.cutoff : 1800
+lfo_a -> wind_bp.cutoff : 800
+wind_amp = vca { gain: 0.10 }
+wind_bp.bp -> wind_amp.in
+lfo_b -> wind_amp.cv : 0.04
+wind_dry = vca { gain: 1 }
+wind_amp -> wind_dry.in
+wind_wet = vca { gain: 1 }
+wind_amp -> wind_wet.in
+
+# === DRONE: D2 saw + A2 saw + D3 tri + E3 saw, through ladder ===
+# Dsus chord stacked, the harmonic floor. Ladder breathes between two
+# LFOs on the cutoff so the timbre never sits still.
+drone_a = vco { freq: 73.42hz, wave: saw }
+drone_b = vco { freq: 110hz, wave: saw }
+drone_c = vco { freq: 146.83hz, wave: tri }
+drone_d = vco { freq: 164.81hz, wave: saw }
+drone_filt = ladder { cutoff: 380, res: 0.18, drive: 0.25 }
+drone_a -> drone_filt.in : 0.32
+drone_b -> drone_filt.in : 0.32
+drone_c -> drone_filt.in : 0.28
+drone_d -> drone_filt.in : 0.22
+lfo_a -> drone_filt.cutoff : 220
+lfo_c -> drone_filt.cutoff : -120
+drone_amp = vca { gain: 0.20 }
+drone_filt.out -> drone_amp.in
+lfo_b -> drone_amp.cv : 0.08
+drone_dry = vca { gain: 1 }
+drone_amp -> drone_dry.in
+drone_wet = vca { gain: 1 }
+drone_amp -> drone_wet.in
+
+# === SUB: D1 sine, slow tremolo ===
+sub = vco { freq: 36.71hz, wave: sine }
+sub_filt = svf { cutoff: 80, res: 0.1 }
+sub -> sub_filt.in
+sub_amp = vca { gain: 0.40 }
+sub_filt.lp -> sub_amp.in
+lfo_d -> sub_amp.cv : 0.12
+sub_dry = vca { gain: 1 }
+sub_amp -> sub_dry.in
+
+# === WATER TONES: pitched-noise bands, bern-gated every 6 s ===
+# Pink noise into a very narrow bandpass (Q=12). The center frequency
+# tracks the quantizer, so as the turing drifts the band sweeps through
+# the pentatonic. bern 0.5 every 6 s opens the gate for ~6 s at a time,
+# so each tone rings out before the next. Feed goes to the wet bus only.
+bern_water = bern { prob: 0.5, seed: 31 }
+gate6 -> bern_water.gate
+water_n = noise { color: pink, seed: 17 }
+water_bp = svf { cutoff: 700, res: 12 }
+water_n -> water_bp.in
+quant_minor -> water_bp.cutoff : 1500
+water_amp = vca { gain: 0 }
+water_bp.bp -> water_amp.in
+bern_water.a -> water_amp.cv : 0.45
+water_wet = vca { gain: 1 }
+water_amp -> water_wet.in
+
+# === BELLS: modal resonator, quant-voiced, bern-gated every 8 s ===
+# Bell structure (0.3) gives bell-like stretched partials; long damping
+# (0.6) for ~2 s ring-out. The bern rising edge strikes the modal -- the
+# bell's own decay controls its tail. Panned center, sent wet only.
+bern_bell = bern { prob: 0.25, seed: 41 }
+gate8 -> bern_bell.gate
+bell = modal { modes: 32, freq: 440hz, structure: 0.3, brightness: 0.55,
+              damping: 0.6, position: 0.2 }
+quant_minor -> bell.v_oct
+bern_bell.a -> bell.strike
+bell_wet = vca { gain: 1 }
+bell -> bell_wet.in
+
+# === EVENTS: quant-voiced sine pulses, bern-gated every 4 s ===
+# Sustained sine tones gated for ~4 s at a time. These are the only
+# foreground melody material; very sparse (prob 0.15).
+bern_event = bern { prob: 0.15, seed: 53 }
+gate4 -> bern_event.gate
+event_vco = vco { freq: 440hz, wave: sine }
+quant_minor -> event_vco.v_oct
+event_amp = vca { gain: 0 }
+event_vco -> event_amp.in
+bern_event.a -> event_amp.cv : 0.45
+event_dry = vca { gain: 1 }
+event_amp -> event_dry.in
+event_wet = vca { gain: 1 }
+event_amp -> event_wet.in
+
+# === FX: tempo-synced dotted-eighth delay (0.75 s @ 60 BPM) ===
+# Two delay lines for stereo width. LFOs modulate feedback (slow swell)
+# and tone (slow brightness drift) so the echoes themselves evolve.
+sync_de = tempo { bpm: 60, beats: 0.75 }
+dly_l = delay { time: 0ms, feedback: 0.5, tone: 2400, mix: 1, slew: 0.3 }
+dly_r = delay { time: 0ms, feedback: 0.55, tone: 1800, mix: 1, slew: 0.3 }
+sync_de.seconds -> dly_l.time
+sync_de.seconds -> dly_r.time
+lfo_c -> dly_l.feedback : 0.15
+lfo_d -> dly_r.feedback : 0.12
+lfo_a -> dly_l.tone : 1500
+lfo_b -> dly_r.tone : 1200
+drone_wet -> dly_l.in : 0.5
+drone_wet -> dly_r.in : 0.5
+bell_wet -> dly_l.in : 0.3
+bell_wet -> dly_r.in : 0.25
+
+# === FX: long plate reverb with LFO-modulated decay/damp ===
+# Big hall, glacial decay modulation. Sends: drone (heaviest), bell,
+# water, events, rain, wind. No dry here -- the sends ARE the spatial.
+space = reverb { decay: 0.85, damp: 0.32, mix: 1,
+                 predelay: 0.025, bandwidth: 0.92,
+                 mod_rate: 0.3, mod_depth: 18 }
+lfo_c -> space.decay : 0.10
+lfo_d -> space.damp : -0.12
+drone_wet -> space.in_l : 0.55
+drone_wet -> space.in_r : 0.55
+bell_wet -> space.in_l : 0.4
+bell_wet -> space.in_r : 0.4
+water_wet -> space.in_l : 0.4
+water_wet -> space.in_r : 0.4
+event_wet -> space.in_l : 0.35
+event_wet -> space.in_r : 0.35
+rain_wet -> space.in_l : 0.25
+rain_wet -> space.in_r : 0.25
+wind_wet -> space.in_l : 0.2
+wind_wet -> space.in_r : 0.2
+
+# === MIX: voices bus (dry + delay tails) ===
+voices = mix { levels: [0.45, 0.5, 0.55, 0.6, 0.45, 0.4, 0.4, 0.0],
+               pans: [0, 0.25, 0, -0.2, 0.1, 0.15, -0.8, 0] }
+rain_dry -> voices.in1
+wind_dry -> voices.in2
+sub_dry -> voices.in3
+drone_dry -> voices.in4
+event_dry -> voices.in5
+dly_l -> voices.in6
+dly_r -> voices.in7
+
+# === MIX: wet bus (reverb returns + bell + water) ===
+wet = mix { levels: [0.5, 0.5, 0.45, 0.4, 0.0, 0.0, 0.0, 0.0],
+            pans: [-0.2, 0.2, 0, 0, 0, 0, 0, 0] }
+space.out_l -> wet.in1
+space.out_r -> wet.in2
+bell_wet -> wet.in3
+water_wet -> wet.in4
+
+# === MASTER: sum voices + wet, hard-panned so each bus keeps its width ===
+master_mix = mix { levels: [1, 1, 0.8, 0.8],
+                   pans: [-1, 1, -1, 1] }
+voices.out_l -> master_mix.in1
+voices.out_r -> master_mix.in2
+wet.out_l -> master_mix.in3
+wet.out_r -> master_mix.in4
+
+# === MASTERING ===
+master_dc = dcblock { cutoff: 15hz }
+master_mix.out_l -> master_dc.in_l
+master_mix.out_r -> master_dc.in_r
+
+master_eq = eq { hp_freq: 30, low_freq: 100, low_gain: -0.5,
+                 mid1_freq: 500, mid1_gain: -0.3, mid1_q: 0.8,
+                 mid2_freq: 4000, mid2_gain: 0.4, mid2_q: 0.8,
+                 high_freq: 10000, high_gain: 0.3 }
+master_dc.out_l -> master_eq.in_l
+master_dc.out_r -> master_eq.in_r
+
+master_comp = compressor { threshold: -18, ratio: 2.0, knee: 8,
+                          attack: 0.05, release: 0.3, makeup: 1.0, mix: 1 }
+master_eq.out_l -> master_comp.in_l
+master_eq.out_r -> master_comp.in_r
+
+master_field = stereo { width: 1.2, balance: 0 }
+master_comp.out_l -> master_field.in_l
+master_comp.out_r -> master_field.in_r
+
+master_clip = clipper { mode: soft, threshold: -3, drive: 0.5, mix: 0.5 }
+master_field.out_l -> master_clip.in_l
+master_field.out_r -> master_clip.in_r
+
+master_limit = limiter { threshold: -1.0, release: 0.15 }
+master_clip.out_l -> master_limit.in_l
+master_clip.out_r -> master_limit.in_r
+
+master_limit.out_l -> out.left
+master_limit.out_r -> out.right
+-0.2 -> out.level
