@@ -44,6 +44,11 @@ mise run render -- patches/first.patch -d 10s -o take.wav
 Renders 10 seconds of `patches/first.patch` to `take.wav`, no audio device
 needed.
 
+Offline renders are stereo float32 WAVs and preserve headroom above 0 dBFS;
+they are not silently hard-clipped. Live PipeWire playback is safety-clamped
+only at the audio-device boundary. Put an explicit `clipper` or `limiter` in
+the patch when peak control is part of the sound.
+
 ### Play a patch live
 
 ```sh

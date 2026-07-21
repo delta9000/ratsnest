@@ -35,8 +35,8 @@ void Engine::process(float* left, float* right, size_t frames) {
         if (!std::isfinite(node_outs[o])) node_outs[o] = 0.0f;
     }
     const size_t oo = out_offset_[static_cast<size_t>(g_->out_node)];
-    left[f]  = std::clamp(outs_[oo],     -1.0f, 1.0f);
-    right[f] = std::clamp(outs_[oo + 1], -1.0f, 1.0f);
+    left[f] = outs_[oo];
+    right[f] = outs_[oo + 1];
   }
 }
 

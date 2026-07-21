@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
+#include <cmath>
 #include "dsl/parser.h"
+#include "engine/audio_safety.h"
 #include "engine/engine.h"
 #include "graph/graph.h"
 
@@ -58,9 +60,24 @@ TEST_CASE("feedback ramp observed below clip") {
   CHECK(l[2] == doctest::Approx(0.1f * 1.11f));    // cv = 0.11
 }
 
-TEST_CASE("master output hard-clips to +/-1") {
+TEST_CASE("engine output preserves finite float headroom above unity") {
   auto e = make_engine("amp = vca { in: 3.0 }\namp -> out.in\n");
   float l[1], r[1];
   e.process(l, r, 1);
-  CHECK(l[0] == doctest::Approx(1.0f));
+  CHECK(l[0] == doctest::Approx(3.0f));
+  CHECK(r[0] == doctest::Approx(3.0f));
+}
+
+TEST_CASE("audio device safety clamps and sanitizes its final buffers") {
+  float l[4] = {2.0f, -2.0f, NAN, 0.5f};
+  float r[4] = {-4.0f, 4.0f, INFINITY, -0.5f};
+  engine::clamp_device_buffer(l, r, 4);
+  CHECK(l[0] == 1.0f);
+  CHECK(l[1] == -1.0f);
+  CHECK(l[2] == 0.0f);
+  CHECK(l[3] == 0.5f);
+  CHECK(r[0] == -1.0f);
+  CHECK(r[1] == 1.0f);
+  CHECK(r[2] == 0.0f);
+  CHECK(r[3] == -0.5f);
 }

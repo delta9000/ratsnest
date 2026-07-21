@@ -68,7 +68,7 @@ TEST_CASE("SetParam commands glide on the running engine") {
   CHECK(bl[2047] == doctest::Approx(1.0f));
 }
 
-TEST_CASE("swap crossfades equal-power over 50ms and retires the old engine") {
+TEST_CASE("swap crossfade preserves float headroom and retires the old engine") {
   RtRunner run(48000.0);
   engine::Engine* first = make_engine(kDcOne);
   REQUIRE(run.push(swap_cmd(first)));
@@ -84,10 +84,11 @@ TEST_CASE("swap crossfades equal-power over 50ms and retires the old engine") {
   auto expected = [&](size_t i) {
     const float t = static_cast<float>(i) / static_cast<float>(fade);
     const float th = t * std::numbers::pi_v<float> / 2.0f;
-    return std::min(1.0f, 1.0f * std::cos(th) + 0.5f * std::sin(th));
+    return 1.0f * std::cos(th) + 0.5f * std::sin(th);
   };
   CHECK(bl[0] == doctest::Approx(expected(0)).epsilon(0.01));
   CHECK(bl[fade / 2] == doctest::Approx(expected(fade / 2)).epsilon(0.01));
+  CHECK(bl[fade / 2] > 1.0f);
   CHECK(bl[fade + 100] == doctest::Approx(0.5f).epsilon(0.001));  // fade done
 
   engine::Engine* retired = nullptr;
