@@ -181,9 +181,9 @@ note, thick chorus. It is a stab, not a bass.
 
 ```text
 # ---- reese: detuned saws through a swept notch ----
-re_a = vco { freq: 110hz, wave: saw }
-re_b = vco { freq: 110hz, wave: saw }
-A1v -> re_a.v_oct
+re_a = vco { freq: 220hz, wave: saw }   # 220 base, so A1v really is 55 Hz;
+re_b = vco { freq: 220hz, wave: saw }   # on a 110 base it lands at 27.5 and
+A1v -> re_a.v_oct                       # the notch has nothing to bite on
 A1v -> re_b.v_oct
 0.006 -> re_b.v_oct
 re_sum = mix { levels: [0.5, 0.5] }

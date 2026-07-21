@@ -77,9 +77,9 @@ wdepth = vca { gain: 0 }
 wob   -> wdepth.in
 depth -> wdepth.cv
 
-saw1 = vco { wave: saw, freq: 55hz }
-saw2 = vco { wave: saw, freq: 55hz }
-note.cv -> saw1.v_oct
+saw1 = vco { wave: saw, freq: 220hz }   # 220 base: a `…v` lane lands on pitch
+saw2 = vco { wave: saw, freq: 220hz }   # reaching for 55hz here is the classic
+note.cv -> saw1.v_oct                   # silent-bass bug — D1v would render 9 Hz
 note.cv -> saw2.v_oct
 0.008 -> saw2.v_oct
 wfilt = ladder { cutoff: 260, res: 0.62 }
@@ -94,8 +94,9 @@ darkest sound you want and let the modulation climb from there.
 ### 2. Mono sub, untouched
 
 ```text
-sub_osc = vco { wave: sine, freq: 55hz }
-note.cv -> sub_osc.v_oct
+sub_osc = vco { wave: sine, freq: 220hz }   # 220, not 55 — see rule 2
+note.cv -> sub_osc.v_oct                    # the sub is the easiest one to
+                                            # lose an octave in and not hear
 sub_env = adsr { attack: 0.004, decay: 0.05, sustain: 0.95, release: 0.06 }
 note.gate -> sub_env.gate
 sub_vca = vca { gain: 0 }

@@ -161,8 +161,9 @@ eighth -> offbeat.a
 beat_not -> offbeat.b
 bass_env = func { rise: 0.002, fall: 0.15, curve: exp }
 offbeat -> bass_env.trig
-bass_osc = vco { freq: 110hz, wave: tri }
-ch_root.cv -> bass_osc.v_oct
+bass_osc = vco { freq: 110hz, wave: tri }   # 110, not 220, *on purpose*: the
+ch_root.cv -> bass_osc.v_oct                # bass sits an octave under the
+                                            # chord root it shares a lane with
 bass_filt = ladder { cutoff: 160, res: 0.15, drive: 0.4 }
 bass_osc -> bass_filt.in
 bass_env -> bass_filt.cutoff : 700
