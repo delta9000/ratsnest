@@ -1,5 +1,6 @@
 # coprime -- five, seven, eleven, thirteen. The pattern repeats every 5005
-# sixteenths, which at 96 BPM is about 52 minutes.
+# sixteenths (LCM of 5, 7, 11 and 13), which at 96 BPM is 782 seconds --
+# just over 13 minutes.
 #
 # Everything rhythmic here runs off one clock, but no two layers share a
 # period. The melody is the same trick in the pitch domain: a 5-step pitch

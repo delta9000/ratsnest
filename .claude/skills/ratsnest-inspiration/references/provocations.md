@@ -1,115 +1,244 @@
 # The deck
 
-Draw one. Apply it literally before you decide whether it was a good idea.
-If it felt comfortable, draw a second and apply both.
+Twenty cards. Draw one, apply it literally, and only then decide whether it
+was a good idea.
 
-**Draw honestly.** A long deck is easy to game — you scan until you find the
-card that endorses what you already meant to do, and then nothing changed.
-That is the failure mode this file is most prone to. If you are choosing rather
-than drawing, use the ten below and take the first one you dislike.
+Every card carries the number that makes it work. That is deliberate: a
+provocation you can't execute is a provocation you'll nod at and ignore. If a
+card doesn't change what you build, you didn't apply it — you agreed with it.
 
-## The sharp ten
+**Draw, don't choose.** If you find yourself scanning for the card that
+endorses your existing plan, take the first one you dislike instead.
 
-These bite hardest, in testing and in practice. Start here.
-
-1. **Everything mono until the last two modules.** Stereo is born in the
-   reverb, not in the voices. Forces you to earn width.
-2. **No `vco`.** Only `modal`, `string`, `noise`, `grains`.
-3. **Five modules. Not six.**
-4. **The delay is the instrument.** The dry signal sits at 0.15.
-5. **Delete the arrangement grid.** Whatever change survives is the piece.
-6. **Five notes, not six.** Shrink the `quant` scale until it hurts.
-7. **Modulate a modulation depth**, not a parameter.
-8. **Nothing enters after the first thirty seconds.** Only things leave.
-9. **Set every envelope to the wrong shape** — slow attack on the drum, snap
-   on the pad.
-10. **Take the best-sounding element out.**
-
-## The full deck
-
-## Structure
-
-1. Delete the arrangement grid. Whatever change survives is the piece.
-2. Make the intro the outro. Build the patch backwards from silence.
-3. The breakdown is the track. Everything else is context for it.
-4. Give one section a different number of bars than the others. Six, not eight.
-5. Nothing enters after the first thirty seconds. Only things leave.
-6. Two pieces at once: an eight-bar loop and a nine-minute arc, no relation.
-7. The piece is a single crossfade between two patches that share a clock.
-8. Put a bar of silence somewhere you'd never dare.
-9. Start at the drop. Earn it retroactively.
-10. Let the grid wrap on purpose. The intro coming back is the form.
+---
 
 ## Time
 
-11. Every rhythmic element on a coprime `euclid`: 5, 7, 11, 13.
-12. Halve the tempo and double every envelope. Same notes, different music.
-13. One element is not clocked at all. Free-running, ignoring everything.
-14. Derive the clock from a `follow` on another voice.
-15. Two clocks at 119 and 120 BPM. Let them walk apart for ten minutes.
-16. Use `logic { op: xor }` of two divs as the only rhythm source.
-17. Swing by putting a `func` slew on the clock, not on the notes.
-18. The kick is the only thing on the grid. Everything else is drift.
-19. `turing.bit1..bit8` supply *all* the gates. One genome, whole rhythm section.
-20. Reverse the roles: the hats are the melody, the lead is the rhythm.
+### 1. No two cycles may share a factor
+
+Coprime lengths turn four small patterns into one long one. 5, 7, 11 and 13
+have a lowest common multiple of **5005 steps** — at 96 BPM on a sixteenth
+clock that is 13 minutes before the combination repeats. At 4, 8, 12 and 16 it
+is one bar.
+
+```text
+e5  = euclid { steps: 5,  hits: 2 }
+e7  = euclid { steps: 7,  hits: 3 }
+e11 = euclid { steps: 11, hits: 4, rot: 2 }
+e13 = euclid { steps: 13, hits: 5, rot: 5 }
+clk -> e5.clock
+clk -> e7.clock
+clk -> e11.clock
+clk -> e13.clock
+```
+
+### 2. Two clocks, one BPM apart
+
+At 119 and 120 BPM the beats drift 4.2 ms per beat, pass through full
+opposition at about 30 s, and realign after **119 beats — just under a
+minute**. Long enough to sound like a mistake, short enough to resolve.
+
+```text
+a = clock { bpm: 120 }
+b = clock { bpm: 119 }
+```
+
+Give each its own voice and never cable them together.
+
+### 3. One saw, five minutes, no grid
+
+At `phase: 0` a `saw` LFO starts at **−1** and rises monotonically to +1
+(`tri` and `square` start at +1, `sine` at 0). One saw at 0.0033 Hz is a
+303-second one-way ramp — the cheapest "one thing changes slowly" in the
+language. Delete your arrangement lanes and use it.
+
+```text
+arc = lfo { wave: saw, freq: 0.0033hz }
+arc -> filt.cutoff : 2400
+arc -> hall.decay : 0.2
+```
+
+---
 
 ## Pitch
 
-21. Five notes. Not six. Shrink the `quant` scale until it hurts.
-22. Just intonation only: 0.58496, 0.32193, 0.80735. Let it lock.
-23. One chord for the whole piece. The timbre does the harmony.
-24. Detune by 1 Hz, not by cents. Compose the beat rate as a tempo.
-25. Take the melody out of `switch { mode: seq }` stepping through chord lanes.
-26. Transpose the whole patch by a bar-clocked `quant.root`. Nothing else changes.
-27. Put the bass an octave *above* the pad.
-28. A pentatonic phrase that never changes, over chords that never stop changing.
-29. `stepseq` for pitch at 5 steps, `stepseq` for gates at 7. Let them phase.
-30. Whole tone. No gravity. See what the ear does with it.
+### 4. Five notes. Not six.
+
+Randomness sounds like a fault through a chromatic quantizer and like
+composition through a pentatonic one. Shrink the scale before you touch
+anything else.
+
+```text
+q = quant { scale: [0, 3, 5, 7, 10] }
+```
+
+### 5. Just intonation only
+
+Tempered intervals beat; just intervals lock and go still. Use only these and
+let the drone stop moving.
+
+```text
+0.58496 -> fifth.v_oct     # 3/2
+0.32193 -> third.v_oct     # 5/4
+0.80735 -> seventh.v_oct   # 7/4
+```
+
+### 6. Detune in hertz, not in cents
+
+Compose the beat rate as a tempo. At 110 Hz, `0.01306` v/oct is exactly 1 Hz
+of detune — a one-second pulse. `0.00328` is 0.25 Hz — a four-second swell.
+
+```text
+a = vco { freq: 110hz, wave: tri }
+b = vco { freq: 110hz, wave: tri }
+0.00328 -> b.v_oct
+```
+
+### 7. Put the bass above the pad
+
+Nothing technical. Voice the bass an octave up and the pad an octave down and
+find out which one you were actually listening to.
+
+---
 
 ## Timbre
 
-31. No `vco`. Only `modal`, `string`, `noise`, `grains`.
-32. One `vco`. Everything else in the patch is a filter or a space.
-33. Modulate `fm.lvl3` instead of a filter cutoff. Timbre as automation.
-34. `modal { ratios: [...] }` with numbers you made up. Listen before judging.
-35. `fold` under an LFO instead of a filter envelope. Brightness from amplitude.
-36. Excite the resonator with the *other* voice, not with noise.
-37. `string { damping: 0.97 }` — the pluck that never stops. Now it's a drone.
-38. Ring-modulate two parts of the patch that have no business meeting.
-39. Everything through one `overdrive { model: muff }`. Commit.
-40. `grains { size: 0.008, jitter: 1 }` on your cleanest element.
+### 8. Brightness without a level change
+
+A filter costs you level; a wavefolder does not. Measured on a triangle at
+unity, moving `fold` from 1 to 8 shifts the energy above 2 kHz relative to
+below 500 Hz by **+40.6 dB** while total RMS stays pinned at −4.8 dBFS.
+
+```text
+t = vco { freq: 220hz, wave: tri }
+f = fold { fold: 4.5 }                  # base is the centre, not the floor
+breathe = lfo { wave: sine, freq: 0.024hz }
+t -> f.in
+breathe -> f.fold : 3.5                 # sweeps 1 .. 8
+```
+
+Use this wherever you were about to automate a cutoff.
+
+### 9. The pluck that never stops
+
+`string` damping is not a switch at 0.95. Measured decay after one strike at
+110 Hz: **0.95 loses ~4 dB/s** (dead in 20 s), **0.99 loses ~1.2 dB/s**, and
+only **1.0 is lossless** (1.5 dB across 18 seconds). Set it to 1.0 and you
+have a drone, not a note.
+
+```text
+s = string { seed: 1, damping: 1.0, freq: 110hz }
+```
+
+### 10. Modulate an operator, not a filter
+
+`fm`'s `lvl1..lvl6` are **inputs**. Timbre is an automation target; you do not
+need a filter to make an FM voice move.
+
+```text
+drift = lfo { wave: tri, freq: 0.0071hz }
+drift -> ep.lvl3 : 0.35
+```
+
+### 11. No `vco` anywhere
+
+Only `modal`, `string`, `noise` and `grains`. Struck resonators sit around
+−25 dBFS RMS with 23 dB of crest against a saw's −4.8 and 4.7 — so you will
+also have to relearn how to level a mix. That is the point.
+
+### 12. Make up the ratios
+
+`modal` will take any mode placement you invent. List the fundamental first;
+everything after is your instrument.
+
+```text
+bell = modal { ratios: [1, 2.76, 5.40, 8.93, 13.34, 18.64], damping: 0.9 }
+```
+
+---
 
 ## Space
 
-41. The delay is the instrument. The dry signal is at 0.15.
-42. Feed the reverb back into the delay and the delay back into the reverb.
-43. Automate `reverb.decay`, not the send level.
-44. Freeze something. Never unfreeze it.
-45. Two delays at 3/8 and 1/4. Let the echoes tangle.
-46. Everything mono until the last two modules.
-47. Pan by frequency: low centre, mid narrow, air hard left and right.
-48. Put the send *before* the filter so the space is brighter than the source.
-49. `delay { time: 0.003, feedback: 0.8 }` — a resonator, not an echo.
-50. The only reverb is the room of one `modal` with high `damping`.
+### 13. Three milliseconds is not an echo
+
+At `time: 0.003` a delay is a comb ringing at 1/t = **333 Hz**. Verified:
+energy peaks at 333, 666 and 1000 Hz with nulls at 166 and 500. Excite it with
+noise and you have a pitched resonator you never tuned.
+
+```text
+n = noise { color: white, seed: 1 }
+c = delay { time: 0.003, feedback: 0.85, mix: 1, tone: 9000, slew: 0.001 }
+n -> c.in : 0.15
+dc = dcblock { cutoff: 20hz }
+c -> dc.in_l
+```
+
+`dcblock` is not optional above ~0.9 feedback.
+
+### 14. The dry signal is a rumour
+
+Put the source at 0.15 and the returns at 0.6. A wet-only `reverb` or `delay`
+comes back at roughly source level (measured −3.4 and −3.1 dBFS from a unity
+saw), so this is a real inversion, not a trim.
+
+```text
+stab -> m.in1 : 0.15
+plate.out_l -> m.in5 : 0.6
+plate.out_r -> m.in6 : 0.6
+```
+
+### 15. Everything mono until the last two modules
+
+No panning, no per-voice stereo, no chorus. Width is born in the plate and
+nowhere else. Sum, filter, then let one reverb open it up.
+
+### 16. Automate the room, not the send
+
+`reverb.decay` under a glacial LFO changes what the space *is*; a send level
+only changes how much of it you hear.
+
+```text
+tide = lfo { wave: sine, freq: 0.0059hz }
+tide -> hall.decay : 0.18
+```
+
+---
 
 ## Process
 
-51. Five modules. Not six.
-52. Every input that can be modulated must be modulated.
-53. Every cable depth must be written explicitly, and none may be 1.
-54. Use a module you've never used. Build the patch around it.
-55. Change one seed. Render both. Keep the one you didn't expect.
-56. Copy a patch you like, delete half of it, finish it differently.
-57. Write the `--stats` timeline you want first, then patch until it matches.
-58. Set every envelope to the wrong shape (slow attack on the drum, snap on the pad).
-59. Take the best-sounding element out.
-60. Render ten minutes and use the last three.
+### 17. Detuning buys RMS headroom and never peak headroom
 
-## When genuinely stuck
+Measured on eight saws at 0.11 each: identical pitch sums **N×** (+18.1 dB at
+n=8), detuned sums **√N×** (+8.7 dB) — but peak is **−1.2 dBFS either way**.
+Stage a unison stack on its peak, not on how loud it feels.
 
-61. The problem is upstream of where you're looking. Go one module earlier.
-62. You are adding when you should be subtracting. Mute something.
-63. The patch is fine; the render is too short. Try six minutes.
-64. You have modulated levels but not timbres. Nothing is *becoming* anything.
-65. Nothing is broken. Break one thing.
-66. Say out loud what the piece is about. If you can't, that's the bug.
+### 18. `drive` is a limiter
+
+`drive { amount: 0.5 }` on a saw takes crest from 4.7 dB to **0.9 dB** and
+adds 3.9 dB of RMS. If you wanted glue, you want `overdrive { mix: 0.5 }` or
+the master clipper.
+
+### 19. Change one seed, keep the surprise
+
+Seeded modules are exactly repeatable, so a patch is a family, not a take.
+Render both and keep the one you did not intend.
+
+```text
+t = turing { len: 8, prob: 0.06, seed: 12 }   # then 29, then 47
+```
+
+### 20. Take the best-sounding element out
+
+Not the worst. Render without it and sit with what's left before you decide.
+
+---
+
+## If none of them bite
+
+The problem is upstream of the deck. In order:
+
+1. You cannot say in one sentence what the piece is about.
+2. You have modulated levels but not timbres, so nothing is *becoming*
+   anything.
+3. The render is too short — glacial LFOs have done nothing at 30 seconds.
+4. You are adding when you should be subtracting.

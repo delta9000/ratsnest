@@ -51,9 +51,15 @@ and a high-passed dry. Adjectives are automation targets.
 
 ## The deck
 
-`references/provocations.md` is a deck of ratsnest-specific provocations —
-Oblique Strategies for a text-file synth. Draw one when stuck. Draw two and
-apply both if the first felt too comfortable.
+`references/provocations.md` is twenty cards, each carrying the number or the
+fragment that makes it executable — a 3 ms delay rings at 333 Hz, `fold` 1→8
+moves 40 dB of spectral tilt at constant RMS, `string { damping: 1.0 }` is the
+only setting that truly never decays. Draw one when stuck and apply it
+literally.
+
+It is deliberately short. A long deck has no friction: you scan until you find
+the card that endorses what you already meant to do, and nothing changes. If
+you are choosing rather than drawing, take the first card you dislike.
 
 `references/artist-lenses.md` builds patches from the documented working methods
 of Radigue, Eno, Ciani, Barbieri, Cortini, Roach, Davachi, Basic Channel,
