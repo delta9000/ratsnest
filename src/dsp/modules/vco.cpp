@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/bandlimited_osc.h"
 #include "dsp/modules.h"
 
 namespace ms::dsp {
@@ -12,14 +13,6 @@ constexpr const char* kWaves[] = {"sine", "tri", "saw", "pulse", nullptr};
 constexpr ConfigInfo kCfg[] = {{"wave", kWaves}};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
-// Two-sample polyBLEP family after Välimäki/Pekonen/Nam; this compact
-// residual formula is locally written. See docs/attribution.md.
-float polyblep(float t, float dt) {
-  if (t < dt) { t /= dt; return t + t - t * t - 1.0f; }
-  if (t > 1.0f - dt) { t = (t - 1.0f) / dt; return t * t + t + t + 1.0f; }
-  return 0.0f;
-}
-
 class Vco final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
@@ -28,6 +21,7 @@ class Vco final : public Module {
     wave_ = w == "tri" ? 1 : w == "saw" ? 2 : w == "pulse" ? 3 : 0;
     phase_ = 0.0f;
     prev_sync_ = 0.0f;
+    bank_ = &BandlimitedOsc::instance();
   }
 
   void process(const float* ins, float* outs) override {
@@ -44,26 +38,25 @@ class Vco final : public Module {
     phase_ += dt;
     phase_ -= std::floor(phase_);
     const float ph = static_cast<float>(phase_);
-    const float dtf = static_cast<float>(dt);
+    const float ff = static_cast<float>(f);
 
     float v = 0.0f;
     switch (wave_) {
       case 0:  // sine
         v = std::sin(2.0f * std::numbers::pi_v<float> * ph);
         break;
-      case 1:  // tri (naive; -12 dB/oct spectrum, acceptable aliasing)
-        v = 4.0f * std::abs(ph - 0.5f) - 1.0f;
+      case 1:  // band-limited triangle table
+        v = bank_->triangle(ph, ff, rate_);
         break;
-      case 2:  // saw, polyBLEP
-        v = 2.0f * ph - 1.0f - polyblep(ph, dtf);
+      case 2:  // band-limited saw table
+        v = bank_->saw(ph, ff, rate_);
         break;
-      case 3: {  // pulse, polyBLEP on both edges
+      case 3: {  // difference of two band-limited saws, plus exact DC term
         const float pw = std::clamp(ins[3] + ins[4], 0.05f, 0.95f);
-        v = (ph < pw ? 1.0f : -1.0f);
-        v += polyblep(ph, dtf);
-        float t2 = ph + 1.0f - pw;
-        t2 -= std::floor(t2);
-        v -= polyblep(t2, dtf);
+        float shifted = ph - pw;
+        shifted -= std::floor(shifted);
+        v = bank_->saw(shifted, ff, rate_) - bank_->saw(ph, ff, rate_) +
+            2.0f * pw - 1.0f;
         break;
       }
     }
@@ -81,6 +74,7 @@ class Vco final : public Module {
   int wave_ = 0;
   double phase_ = 0.0;
   float prev_sync_ = 0.0f;
+  const BandlimitedOsc* bank_ = nullptr;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Vco>(); }

@@ -126,7 +126,7 @@ TEST_CASE("triangle matches band-limited reference across the high register") {
 TEST_CASE("band-limited pulse preserves width DC and signal convention") {
   const ModuleInfo* info = find_module("vco");
   REQUIRE(info != nullptr);
-  for (float pw : {0.25f, 0.5f, 0.75f}) {
+  for (float pw : {0.05f, 0.10f, 0.25f, 0.5f, 0.75f, 0.90f, 0.95f}) {
     CAPTURE(pw);
     auto m = info->create();
     Config cfg;
@@ -145,8 +145,10 @@ TEST_CASE("band-limited pulse preserves width DC and signal convention") {
     }
     mean /= 48000.0;
     CHECK(mean == doctest::Approx(2.0f * pw - 1.0f).epsilon(0.01));
-    CHECK(lo >= -1.05f);
-    CHECK(hi <= 1.05f);
+    // A truly band-limited step has bounded Gibbs ringing. Do not hard-clip
+    // it back to nominal +/-1: that would recreate the aliases we removed.
+    CHECK(lo >= -1.2f);
+    CHECK(hi <= 1.2f);
     CHECK(lo < -0.5f);
     CHECK(hi > 0.5f);
   }
