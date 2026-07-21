@@ -1,0 +1,102 @@
+# incommensurate -- nothing in this patch shares a period with anything else.
+#
+# The generative skeleton, minimal: a just-tuned drone bed, a Bernoulli-gated
+# bell, and five glacial LFOs (53 / 88 / 141 / 233 / 303 s) on five different
+# destinations. Those periods realign after about six days.
+#
+# There is no arrangement grid. Render 6-10 minutes and fade in post:
+#   ffmpeg -i take.wav -af "afade=t=in:st=0:d=6,afade=t=out:st=354:d=12" out.wav
+#
+# Companion to .claude/skills/ratsnest-generative.
+
+# ---- the modulation web: one destination each, never two ----
+d1 = lfo { wave: sine, freq: 0.0189hz }   #  53 s -- third fades in and out
+d2 = lfo { wave: tri,  freq: 0.0114hz }   #  88 s -- bed cutoff, echo feedback
+d3 = lfo { wave: sine, freq: 0.0071hz }   # 141 s -- fold depth, echo tone
+d4 = lfo { wave: tri,  freq: 0.0043hz }   # 233 s -- bell brightness
+d5 = lfo { wave: sine, freq: 0.0033hz }   # 303 s -- bell structure, hall decay
+
+# ---- drone bed: just fifth (3/2) and just major third (5/4) over A2 ----
+# The third is detuned by ~0.3 cents against just, so it beats once every
+# ~9 s. Cables sum onto svf.in, so the mixer is the filter input itself.
+root  = vco { freq: 110hz, wave: tri }
+fifth = vco { freq: 110hz, wave: tri }
+third = vco { freq: 110hz, wave: tri }
+0.58496 -> fifth.v_oct
+0.32193 -> third.v_oct
+0.00026 -> third.v_oct
+
+bed = svf { cutoff: 320, res: 0.15 }
+root  -> bed.in : 0.5
+fifth -> bed.in : 0.34
+third -> bed.in : 0.26
+d2 -> bed.cutoff : 240
+
+# Wavefolding gives harmonic motion without touching a filter: brightness
+# rises with amplitude, so a slow fold sweep reads as the drone opening up.
+warp = fold { fold: 1.0 }
+bed.lp -> warp.in
+d3 -> warp.fold : 0.8
+
+# ---- bells: a coin-gated slow clock striking a modal resonator ----
+# 40 BPM divided by 3 is one candidate event every 4.5 s; the coin passes
+# about 42% of them, so events land irregularly and sometimes not at all.
+clk  = clock { bpm: 40 }
+slow = div { by: 3 }
+clk -> slow.in
+coin = bern { prob: 0.42, seed: 9 }
+slow -> coin.gate
+
+wander = random { rate: 0.23hz, smooth: 1, seed: 3 }
+pick   = sh { mode: sample }
+wander -> pick.in
+slow -> pick.trig
+qq = quant { scale: [0, 2, 5, 7, 9] }
+pick -> qq.in : 0.55
+
+bell = modal { modes: 48, structure: 0.62, brightness: 0.4,
+               damping: 0.88, position: 0.3 }
+qq.out -> bell.v_oct
+coin.a -> bell.strike
+d4 -> bell.brightness : 0.25
+d5 -> bell.structure : 0.2
+
+# ---- space: a long echo into a plate, both slowly modulated ----
+ech = delay { time: 3.7, feedback: 0.55, mix: 1, tone: 2600, slew: 0.4 }
+bell -> ech.in : 0.5
+d2 -> ech.feedback : 0.16
+d3 -> ech.tone : 1400
+
+hall = reverb { decay: 0.84, damp: 0.35, mix: 1, predelay: 0.03 }
+warp -> hall.in_l : 0.35
+warp -> hall.in_r : 0.35
+bell -> hall.in_l : 0.40
+bell -> hall.in_r : 0.30
+ech  -> hall.in_l : 0.30
+ech  -> hall.in_r : 0.40
+d5 -> hall.decay : 0.12
+
+# ---- out ----
+m = mix { levels: [0.55, 0.40, 0.30, 0.50, 0.50],
+          pans:   [-0.15, 0.20, 0.40, -0.90, 0.90] }
+warp -> m.in1
+bell -> m.in2
+ech  -> m.in3
+hall.out_l -> m.in4
+hall.out_r -> m.in5
+d1 -> m.lvl2 : 0.15
+
+# The folder is asymmetric enough to leave a few millivolts of DC. Block it.
+dc = dcblock { cutoff: 12hz }
+m.out_l -> dc.in_l
+m.out_r -> dc.in_r
+
+dc.out_l -> out.left
+dc.out_r -> out.right
+-0.5 -> out.level
+
+# How to extend, in order of payoff:
+#   1. swap the quant scale for [0, 3, 5, 7, 10] and hear the whole mood move
+#   2. add a second bell at seed 17 and prob 0.2, panned opposite
+#   3. put a turing on the pitch instead of random+sh, with prob under d4
+#   4. give the bed a second fold with sym under d1 -- asymmetric folding

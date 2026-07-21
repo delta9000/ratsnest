@@ -1,0 +1,32 @@
+# mallet.sub -- a struck triangle with a decay envelope.
+#
+# The worked example for .claude/skills/ratsnest-synthesis/references/
+# writing-subs.md: the smallest subpatch that still shows every declaration
+# (param, input with a default, two outputs, a demo section).
+#
+# Measured, main -> out.in at unity, 120 BPM triggers: peak -0.3 dBFS,
+# rms -13.4 dBFS. Stage it around 0.4-0.6 in a mix. (Rendering this file
+# directly reads -4.8 / -17.8 -- that is the demo section's 0.6 cable, not
+# the level the sub hands you. See lib-voices.md.)
+
+tune  = param { default: A2 }        # compile-time value, not a signal
+decay = param { default: 0.4s }
+
+trig = input {}                      # outside: a destination
+cv   = input { default: 0 }          # read when nothing is patched (rule 4)
+main = output {}                     # first output = the instance default
+aux  = output {}                     # the envelope, for ducking and sends
+
+osc = vco { freq: tune, wave: tri }
+cv -> osc.v_oct
+env = func { rise: 0.004, fall: decay, curve: log }
+trig -> env.trig
+amp = vca { gain: 0 }
+osc -> amp.in
+env -> amp.cv
+amp -> main.in
+env -> aux.in
+
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in : 0.6

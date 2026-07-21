@@ -1,0 +1,136 @@
+# feedback-garden -- the dry signal is a rumour. The ecosystem is the piece.
+#
+# One chord stab per bar, deliberately quiet, into saturation -> a filtered
+# delay near self-oscillation -> a plate -> a granular shimmer -> and back
+# into the delay at low gain. Nothing here is a "send"; every effect has a
+# path home, so the tail of one stab becomes the attack of the next thing
+# you hear.
+#
+# The shimmer is the interesting cheat: ratsnest has no pitch-shifter, so an
+# octave-up `grains` sitting in the reverb's return path does the job the way
+# a tape machine used to.
+#
+# WATCH THE PEAK. A feedback net can bloom long after the window you
+# rendered. The first draft of this patch sat at feedback 0.68 with a 0.1
+# path home and read -31 dB RMS at 80 s, then 0.0 dBFS clipping at 160 s.
+# Verified stable here across five minutes (peak -9.5, RMS -28, flat). If
+# you raise `ech.feedback` or either path home, re-render five minutes and
+# read every window before you believe it.
+#
+# Companion to .claude/skills/ratsnest-synthesis (references/space.md).
+
+# ---- clock: 122 BPM, one stab per bar ----
+clk     = clock { bpm: 488 }
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+bar     = div { by: 8 }
+clk -> eighth.in
+eighth -> quarter.in
+quarter -> bar.in
+
+# ---- the stab: a minor 9th, three detuned saws per note, gone in 200 ms ----
+# Chord lanes so the harmony is three numbers: Cm9 | Abmaj7 | Fm9 | Bb
+root  = stepseq { steps: [C3v, Gs2v, F2v, As2v] }
+third = stepseq { steps: [Ds3v, C3v, Gs2v, D3v] }
+ninth = stepseq { steps: [D4v, G3v, G3v, C4v] }
+bar -> root.clock
+bar -> third.clock
+bar -> ninth.clock
+
+s1 = vco { freq: 110hz, wave: saw }
+s2 = vco { freq: 110hz, wave: saw }
+s3 = vco { freq: 110hz, wave: saw }
+root.cv  -> s1.v_oct
+third.cv -> s2.v_oct
+ninth.cv -> s3.v_oct
+0.0007 -> s2.v_oct
+-0.0009 -> s3.v_oct
+
+stab_f = svf { cutoff: 900, res: 0.25 }
+s1 -> stab_f.in : 0.3
+s2 -> stab_f.in : 0.26
+s3 -> stab_f.in : 0.2
+
+stab_env = func { rise: 0.006, fall: 0.2, curve: log }
+bar -> stab_env.trig
+stab_env -> stab_f.cutoff : 1400
+
+stab = vca { gain: 0 }
+stab_f.lp -> stab.in
+stab_env -> stab.cv : 0.9
+
+# Saturate before the send. Harmonics the filtered delay can then sculpt --
+# this, not an EQ boost, is where the warmth comes from.
+sat = drive { amount: 0.22, mode: soft }
+stab -> sat.in : 0.8
+
+# ---- the delay: dotted eighth, dark, feedback high enough to be a voice ----
+sync = tempo { bpm: 122, beats: 0.75 }
+ech = delay { time: 0ms, feedback: 0.5, mix: 1, tone: 2400, slew: 0.2 }
+sync.seconds -> ech.time
+sat -> ech.in : 0.45
+
+# Feedback and tone both drift, on periods that share nothing.
+drift1 = lfo { wave: sine, freq: 0.0091hz }    # 110 s
+drift2 = lfo { wave: tri,  freq: 0.0059hz }    # 169 s
+drift1 -> ech.feedback : 0.07
+drift2 -> ech.tone : 1100
+
+# ---- the plate ----
+plate = reverb { decay: 0.86, damp: 0.36, mix: 1, predelay: 0.025,
+                 bandwidth: 0.9, mod_rate: 0.3, mod_depth: 12 }
+ech -> plate.in_l : 0.5
+ech -> plate.in_r : 0.5
+sat -> plate.in_l : 0.12
+sat -> plate.in_r : 0.12
+drift2 -> plate.decay : 0.08
+
+# ---- the shimmer: an octave-up granular cloud living in the return path ----
+shim = grains { secs: 3, seed: 13 }
+plate.out_l -> shim.in : 0.45
+plate.out_r -> shim.in : 0.45
+1 -> shim.pitch                  # +1 octave
+0.35 -> shim.density             # sparse -- this is a haze, not a texture
+drift1 -> shim.position : 0.25
+
+# The path home. Keep these small; they are what turns a chain into a garden.
+shim.out_l -> plate.in_l : 0.1
+shim.out_r -> plate.in_r : 0.1
+plate.out_l -> ech.in : 0.04
+
+# ---- a low-passed sub under everything, tracking the root ----
+sub_osc = vco { freq: 55hz, wave: sine }
+root.cv -> sub_osc.v_oct
+sub_env = func { rise: 0.01, fall: 0.9, curve: log }
+bar -> sub_env.trig
+sub_amp = vca { gain: 0 }
+sub_osc -> sub_amp.in
+sub_env -> sub_amp.cv : 0.55
+
+# ---- hiss, kept in on purpose ----
+hiss = noise { color: pink, seed: 2 }
+
+# ---- mix ----
+m = mix { levels: [0.28, 0.7, 0.45, 0.5, 0.5, 0.4, 0.4, 0.05],
+          pans:   [0, 0, -0.6, 0.6, -0.9, 0.9, 0, 0.3] }
+stab       -> m.in1       # the dry stab is a rumour
+sub_amp    -> m.in2
+ech        -> m.in3
+ech        -> m.in4 : 0.85
+plate.out_l -> m.in5
+plate.out_r -> m.in6
+shim.out_l -> m.in7
+hiss       -> m.in8
+
+dc = dcblock { cutoff: 16hz }
+m.out_l -> dc.in_l
+m.out_r -> dc.in_r
+dc.out_l -> out.left
+dc.out_r -> out.right
+
+# Try next:
+#   * turn the dry stab down to 0.15 and see how little you need
+#   * raise plate.out_l -> ech.in to 0.2 and render ten minutes, watching peak
+#   * gate shim.freeze from a rare bern -- the haze stops breathing and holds
+#   * shorten ech.time to 3 ms: the delay stops being an echo and becomes a
+#     resonator, which is the whole dark-ambient howl trick

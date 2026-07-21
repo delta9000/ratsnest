@@ -145,6 +145,20 @@ keep `pw` at `0.5` or block DC downstream if the path is DC-coupled.
 phase offset; bipolar output `out`. Waves: `sine`, `tri`, `saw`, `square`.
 Example: `slow -> filter.cutoff : 300`.
 
+**Starting value at `phase: 0`** (measured) — this matters whenever an LFO is
+the structure of a piece rather than a wobble:
+
+| wave | value at t=0 | then |
+|---|---|---|
+| `saw` | −1 | ramps up to +1 |
+| `tri` | +1 | ramps down, then back |
+| `square` | +1 | holds, then flips |
+| `sine` | 0 | rises |
+
+So a single `saw` at 0.0033 Hz is a monotonic −1 → +1 ramp across five
+minutes: the cheapest "one thing changes slowly" arc there is. A `tri` at the
+same rate ramps the wrong way first.
+
 ## `clock`
 
 `clock { bpm: 120, run: 1 }` — inputs `bpm`, `run`, rising-edge `reset`;

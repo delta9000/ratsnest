@@ -1,0 +1,113 @@
+# locked-loop -- one genome. Pitch, rhythm and timbre all come from a single
+# eight-bit shift register, so when the register mutates, the whole piece
+# mutates together and stays coherent.
+#
+# The move most generative patches miss is in the third block: the mutation
+# probability is itself under a 233-second LFO. The riff locks for minutes,
+# dissolves, and re-forms as something related. Render 8 minutes.
+#
+# Companion to .claude/skills/ratsnest-generative.
+
+# ---- clock tree: sixteenths at 66 BPM ----
+clk     = clock { bpm: 264 }
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+bar     = div { by: 4 }
+clk -> eighth.in
+eighth -> quarter.in
+quarter -> bar.in
+
+# ---- the genome ----
+t = turing { len: 8, prob: 0.04, seed: 12 }
+eighth -> t.clock
+
+# Modulate the randomness, not just the parameters it drives. The register
+# spends long stretches locked (prob clamps at 0) and brief stretches fluid.
+mutate = lfo { wave: tri, freq: 0.0043hz }        # 233 s
+mutate -> t.prob : 0.06
+
+q = quant { scale: [0, 3, 5, 7, 10] }             # minor pentatonic: no avoid notes
+t.out -> q.in : 0.5
+
+# ---- lead: a struck string, pitch and brightness both from the register ----
+lead = string { seed: 4, structure: 0.27, brightness: 0.5,
+                damping: 0.78, position: 0.28 }
+q.out -> lead.v_oct
+t.out -> lead.brightness : 0.3
+
+# bit1 decides which eighths sound. `and` with the clock keeps it on the grid.
+lead_gate = logic { op: and }
+eighth -> lead_gate.a
+t.bit1 -> lead_gate.b
+lead_gate -> lead.strike
+
+lead_amp = vca { gain: 0.8 }
+lead -> lead_amp.in
+
+# ---- bass: the same pitch, two octaves down, sustained under the plucks ----
+bass = vco { freq: 55hz, wave: saw }
+q.out -> bass.v_oct
+bass_f = ladder { cutoff: 190, res: 0.2, drive: 0.3 }
+bass -> bass_f.in : 0.6
+bass_env = func { rise: 0.02, fall: 0.42, curve: log }
+quarter -> bass_env.trig
+bass_env -> bass_f.cutoff : 220
+bass_amp = vca { gain: 0 }
+bass_f -> bass_amp.in
+bass_env -> bass_amp.cv : 0.8
+
+# ---- drums: bits 3 and 5, gated against the grid ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 47hz }
+kick_gate = logic { op: and }
+quarter -> kick_gate.a
+t.bit3 -> kick_gate.b
+kick_gate -> kick.trig
+
+hat = sub { file: "../lib/kit/hat.sub", decay: 0.16 }
+hat_gate = logic { op: and }
+clk -> hat_gate.a
+t.bit5 -> hat_gate.b
+hat_gate -> hat.trig
+
+# ---- space ----
+sync = tempo { bpm: 66, beats: 0.75 }             # dotted eighth
+ech = delay { time: 0ms, feedback: 0.42, mix: 1, tone: 3200, slew: 0.15 }
+sync.seconds -> ech.time
+lead_amp -> ech.in : 0.4
+
+hall = reverb { decay: 0.72, damp: 0.4, mix: 1 }
+lead_amp -> hall.in_l : 0.25
+lead_amp -> hall.in_r : 0.25
+ech -> hall.in_l : 0.3
+ech -> hall.in_r : 0.3
+
+# ---- mix ----
+m = mix { levels: [0.95, 0.85, 0.9, 0.4, 0.35, 0.5, 0.5],
+          pans:   [0, 0, -0.15, 0.45, 0.3, -0.85, 0.85] }
+kick.main -> m.in1
+bass_amp  -> m.in2
+lead_amp  -> m.in3
+hat.main  -> m.in4
+ech       -> m.in5
+hall.out_l -> m.in6
+hall.out_r -> m.in7
+
+# duck everything melodic off the kick's own quarter pulse
+duck = func { rise: 0.004, fall: 0.24, curve: exp }
+kick_gate -> duck.trig
+duck -> m.lvl2 : -0.3
+duck -> m.lvl3 : -0.12
+duck -> m.lvl6 : -0.14
+duck -> m.lvl7 : -0.14
+
+dc = dcblock { cutoff: 14hz }
+m.out_l -> dc.in_l
+m.out_r -> dc.in_r
+dc.out_l -> out.left
+dc.out_r -> out.right
+
+# Try next:
+#   * seed 12 -> 29 and hear a different piece with identical architecture
+#   * mutate depth 0.06 -> 0.18: the loop never settles
+#   * mutate depth -> 0: prob stays 0.04, a slow steady drift
+#   * swap t.bit1 for t.bit7 on the lead gate -- same genome, different phrasing

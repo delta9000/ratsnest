@@ -1,0 +1,121 @@
+# coprime -- five, seven, eleven, thirteen. The pattern repeats every 5005
+# sixteenths (LCM of 5, 7, 11 and 13), which at 96 BPM is 782 seconds --
+# just over 13 minutes.
+#
+# Everything rhythmic here runs off one clock, but no two layers share a
+# period. The melody is the same trick in the pitch domain: a 5-step pitch
+# sequence against a 7-step gate sequence gives a 35-step phrase from twelve
+# numbers. Nothing is authored above the bar; the form is arithmetic.
+#
+# Companion to .claude/skills/ratsnest-generative.
+
+# ---- one clock, sixteenths at 96 BPM ----
+clk     = clock { bpm: 384 }
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+clk -> eighth.in
+eighth -> quarter.in
+
+# ---- four coprime euclids on the same sixteenth clock ----
+e5  = euclid { steps: 5,  hits: 2 }
+e7  = euclid { steps: 7,  hits: 3 }
+e11 = euclid { steps: 11, hits: 4, rot: 2 }
+e13 = euclid { steps: 13, hits: 5, rot: 5 }
+clk -> e5.clock
+clk -> e7.clock
+clk -> e11.clock
+clk -> e13.clock
+
+# ---- percussion from the kit, one voice per prime ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 46hz, decay: 0.5 }
+rim  = sub { file: "../lib/kit/rim.sub",  tune: 520hz }
+hat  = sub { file: "../lib/kit/hat.sub",  decay: 0.13 }
+tom  = sub { file: "../lib/kit/tom.sub",  tune: 128hz, decay: 0.5 }
+
+# The kick keeps the quarter so the ear has one thing to hold on to. Take
+# this cable out and the piece stops being music and starts being weather.
+quarter -> kick.trig
+e5.trig  -> tom.trig
+e7.trig  -> rim.trig
+e11.trig -> hat.trig
+
+# A coin on the densest layer so it is never quite mechanical.
+coin = bern { prob: 0.82, seed: 21 }
+e13.trig -> coin.gate
+coin.a -> hat.trig
+
+# ---- melody: 5 pitches against 7 gates ----
+pitches = stepseq { steps: [A3v, C4v, D4v, G4v, E4v] }
+gates   = stepseq { gates: [1, 0, 1, 1, 0, 1, 0] }   # rhythm only: cv unused
+eighth -> pitches.clock
+eighth -> gates.clock
+
+hold = sh { mode: sample }              # hold pitch through the decay
+pitches.cv -> hold.in
+eighth -> hold.trig
+
+voice = string { seed: 6, structure: 0.28, brightness: 0.58,
+                 damping: 0.74, position: 0.24 }
+hold -> voice.v_oct
+gates.gate -> voice.strike
+
+voice_amp = vca { gain: 0.7 }
+voice -> voice_amp.in
+
+# ---- bass: the melody two octaves down, on the 11-layer ----
+bass = vco { freq: 55hz, wave: saw }
+hold -> bass.v_oct
+bass_f = ladder { cutoff: 170, res: 0.18, drive: 0.35 }
+bass -> bass_f.in : 0.55
+bass_env = func { rise: 0.01, fall: 0.34, curve: log }
+e11.gate -> bass_env.trig
+bass_env -> bass_f.cutoff : 200
+bass_amp = vca { gain: 0 }
+bass_f -> bass_amp.in
+bass_env -> bass_amp.cv : 0.85
+
+# ---- space: a 3/8 echo, deliberately off the melody's period ----
+sync = tempo { bpm: 96, beats: 1.5 }
+ech = delay { time: 0ms, feedback: 0.44, mix: 1, tone: 3400, slew: 0.12 }
+sync.seconds -> ech.time
+voice_amp -> ech.in : 0.35
+rim.main -> ech.in : 0.25
+
+hall = reverb { decay: 0.68, damp: 0.42, mix: 1 }
+voice_amp -> hall.in_l : 0.2
+voice_amp -> hall.in_r : 0.2
+ech -> hall.in_l : 0.28
+ech -> hall.in_r : 0.28
+
+# ---- mix ----
+m = mix { levels: [0.95, 0.8, 0.85, 0.45, 0.4, 0.4, 0.35, 0.35],
+          pans:   [0, 0, -0.2, 0.5, -0.45, 0.25, -0.85, 0.85] }
+kick.main -> m.in1
+bass_amp  -> m.in2
+voice_amp -> m.in3
+hat.main  -> m.in4
+rim.main  -> m.in5
+tom.main  -> m.in6
+hall.out_l -> m.in7
+hall.out_r -> m.in8
+ech -> m.in5 : 0.6      # echo submixed onto the rim channel; 8 slots, all spoken for
+
+duck = func { rise: 0.004, fall: 0.22, curve: exp }
+quarter -> duck.trig
+duck -> m.lvl2 : -0.3
+duck -> m.lvl3 : -0.12
+duck -> m.lvl7 : -0.15
+duck -> m.lvl8 : -0.15
+
+dc = dcblock { cutoff: 14hz }
+m.out_l -> dc.in_l
+m.out_r -> dc.in_r
+dc.out_l -> out.left
+dc.out_r -> out.right
+-0.2 -> out.level       # no mastering chain here, so leave the headroom explicit
+
+# Try next:
+#   * change one euclid from 11 to 12 and hear the whole thing become a loop
+#   * put a glacial lfo on e13.rot -- the pattern rotates over minutes
+#   * lane a slow ramp into e7.hits: 3 -> 5 thickens without a new voice
+#   * delete the quarter -> kick.trig cable and let the primes have it
