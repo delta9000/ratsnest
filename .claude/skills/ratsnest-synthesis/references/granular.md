@@ -226,10 +226,15 @@ machine (0, periodic) or weather (1, Poisson).
 
 ## Gotchas
 
-- **A live buffer is silent for its first `secs` seconds.** The ring starts
-  zeroed and the read head trails the write head modulo the buffer, so a
-  `secs: 4` cloud gives you four seconds of nothing. Keep buffers 1–4 s, or
-  render long enough to see past it. `file:` mode has no warm-up.
+- **A live buffer is silent for `position × secs` seconds**, not for `secs`.
+  The ring starts zeroed and the read head trails the write head by
+  `position`, so the warm-up scales with where you are reading from.
+  Measured on a `secs: 4` cloud: `position: 0` sounds from sample zero,
+  `0.25` from 1 s, `0.5` (the default) from 2 s, `1.0` not within 5 s.
+  Keep buffers 1–4 s, drop `position` if you need an early start, or render
+  long enough to see past it. `file:` mode has no warm-up.
+  Remember `position`'s base is 0.5 — a `0.5 ->` cable makes it 1.0 and the
+  cloud never speaks.
 - Freezing an empty buffer freezes silence, and it stays silent until you
   unfreeze.
 - **Output is loudness-normalised `1/√N`.** Turning `density` up will not make

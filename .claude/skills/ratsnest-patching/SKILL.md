@@ -1,6 +1,6 @@
 ---
 name: ratsnest-patching
-description: Use when writing, editing, debugging, or reviewing a ratsnest .patch or .sub file — any request to make a sound, a groove, a drone, a track, a voice, or a generative system in this repo, or when a patch renders silent, clipped, out of tune, or wrong-length.
+description: Use when writing, editing, or reviewing a ratsnest .patch or .sub file — any request to make a sound, a groove, a drone, a track, a voice, or a generative system in this repo. Entry point that routes to the other ratsnest skills.
 ---
 
 # Patching ratsnest
@@ -24,6 +24,7 @@ Then load the skill that matches the job:
 | structure, harmony, arrangement, mixing, mastering | `ratsnest-composition` |
 | "surprise me", a starting point, a way out of a rut | `ratsnest-inspiration` |
 | MIDI, polyphony, chords, live play, capture, writing a `.sub` | `ratsnest-instrument` |
+| a patch that is silent, clipping, out of tune, or not what the comment claims | `ratsnest-debugging` |
 
 Worked examples with verified numbers live in `patches/etudes/`:
 

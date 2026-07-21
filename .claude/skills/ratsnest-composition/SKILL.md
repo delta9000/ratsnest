@@ -20,7 +20,8 @@ is the brief; the patch is its realization.
    table (see `references/form.md`).
 2. **What is the harmony?** Even if it's one chord for nine minutes, say so.
    See `references/harmony.md`.
-3. **Which element carries which frequency slot?** See `references/mixing.md`.
+3. **Which element carries which frequency slot, and at what level?** See
+   `references/mixing.md` and `references/levels.md`.
 4. **How loud, and how does it end?** See `references/mastering.md`.
 
 ## Two structural strategies
@@ -67,6 +68,7 @@ life.
 | `references/harmony.md` | chord lanes, modes, quantizer scales, tuning, voice leading, avoid notes |
 | `references/mixing.md` | frequency slots, gain staging, sidechain layers, stereo by frequency |
 | `references/mastering.md` | the proven chain, the calibration numbers, loudness targets |
+| `references/levels.md` | **measured** module output levels, processor gain changes, the summing arithmetic |
 
 ## Common mistakes
 

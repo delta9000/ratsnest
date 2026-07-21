@@ -23,6 +23,7 @@ overrides a `param`; unknown keys are compile errors, so a typo is caught by
 | `lib/kick.sub` | `tune` 50hz, `decay` 0.095s, `click` 0.32 | `trig` | `main` |
 | `lib/bass.sub` | `pitch` G1, `decay` 0.22s | `trig` | `main` |
 | `lib/hat.sub` | `pitch` 8khz, `decay` 0.05s, `color` 0.15 | `trig` | `main` |
+| `lib/mallet.sub` | `tune` A2, `decay` 0.4s | `trig`, `cv` (0) | `main`, `aux` |
 | `lib/sym-drone.sub` | `tune` E2, `damp` .84, `damp2` .88, `pos` .28, `pos2` .35, `prate` .18, `pdepth` .45, `pfb` .15 | `trig`, `root` (0), `fifth` (0.58333), `phmix` (0.35) | `main`, `aux` |
 | `lib/frozen-cloud.sub` | `secs` 2.5, `seed` 7 | `in`, `freeze`, `lvl` (1) | `main`, `dry`, `hall` |
 
@@ -72,6 +73,7 @@ Each sub instantiated alone, `main -> out.in` at unity, 120 BPM triggers,
 |---|---|---|---|
 | `bass.sub` | **0.0** | −6.4 | **clips at unity.** Stage at 0.4–0.5. Also carries −0.006 DC — block it |
 | `kick.sub` | −0.6 | −17.9 | the peak anchor; ~0.85 on its channel is the house setting |
+| `mallet.sub` | −0.3 | −13.4 | the worked example in `writing-subs.md`; `aux` gives you its envelope |
 | `kit/kick.sub` | −3.7 | −21.5 | quieter than `kick.sub`; needs ~+3 dB to swap in |
 | `kit/tom.sub` | −3.7 | −19.8 | |
 | `kit/hat.sub` | −3.7 | −26.0 | |
