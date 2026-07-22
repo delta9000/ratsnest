@@ -47,7 +47,8 @@ TEST_CASE("feedback edge delivers previous sample (one-sample delay)") {
   float l[3], r[3];
   e.process(l, r, 3);
   CHECK(l[0] == doctest::Approx(1.0f));  // cv sees b's initial 0
-  CHECK(l[1] == doctest::Approx(1.0f));  // out clamps ±1; check pre-clip via smaller drive:
+  CHECK(l[1] == doctest::Approx(2.0f));  // cv sees b's previous-sample 1
+  CHECK(l[2] == doctest::Approx(3.0f));  // float headroom exposes the ramp
 }
 
 TEST_CASE("feedback ramp observed below clip") {
