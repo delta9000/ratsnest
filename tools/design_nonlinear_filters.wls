@@ -22,19 +22,15 @@ sos[filter_] := Module[{zeros, poles},
   ]], {zeros, poles}]
 ];
 
-roundTripImpulse[filter_, rate_] := Module[{input, up, down},
+roundTripImpulse[filter_, rate_] := Module[{input, up, down, machine = N[filter]},
   input = N@PadRight[{1}, rate 256];
-  up = RecurrenceFilter[filter, rate input];
-  down = RecurrenceFilter[filter, up][[1 ;; ;; rate]];
+  up = RecurrenceFilter[machine, rate input];
+  down = RecurrenceFilter[machine, up][[1 ;; ;; rate]];
   {First@Ordering[Abs[down], -1] - 1, Max[Abs[down]]}
 ];
 
 filter8x = design[12/100, 145/1000, 80];
-filter16x = design[6/100, 73/1000, 84];
-
 <|
   "8xSOS" -> sos[filter8x],
-  "16xSOS" -> sos[filter16x],
-  "8xImpulse" -> roundTripImpulse[filter8x, 8],
-  "16xImpulse" -> roundTripImpulse[filter16x, 16]
+  "8xImpulse" -> roundTripImpulse[filter8x, 8]
 |>

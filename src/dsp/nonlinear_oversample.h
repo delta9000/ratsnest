@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <utility>
 
 namespace ms::dsp {
 namespace nonlinear_detail {
@@ -17,8 +18,8 @@ struct SosCoefficients {
 
 // Wolfram-generated, DC-normalized elliptic lowpasses. See
 // tools/design_nonlinear_filters.wls. Each design has 0.001 dB passband ripple
-// and 80 dB (8x) or 84 dB (16x) stopband attenuation. Cascaded SOS avoid the
-// numerical fragility of a twelfth-order direct form.
+// and 80 dB stopband attenuation. Cascaded SOS avoid the numerical fragility
+// of a twelfth-order direct form.
 inline constexpr std::array<SosCoefficients, 6> kSos8x{{
     {0.2533872483f, -0.4593270850f, 0.2533872483f,
      -1.5887756410f, 0.6362230525f},
@@ -34,28 +35,10 @@ inline constexpr std::array<SosCoefficients, 6> kSos8x{{
      -1.8352358540f, 0.9839197108f},
 }};
 
-inline constexpr std::array<SosCoefficients, 6> kSos16x{{
-    {0.2489139855f, -0.4855093658f, 0.2489139855f,
-     -1.7916404517f, 0.8039590345f},
-    {0.3447114638f, -0.6710457802f, 0.3447114638f,
-     -1.8265398589f, 0.8449169961f},
-    {0.4085455176f, -0.7909739017f, 0.4085455176f,
-     -1.8716519487f, 0.8977691610f},
-    {0.3476102355f, -0.6629841924f, 0.3476102355f,
-     -1.9086788254f, 0.9409150755f},
-    {0.1817476925f, -0.3274743259f, 0.1817476925f,
-     -1.9345228590f, 0.9705439242f},
-    {0.0325239304f, -0.0271760225f, 0.0325239304f,
-     -1.9532809811f, 0.9911527877f},
-}};
-
 template <int Rate>
 constexpr const auto& coefficients() {
-  static_assert(Rate == 8 || Rate == 16);
-  if constexpr (Rate == 8)
-    return kSos8x;
-  else
-    return kSos16x;
+  static_assert(Rate == 8);
+  return kSos8x;
 }
 
 class Biquad {
@@ -102,7 +85,7 @@ class EllipticCascade {
 template <int Rate>
 class NonlinearOversampler {
  public:
-  static_assert(Rate == 8 || Rate == 16);
+  static_assert(Rate == 8);
 
   void reset() {
     interpolator_.reset();
@@ -111,7 +94,7 @@ class NonlinearOversampler {
 
   template <typename Shape>
   float process(float x, Shape&& shape) {
-    return process_phase<0>(x, static_cast<Shape&&>(shape));
+    return process_phase<0>(x, std::forward<Shape>(shape));
   }
 
   template <int OutputPhase, typename Shape>

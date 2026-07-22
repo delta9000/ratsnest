@@ -87,7 +87,7 @@ class Fold final : public Module {
 
  private:
   bool clean_ = false;
-  NonlinearOversampler<16> clean_oversampler_{};
+  NonlinearOversampler<8> clean_oversampler_{};
   FoldAdaa clean_shape_{};
 };
 

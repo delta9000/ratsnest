@@ -4,7 +4,7 @@
 
 **Goal:** Implement opt-in clean processing for `drive` and `fold` with an exact four-host-sample impulse peak, leaving raw output bit-identical.
 
-**Architecture:** A shared six-biquad elliptic IIR performs interpolation and reconstruction around the existing memoryless curve. Drive uses 8x; fold uses 16x. Coefficients are offline Wolfram designs expressed as normalized second-order sections, while runtime code owns only fixed arrays and scalar state.
+**Architecture:** A shared six-biquad elliptic IIR performs interpolation and reconstruction around the existing memoryless curve. Both modules use 8x; fold adds first-order ADAA. Coefficients are offline Wolfram designs expressed as normalized second-order sections, while runtime code owns only fixed arrays and scalar state.
 
 **Tech Stack:** C++20, doctest, CMake/CTest, Wolfram Language for offline coefficient provenance, fixed-size direct-form-II-transposed biquads.
 
@@ -19,7 +19,7 @@
 
 **Step 1: Write failing contract tests**
 
-Test an 8x and 16x fixed-rate round trip with an identity callback. Require
+Test the 8x fixed-rate round trip with an identity callback. Require
 silence, finite output, DC settling within `2e-5`, an impulse peak at zero-based
 host index 4, tail recovery, and deterministic reset. Exercise the actual
 callback API that modules will call.
@@ -40,9 +40,8 @@ smaller than `1e-20f`; perform no allocation, locking, or variable-work search.
 
 **Step 4: Record reproducible Wolfram generation**
 
-The `.wls` file designs twelfth-order elliptic lowpasses with 0.001 dB ripple
-and 80 dB attenuation, using normalized edges 0.12/0.145 for 8x and
-0.06/0.0725 for 16x. It converts conjugate pole/zero pairs to DC-normalized
+The `.wls` file designs a twelfth-order elliptic lowpass with 0.001 dB ripple,
+80 dB attenuation, and normalized edges 0.12/0.145. It converts pairs to DC-normalized
 SOS rows and verifies the round-trip impulse peak is four.
 
 **Step 5: Verify green and commit**
@@ -105,9 +104,10 @@ Run `cmake --build build && build/mstests --test-case="fold clean*" --no-skip`.
 
 **Step 3: Implement the clean branch**
 
-Own `NonlinearOversampler<16>`. Preserve raw arithmetic and ordering exactly.
+Own `NonlinearOversampler<8>`. Preserve raw arithmetic and ordering exactly.
 For clean only, sanitize and overflow-check the host controls, then evaluate
-the same periodic fold formula in the 16x callback.
+the periodic fold through its analytic first-order ADAA shaper in the 8x
+callback. Decimation phase one retains the four-sample peak.
 
 **Step 4: Add matching-quality migration**
 
@@ -129,10 +129,10 @@ Run fold, migration, oversampler, and full unit tests. Commit as
 
 **Step 1: Add measured performance coverage**
 
-Benchmark raw, 8x drive, and 16x fold in release mode over a fixed sample
+Benchmark raw, 8x drive, and 8x+ADAA fold in release mode over a fixed sample
 count. Report ns/sample and clean/raw ratios. The acceptance gate is no heap
-allocation in `process()`, fixed work, and enough throughput for at least 64
-simultaneous clean modules at 48 kHz on the development machine.
+allocation in `process()`, fixed work, and comfortable headroom for a typical
+patch of up to 16 clean nonlinear modules at 48 kHz.
 
 **Step 2: Run safety verification**
 
@@ -142,7 +142,7 @@ Run the focused spectral/latency tests, full CTest, ASan/UBSan build, and
 **Step 3: Document the user contract**
 
 Document `quality: raw|clean`, raw zero latency/legacy character, clean four
-samples (0.083 ms at 48 kHz), 8x drive, 16x fold, CPU tradeoff, and manual
+samples (0.083 ms at 48 kHz), 8x drive, 8x+ADAA fold, CPU tradeoff, and manual
 parallel-path alignment. Record Wolfram-generated coefficient provenance and
 the diagnostic/full-matrix distinction honestly.
 

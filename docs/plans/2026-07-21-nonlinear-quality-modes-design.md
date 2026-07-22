@@ -51,12 +51,11 @@ decision.
 ## DSP architecture
 
 Clean mode uses a shared, allocation-free elliptic-IIR oversampling core. The
-drive module runs its existing soft or hard curve at 8x. The cheaper periodic
-fold curve runs at 16x because the extreme fold-8/10 kHz case materially
-benefits from the additional octave. Both paths use a twelfth-order elliptic
-interpolator and matching reconstruction filter designed for 0.001 dB
-passband ripple and 80 dB stopband attenuation. Their normalized pass/stop
-edges are 0.12/0.145 of high-rate Nyquist at 8x and 0.06/0.0725 at 16x.
+drive module runs its existing soft or hard curve at 8x. Fold uses the same 8x
+filter plus first-order periodic ADAA, which suppresses its corners more
+efficiently than doubling the sample rate. The twelfth-order elliptic
+interpolator and matching reconstruction filter use 0.001 dB passband ripple,
+80 dB stopband attenuation, and normalized pass/stop edges 0.12/0.145.
 
 Wolfram Language is the offline design oracle. It generated the transfer
 functions, verified stability and frequency response, and measured the

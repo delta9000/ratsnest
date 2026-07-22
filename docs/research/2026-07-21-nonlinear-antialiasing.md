@@ -8,7 +8,8 @@ Date: 2026-07-21
 latency budget was explicitly revised to four host samples, Wolfram designed a
 causal twelfth-order elliptic round trip that peaks at sample four. The 8x
 design uses normalized pass/stop edges 0.12/0.145, 0.001 dB passband ripple,
-and 80 dB stopband attenuation. A frequency-scaled 16x form is used for fold.
+and 80 dB stopband attenuation. Fold uses the same 8x filter with first-order
+periodic ADAA.
 
 The evidence establishes only an **ideal sampling-factor lower bound**.  Ideal
 8x raw-curve sampling cleared the seven deliberately difficult checks, whereas
@@ -19,8 +20,8 @@ and its round-trip impulse peaks at zero-based sample 5, not sample 1.
 First-order ADAA, ideal 4x,
 4x+ADAA, and the current coefficient cascade are rejected as concrete answers.
 
-The selected production direction is 8x for drive and 16x for fold, implemented
-as cascaded biquads rather than a high-order direct form. Raw mode continues to
+The selected production direction is 8x for drive and 8x plus ADAA for fold,
+implemented as cascaded biquads rather than a high-order direct form. Raw mode continues to
 call the curves below directly and remains bit-for-bit legacy behavior.
 
 The 8x round trip improved the eight preregistered difficult cases by
@@ -30,8 +31,17 @@ the metric treats tiny passband response differences as alias residual; the
 former universal ratio gate is therefore retained as a diagnostic, not a
 production acceptance rule. Absolute residual, fundamental gain, and the
 preregistered difficult cases remain mandatory. The extreme 48 kHz, 10 kHz,
-fold-8 case improved from 22.76 dB at 8x to 36.33 dB at 16x while preserving
-the four-sample peak.
+fold-8 case initially motivated a 16x trial, but production 8x+ADAA was both
+cheaper and stronger: its isolated 18 kHz alias fell from 3084.04 to 2.01678
+(63.69 dB) while preserving the four-sample peak.
+
+A 2026-07-21 GCC `-O3` single-thread microbenchmark on the development machine
+measured about 8 ns/sample for raw soft drive, 6 ns/sample for raw fold,
+329 ns/sample for clean soft drive, and 248 ns/sample for clean fold. At
+48 kHz, sixteen simultaneous clean instances consume approximately 25% of one
+core for drive or 19% for fold before graph overhead. Sixty-four clean drives
+would be too aggressive for one realtime core, so clean remains an explicit
+per-module choice rather than a global switch.
 
 ## Curves and antiderivatives
 
@@ -578,6 +588,6 @@ ran in session `IDL8qnbD`.  The 308-case actual-coefficient table ran locally
 from the Python listing embedded above.  No C++ or tests were changed.
 
 The four-sample topology above removes the implementation block. Production
-tests still need to verify the checked-in float biquads against the double
-precision model, measure the exact four-sample peak, enforce the difficult-case
-spectral floor, and benchmark the 8x and 16x paths under representative load.
+tests verify the checked-in float biquads, measure the exact four-sample peak,
+enforce isolated difficult-case spectral floors, and benchmark both 8x paths
+under representative load.

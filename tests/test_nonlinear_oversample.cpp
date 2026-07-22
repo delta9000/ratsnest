@@ -53,7 +53,3 @@ void check_round_trip_contract() {
 TEST_CASE("nonlinear oversample: 8x round trip has four-sample peak") {
   check_round_trip_contract<8>();
 }
-
-TEST_CASE("nonlinear oversample: 16x round trip has four-sample peak") {
-  check_round_trip_contract<16>();
-}
