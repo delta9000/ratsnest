@@ -27,11 +27,13 @@ class Vco final : public Module {
   void process(const float* ins, float* outs) override {
     double f = static_cast<double>(ins[0]) * std::exp2(static_cast<double>(ins[1])) +
                static_cast<double>(ins[2]) * static_cast<double>(ins[0]);
+    if (!std::isfinite(f)) f = 0.0;
     f = std::clamp(f, 0.0, 0.45 * static_cast<double>(rate_));
     const double dt = f / static_cast<double>(rate_);
 
-    if (ins[5] > 0.5f && prev_sync_ <= 0.5f) phase_ = 0.0;
-    prev_sync_ = ins[5];
+    const float sync = std::isfinite(ins[5]) ? ins[5] : 0.0f;
+    if (sync > 0.5f && prev_sync_ <= 0.5f) phase_ = 0.0;
+    prev_sync_ = sync;
 
     // Advance first (double phase): a k-Hz tone then completes exactly k cycles
     // over rate samples, and a sync reset lands the next sample near -1.
@@ -52,7 +54,10 @@ class Vco final : public Module {
         v = bank_->saw(ph, ff, rate_);
         break;
       case 3: {  // difference of two band-limited saws, plus exact DC term
-        const float pw = std::clamp(ins[3] + ins[4], 0.05f, 0.95f);
+        const float raw_pw = ins[3] + ins[4];
+        const float pw = std::isfinite(raw_pw)
+                             ? std::clamp(raw_pw, 0.05f, 0.95f)
+                             : 0.5f;
         float shifted = ph - pw;
         shifted -= std::floor(shifted);
         v = bank_->saw(shifted, ff, rate_) - bank_->saw(ph, ff, rate_) +

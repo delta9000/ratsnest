@@ -80,10 +80,12 @@ float BandlimitedOsc::sample(const std::vector<float>& tables, float phase,
   if (std::isfinite(frequency) && frequency > 0.0f &&
       std::isfinite(sample_rate) && sample_rate > 0.0f) {
     const float limit = std::nextafter(0.5f * sample_rate / frequency, 0.0f);
-    harmonics = std::clamp(static_cast<int>(limit), 1, kMaxHarmonics);
+    harmonics = !std::isfinite(limit) || limit >= static_cast<float>(kMaxHarmonics)
+                    ? kMaxHarmonics
+                    : std::clamp(static_cast<int>(limit), 1, kMaxHarmonics);
   }
   const std::size_t level = level_for_harmonics_[static_cast<std::size_t>(harmonics)];
-  phase -= std::floor(phase);
+  phase = std::isfinite(phase) ? phase - std::floor(phase) : 0.0f;
   const float position = phase * static_cast<float>(kTableSize);
   const auto index = static_cast<std::size_t>(position);
   const float fraction = position - static_cast<float>(index);

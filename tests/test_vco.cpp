@@ -169,3 +169,25 @@ TEST_CASE("sync resets phase") {
   CHECK(o[0] != doctest::Approx(before));
   CHECK(o[0] == doctest::Approx(-1.0f).epsilon(0.05));  // saw restarts near -1
 }
+
+TEST_CASE("band-limited vco survives hostile inputs and recovers") {
+  const ModuleInfo* info = find_module("vco");
+  REQUIRE(info != nullptr);
+  auto m = info->create();
+  Config cfg;
+  cfg.push_back({"wave", ConfigValue{"saw", 0, {}, false}});
+  m->init(48000.0, cfg);
+  float hostile[6] = {NAN, NAN, NAN, NAN, NAN, NAN};
+  float out[1]{};
+  m->process(hostile, out);
+  CHECK(std::isfinite(out[0]));
+
+  float valid[6] = {440.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+  bool audible = false;
+  for (int i = 0; i < 128; ++i) {
+    m->process(valid, out);
+    REQUIRE(std::isfinite(out[0]));
+    audible = audible || std::abs(out[0]) > 0.1f;
+  }
+  CHECK(audible);
+}
