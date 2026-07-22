@@ -18,7 +18,9 @@ class BandlimitedOsc {
 
  private:
   static constexpr std::size_t kTableSize = 2048;
-  static constexpr int kMaxHarmonics = 2048;
+  // A real-valued N-point table can represent bins 1..N/2-1. Summing higher
+  // Fourier partials here would fold them into the table before playback.
+  static constexpr int kMaxHarmonics = static_cast<int>(kTableSize / 2) - 1;
 
   BandlimitedOsc();
   float sample(const std::vector<float>& tables, float phase, float frequency,

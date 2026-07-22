@@ -135,9 +135,10 @@ Inputs `in` 0 (both channels), `left` 0, `right` 0, `level` 1; engine outputs
 `vco { freq: 440hz, wave: sine, pw: 0.5 }` — inputs `freq`, `v_oct`, relative
 linear `fm`, `pw`, `pwm`, rising-edge `sync`; output `out`. Waves: `sine`,
 `tri`, `saw`, `pulse`. `+1` v/oct doubles pitch. Free-running triangle, saw,
-and pulse use shared Fourier-series tables whose highest partial stays below
-Nyquist; hard sync still creates an arbitrary discontinuity and can alias.
-A band-limited pulse has brief Gibbs ringing up to about `+/-1.15`, and at
+and pulse morph between shared Fourier-series tables whose highest partial
+stays below Nyquist; hard sync still creates an arbitrary discontinuity and
+can alias.
+A band-limited pulse has brief Gibbs ringing up to about `+/-1.3`, and at
 `pw != 0.5` carries a DC offset of about `2 * pw - 1` that low-pass filters
 (`svf.lp`, `ladder`) pass straight through. Keep `pw` at `0.5` or block DC
 downstream if the path is DC-coupled.

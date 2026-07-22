@@ -2,6 +2,7 @@
 #include <cmath>
 #include <numbers>
 #include <vector>
+#include "dsp/bandlimited_osc.h"
 #include "dsp/modules.h"
 
 using namespace ms::dsp;
@@ -56,10 +57,6 @@ double bandlimited_error_db(const std::vector<float>& x, int fundamental,
     }
   }
 
-  double peak = 0.0;
-  for (double v : reference) peak = std::max(peak, std::abs(v));
-  for (double& v : reference) v /= peak;
-
   double signal = 0.0, error = 0.0;
   for (size_t i = 0; i < x.size(); ++i) {
     signal += reference[i] * reference[i];
@@ -90,21 +87,53 @@ TEST_CASE("saw amplitude within convention") {
   auto x = render("saw", 110.0f, 0.0f, 4800);
   float mn = 1e9f, mx = -1e9f;
   for (float v : x) { mn = std::min(mn, v); mx = std::max(mx, v); }
-  CHECK(mx <= 1.05f);
-  CHECK(mn >= -1.05f);
+  // A consistently scaled Fourier saw retains the ideal waveform's bounded
+  // Gibbs overshoot instead of changing gain at every table boundary.
+  CHECK(mx <= 1.2f);
+  CHECK(mn >= -1.2f);
   CHECK(mx > 0.8f);
   CHECK(mn < -0.8f);
 }
 
-TEST_CASE("polyBLEP saw suppresses aliasing") {
+TEST_CASE("band-limited saw suppresses aliasing") {
   // 5000 Hz saw at 48k: harmonic 5 (25 kHz) aliases to 23 kHz.
   auto x = render("saw", 5000.0f, 0.0f, 1 << 15);
   double fundamental = goertzel(x, 5000.0, 48000.0);
   double alias = goertzel(x, 23000.0, 48000.0);
-  // Naive saw shows this alias ~14 dB below fundamental; the zero-latency
-  // 2-point polyBLEP pushes it past 20 dB (measured ~-22 dB). A stricter gate
-  // is unreachable without added latency that would break the sync test above.
-  CHECK(20.0 * std::log10(alias / fundamental) < -20.0);
+  // The selected Fourier table contains no partial at or above Nyquist.
+  CHECK(20.0 * std::log10(alias / fundamental) < -60.0);
+}
+
+TEST_CASE("saw fundamental level is stable across table boundaries") {
+  const auto two_harmonics = render("saw", 8000.0f, 0.0f, 48000);
+  const auto one_harmonic = render("saw", 12000.0f, 0.0f, 48000);
+  const double a = goertzel(two_harmonics, 8000.0, 48000.0);
+  const double b = goertzel(one_harmonic, 12000.0, 48000.0);
+  CHECK(a == doctest::Approx(b).epsilon(0.01));
+}
+
+TEST_CASE("saw morphs continuously when a harmonic becomes available") {
+  const auto& bank = BandlimitedOsc::instance();
+  constexpr float phase = 0.125f;
+  const float below_boundary = bank.saw(phase, 11999.0f, 48000.0f);
+  const float above_boundary = bank.saw(phase, 12001.0f, 48000.0f);
+  CHECK(std::abs(below_boundary - above_boundary) < 0.001f);
+}
+
+TEST_CASE("lowest saw table does not fold harmonics above table Nyquist") {
+  constexpr int n = 2048;
+  // Harmonics above 1023 fold onto ordinary table bins when they are summed
+  // into a 2048-point table. Bin 500 exposes that contamination directly.
+  constexpr int bin = 500;
+  std::vector<float> table(n);
+  const auto& bank = BandlimitedOsc::instance();
+  for (int i = 0; i < n; ++i)
+    table[static_cast<std::size_t>(i)] =
+        bank.saw(static_cast<float>(i) / static_cast<float>(n), 0.0f, 48000.0f);
+  const double expected = 2.0 / (std::numbers::pi * static_cast<double>(bin));
+  const double measured =
+      goertzel(table, static_cast<double>(bin), static_cast<double>(n));
+  CHECK(measured / expected == doctest::Approx(1.0).epsilon(0.01));
 }
 
 TEST_CASE("saw matches band-limited reference across the high register") {
@@ -147,8 +176,8 @@ TEST_CASE("band-limited pulse preserves width DC and signal convention") {
     CHECK(mean == doctest::Approx(2.0f * pw - 1.0f).epsilon(0.01));
     // A truly band-limited step has bounded Gibbs ringing. Do not hard-clip
     // it back to nominal +/-1: that would recreate the aliases we removed.
-    CHECK(lo >= -1.2f);
-    CHECK(hi <= 1.2f);
+    CHECK(lo >= -1.3f);
+    CHECK(hi <= 1.3f);
     CHECK(lo < -0.5f);
     CHECK(hi > 0.5f);
   }
@@ -157,17 +186,21 @@ TEST_CASE("band-limited pulse preserves width DC and signal convention") {
 TEST_CASE("sync resets phase") {
   const ModuleInfo* info = find_module("vco");
   auto m = info->create();
+  auto fresh = info->create();
   Config cfg;
   cfg.push_back({"wave", ConfigValue{"saw", 0, {}, false}});
   m->init(48000.0, cfg);
+  fresh->init(48000.0, cfg);
   float ins[6] = {100.f, 0.f, 0.f, 0.5f, 0.f, 0.f};
   float o[1];
+  float fresh_out[1];
+  fresh->process(ins, fresh_out);
   for (int i = 0; i < 100; ++i) m->process(ins, o);
   float before = o[0];
   ins[5] = 1.0f;  // sync rising edge
   m->process(ins, o);
   CHECK(o[0] != doctest::Approx(before));
-  CHECK(o[0] == doctest::Approx(-1.0f).epsilon(0.05));  // saw restarts near -1
+  CHECK(o[0] == doctest::Approx(fresh_out[0]).epsilon(1e-6));
 }
 
 TEST_CASE("band-limited vco survives hostile inputs and recovers") {
