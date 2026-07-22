@@ -1,17 +1,22 @@
 #include <doctest/doctest.h>
+#include <algorithm>
 #include <cmath>
+#include <string_view>
 #include "dsp/modules.h"
 
 using namespace ms::dsp;
 
 namespace {
-float run_drive(const char* mode, float in, float amount) {
+float run_drive(const char* mode, float in, float amount,
+                const char* quality = nullptr) {
   const ModuleInfo* info = find_module("drive");
   REQUIRE(info != nullptr);
   auto m = info->create();
   Config cfg;
   ConfigValue v; v.str = mode;
   cfg.push_back({"mode", v});
+  if (quality)
+    cfg.push_back({"quality", ConfigValue{quality, 0, {}, false}});
   m->init(48000.0, cfg);
   const float ins[2] = {in, amount};
   float out[1];
@@ -19,6 +24,40 @@ float run_drive(const char* mode, float in, float amount) {
   return out[0];
 }
 }  // namespace
+
+TEST_CASE("drive quality metadata declares raw and clean") {
+  const ModuleInfo* info = find_module("drive");
+  REQUIRE(info != nullptr);
+  REQUIRE(info->configs.size() == 2);
+  CHECK(std::string(info->configs[0].name) == "mode");
+  CHECK(std::string(info->configs.back().name) == "quality");
+  CHECK(std::string(info->configs.back().enum_vals[0]) == "raw");
+  CHECK(std::string(info->configs.back().enum_vals[1]) == "clean");
+}
+
+TEST_CASE("drive quality raw is bit-identical to legacy output") {
+  constexpr const char* modes[] = {"soft", "hard"};
+  constexpr float inputs[] = {-2.0f, -0.7f, -0.1f, 0.0f,
+                              0.1f, 0.7f, 2.0f};
+  constexpr float amounts[] = {0.0f, 0.1f, 0.5f, 1.0f};
+
+  for (const char* mode : modes) {
+    for (float in : inputs) {
+      for (float amount : amounts) {
+        const float g = 1.0f + 9.0f * std::clamp(amount, 0.0f, 1.0f);
+        const float x = in * g;
+        const float expected = std::string_view(mode) == "hard"
+            ? std::clamp(x, -1.0f, 1.0f)
+            : std::tanh(x);
+        const float missing = run_drive(mode, in, amount);
+        const float raw = run_drive(mode, in, amount, "raw");
+        CHECK(missing == raw);
+        CHECK(missing == expected);
+        CHECK(raw == expected);
+      }
+    }
+  }
+}
 
 TEST_CASE("soft drive saturates smoothly and stays bounded") {
   CHECK(run_drive("soft", 0.0f, 1.0f) == doctest::Approx(0.0f));

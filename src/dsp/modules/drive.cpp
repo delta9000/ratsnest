@@ -7,13 +7,15 @@ namespace {
 
 constexpr InputInfo kIns[] = {{"in", 0.f}, {"amount", 0.5f}};
 constexpr const char* kModes[] = {"soft", "hard", nullptr};
-constexpr ConfigInfo kCfg[] = {{"mode", kModes}};
+constexpr const char* kQualities[] = {"raw", "clean", nullptr};
+constexpr ConfigInfo kCfg[] = {{"mode", kModes}, {"quality", kQualities}};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
 class Drive final : public Module {
  public:
   void init(double, const Config& cfg) override {
     hard_ = cfg_str(cfg, "mode", "soft") == "hard";
+    clean_ = cfg_str(cfg, "quality", "raw") == "clean";
   }
 
   void process(const float* ins, float* outs) override {
@@ -24,6 +26,7 @@ class Drive final : public Module {
 
  private:
   bool hard_ = false;
+  bool clean_ = false;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Drive>(); }
