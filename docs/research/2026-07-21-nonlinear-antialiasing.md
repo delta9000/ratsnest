@@ -88,27 +88,20 @@ on a 1/250-second period, so this avoids transition-band, window, leakage, and
 FIR-delay ambiguity rather than adding a nominally “long” but arbitrary FIR.
 This is an explicit protocol deviation, not a claim that a long FIR was run.
 
-For Wolfram at host rate `fs`, `n = Round[fs/250]`, `nh = 64 n`, and
-`t = Range[0, nh - 1]/(64 fs)`.  After evaluating the curve, its `nh`-point
-`Fourier` bins from `kmax + 2` through `nh - kmax`, where
-`kmax = Floor[(fs/2)/250]`, were zeroed.  `InverseFourier` was made real and
-decimation selected samples `[[1;;;;64]]`.  Thus DC and baseband harmonics
-through the DFT-bin Nyquist convention were retained, there was no window or
-FIR length, circular phase was zero, and decimation began at the first sample.
-Ideal 4x, 8x, and 16x candidates used the same operation at their rates.
+Both implementations now exclude DC and the exact host-Nyquist bin.  For
+Wolfram, a `q n`-point periodic candidate zeros spectrum indices `n/2 + 1`
+through `q n - n/2 + 1`, then takes first-sample decimation `[[1;;;;q]]`.
+For local NumPy, the 64x `rfft` coefficients `0..N/2` are divided by 64, the
+`N/2` coefficient is set to zero, and `irfft(..., n=N)` reconstructs the
+reference.  Candidate/error comparisons use positive bins `1..N/2-1`.  A
+fractional shift also zeros its Nyquist coefficient, so a phase operation
+cannot reintroduce excluded boundary energy.
 
-The local coefficient-specific cross-check used the same periodic brick-wall
-idea on its longer record: a 64x real FFT, retention of bins through the host
-Nyquist (DC through bin 6,144, with the boundary Nyquist bin rejected), division
-by 64, and a 12,288-point inverse real FFT.  The differing boundary convention
-is immaterial to the reported cases but is stated for reproducibility.
-
-In Wolfram, stateful ADAA was fractionally aligned by Fourier phase-shift search
-over -2 through 2 host samples in 1/400-sample steps (1/200 for the earlier 1x
-table).  The local candidate phase was unwrapped to the delay nearest the topology's
-low-frequency group delay, then removed with an exact fractional Fourier
-shift.  This aligns the coherent fundamental but deliberately leaves harmonic
-phase dispersion in the error.  The measured ADAA delay was 0.5 host sample.
+Wolfram stateful candidates were aligned by Fourier phase-shift search over -2
+through 2 host samples in 1/400-sample steps.  Local waveform fidelity used
+fixed measured delays: 0 for raw, 0.5 for 1x ADAA, 3.174168 for actual 4x,
+3.299168 for actual 4x+ADAA, and 4.761252 for the extended 8x tree.  The primary
+magnitude-spectrum score is phase invariant and needs no alignment.
 For the exact legacy allpass round trip, the low-frequency delays were about
 3.174 samples at 4x and 4.761 samples at 8x; effective phase delay varied with
 frequency.  Direct linear round-trip impulses peaked at sample index 4 for 4x
@@ -116,34 +109,35 @@ and sample index 5 for the extended 8x tree (zero-based), so neither realizes
 the one-host-sample peak-latency gate.  The reference had zero circular phase
 and therefore no group delay to compensate.
 
-With `r` the reference, `y` the aligned candidate, and a bar denoting the
-record mean, the metrics were:
+With `R[k]` and `Y[k]` the unnormalized real-DFT coefficients, `K =
+{1,...,N/2-1}`, `z` the delay-aligned candidate, and a bar denoting the record
+mean, the metrics are:
 
 ```text
-E(y)        = mean(((y - r) - mean(y - r))^2)
-improvement = 10 log10(E(raw) / E(y))
-AC wanted   = RMS-power-normalized sum of reference in-band FFT-bin energy,
-              excluding DC and the input fundamental
-gain alpha  = dot(y - mean(y), r - mean(r)) / dot(r - mean(r), r - mean(r))
-gain error  = 20 log10(abs(alpha))
-peak        = max(abs(y))
+Ealias(y)   = (2/N^2) sum(k in K, (abs(Y[k]) - abs(R[k]))^2)
+Efidelity   = mean(((z - r) - mean(z - r))^2)
+improvement = 10 log10(Ealias(raw) / Ealias(y))
+wanted      = (2/N^2) sum(k in K except input fundamental, abs(R[k])^2)
+fundamental = Z[k_input] / R[k_input]       (magnitude dB and phase degrees)
+projection  = dot(z-mean(z), r-mean(r)) / dot(r-mean(r), r-mean(r))
+peak        = max(abs(y))                   (physical, before alignment)
 ```
 
-All candidates used the same record, bin set, DC exclusion, phase alignment,
-and gain convention.  Gain was reported separately; it was not optimized away,
-so attenuation cannot masquerade as antialiasing.
+`Ealias` is the primary alias/timbre residual: it counts wanted-bin magnitude
+corruption and energy in non-wanted bins but is invariant to phase.  `Efidelity`
+is explicitly a different score and retains phase dispersion.  Fundamental
+complex ratio and whole-waveform projection are reported separately; neither
+is called “passband gain.”  Attenuation is not fitted out of either error.
 
-The acceptance threshold was at least **30.00 dB** improvement in every
-practical case.  A case is practical when reference in-band AC energy exceeds
-`-120 dBFS` and raw error exceeds `-140 dBFS`.  The latter is more than 80 dB
-above the observed numerical/window floor and left 261 of 308 local cases.
-Intentional clipping/folding is part of the reference and never excludes a
-case.  Peak must remain finite, and gain projection is a separate diagnostic
-rather than part of the error normalization.  No gain or peak cutoff was set
-after looking at results: the preregistered numerical thresholds were `1e-10`
-for the antiderivative checks and 30.00 dB with the `-120/-140 dBFS`
-practical-case gates for quality.  A gain/peak limit must be declared before
-the implementation-validation rerun.
+The production gate is fixed before any new filter is evaluated.  Of the 308
+cases, 253 have raw `Ealias > -100 dBFS` and require at least **30.00 dB**
+improvement.  The remaining 55 have raw `Ealias <= -100 dBFS` and instead
+require clean `Ealias <= -100 dBFS`; demanding another ratio below the floor is
+not meaningful.  Wanted non-fundamental harmonic energy is reported separately
+and does not select the gate.  Intentional clipping/folding remains part of the
+reference.  Antiderivative error must remain below `1e-10`; peak must be finite.
+A fundamental/projection bound still must be preregistered for implementation
+validation.
 
 ## Wolfram ideal-factor results
 
@@ -151,60 +145,193 @@ Wolfram evaluated the representative cases stated below, not the full 308-case
 matrix.  The full matrix belongs solely to the local coefficient-specific
 cross-check in the next section.
 
-First-order 1x ADAA did not reliably improve the nominal-curve match.  Selected
-improvements were -0.72 dB for soft at 2 kHz, 1.65 dB for soft at 8 kHz, 1.81
-dB for hard at 2 kHz, 1.54 dB for hard at 8 kHz, and -0.02/9.55/34.20 dB for
-fold 4 at 2/4/8 kHz.  Best alignment was approximately 0.5 host sample and gain
-projection was about 0.925 through 1.015.
+Each candidate cell below is `absolute alias error dBFS / improvement dB`.
+Soft and hard use `amount=1` (`scale=10`).  Fold uses `fold=4,sym=0`, except
+the final 96 kHz case which uses `sym=0.5`.
 
-The cases that demonstrated ideal 4x failure and justified measuring ideal 8x
-were:
+| Case (48 kHz unless noted) | Raw error | 1x ADAA | ideal 4x raw | ideal 4x+ADAA | ideal 8x raw | ideal 16x raw |
+|---|---:|---:|---:|---:|---:|---:|
+| soft, 2 kHz | -25.94 | -37.32 / 11.37 | -124.11 / 98.17 | -53.90 / 27.95 | <-200 / >200 | <-200 / >200 |
+| soft, 8 kHz | -21.93 | -41.41 / 19.48 | -53.52 / 31.59 | -53.67 / 31.74 | -86.35 / 64.42 | -151.58 / 129.65 |
+| hard, 2 kHz | -22.74 | -37.75 / 15.01 | -52.70 / 29.96 | -52.69 / 29.95 | -62.41 / 39.67 | -79.25 / 56.51 |
+| hard, 8 kHz | -21.69 | -35.51 / 13.82 | -48.75 / 27.06 | -54.56 / 32.87 | -73.55 / 51.86 | -75.99 / 54.30 |
+| fold, 2 kHz | -22.95 | -24.86 / 1.91 | -52.16 / 29.21 | -50.81 / 27.86 | -66.55 / 43.60 | -77.36 / 54.41 |
+| fold, 4 kHz | -13.49 | -24.51 / 11.02 | -41.71 / 28.22 | -41.71 / 28.22 | -53.83 / 40.34 | -70.06 / 56.57 |
+| fold, 8 kHz | -13.68 | -51.80 / 38.12 | -39.27 / 25.59 | -40.33 / 26.66 | -47.45 / **33.77** | -62.69 / 49.01 |
+| fold, sym 0.5, 4 kHz at 96 kHz | -25.44 | -28.34 / 2.90 | -53.64 / 28.20 | -50.77 / 25.33 | -70.30 / 44.85 | -77.70 / 52.26 |
 
-| Case (48 kHz unless noted) | 4x raw | 8x raw | 16x raw |
-|---|---:|---:|---:|
-| soft, 8 kHz | 31.59 dB | 64.42 dB | 129.65 dB |
-| hard, 2 kHz | 29.96 dB | 39.67 dB | 56.51 dB |
-| hard, 8 kHz | 27.06 dB | 51.86 dB | 54.30 dB |
-| fold 4, 2 kHz | 29.26 dB | 43.65 dB | 54.46 dB |
-| fold 4, 4 kHz | 28.22 dB | 40.34 dB | 56.57 dB |
-| fold 4, 8 kHz | 25.59 dB | **33.77 dB** | 49.01 dB |
-| fold 4, sym 0.5, 4 kHz at 96 kHz | 28.14 dB | 43.72 dB | 52.54 dB |
+`>200` marks a numerical-floor result, not evidence for hundreds of decibels
+of realizable rejection; evaluator and local equivalents diverged there while
+agreeing on meaningful cases.  Ideal 4x raw misses 30 dB in five representative
+cases, and ideal 4x+ADAA misses in five.  The bold 33.77 dB is the lowest of the
+seven deliberately difficult ideal-8x checks, not a full-sweep worst case.
+Thus ideal evidence says only that the concrete-filter search starts at 8x.
 
-The bold 33.77 dB result was the lowest of these **seven representative
-difficult checks**, not a full-sweep worst case.  It cleared the exact threshold
-by 3.77 dB.  Their ideal-8x gain projections spanned
-0.9816 through 1.0041.  Four-times plus ADAA was generally worse at high
-frequencies: soft/hard at 8 kHz measured -4.71/-4.67 dB improvement, and fold
-4 at 4/8 kHz measured 26.87/20.08 dB.  This is why 4x+ADAA is not preferred
-despite its attractive arithmetic cost.
+Under the revised magnitude metric, toggling only exact-Nyquist inclusion
+changed no meaningful representative value by 0.01 dB; soft 2 kHz at ideal
+16x moved 0.14 dB, but both values were below the numerical floor.  Differences
+from the earlier table beyond that (notably the 96 kHz row) also reflect the
+metric correction and explicit case parameters, not merely the boundary bin.
+
+## Executable representative Wolfram analysis
+
+The following is the complete representative-only listing validated after the
+metric correction.  Wolfram CodeInspector reported no issues at confidence
+0.75 with Formatting/Scoping excluded.  Authorized evaluator session
+`IDL8qnbD` completed it; the only message was benign symbol shadowing from the
+global-context `ClearAll`.  Meaningful results agree with the independently
+implemented local equivalent.  It does not run the 308-case coefficient sweep.
+
+```wl
+ClearAll["Global`*"];
+$MaxExtraPrecision = 1000;
+
+rawSoft[x_, amount_] := Tanh[x (1 + 9 Clip[amount, {0, 1}])];
+rawHard[x_, amount_] := Clip[x (1 + 9 Clip[amount, {0, 1}]), {-1, 1}];
+rawFold[x_, fold_, sym_] :=
+  1 - 4 Abs[Mod[(x Max[fold, 0] + sym + 1)/4, 1] - 1/2];
+foldAnti[x_] := With[{k = Floor[(x + 1)/2]},
+  With[{s = (-1)^k}, s (x - 2 k)^2/2 + If[s < 0, 1, 0]]];
+
+rawU["soft", u_] := Tanh[u];
+rawU["hard", u_] := Clip[u, {-1, 1}];
+rawU["fold", u_] := 1 - 4 Abs[Mod[(u + 1)/4, 1] - 1/2];
+antiU["soft", u_] := Log[Cosh[u]];
+antiU["hard", u_] := If[Abs[u] <= 1, u^2/2, Abs[u] - 1/2];
+antiU["fold", u_] := foldAnti[u];
+
+adaaRun[kind_, onePeriod_List] := Module[
+  {u = Join[onePeriod, onePeriod], prev = 0., out, dx, i},
+  out = ConstantArray[0., 2 Length[onePeriod]];
+  Do[dx = u[[i]] - prev;
+    out[[i]] = If[Abs[dx] < 10^-10,
+      rawU[kind, (u[[i]] + prev)/2],
+      (antiU[kind, u[[i]]] - antiU[kind, prev])/dx];
+    prev = u[[i]], {i, Length[u]}];
+  Take[out, -Length[onePeriod]]];
+
+(* y contains q samples per host sample for one coherent period.  The exact
+   host Nyquist coefficient and every higher-frequency coefficient are zeroed.
+   Default Fourier convention is used consistently; first-sample decimation. *)
+periodicProject[y_List, q_Integer, n_Integer] := Module[{s = Fourier[y], nh},
+  nh = Length[y];
+  s[[n/2 + 1 ;; nh - n/2 + 1]] = 0;
+  Re[InverseFourier[s][[1 ;; ;; q]]]];
+
+makeSignal[case_, q_Integer, useADAA_: False] := Module[
+  {fs = case["fs"], f = case["tone"], n, t, x, u, y},
+  n = Round[fs/250]; t = Range[0, q n - 1]/(q fs);
+  x = Sin[2 Pi f t];
+  u = case["scale"] x + case["bias"];
+  y = If[useADAA, adaaRun[case["kind"], u], rawU[case["kind"], u]];
+  periodicProject[y, q, n]];
+
+makeReference[case_] := makeSignal[case, 64, False];
+
+fracAdvance[x_List, d_] := Module[{n = Length[x], s, signedK},
+  s = Fourier[x]; s[[n/2 + 1]] = 0;
+  signedK = Join[Range[0, n/2], Range[-n/2 + 1, -1]];
+  Re[InverseFourier[s Exp[2 Pi I signedK d/n]]]];
+
+measure[y_List, ref_List, raw_List, case_] := Module[
+  {n = Length[ref], ys, rs, ws, pos, aliasE, rawE, delays, fidelity,
+   best, aligned, k, fund, alpha},
+  ys = Fourier[y]; rs = Fourier[ref]; ws = Fourier[raw];
+  pos = Range[2, n/2]; (* DC and exact Nyquist excluded. *)
+  aliasE = 2 Total[(Abs[ys[[pos]]] - Abs[rs[[pos]]])^2]/n^2;
+  rawE = 2 Total[(Abs[ws[[pos]]] - Abs[rs[[pos]]])^2]/n^2;
+  delays = Range[-2, 2, 1/400];
+  fidelity = Table[With[{z = fracAdvance[y, d]},
+    {Mean[(z - ref - Mean[z - ref])^2], d, z}], {d, delays}];
+  best = First@SortBy[fidelity, First]; aligned = best[[3]];
+  k = Round[case["tone"]/250] + 1;
+  fund = Fourier[aligned][[k]]/rs[[k]];
+  alpha = ((aligned - Mean[aligned]).(ref - Mean[ref]))/
+    ((ref - Mean[ref]).(ref - Mean[ref]));
+  <|"alias_error_dbfs" -> 10 Log10[Max[aliasE, 10^-300]],
+    "alias_improvement_db" -> 10 Log10[Max[rawE, 10^-300]/Max[aliasE, 10^-300]],
+    "fidelity_error_dbfs" -> 10 Log10[Max[best[[1]], 10^-300]],
+    "delay" -> best[[2]], "fundamental_mag_db" -> 20 Log10[Abs[fund]],
+    "fundamental_phase_deg" -> Arg[fund]/Degree,
+    "waveform_projection" -> alpha, "physical_peak" -> Max[Abs[y]]|>];
+
+cases = {
+  <|"name" -> "soft2k", "kind" -> "soft", "fs" -> 48000,
+    "tone" -> 2000, "amount" -> 1, "scale" -> 10, "bias" -> 0|>,
+  <|"name" -> "soft8k", "kind" -> "soft", "fs" -> 48000,
+    "tone" -> 8000, "amount" -> 1, "scale" -> 10, "bias" -> 0|>,
+  <|"name" -> "hard2k", "kind" -> "hard", "fs" -> 48000,
+    "tone" -> 2000, "amount" -> 1, "scale" -> 10, "bias" -> 0|>,
+  <|"name" -> "hard8k", "kind" -> "hard", "fs" -> 48000,
+    "tone" -> 8000, "amount" -> 1, "scale" -> 10, "bias" -> 0|>,
+  <|"name" -> "fold2k", "kind" -> "fold", "fs" -> 48000,
+    "tone" -> 2000, "fold" -> 4, "sym" -> 0, "scale" -> 4, "bias" -> 0|>,
+  <|"name" -> "fold4k", "kind" -> "fold", "fs" -> 48000,
+    "tone" -> 4000, "fold" -> 4, "sym" -> 0, "scale" -> 4, "bias" -> 0|>,
+  <|"name" -> "fold8k", "kind" -> "fold", "fs" -> 48000,
+    "tone" -> 8000, "fold" -> 4, "sym" -> 0, "scale" -> 4, "bias" -> 0|>,
+  <|"name" -> "fold4k96sym5", "kind" -> "fold", "fs" -> 96000,
+    "tone" -> 4000, "fold" -> 4, "sym" -> .5, "scale" -> 4, "bias" -> .5|>};
+
+results = Association@Table[Module[{ref = makeReference[c], raw, candidates},
+  raw = makeSignal[c, 1, False];
+  candidates = <|"raw" -> raw, "adaa" -> makeSignal[c, 1, True],
+    "4x" -> makeSignal[c, 4, False], "4x_adaa" -> makeSignal[c, 4, True],
+    "8x" -> makeSignal[c, 8, False], "16x" -> makeSignal[c, 16, False]|>;
+  c["name"] -> Association@KeyValueMap[#1 -> measure[#2, ref, raw, c] &,
+    candidates]], {c, cases}];
+Export["/tmp/nonlinear-ideal-results.json", results, "RawJSON"];
+results
+```
 
 ## Exact legacy-coefficient cross-check
 
-The local NumPy 2.5.1 harness copied the sample ordering and state equations in
-`oversample.h` exactly, then added one identical tree level for an 8x trial.
-It ran all 308 cases.  The table reports the 261-case practical set; median and
-worst are improvement against raw, maximum gain error is the absolute
-projection error, and peak is the largest aligned candidate sample.
+The local NumPy 2.5.1 harness matches the C++ equations, state update, branch
+order, and cascade structure, then adds one identical tree level for an 8x
+trial.  It is not bit-exact production correspondence: Python uses float64 and
+does not reproduce C++ float rounding or the denormal flush in `Allpass`.
 
-| Candidate | Worst improvement | Median improvement | Max integrated error | Max gain error | Peak |
+All 308 cases were classified: 253 ratio-gated and 55 floor-gated.  “Worst” and
+“median” below apply to ratio-gated magnitude improvement; maximum alias error
+and gate passes cover all cases.
+
+| Candidate | Worst improvement | Median improvement | Max alias error | Ratio/floor passes |
+|---|---:|---:|---:|---:|
+| 1x raw | 0.00 dB | 0.00 dB | -4.58 dBFS | 0/55 (55 total) |
+| 1x ADAA | -39.16 dB | 2.79 dB | -11.33 dBFS | 3/0 (3 total) |
+| actual 4x raw | -1.20 dB | 15.17 dB | -7.87 dBFS | 37/43 (80 total) |
+| actual 4x+ADAA | -29.30 dB | 9.62 dB | -13.09 dBFS | 0/3 (3 total) |
+| extended actual 8x raw | -3.04 dB | 14.13 dB | -7.95 dBFS | 4/43 (47 total) |
+
+The separate fidelity and transfer diagnostics are:
+
+| Candidate | Max fidelity error | Max abs fundamental magnitude | Max abs fundamental phase | Max abs projection | Physical peak |
 |---|---:|---:|---:|---:|---:|
-| 1x raw | 0.00 dB | 0.00 dB | -4.58 dBFS | 13.09 dB | 1.000 |
-| 1x ADAA | -87.77 dB | 3.36 dB | -10.97 dBFS | 19.16 dB | 1.418 |
-| actual 4x raw | -74.57 dB | -3.77 dB | -4.35 dBFS | 14.73 dB | 1.356 |
-| actual 4x + ADAA | -77.40 dB | -3.24 dB | -6.04 dBFS | 11.66 dB | 1.283 |
-| actual cascade extended to 8x raw | -78.09 dB | -6.86 dB | -2.51 dBFS | 17.46 dB | 1.398 |
+| 1x raw | -4.58 dBFS | 13.09 dB | 0.00 deg | 13.09 dB | 1.000 |
+| 1x ADAA | -10.97 dBFS | 7.51 dB | 0.00 deg | 19.16 dB | 1.000 |
+| actual 4x raw | -5.24 dBFS | 10.65 dB | 73.03 deg | 10.30 dB | 1.446 |
+| actual 4x+ADAA | -6.60 dBFS | 4.77 dB | 59.52 deg | 9.73 dB | 1.382 |
+| extended actual 8x raw | -3.10 dBFS | 7.20 dB | 53.83 deg | 38.54 dB | 1.404 |
 
-Wanted in-band harmonic energy on this practical set was numerically zero when
-no nonlinear harmonic fell below Nyquist (17 cases); otherwise it ranged from
-`-87.98` to `-5.20 dBFS`.  It is a property of the wanted reference, not an
-error score, and was retained separately for every case.
+Wanted non-fundamental in-band harmonic energy was numerically zero in 45
+cases; otherwise it ranged from `-87.98` to `-5.20 dBFS`.  It is reference
+classification, not alias error.
 
-The broad worst case is soft, amount 0, 2 kHz at 48 kHz: raw error is already
-`-135.61 dBFS`, while the exact 4x and extended 8x filters introduce harmonic
-phase errors at `-61.04` and `-57.52 dBFS`.  Even restricting attention to
-cases with raw error above `-40 dBFS`, the extended 8x cascade's worst
-improvement is -15.22 dB (hard, amount 1, 1 kHz at 48 kHz).  It therefore fails
-for substantive nonlinear cases, not only numerical-floor cases.
+The worst ratio-gated case for actual 4x and extended 8x is soft at 48 kHz,
+500 Hz, amount 0.75: raw alias error is `-92.04 dBFS`; actual 4x is
+`-90.84 dBFS` (-1.20 dB improvement) and extended 8x is `-89.00 dBFS`
+(-3.04 dB).  Absolute extended-8x alias error reaches `-7.95 dBFS` for fold 8,
+10 kHz at 48 kHz.  The existing cascade therefore fails the primary magnitude
+gate as well as the latency and fidelity gates.
+
+Exact-Nyquist exclusion changed alias error by more than 0.005 dB in 108 raw,
+91 ADAA, 86 actual-4x, 102 actual-4x+ADAA, and 108 extended-8x cases.  Maximum
+changes were 19.39, 59.71, 51.95, 33.80, and 48.19 dB respectively; the largest
+values occur where reference or candidate places strong energy exactly at
+Nyquist or the remaining error is near the numerical floor.  Those maxima were
+respectively soft amount 0 at 8 kHz, soft amount 0.75 at 8 kHz, soft amount 0
+at 8 kHz, fold 2/sym 0 at 8 kHz, and soft amount 0 at 8 kHz, all at 48 kHz.
+This is why the boundary is now identical and excluded everywhere.
 
 These local numbers are not in conflict with the Wolfram ideal-factor table:
 they answer a different question.  The ideal table supplies evidence that the
@@ -303,14 +430,16 @@ def ideal_ref(kind,u_hi):
     y=raw(kind,u_hi)
     Y=np.fft.rfft(y)
     H=Y[:N//2+1]/64
+    included_nyquist_magnitude=float(abs(H[-1]))
     # Nyquist is a boundary convention; reject it rather than double-count it.
     H[-1]=0
-    return np.fft.irfft(H,n=N)
+    return np.fft.irfft(H,n=N),included_nyquist_magnitude
 
 def frac_advance(x,d):
     X=np.fft.rfft(x); k=np.arange(len(X))
     X*=np.exp(2j*np.pi*k*d/N)
-    X[-1]=X[-1].real
+    # Exact Nyquist is outside every reference and comparison bin set.
+    X[-1]=0
     return np.fft.irfft(X,n=N)
 
 def candidate(kind,x,scale,bias,levels,adaa):
@@ -328,31 +457,36 @@ def candidate(kind,x,scale,bias,levels,adaa):
         out[i]=os.dn(ys)
     return out
 
-def metric(y,ref,rawerr,delay,tone,rate):
-    # Resolve the fundamental phase to the equivalent delay nearest the
-    # topology's low-frequency group delay, then fractionally align.
-    k=tone*N//rate
-    q=np.fft.rfft(y)[k]/np.fft.rfft(ref)[k]
-    base=-np.angle(q)/(2*np.pi*tone/rate)
-    period=rate/tone
-    delay=base+round((delay-base)/period)*period
+def metric(y,ref,ref_nyquist_magnitude,delay,tone,rate):
+    # Alias/timbre score is phase invariant and excludes DC and exact Nyquist.
+    Y=np.fft.rfft(y); R=np.fft.rfft(ref)
+    alias_E=float(2*np.sum((np.abs(Y[1:-1])-np.abs(R[1:-1]))**2)/N**2)
+    alias_E_with_nyquist=alias_E+float((abs(Y[-1])-ref_nyquist_magnitude)**2/N**2)
+    # Fidelity score uses the topology's fixed delay and retains phase dispersion.
     ya=frac_advance(y,delay)
     e=ya-ref; e-=e.mean(); ac=ref-ref.mean()
-    E=float(np.mean(e*e)); Er=float(np.mean(rawerr*rawerr))
+    fidelity_E=float(np.mean(e*e))
     acE=float(np.mean(ac*ac))
     alpha=float(np.dot(ya-ya.mean(),ac)/np.dot(ac,ac))
-    improve=10*math.log10(max(Er,1e-300)/max(E,1e-300))
-    return dict(error_dbfs=10*math.log10(max(E,1e-300)), improvement_db=improve,
-                gain_projection=alpha, projection_error_db=20*math.log10(max(abs(alpha),1e-300)),
-                peak=float(np.max(np.abs(ya))), ref_ac_dbfs=10*math.log10(max(acE,1e-300)),delay_samples=float(delay))
+    k=tone*N//rate
+    fundamental=np.fft.rfft(ya)[k]/R[k]
+    return dict(alias_error_dbfs=10*math.log10(max(alias_E,1e-300)),
+                alias_error_with_nyquist_dbfs=10*math.log10(max(alias_E_with_nyquist,1e-300)),
+                nyquist_exclusion_delta_db=10*math.log10(max(alias_E,1e-300)/max(alias_E_with_nyquist,1e-300)),
+                fidelity_error_dbfs=10*math.log10(max(fidelity_E,1e-300)),
+                fundamental_mag_db=20*math.log10(max(abs(fundamental),1e-300)),
+                fundamental_phase_deg=float(np.angle(fundamental,deg=True)),
+                waveform_projection=alpha,
+                waveform_projection_db=20*math.log10(max(abs(alpha),1e-300)),
+                physical_peak=float(np.max(np.abs(y))),
+                ref_ac_dbfs=10*math.log10(max(acE,1e-300)),delay_samples=float(delay))
 
 def run_case(kind,rate,tone,scale,bias):
     # Two periods establish IIR and ADAA state; retain the final coherent record.
     nt=2*N; n=np.arange(nt); x=np.sin(2*np.pi*tone*n/rate)
     mh=np.arange(N*64); xh=np.sin(2*np.pi*tone*mh/(rate*64))
-    ref=ideal_ref(kind,xh*scale+bias)
+    ref,ref_nyquist_magnitude=ideal_ref(kind,xh*scale+bias)
     xr=x[N:]; rawy=raw(kind,xr*scale+bias)
-    rawerr=rawy-ref; rawerr-=rawerr.mean()
     # Fixed low-frequency group-delay alignment measured from the exact linear
     # round trip. ADAA contributes half a sample at its processing rate.
     specs=(('raw',0,False,0.),('adaa',0,True,.5),('4x',2,False,3.174168),
@@ -360,24 +494,40 @@ def run_case(kind,rate,tone,scale,bias):
     out={}
     for name,lev,aa,d in specs:
         y=candidate(kind,x,scale,bias,lev,aa)[N:]
-        out[name]=metric(y,ref,rawerr,d,tone,rate)
+        out[name]=metric(y,ref,ref_nyquist_magnitude,d,tone,rate)
+    rawE=10**(out['raw']['alias_error_dbfs']/10)
+    for name in ('raw','adaa','4x','4x_adaa','8x'):
+        m=out[name]; cleanE=10**(m['alias_error_dbfs']/10)
+        m['alias_improvement_db']=10*math.log10(max(rawE,1e-300)/max(cleanE,1e-300))
+        if out['raw']['alias_error_dbfs']>-100:
+            m['gate']='ratio'; m['passes_gate']=m['alias_improvement_db']>=30
+        else:
+            m['gate']='floor'; m['passes_gate']=m['alias_error_dbfs']<=-100
     # Wanted in-band nonlinear harmonics = reference AC minus coherent fundamental.
     R=np.fft.rfft(ref-ref.mean()); k=tone*N//rate
-    wanted=(np.sum(np.abs(R[1:])**2)-abs(R[k])**2)*2/N**2
+    wanted=(np.sum(np.abs(R[1:-1])**2)-abs(R[k])**2)*2/N**2
     out['meta']=dict(kind=kind,rate=rate,tone=tone,scale=scale,bias=bias,
                      ref_peak=float(np.max(np.abs(ref))),wanted_harmonics_dbfs=10*math.log10(max(float(wanted),1e-300)))
     return out
 
 def summary(rows,name):
-    practical=[r[name] for r in rows
-               if r['raw']['error_dbfs']>-140 and r[name]['ref_ac_dbfs']>-120]
+    vals=[r[name] for r in rows]
+    ratio=[r[name] for r in rows if r['raw']['alias_error_dbfs']>-100]
     return dict(
-                practical_count=len(practical),
-                worst_improvement_db=min(v['improvement_db'] for v in practical),
-                median_improvement_db=statistics.median(v['improvement_db'] for v in practical),
-                max_error_dbfs=max(v['error_dbfs'] for v in practical),
-                max_abs_projection_error_db=max(abs(v['projection_error_db']) for v in practical),
-                peak_max=max(v['peak'] for v in practical))
+                ratio_case_count=len(ratio),floor_case_count=len(vals)-len(ratio),
+                ratio_worst_improvement_db=min(v['alias_improvement_db'] for v in ratio),
+                ratio_median_improvement_db=statistics.median(v['alias_improvement_db'] for v in ratio),
+                max_alias_error_dbfs=max(v['alias_error_dbfs'] for v in vals),
+                max_fidelity_error_dbfs=max(v['fidelity_error_dbfs'] for v in vals),
+                max_abs_fundamental_mag_db=max(abs(v['fundamental_mag_db']) for v in vals),
+                max_abs_fundamental_phase_deg=max(abs(v['fundamental_phase_deg']) for v in vals),
+                max_abs_waveform_projection_db=max(abs(v['waveform_projection_db']) for v in vals),
+                physical_peak_max=max(v['physical_peak'] for v in vals),
+                nyquist_changed_case_count=sum(abs(v['nyquist_exclusion_delta_db'])>.005 for v in vals),
+                max_abs_nyquist_delta_db=max(abs(v['nyquist_exclusion_delta_db']) for v in vals),
+                ratio_pass_count=sum(v['passes_gate'] for v in ratio),
+                floor_pass_count=sum(v['passes_gate'] for v in vals if v['gate']=='floor'),
+                pass_count=sum(v['passes_gate'] for v in vals))
 
 def impulse_peak(levels):
     x=np.zeros(128); x[0]=1
@@ -395,10 +545,12 @@ def main():
         for f in FOLDS:
           for s in SYMS: rows.append(run_case('fold',rate,tone,f,s))
         print('done',rate,tone,flush=True)
-    practical=[r for r in rows if r['raw']['error_dbfs']>-140 and r['raw']['ref_ac_dbfs']>-120]
-    wanted=[r['meta']['wanted_harmonics_dbfs'] for r in practical]
+    wanted=[r['meta']['wanted_harmonics_dbfs'] for r in rows]
     nonzero=[v for v in wanted if v>-1000]
-    data={'config':dict(N=N,coefficients=[A0,A1],alignment={'raw':0,'adaa':.5,'4x':3.174168,'4x_adaa':3.299168,'8x':4.761252},
+    data={'config':dict(N=N,coefficients=[A0,A1],nyquist='excluded',
+                        gate={'ratio_if_raw_dbfs_above':-100,'required_improvement_db':30,
+                              'otherwise_clean_max_dbfs':-100},
+                        alignment={'raw':0,'adaa':.5,'4x':3.174168,'4x_adaa':3.299168,'8x':4.761252},
                         impulse_peaks={'4x':impulse_peak(2),'8x':impulse_peak(3)}),
           'count':len(rows),'summary':{n:summary(rows,n) for n in ('raw','adaa','4x','4x_adaa','8x')},'rows':rows}
     data['wanted_summary']={'numerical_zero_count':len(wanted)-len(nonzero),
@@ -410,15 +562,15 @@ if __name__=='__main__': main()
 
 ## Reproduction boundary and follow-up
 
-Symbolic identities, arbitrary-precision validation, the eight representative
-ADAA/ideal-4x cases, and the seven difficult ideal 4x/8x/16x cases above ran in
-the authorized offline Wolfram evaluator session `leNwYLgT`.  The 308-case
-actual-coefficient table ran locally in a
-temporary, uncommitted Python harness.  No C++ or tests were changed.
+Symbolic identities and arbitrary-precision validation ran in authorized
+Wolfram session `leNwYLgT`.  The corrected eight-case representative listing
+ran in session `IDL8qnbD`.  The 308-case actual-coefficient table ran locally
+from the Python listing embedded above.  No C++ or tests were changed.
 
 Before `CleanShaper` implementation can begin, a concrete 8x filter must be
-added to the design/plan and tested with the same sweep.  It must simultaneously
-demonstrate: minimum 30.00 dB improvement on the 261-case practical set (or a
-documented stricter set), finite peaks, a preregistered gain bound, and exactly
-one host-sample peak latency.  Until then, the concrete topology decision is
-open and dependent implementation tasks are blocked.
+added to the design/plan and tested with the same sweep.  It must pass all 308
+production gates: at least 30.00 dB improvement in the 253 raw-error-above-floor
+cases and clean error at or below `-100 dBFS` in the 55 floor cases.  It also
+needs finite physical peaks, a preregistered fundamental/projection bound, and
+exactly one host-sample peak latency.  Until then, the concrete topology
+decision is open and dependent implementation tasks are blocked.
