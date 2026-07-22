@@ -1,13 +1,13 @@
 #include <doctest/doctest.h>
 #include <algorithm>
 #include <cmath>
+#include <string>
 #include "dsp/modules.h"
 
 using namespace ms::dsp;
 
 namespace {
-float run_fold(float in, float fold, float sym = 0.0f,
-               const char* quality = nullptr) {
+std::unique_ptr<Module> make_fold(const char* quality = nullptr) {
   const ModuleInfo* info = find_module("fold");
   REQUIRE(info != nullptr);
   auto m = info->create();
@@ -15,6 +15,12 @@ float run_fold(float in, float fold, float sym = 0.0f,
   if (quality)
     cfg.push_back({"quality", ConfigValue{quality, 0, {}, false}});
   m->init(48000.0, cfg);
+  return m;
+}
+
+float run_fold(float in, float fold, float sym = 0.0f,
+               const char* quality = nullptr) {
+  auto m = make_fold(quality);
   const float ins[3] = {in, fold, sym};
   float out[1];
   m->process(ins, out);
@@ -27,8 +33,11 @@ TEST_CASE("fold quality metadata declares raw and clean") {
   REQUIRE(info != nullptr);
   REQUIRE(info->configs.size() == 1);
   CHECK(std::string(info->configs.back().name) == "quality");
-  CHECK(std::string(info->configs.back().enum_vals[0]) == "raw");
-  CHECK(std::string(info->configs.back().enum_vals[1]) == "clean");
+  const char* const* enum_vals = info->configs.back().enum_vals;
+  REQUIRE(enum_vals != nullptr);
+  CHECK(std::string(enum_vals[0]) == "raw");
+  CHECK(std::string(enum_vals[1]) == "clean");
+  CHECK(enum_vals[2] == nullptr);
 }
 
 TEST_CASE("fold quality raw is bit-identical to legacy output") {
@@ -36,6 +45,8 @@ TEST_CASE("fold quality raw is bit-identical to legacy output") {
                               0.25f, 1.5f, 6.0f};
   constexpr float folds[] = {0.0f, 1.0f, 2.0f, 4.0f};
   constexpr float syms[] = {-0.5f, 0.0f, 0.5f};
+  auto missing_module = make_fold();
+  auto raw_module = make_fold("raw");
 
   for (float in : inputs) {
     for (float fold : folds) {
@@ -44,8 +55,13 @@ TEST_CASE("fold quality raw is bit-identical to legacy output") {
         float t = (x + 1.0f) * 0.25f;
         t -= std::floor(t);
         const float expected = 1.0f - 4.0f * std::abs(t - 0.5f);
-        const float missing = run_fold(in, fold, sym);
-        const float raw = run_fold(in, fold, sym, "raw");
+        const float ins[3] = {in, fold, sym};
+        float missing_out[1];
+        float raw_out[1];
+        missing_module->process(ins, missing_out);
+        raw_module->process(ins, raw_out);
+        const float missing = missing_out[0];
+        const float raw = raw_out[0];
         CHECK(missing == raw);
         CHECK(missing == expected);
         CHECK(raw == expected);
