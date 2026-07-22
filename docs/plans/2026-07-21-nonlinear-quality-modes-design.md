@@ -74,10 +74,10 @@ design, or variable-work loops.
 ## State, hot reload, and hostile input
 
 Clean-mode antialiasing and filter histories are migrated in
-`copy_state_from()` when old and new instances use the same quality mode. When
-quality changes, the new graph begins with cleared quality state; the existing
-engine hot-swap crossfade masks that structural change. Raw mode retains no new
-state.
+`copy_state_from()` when old and new instances use compatible quality and curve
+configuration. When quality or drive curve changes, the new graph begins with
+cleared quality state; the existing engine hot-swap crossfade masks that
+structural change. Raw mode retains no new state.
 
 Non-finite audio or parameter inputs must not poison persistent ADAA or filter
 state. Each clean path sanitizes before updating history and must recover on
