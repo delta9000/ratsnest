@@ -5,6 +5,7 @@
 #include <numbers>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 #include "dsp/modules.h"
 
@@ -160,8 +161,13 @@ TEST_CASE("drive clean suppresses the isolated 300 Hz clip alias") {
     const auto clean = render_drive_tone(mode, "clean", 16100.0, 1.0f);
     const double raw_alias = tone_magnitude(raw, 300.0);
     const double clean_alias = tone_magnitude(clean, 300.0);
+    const double raw_fundamental = tone_magnitude(raw, 16100.0);
+    const double clean_fundamental = tone_magnitude(clean, 16100.0);
     REQUIRE(raw_alias > 1.0);
     CHECK(clean_alias < raw_alias * 0.0316227766);  // >= 30 dB
+    // Alias reduction must not come from muting or wildly boosting the tone.
+    CHECK(clean_fundamental > raw_fundamental * 0.5);
+    CHECK(clean_fundamental < raw_fundamental * 2.0);
   }
 }
 
@@ -201,5 +207,48 @@ TEST_CASE("drive clean migrates matching filter state") {
     source->process(ins, source_out);
     resumed->process(ins, resumed_out);
     CHECK(resumed_out[0] == source_out[0]);
+  }
+}
+
+TEST_CASE("drive incompatible quality and mode changes start with clean state") {
+  auto dirty_clean_soft = make_drive("soft", "clean");
+  float ignored[1]{};
+  for (int i = 0; i < 257; ++i) {
+    const float ins[2] = {
+        static_cast<float>(std::sin(0.173 * static_cast<double>(i))), 0.7f};
+    dirty_clean_soft->process(ins, ignored);
+  }
+
+  for (const auto& transition : {
+           std::pair{"soft", "raw"}, std::pair{"hard", "clean"}}) {
+    auto resumed = make_drive(transition.first, transition.second);
+    auto fresh = make_drive(transition.first, transition.second);
+    resumed->copy_state_from(*dirty_clean_soft);
+    for (int i = 0; i < 64; ++i) {
+      const float ins[2] = {
+          static_cast<float>(std::sin(0.191 * static_cast<double>(i))), 0.6f};
+      float resumed_out[1]{};
+      float fresh_out[1]{};
+      resumed->process(ins, resumed_out);
+      fresh->process(ins, fresh_out);
+      CHECK(resumed_out[0] == fresh_out[0]);
+    }
+  }
+
+  auto dirty_raw = make_drive("soft", "raw");
+  for (int i = 0; i < 64; ++i) {
+    const float ins[2] = {0.25f, 1.0f};
+    dirty_raw->process(ins, ignored);
+  }
+  auto resumed_clean = make_drive("soft", "clean");
+  auto fresh_clean = make_drive("soft", "clean");
+  resumed_clean->copy_state_from(*dirty_raw);
+  for (int i = 0; i < 64; ++i) {
+    const float ins[2] = {i == 0 ? 0.1f : 0.0f, 0.0f};
+    float resumed_out[1]{};
+    float fresh_out[1]{};
+    resumed_clean->process(ins, resumed_out);
+    fresh_clean->process(ins, fresh_out);
+    CHECK(resumed_out[0] == fresh_out[0]);
   }
 }

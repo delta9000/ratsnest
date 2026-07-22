@@ -5,6 +5,7 @@
 #include <limits>
 #include <numbers>
 #include <string>
+#include <utility>
 #include <vector>
 #include "dsp/modules.h"
 
@@ -151,8 +152,13 @@ TEST_CASE("fold clean suppresses the 18 kHz folded harmonic") {
   const auto clean = render_fold_tone("clean", 10000.0, 8.0f, 0.0f);
   const double raw_alias = fold_tone_magnitude(raw, 18000.0);
   const double clean_alias = fold_tone_magnitude(clean, 18000.0);
+  const double raw_fundamental = fold_tone_magnitude(raw, 10000.0);
+  const double clean_fundamental = fold_tone_magnitude(clean, 10000.0);
   REQUIRE(raw_alias > 1.0);
   CHECK(clean_alias < raw_alias * 0.0316227766);  // >= 30 dB
+  // Alias reduction must not come from muting or wildly boosting the tone.
+  CHECK(clean_fundamental > raw_fundamental * 0.5);
+  CHECK(clean_fundamental < raw_fundamental * 2.0);
 }
 
 TEST_CASE("fold clean hostile input cannot poison filter state") {
@@ -195,5 +201,47 @@ TEST_CASE("fold clean migrates matching filter and ADAA state") {
     source->process(ins, source_out);
     resumed->process(ins, resumed_out);
     CHECK(resumed_out[0] == source_out[0]);
+  }
+}
+
+TEST_CASE("fold quality changes start with clean state") {
+  auto dirty_clean = make_fold("clean");
+  float ignored[1]{};
+  for (int i = 0; i < 257; ++i) {
+    const float ins[3] = {
+        static_cast<float>(std::sin(0.137 * static_cast<double>(i))),
+        4.0f, 0.25f};
+    dirty_clean->process(ins, ignored);
+  }
+
+  auto resumed_raw = make_fold("raw");
+  auto fresh_raw = make_fold("raw");
+  resumed_raw->copy_state_from(*dirty_clean);
+  for (int i = 0; i < 64; ++i) {
+    const float ins[3] = {
+        static_cast<float>(std::sin(0.157 * static_cast<double>(i))),
+        3.0f, -0.2f};
+    float resumed_out[1]{};
+    float fresh_out[1]{};
+    resumed_raw->process(ins, resumed_out);
+    fresh_raw->process(ins, fresh_out);
+    CHECK(resumed_out[0] == fresh_out[0]);
+  }
+
+  auto dirty_raw = make_fold("raw");
+  for (int i = 0; i < 64; ++i) {
+    const float ins[3] = {0.25f, 8.0f, 0.1f};
+    dirty_raw->process(ins, ignored);
+  }
+  auto resumed_clean = make_fold("clean");
+  auto fresh_clean = make_fold("clean");
+  resumed_clean->copy_state_from(*dirty_raw);
+  for (int i = 0; i < 64; ++i) {
+    const float ins[3] = {i == 0 ? 0.1f : 0.0f, 1.0f, 0.0f};
+    float resumed_out[1]{};
+    float fresh_out[1]{};
+    resumed_clean->process(ins, resumed_out);
+    fresh_clean->process(ins, fresh_out);
+    CHECK(resumed_out[0] == fresh_out[0]);
   }
 }

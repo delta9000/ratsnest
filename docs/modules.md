@@ -200,19 +200,22 @@ Note even `amount: 0.1` is a ~2x boost into the curve; on a full mix that is
 a limiter, not glue. Config `quality` is `raw` (default) or `clean`. Raw is the
 original zero-latency path, including its useful aliasing character. Clean runs
 the same curve through an 8x elliptic oversampler, has a four-sample peak
-latency (0.083 ms at 48 kHz), and costs more CPU. Align parallel raw/clean
-paths manually; the graph does not add hidden delay compensation.
+latency (0.083 ms at 48 kHz), and costs more CPU. Its reconstruction filter can
+ring beyond `+/-1` on transients even though the shaping curve itself is
+bounded, so leave downstream headroom. Align parallel raw/clean paths manually;
+the graph does not add hidden delay compensation.
 
 ## `fold`
 
 `fold { quality: raw }` — inputs `in` 0, non-negative `fold` 1, symmetry offset
-`sym` 0; output `out` folded into `-1..1`. Config `quality` is `raw` (default)
-or `clean`. Raw preserves the original zero-latency corner-rich character.
-Clean combines first-order antiderivative antialiasing with 8x elliptic
+`sym` 0; output `out` nominally folded into `-1..1`. Config `quality` is `raw`
+(default) or `clean`. Raw preserves the original zero-latency corner-rich
+character. Clean combines first-order antiderivative antialiasing with 8x elliptic
 oversampling and has a four-sample peak latency (0.083 ms at 48 kHz). It is the
 more CPU-intensive option and is intended for exposed or high-frequency folds.
-Align parallel paths manually. Best paired with a triangle oscillator and
-modulated fold.
+Its reconstruction filter can overshoot the nominal range on transients; leave
+downstream headroom. Align parallel paths manually. Best paired with a triangle
+oscillator and modulated fold.
 
 ## `sh`
 

@@ -35,6 +35,11 @@ fold-8 case initially motivated a 16x trial, but production 8x+ADAA was both
 cheaper and stronger: its isolated 18 kHz alias fell from 3084.04 to 2.01678
 (63.69 dB) while preserving the four-sample peak.
 
+The checked-in C++ spectral regressions also bound the wanted fundamental to
+0.5x--2x the raw magnitude, preventing a falsely clean result obtained by
+muting or wildly boosting the test tone. The broader 308-case reference sweep
+below remains offline design evidence rather than an executable unit-test claim.
+
 A 2026-07-21 GCC `-O3` single-thread microbenchmark on the development machine
 measured about 8 ns/sample for raw soft drive, 6 ns/sample for raw fold,
 329 ns/sample for clean soft drive, and 248 ns/sample for clean fold. At

@@ -41,12 +41,14 @@ Raw processing remains the exact current formula and has zero latency. This is
 a compatibility contract enforced by sample-for-sample tests, including when
 the `quality` config is absent.
 
-Clean processing preserves the same nominal transfer curve and signal range,
-but may use a different numerical realization. It has exactly four host samples
-of latency. Because clean mode is explicit and latency-bearing processing
-already exists in `clipper` and `limiter`, no global delay compensation is
-added. The latency is documented so parallel paths remain an intentional patch
-decision.
+Clean processing preserves the same nominal transfer curve and nominal signal
+range, but may use a different numerical realization. The causal reconstruction
+filter can ring beyond the curve's `+/-1` bounds on transients, so clean paths
+require downstream headroom and are not brick-wall limiters. It has exactly four
+host samples of peak latency. Because clean mode is explicit and latency-bearing
+processing already exists in `clipper` and `limiter`, no global delay
+compensation is added. The latency is documented so parallel paths remain an
+intentional patch decision.
 
 ## DSP architecture
 
@@ -84,8 +86,8 @@ by the modules' documented contracts.
 
 ## Objective quality gates
 
-Tests compare the C++ output with a high-rate Wolfram reference that is
-low-pass filtered before decimation. The sweep covers:
+Offline evaluation compared candidate output with a high-rate Wolfram reference
+that was low-pass filtered before decimation. That 308-case design sweep covered:
 
 - 48 and 96 kHz host rates;
 - coherent tones from the low register through 10 kHz;
@@ -100,10 +102,11 @@ Acceptance criteria:
   implementation;
 - clean output has an impulse-response peak at exactly four host samples;
 - clean output matches the nominal static transfer curve after latency;
-- across the preregistered difficult cases, clean reduces the phase-invariant
-  in-band spectral residual by at least 30 dB versus raw;
-- the complete 308-case sweep reports both relative improvement and absolute
-  residual rather than demanding a large ratio when raw is already quiet;
+- checked-in C++ regressions reduce isolated difficult alias bins by at least
+  30 dB while retaining the wanted fundamental within a 0.5x--2x guardrail;
+- the offline 308-case candidate sweep reports both relative improvement and
+  absolute residual rather than demanding a large ratio when raw is already
+  quiet;
 - no unexpected DC, instability, or non-finite output;
 - every module instance remains comfortably realtime in representative patch
   benchmarks.
