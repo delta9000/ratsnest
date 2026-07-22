@@ -305,7 +305,7 @@ and gate passes cover all cases.
 
 The separate fidelity and transfer diagnostics are:
 
-| Candidate | Max fidelity error | Max abs fundamental magnitude | Max abs fundamental phase | Max abs projection | Physical peak |
+| Candidate | Max fidelity error | Max abs fundamental magnitude | Max abs fundamental phase | Max abs projection (dB) | Physical peak |
 |---|---:|---:|---:|---:|---:|
 | 1x raw | -4.58 dBFS | 13.09 dB | 0.00 deg | 13.09 dB | 1.000 |
 | 1x ADAA | -10.97 dBFS | 7.51 dB | 0.00 deg | 19.16 dB | 1.000 |
@@ -322,7 +322,7 @@ The worst ratio-gated case for actual 4x and extended 8x is soft at 48 kHz,
 `-90.84 dBFS` (-1.20 dB improvement) and extended 8x is `-89.00 dBFS`
 (-3.04 dB).  Absolute extended-8x alias error reaches `-7.95 dBFS` for fold 8,
 10 kHz at 48 kHz.  The existing cascade therefore fails the primary magnitude
-gate as well as the latency and fidelity gates.
+and latency gates, with poor fidelity diagnostics as shown separately above.
 
 Exact-Nyquist exclusion changed alias error by more than 0.005 dB in 108 raw,
 91 ADAA, 86 actual-4x, 102 actual-4x+ADAA, and 108 extended-8x cases.  Maximum
