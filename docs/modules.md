@@ -137,7 +137,8 @@ linear `fm`, `pw`, `pwm`, rising-edge `sync`; output `out`. Waves: `sine`,
 `tri`, `saw`, `pulse`. `+1` v/oct doubles pitch. Free-running triangle, saw,
 and pulse morph between shared Fourier-series tables whose highest partial
 stays below Nyquist; hard sync still creates an arbitrary discontinuity and
-can alias.
+can alias. The saw's Fourier reconstruction has brief Gibbs peaks up to about
+`+/-1.2`; leave headroom downstream if it must reach the live device unclipped.
 A band-limited pulse has brief Gibbs ringing up to about `+/-1.3`, and at
 `pw != 0.5` carries a DC offset of about `2 * pw - 1` that low-pass filters
 (`svf.lp`, `ladder`) pass straight through. Keep `pw` at `0.5` or block DC
