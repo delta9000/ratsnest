@@ -1,12 +1,12 @@
 (* Reproduce the clean nonlinear oversampling filters. Wolfram Language 14.x. *)
 ClearAll[design, sos, roundTripImpulse];
 
-design[wp0_, ws0_] := Module[{s, wp, ws, analog},
+design[wp0_, ws0_, stopDb_] := Module[{s, wp, ws, analog},
   wp = N[wp0, 60];
   ws = N[ws0, 60];
   analog = EllipticFilterModel[
     {"Lowpass", {2 Tan[wp Pi/2], 2 Tan[ws Pi/2]},
-     {N[1/1000, 60], 80}}, s];
+     {N[1/1000, 60], stopDb}}, s];
   ToDiscreteTimeModel[analog, 1, Method -> "BilinearTransform"]
 ];
 
@@ -29,8 +29,8 @@ roundTripImpulse[filter_, rate_] := Module[{input, up, down},
   {First@Ordering[Abs[down], -1] - 1, Max[Abs[down]]}
 ];
 
-filter8x = design[12/100, 145/1000];
-filter16x = design[6/100, 725/10000];
+filter8x = design[12/100, 145/1000, 80];
+filter16x = design[6/100, 73/1000, 84];
 
 <|
   "8xSOS" -> sos[filter8x],

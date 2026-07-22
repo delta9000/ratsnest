@@ -17,8 +17,8 @@ struct SosCoefficients {
 
 // Wolfram-generated, DC-normalized elliptic lowpasses. See
 // tools/design_nonlinear_filters.wls. Each design has 0.001 dB passband ripple
-// and 80 dB stopband attenuation. Cascaded SOS avoid the numerical fragility
-// of a twelfth-order direct form.
+// and 80 dB (8x) or 84 dB (16x) stopband attenuation. Cascaded SOS avoid the
+// numerical fragility of a twelfth-order direct form.
 inline constexpr std::array<SosCoefficients, 6> kSos8x{{
     {0.2533872483f, -0.4593270850f, 0.2533872483f,
      -1.5887756410f, 0.6362230525f},
@@ -35,18 +35,18 @@ inline constexpr std::array<SosCoefficients, 6> kSos8x{{
 }};
 
 inline constexpr std::array<SosCoefficients, 6> kSos16x{{
-    {0.2718111148f, -0.5306667147f, 0.2718111148f,
-     -1.7865947867f, 0.7995503016f},
-    {0.3734373990f, -0.7277758745f, 0.3734373990f,
-     -1.8249219646f, 0.8440208882f},
-    {0.4389977100f, -0.8512781635f, 0.4389977100f,
-     -1.8729188004f, 0.8996360568f},
-    {0.3723882352f, -0.7122361894f, 0.3723882352f,
-     -1.9108206957f, 0.9433609765f},
-    {0.1947845860f, -0.3535290893f, 0.1947845860f,
-     -1.9362519539f, 0.9722920366f},
-    {0.0343011967f, -0.0308819348f, 0.0343011967f,
-     -1.9540469781f, 0.9917674366f},
+    {0.2489139855f, -0.4855093658f, 0.2489139855f,
+     -1.7916404517f, 0.8039590345f},
+    {0.3447114638f, -0.6710457802f, 0.3447114638f,
+     -1.8265398589f, 0.8449169961f},
+    {0.4085455176f, -0.7909739017f, 0.4085455176f,
+     -1.8716519487f, 0.8977691610f},
+    {0.3476102355f, -0.6629841924f, 0.3476102355f,
+     -1.9086788254f, 0.9409150755f},
+    {0.1817476925f, -0.3274743259f, 0.1817476925f,
+     -1.9345228590f, 0.9705439242f},
+    {0.0325239304f, -0.0271760225f, 0.0325239304f,
+     -1.9532809811f, 0.9911527877f},
 }};
 
 template <int Rate>
@@ -111,12 +111,18 @@ class NonlinearOversampler {
 
   template <typename Shape>
   float process(float x, Shape&& shape) {
+    return process_phase<0>(x, static_cast<Shape&&>(shape));
+  }
+
+  template <int OutputPhase, typename Shape>
+  float process_phase(float x, Shape&& shape) {
+    static_assert(OutputPhase >= 0 && OutputPhase < Rate);
     float output = 0.0f;
     for (int phase = 0; phase < Rate; ++phase) {
       const float sparse = phase == 0 ? x * static_cast<float>(Rate) : 0.0f;
       const float high_rate = interpolator_.process(sparse);
       const float filtered = reconstructor_.process(shape(high_rate));
-      if (phase == 0) output = filtered;
+      if (phase == OutputPhase) output = filtered;
     }
     return output;
   }
