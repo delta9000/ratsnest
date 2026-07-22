@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add explicit per-module `raw` and one-sample-latency `clean` quality modes to `drive` and `fold`, preserving legacy output exactly while reducing representative in-band alias error by at least 30 dB.
+**Goal:** Add explicit per-module `raw` and four-sample-latency `clean` quality modes to `drive` and `fold`, preserving legacy output exactly while reducing difficult representative in-band alias error by at least 30 dB.
 
-**Architecture:** Keep the existing formulas as an untouched raw branch selected once from config. Build the clean branch from a shared first-order ADAA curve core inside the existing 4x polyphase oversampling round trip, with curve-specific analytic antiderivatives for `tanh`, hard clip, and the periodic fold. Use Wolfram Language offline to validate the fold antiderivative, measure candidate spectra, and record the acceptance thresholds; C++ remains dependency-free and realtime-safe.
+**Architecture:** Keep the existing formulas as an untouched raw branch selected once from config. This original plan's Tasks 3 onward are superseded by `docs/plans/2026-07-21-four-sample-nonlinear-clean.md`, after measurement rejected the legacy oversampler and the user approved a four-sample budget.
 
 **Tech Stack:** C++20, doctest, existing `Oversampler4x`/`Decimator4x`, existing ADAA `waveshape::Shaper`, Wolfram Language as an offline numerical oracle, CMake/mise.
 

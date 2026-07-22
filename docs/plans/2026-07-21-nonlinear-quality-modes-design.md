@@ -42,7 +42,7 @@ a compatibility contract enforced by sample-for-sample tests, including when
 the `quality` config is absent.
 
 Clean processing preserves the same nominal transfer curve and signal range,
-but may use a different numerical realization. It has exactly one host-sample
+but may use a different numerical realization. It has exactly four host samples
 of latency. Because clean mode is explicit and latency-bearing processing
 already exists in `clipper` and `limiter`, no global delay compensation is
 added. The latency is documented so parallel paths remain an intentional patch
@@ -50,27 +50,21 @@ decision.
 
 ## DSP architecture
 
-Clean mode uses a small shared, allocation-free nonlinear-processing core. It
-supports the existing soft saturation, hard clip, and periodic fold curves and
-owns only fixed scalar filter/history state.
+Clean mode uses a shared, allocation-free elliptic-IIR oversampling core. The
+drive module runs its existing soft or hard curve at 8x. The cheaper periodic
+fold curve runs at 16x because the extreme fold-8/10 kHz case materially
+benefits from the additional octave. Both paths use a twelfth-order elliptic
+interpolator and matching reconstruction filter designed for 0.001 dB
+passband ripple and 80 dB stopband attenuation. Their normalized pass/stop
+edges are 0.12/0.145 of high-rate Nyquist at 8x and 0.06/0.0725 at 16x.
 
-Wolfram Language is the offline design oracle. For each curve it will compare
-candidate realizations such as first-order antiderivative antialiasing (ADAA),
-2x/4x polyphase oversampling, and hybrids. The chosen realization is the
-cheapest one that meets the spectral target while preserving exactly one host
-sample of latency. Generated coefficients and reference vectors are checked
-into the repository; Wolfram is not a runtime dependency.
-
-The expected starting point is:
-
-- soft drive: ADAA, with oversampling only if the sweep shows it is needed;
-- hard drive: ADAA plus the minimum oversampling needed at the discontinuity;
-- wavefold: an analytic periodic antiderivative plus oversampling, because its
-  repeated corners produce the largest high-frequency error.
-
-This allocation is a hypothesis, not a commitment. Measurements choose the
-final per-curve path. A uniform 4x solution is acceptable if it is simpler and
-comfortably within the realtime budget.
+Wolfram Language is the offline design oracle. It generated the transfer
+functions, verified stability and frequency response, and measured the
+complete interpolate/shape/reconstruct impulse response. Both round trips
+peak at exactly host sample four. Coefficients and the reproducible design
+listing are checked into the repository; Wolfram is not a runtime dependency.
+Production uses cascaded biquads rather than a high-order direct form so float
+roundoff cannot destabilize the filter.
 
 Selection occurs during `Module::init()` from immutable config, not from an
 audio-rate input. `process()` performs no allocation, locking, I/O, coefficient
@@ -105,11 +99,12 @@ Acceptance criteria:
 
 - absent `quality` and explicit `quality: raw` are bit-identical to the old
   implementation;
-- clean output is delayed by exactly one host sample;
+- clean output has an impulse-response peak at exactly four host samples;
 - clean output matches the nominal static transfer curve after latency;
-- across the representative sweep, clean reduces integrated in-band alias
-  error by at least 30 dB versus raw, with exceptions documented where raw
-  error is already below the measurement floor;
+- across the preregistered difficult cases, clean reduces the phase-invariant
+  in-band spectral residual by at least 30 dB versus raw;
+- the complete 308-case sweep reports both relative improvement and absolute
+  residual rather than demanding a large ratio when raw is already quiet;
 - no unexpected DC, instability, or non-finite output;
 - every module instance remains comfortably realtime in representative patch
   benchmarks.

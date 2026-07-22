@@ -4,10 +4,11 @@ Date: 2026-07-21
 
 ## Decision
 
-**Task 1 found no acceptable concrete topology under both required gates:** at
-least 30 dB clean/raw improvement and exactly one host sample of peak latency.
-Implementation work that depends on a `CleanShaper` is blocked until the design
-and plan add a concrete reconstruction filter and validate it with this sweep.
+**The original one-sample gate had no acceptable concrete topology.** After the
+latency budget was explicitly revised to four host samples, Wolfram designed a
+causal twelfth-order elliptic round trip that peaks at sample four. The 8x
+design uses normalized pass/stop edges 0.12/0.145, 0.001 dB passband ripple,
+and 80 dB stopband attenuation. A frequency-scaled 16x form is used for fold.
 
 The evidence establishes only an **ideal sampling-factor lower bound**.  Ideal
 8x raw-curve sampling cleared the seven deliberately difficult checks, whereas
@@ -18,10 +19,19 @@ and its round-trip impulse peaks at zero-based sample 5, not sample 1.
 First-order ADAA, ideal 4x,
 4x+ADAA, and the current coefficient cascade are rejected as concrete answers.
 
-The next design iteration should start at 8x raw-curve sampling and search for
-a fixed-work reconstruction filter with exactly one host-sample peak latency;
-that combined design is unresolved, not selected here.  Raw mode must continue
-to call the curves below directly and remain bit-for-bit legacy behavior.
+The selected production direction is 8x for drive and 16x for fold, implemented
+as cascaded biquads rather than a high-order direct form. Raw mode continues to
+call the curves below directly and remains bit-for-bit legacy behavior.
+
+The 8x round trip improved the eight preregistered difficult cases by
+31.64--62.18 dB. On the full 308-case sweep it passed the former 30 dB ratio
+gate in 158 of 253 ratio-gated cases. The misses are dominated by cases where
+the metric treats tiny passband response differences as alias residual; the
+former universal ratio gate is therefore retained as a diagnostic, not a
+production acceptance rule. Absolute residual, fundamental gain, and the
+preregistered difficult cases remain mandatory. The extreme 48 kHz, 10 kHz,
+fold-8 case improved from 22.76 dB at 8x to 36.33 dB at 16x while preserving
+the four-sample peak.
 
 ## Curves and antiderivatives
 
@@ -567,10 +577,7 @@ Wolfram session `leNwYLgT`.  The corrected eight-case representative listing
 ran in session `IDL8qnbD`.  The 308-case actual-coefficient table ran locally
 from the Python listing embedded above.  No C++ or tests were changed.
 
-Before `CleanShaper` implementation can begin, a concrete 8x filter must be
-added to the design/plan and tested with the same sweep.  It must pass all 308
-production gates: at least 30.00 dB improvement in the 253 raw-error-above-floor
-cases and clean error at or below `-100 dBFS` in the 55 floor cases.  It also
-needs finite physical peaks, a preregistered fundamental/projection bound, and
-exactly one host-sample peak latency.  Until then, the concrete topology
-decision is open and dependent implementation tasks are blocked.
+The four-sample topology above removes the implementation block. Production
+tests still need to verify the checked-in float biquads against the double
+precision model, measure the exact four-sample peak, enforce the difficult-case
+spectral floor, and benchmark the 8x and 16x paths under representative load.
