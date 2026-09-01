@@ -77,6 +77,12 @@ Cables sum onto input bases. Two classic self-owns:
 - `tempo.seconds -> dly.time` with the default `time: 0.4` base gives a
   0.75 s delay, not a dotted 8th. Write `delay { time: 0ms }` and let the
   tempo module own the input outright.
+- **`math`'s `b` input defaults to 1, not 0.** `math { op: add }` with
+  `contour -> m.b` adds `1 + contour` -- the whole line comes out an octave
+  high, in tune, and sounds like a voicing choice rather than a bug. Write
+  `math { op: add, b: 0 }` and let the cable own the input. (By the same
+  arithmetic, the `1 -> m.b` octave-lift idiom in `mainstage` lands two
+  octaves up, not one.)
 - Filter cutoff is `base + env + LFO + ...` — the config value is the
   *floor* of the sweep, not the sweep amount. Set the base to the darkest
   sound you want and scale the env cables up from there.
@@ -132,6 +138,14 @@ the flat ones:
   has no avoid notes over an i–VI–III–VII cadence ("big, dumb, correct" —
   `ion.patch`). If the phrase isn't pentatonic, use the chord-tracking
   switch contour instead (`halcyon.patch` explains the clash math).
+- **An accent lane is not a fader.** The kit subs take `accent` (per-hit
+  dynamics) and `trig`; neither sets how loud the channel is. Driving only
+  `accent` from an arrangement lane makes a drum play at full mixer level
+  the instant it is gated on, so "the kick arrives" and "everything is here"
+  measure the same in `--stats` -- verified: two sections designed 15 dB
+  apart came back 0.4 dB apart. Put the lane on `mix.lvlN` as well, with the
+  config `levels` entry as the floor. (A tight glue comp hides the mistake
+  further; loosen the master before concluding the arrangement is wrong.)
 - **Euclid density is an automation target.** `lane -> euclid.hits : 7`
   thickens hats/rolls/arps into a drop; `lane -> func.fall : 0.03` opens
   hat decays; a glacial LFO into `euclid.rot` rotates a pattern over

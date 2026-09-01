@@ -45,10 +45,10 @@ filt  -> saw_amp.in
 level -> saw_amp.cv : 0.8
 
 # --- the half that never moves ---
-sine = vco { freq: sub_freq, wave: sine }
-voct -> sine.v_oct
+sine_osc = vco { freq: sub_freq, wave: sine }
+voct -> sine_osc.v_oct
 sub_lp = ladder { cutoff: sub_cut, res: 0.1, drive: 0.2 }
-sine -> sub_lp.in
+sine_osc -> sub_lp.in
 sub_amp = vca { gain: 0 }
 sub_lp -> sub_amp.in
 level  -> sub_amp.cv : 0.7
