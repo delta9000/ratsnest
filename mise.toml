@@ -41,7 +41,7 @@ depends = ["build"]
 run = "./build/ratsnest check"
 
 [tasks.render]
-description = "Render a patch to WAV offline. Usage: mise run render -- patches/first.patch -d 10s -o take.wav"
+description = "Render a patch to WAV offline. Usage: mise run render -- patches/first.patch -d 10s -o take.wav (also --start Ns)"
 depends = ["build"]
 run = "./build/ratsnest render"
 

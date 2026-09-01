@@ -32,7 +32,8 @@ int usage() {
   std::fprintf(stderr,
       "usage:\n"
       "  ratsnest check  <patch>\n"
-      "  ratsnest render <patch> [-d <seconds|Ns>] [-o <out.wav>] [--rate <hz>] [--stats [Ns]]\n"
+      "  ratsnest render <patch> [-d <seconds|Ns>] [--start <seconds|Ns>] [-o <out.wav>]\n"
+      "                          [--rate <hz>] [--stats [Ns]]\n"
       "  ratsnest play   <patch> [--latency <N/RATE>] [--rate <hz>] [--watch <mod[.port]>]\n");
   return 2;
 }
@@ -277,12 +278,13 @@ int main(int argc, char** argv) {
   }
 
   if (cmd == "render") {
-    double seconds = 10.0, rate = 48000.0;
+    double seconds = 10.0, rate = 48000.0, start_sec = 0.0;
     std::string out_path = "out.wav";
     double stats_window = 0.0;  // 0 = no stats
     for (int i = 3; i < argc; ++i) {
       if (!std::strcmp(argv[i], "-d") && i + 1 < argc) seconds = parse_duration(argv[++i]);
       else if (!std::strcmp(argv[i], "-o") && i + 1 < argc) out_path = argv[++i];
+      else if (!std::strcmp(argv[i], "--start") && i + 1 < argc) start_sec = parse_duration(argv[++i]);
       else if (!std::strcmp(argv[i], "--rate") && i + 1 < argc) rate = std::atof(argv[++i]);
       else if (!std::strcmp(argv[i], "--stats")) {
         stats_window = 10.0;
@@ -292,15 +294,30 @@ int main(int argc, char** argv) {
       else return usage();
     }
     if (seconds <= 0.0) { std::fprintf(stderr, "error: duration must be positive\n"); return 2; }
+    if (start_sec < 0.0) { std::fprintf(stderr, "error: --start must not be negative\n"); return 2; }
 
     auto g = load(patch, rate);
     if (!g) return 1;
     ms::engine::Engine engine(std::move(g));
 
     const size_t frames = static_cast<size_t>(seconds * rate);
+    const size_t skip = static_cast<size_t>(start_sec * rate);
     std::vector<float> l(frames), r(frames), interleaved(frames * 2);
     // Decaying filter tails hit denormals; match the PipeWire thread's FTZ.
     ms::rt::flush_denormals_on_this_thread();
+    // A stateful graph has no seek: --start runs it from zero and discards the
+    // skipped samples. Block size cannot change the result (Engine::process is
+    // per-sample; tests/test_integration.cpp pins it), so chunk the discard
+    // instead of allocating a buffer for it.
+    if (skip > 0) {
+      constexpr size_t kChunk = 4096;
+      std::vector<float> sl(kChunk), sr(kChunk);
+      for (size_t done = 0; done < skip;) {
+        const size_t n = std::min(kChunk, skip - done);
+        engine.process(sl.data(), sr.data(), n);
+        done += n;
+      }
+    }
     engine.process(l.data(), r.data(), frames);
     for (size_t i = 0; i < frames; ++i) {
       interleaved[2 * i] = l[i];
@@ -311,7 +328,10 @@ int main(int argc, char** argv) {
       std::fprintf(stderr, "error: cannot write '%s'\n", out_path.c_str());
       return 1;
     }
-    std::printf("rendered %.1fs -> %s\n", seconds, out_path.c_str());
+    if (skip > 0)
+      std::printf("rendered %.1fs from %.1fs -> %s\n", seconds, start_sec, out_path.c_str());
+    else
+      std::printf("rendered %.1fs -> %s\n", seconds, out_path.c_str());
 
     if (stats_window > 0.0) {
       auto db = [](double v) { return 20.0 * std::log10(std::max(v, 1e-12)); };
@@ -339,7 +359,8 @@ int main(int argc, char** argv) {
         const int fill = static_cast<int>(std::clamp((wrms + 60.0) / 60.0, 0.0, 1.0) * 20.0);
         for (int i = 0; i < fill; ++i) bar[static_cast<size_t>(i)] = '#';
         std::printf("%7.1fs  rms %6.1f  peak %6.1f  |%s|\n",
-                    static_cast<double>(start) / rate, wrms, db(wpeak), bar.c_str());
+                    start_sec + static_cast<double>(start) / rate, wrms, db(wpeak),
+                    bar.c_str());
       }
     }
     return 0;

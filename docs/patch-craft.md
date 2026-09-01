@@ -24,6 +24,15 @@ your ears — a per-window peak/RMS timeline that validates almost everything:
 Iterate on numbers, not vibes: change a level, re-render, re-read the
 timeline. Two or three iterations converges.
 
+`--start Ns` captures a later window (`--start 10m -d 60s`) and reports
+absolute offsets, but it does **not** skip the work: the graph is stateful,
+so it still runs from zero. For a song-length patch the cheap probe is to
+divide the arrangement grid instead — drop the divisor that clocks the
+tracker lanes by 10-15x and the whole form plays in a minute. That verifies
+section boundaries, lane crossfades and grid wrap; it does *not* verify
+anything with a real time constant (reverb tails, multi-second `func` slews,
+tempo ramps, granular freeze windows), which still needs a full pass.
+
 ## Arrangement grid semantics (probed, not documented)
 
 A stepseq clocked by the div chain plays **step 0 at t=0** — there is no

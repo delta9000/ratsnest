@@ -42,7 +42,16 @@ mise run render -- patches/first.patch -d 10s -o take.wav
 ```
 
 Renders 10 seconds of `patches/first.patch` to `take.wav`, no audio device
-needed.
+needed. `--start` captures a window from further in:
+
+```sh
+mise run render -- patches/longwave/4-lydian.patch --start 10m -d 60s --stats 10s
+```
+
+A stateful graph has no seek, so `--start` runs the patch from zero and
+discards the skipped samples — it costs the same time as rendering the whole
+span, but writes only the window you asked for, and `--stats` still reports
+absolute piece time.
 
 ### Play a patch live
 
