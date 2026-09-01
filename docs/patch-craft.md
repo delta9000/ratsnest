@@ -92,6 +92,14 @@ Offsets are bare fractions: `0.25 -> osc.v_oct` is up a minor third from
 whatever the pitch input carries — there is no note-name form for
 intervals.
 
+**The note letter must be uppercase, and a lowercase one fails silently.**
+`D2v` is a note; `d2v` is not, and it does not raise — it reads as `0.0`,
+so every voice sits at its oscillator's base frequency and the patch renders
+plausible-sounding nonsense. (Probed: a `stepseq { steps: [d2v, ...] }` puts
+out flat zero, the same patch with `D2v` puts out −1.58.) This is why
+identifiers must stay lowercase — the two namespaces are told apart by case
+alone.
+
 ## Free-ringing voices ghost; ADSR voices don't
 
 `string`, `lpg`, and `modal` ring after their trigger. If an arrangement

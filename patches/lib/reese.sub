@@ -1,0 +1,71 @@
+# reese.sub -- split bass: a pure sine sub that never moves, and a detuned
+# saw pair above it that does all the modulating.
+#
+# Extracted by copy from `nightbus.patch` (the discipline) and
+# `mainstage.patch` (the voicing); both still carry their own inline copies.
+# The rule is the point: nothing touches the sine -- no detune, no filter
+# sweep, no drive -- so 30-100 Hz stays solid however hard the saws move.
+# `sub_out` and `saw_out` come out separately so the movement can duck them
+# at different depths; `main` is the pre-balanced sum for when it need not.
+
+sub_freq  = param { default: 110hz }
+saw_freq  = param { default: 220hz }
+detune    = param { default: 0.006 }
+saw_cut   = param { default: 240 }
+saw_res   = param { default: 0.16 }
+saw_drive = param { default: 0.7 }
+sub_cut   = param { default: 120 }
+motion_hz = param { default: 0.07hz }
+
+voct    = input {}
+level   = input {}
+cut_mod = input {}
+main    = output {}
+sub_out = output {}
+saw_out = output {}
+
+# --- the moving half ---
+saw_a = vco { freq: saw_freq, wave: saw }
+saw_b = vco { freq: saw_freq, wave: saw }
+voct -> saw_a.v_oct
+voct -> saw_b.v_oct
+drift = lfo { freq: 0.05hz, wave: tri }
+drift -> saw_b.v_oct : detune
+
+filt = ladder { cutoff: saw_cut, res: saw_res, drive: saw_drive }
+saw_a -> filt.in : 0.5
+saw_b -> filt.in : 0.5
+motion = lfo { freq: motion_hz, wave: tri }
+motion  -> filt.cutoff : 80
+cut_mod -> filt.cutoff
+level   -> filt.cutoff : 220
+
+saw_amp = vca { gain: 0, response: exp }
+filt  -> saw_amp.in
+level -> saw_amp.cv : 0.8
+
+# --- the half that never moves ---
+sine = vco { freq: sub_freq, wave: sine }
+voct -> sine.v_oct
+sub_lp = ladder { cutoff: sub_cut, res: 0.1, drive: 0.2 }
+sine -> sub_lp.in
+sub_amp = vca { gain: 0 }
+sub_lp -> sub_amp.in
+level  -> sub_amp.cv : 0.7
+
+saw_amp -> saw_out.in
+sub_amp -> sub_out.in
+saw_amp -> main.in : 0.55
+sub_amp -> main.in : 0.75
+
+# Audition: `mise run play -- patches/lib/reese.sub` -- a two-bar root
+# movement in D so the split is audible: the sub holds while the saws snarl.
+demo.clk = clock { bpm: 63 }
+demo.seq = stepseq { steps: [D2v, D2v, F2v, C2v] }
+demo.clk -> demo.seq.clock
+demo.seq.cv -> voct
+demo.lvl = func { rise: 0.06, fall: 0.3 }
+demo.clk -> demo.lvl.in
+0.9 -> demo.lvl.in
+demo.lvl -> level
+main -> demo.out.in : 0.45

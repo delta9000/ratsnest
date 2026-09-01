@@ -856,3 +856,28 @@ bern.a -> chat.accent        # per-hit dynamics from any 0..1 source (cabling ac
 ```
 
 Full groove: `patches/kit.patch`.
+
+### Song subpatches (`lib/master-chain.sub`, `lib/tape-echo.sub`, `lib/reese.sub`)
+
+Three shared voices for song-length patches, extracted by copy from
+`mainstage`, `antigravity-dub` and `nightbus` (which still carry their own
+inline versions — the duplication is deliberate, not an oversight).
+
+```text
+room = sub { file: "lib/tape-echo.sub", verb_decay: 0.9 }
+bpm_lane -> room.bpm          # echoes follow a clock that ramps
+bass = sub { file: "lib/reese.sub", saw_cut: 300 }
+mast = sub { file: "lib/master-chain.sub", ceiling: -0.4 }
+kick_drive -> mast.side_l     # external sidechain: unpatched = no pump
+mast.l -> out.left
+mast.r -> out.right
+```
+
+`master-chain.sub` is the full `dcblock -> eq -> glue comp -> stereo -> clip
+-> limiter` bus and owns the ceiling (never scale it again with `out.level`).
+`tape-echo.sub` is the dub room — dotted-eighth and dotted-quarter echoes, a
+phase sweep on the long return, and a plate fed by both; its `bpm` is an
+input so delay times track a tempo ramp. `reese.sub` keeps the split-bass
+discipline: the sine sub is untouched by every modulation the saws receive,
+and `sub_out`/`saw_out` come out separately so they can be ducked at
+different depths.

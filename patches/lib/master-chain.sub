@@ -1,0 +1,96 @@
+# master-chain.sub -- the mastering bus, as one instance:
+# DC block -> parametric EQ -> kick-sidechain glue compressor -> stereo
+# width -> soft clip -> brickwall limit.
+#
+# Extracted by copy from `mainstage.patch`, which still carries its own inline
+# copy (they are not yet unified -- do that deliberately, not as a side effect).
+# Defaults are the calibration numbers in `docs/patch-craft.md`: premaster peak
+# near -3 dBFS in, +3 dB glue makeup, 6.5 dB clipper drive at a 0.32 parallel
+# mix, -0.4 dBFS ceiling. Let the limiter own the ceiling -- never scale it
+# again with `out.level`.
+#
+# The compressor's sidechain is EXTERNAL: patch the saturated kick into
+# `side_l`/`side_r` or the detector reads silence and the bus never pumps.
+
+hp_freq    = param { default: 28 }
+low_freq   = param { default: 100 }
+low_gain   = param { default: -0.5 }
+mid1_freq  = param { default: 380 }
+mid1_gain  = param { default: -1.2 }
+mid1_q     = param { default: 0.9 }
+mid2_freq  = param { default: 3400 }
+mid2_gain  = param { default: 0.7 }
+mid2_q     = param { default: 0.8 }
+high_freq  = param { default: 10000 }
+high_gain  = param { default: 0.8 }
+comp_thr   = param { default: -16 }
+comp_ratio = param { default: 2.4 }
+comp_makeup= param { default: 3.0 }
+comp_blend = param { default: 0.85 }
+width      = param { default: 1.15 }
+clip_drive = param { default: 6.5 }
+clip_blend = param { default: 0.32 }
+ceiling    = param { default: -0.4 }
+
+in_l   = input {}
+in_r   = input {}
+side_l = input {}
+side_r = input {}
+l = output {}
+r = output {}
+
+dc = dcblock { cutoff: 12hz }
+in_l -> dc.in_l
+in_r -> dc.in_r
+
+tone = eq { hp_freq: hp_freq, low_freq: low_freq, low_gain: low_gain,
+            mid1_freq: mid1_freq, mid1_gain: mid1_gain, mid1_q: mid1_q,
+            mid2_freq: mid2_freq, mid2_gain: mid2_gain, mid2_q: mid2_q,
+            high_freq: high_freq, high_gain: high_gain }
+dc.out_l -> tone.in_l
+dc.out_r -> tone.in_r
+
+glue = compressor { sidechain: external, threshold: comp_thr,
+                    ratio: comp_ratio, knee: 5, attack: 0.012,
+                    release: 0.14, makeup: comp_makeup, mix: comp_blend }
+tone.out_l -> glue.in_l
+tone.out_r -> glue.in_r
+side_l -> glue.side_l
+side_r -> glue.side_r
+
+field = stereo { width: width, balance: 0 }
+glue.out_l -> field.in_l
+glue.out_r -> field.in_r
+
+clip = clipper { mode: soft, threshold: -2.5, drive: clip_drive, mix: clip_blend }
+field.out_l -> clip.in_l
+field.out_r -> clip.in_r
+
+brick = limiter { threshold: ceiling, release: 0.07 }
+clip.out_l -> brick.in_l
+clip.out_r -> brick.in_r
+
+brick.out_l -> l.in
+brick.out_r -> r.in
+
+# Audition: `mise run play -- patches/lib/master-chain.sub` -- a saw bed and a
+# kick, so the pump is audible and the ceiling is real.
+demo.clk  = clock { bpm: 120 }
+demo.beat = div { by: 2 }
+demo.clk -> demo.beat.in
+demo.kenv = func { rise: 0.001, fall: 0.16, curve: exp }
+demo.beat -> demo.kenv.trig
+demo.kosc = vco { freq: 52hz, wave: sine }
+demo.kenv -> demo.kosc.fm : 40
+demo.kamp = vca { gain: 0 }
+demo.kosc -> demo.kamp.in
+demo.kenv -> demo.kamp.cv
+demo.pad  = vco { freq: 110hz, wave: saw }
+demo.pad -> in_l : 0.35
+demo.pad -> in_r : 0.35
+demo.kamp -> in_l : 0.8
+demo.kamp -> in_r : 0.8
+demo.kamp -> side_l : 0.7
+demo.kamp -> side_r : 0.7
+l -> demo.out.left
+r -> demo.out.right
