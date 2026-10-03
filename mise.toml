@@ -49,3 +49,15 @@ run = "./build/ratsnest render"
 description = "Play a patch live with hot-reload. Usage: mise run play -- patches/first.patch"
 depends = ["build"]
 run = "./build/ratsnest play"
+
+[tasks.studio-build]
+description = "Build the native SDL3/ImGui graph editor and MCP bridge."
+run = """
+cmake -S . -B build-studio -G Ninja -DCMAKE_BUILD_TYPE=Debug -DRATSNEST_STUDIO=ON -DRATSNEST_WERROR=ON
+cmake --build build-studio
+"""
+
+[tasks.studio]
+description = "Open a patch in the live node editor. Usage: mise run studio -- patches/keepsake.patch"
+depends = ["studio-build"]
+run = "./build-studio/ratsnest-studio"

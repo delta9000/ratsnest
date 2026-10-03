@@ -64,6 +64,17 @@ Starts a PipeWire output stream and plays the patch. Edit and save the
 state (filter memory, envelope phase, sequencer position, ...) intact
 wherever the module name and type haven't changed.
 
+### Live node editor and MCP collaborator
+
+```sh
+mise run studio -- patches/keepsake.patch
+```
+
+The native SDL3/ImGui editor provides a node canvas, live parameter editing,
+transport/scene controls, meters, source editing, and shared Undo/Redo. **Copy MCP
+config** connects an external agent to the same session with revision-checked
+edits. See [Studio and collaboration](docs/studio.md) for setup and current limits.
+
 ### Discover module interfaces
 
 ```sh

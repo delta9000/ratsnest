@@ -153,3 +153,22 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Optional native studio dependencies
+
+The optional studio downloads these dependencies into its build directory;
+their source and license files remain together there:
+
+- Dear ImGui, Omar Cornut and contributors, MIT License, commit
+  `f5befd2d29e66809cd1110a152e375a7f1981f06`.
+  https://github.com/ocornut/imgui/blob/f5befd2d29e66809cd1110a152e375a7f1981f06/LICENSE.txt
+- imgui-node-editor, Michał Cichoń and contributors, MIT License, commit
+  `021aa0ea4da13fed864bafb2a92d4c5205076866`.
+  https://github.com/thedmd/imgui-node-editor/blob/021aa0ea4da13fed864bafb2a92d4c5205076866/LICENSE
+- JSON for Modern C++, Niels Lohmann and contributors, MIT License, commit
+  `65ee68451d8eb2b5f3a30b410476ab83deb3289b`.
+  https://github.com/nlohmann/json/blob/65ee68451d8eb2b5f3a30b410476ab83deb3289b/LICENSE.MIT
+
+Studio initialization follows Dear ImGui's SDL3/OpenGL example. SDL3 is linked
+from the system installation under its zlib license. Preserve upstream notices
+when redistributing the studio and its dependencies.

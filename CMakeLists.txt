@@ -62,3 +62,8 @@ add_test(NAME cli_describe COMMAND ratsnest describe additive)
 set_tests_properties(cli_describe PROPERTIES PASS_REGULAR_EXPRESSION "number_array")
 add_test(NAME cli_describe_unknown COMMAND ratsnest describe nonexistent)
 set_tests_properties(cli_describe_unknown PROPERTIES WILL_FAIL TRUE)
+
+option(RATSNEST_STUDIO "Build the native graph editor and local MCP bridge" OFF)
+if(RATSNEST_STUDIO)
+  include(app/CMakeLists.txt)
+endif()
