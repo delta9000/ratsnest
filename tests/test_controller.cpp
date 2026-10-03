@@ -142,3 +142,17 @@ TEST_CASE("controller expands subs relative to the patch path") {
   CHECK(res.files[0] == (dir / "lib" / "tone.sub").lexically_normal().string());
   fs::remove_all(dir);
 }
+
+TEST_CASE("full control queue rejects a whole parameter edit without partial application") {
+  Rig rig;
+  REQUIRE(rig.ctl.load("a = vca { gain: 0.5 }\n1 -> a.in\na -> out.in\n").ok);
+  rig.spin(64);
+  engine::Command command;command.kind=engine::Command::Kind::Watch;command.node=RtRunner::kWatchOff;
+  while(rig.run.push(command)) {}
+  CHECK_FALSE(rig.ctl.load("a = vca { gain: 0.8 }\n1 -> a.in\na -> out.in\n").ok);
+  rig.spin(4000);
+  CHECK(rig.l[3999]==doctest::Approx(.5));
+  REQUIRE(rig.ctl.load("a = vca { gain: 0.8 }\n1 -> a.in\na -> out.in\n").ok);
+  rig.spin(4000);
+  CHECK(rig.l[3999]==doctest::Approx(.8));
+}

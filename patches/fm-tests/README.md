@@ -26,7 +26,7 @@ hot-reload; the header comment in each file says what it exercises.
 | 12 | `fixed-click` | `fixed[]` pitch-pinned op, custom route | metallic attack transient |
 | 13 | `custom-exotic` | `custom` route, two converging chains, Kahn topo order | dense two-path timbre |
 | 14 | `sync-off-drift` | `sync: off` vs `on` (repeated strikes) | phase-drift transients |
-| 15 | `fallback-free` | malformed cyclic `route` → graceful `free` fallback | proves rule 6 (never dies) |
+| 15 | `custom-route` | validated custom route, extra carriers | mixed FM/additive voice |
 
 ## Suggested tweak points (hot-reload while playing)
 

@@ -6,8 +6,9 @@
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"freq", 440.f}, {"v_oct", 0.f}, {"fm", 0.f},
-                              {"pw", 0.5f},    {"pwm", 0.f},   {"sync", 0.f}};
+constexpr InputInfo kIns[] = {{"freq", 220.f}, {"v_oct", 0.f}, {"fm", 0.f},
+                              {"pw", 0.5f},    {"pwm", 0.f},   {"sync", 0.f},
+                              {"phase", 0.f}};
 constexpr const char* kWaves[] = {"sine", "tri", "saw", "pulse", nullptr};
 constexpr ConfigInfo kCfg[] = {{"wave", kWaves}};
 constexpr OutputInfo kOuts[] = {{"out"}};
@@ -43,7 +44,9 @@ class Vco final : public Module {
     // over rate samples, and a sync reset lands the next sample near -1.
     phase_ += dt;
     phase_ -= std::floor(phase_);
-    const float ph = static_cast<float>(phase_);
+    double shifted = phase_ + (std::isfinite(ins[6]) ? static_cast<double>(ins[6]) : 0.0);
+    shifted -= std::floor(shifted);
+    const float ph = static_cast<float>(shifted);
     const float dtf = static_cast<float>(dt);
 
     float v = 0.0f;

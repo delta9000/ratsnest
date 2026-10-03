@@ -1,6 +1,8 @@
 #include <doctest/doctest.h>
 #include "dsl/parser.h"
 #include "engine/engine.h"
+#include "engine/pipewire_out.h"
+#include <limits>
 #include "graph/graph.h"
 
 using namespace ms;
@@ -45,7 +47,8 @@ TEST_CASE("feedback edge delivers previous sample (one-sample delay)") {
   float l[3], r[3];
   e.process(l, r, 3);
   CHECK(l[0] == doctest::Approx(1.0f));  // cv sees b's initial 0
-  CHECK(l[1] == doctest::Approx(1.0f));  // out clamps ±1; check pre-clip via smaller drive:
+  CHECK(l[1] == doctest::Approx(2.0f));
+  CHECK(l[2] == doctest::Approx(3.0f));
 }
 
 TEST_CASE("feedback ramp observed below clip") {
@@ -58,9 +61,18 @@ TEST_CASE("feedback ramp observed below clip") {
   CHECK(l[2] == doctest::Approx(0.1f * 1.11f));    // cv = 0.11
 }
 
-TEST_CASE("master output hard-clips to +/-1") {
+TEST_CASE("graph output preserves finite float headroom") {
   auto e = make_engine("amp = vca { in: 3.0 }\namp -> out.in\n");
   float l[1], r[1];
   e.process(l, r, 1);
-  CHECK(l[0] == doctest::Approx(1.0f));
+  CHECK(l[0] == doctest::Approx(3.0f));
+  CHECK(r[0] == doctest::Approx(3.0f));
+}
+
+TEST_CASE("device boundary contains overload and non-finite samples") {
+  CHECK(engine::device_sample(3.0f) == 1.0f);
+  CHECK(engine::device_sample(-3.0f) == -1.0f);
+  CHECK(engine::device_sample(0.25f) == 0.25f);
+  CHECK(engine::device_sample(std::numeric_limits<float>::infinity()) == 0.0f);
+  CHECK(engine::device_sample(std::numeric_limits<float>::quiet_NaN()) == 0.0f);
 }

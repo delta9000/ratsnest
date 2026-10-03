@@ -41,24 +41,24 @@ add_executable(mstests ${MSTEST_SOURCES})
 target_link_libraries(mstests PRIVATE mscore doctest::doctest)
 add_test(NAME unit COMMAND mstests)
 
-file(GLOB MSPATCHES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/patches/*.patch)
+file(GLOB_RECURSE MSPATCHES CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/patches/*.patch
+  ${CMAKE_CURRENT_SOURCE_DIR}/patches/*.sub)
 foreach(patch ${MSPATCHES})
-  get_filename_component(patch_name ${patch} NAME_WE)
+  file(RELATIVE_PATH patch_name ${CMAKE_CURRENT_SOURCE_DIR}/patches ${patch})
+  string(REGEX REPLACE "\\.(patch|sub)$" "" patch_name ${patch_name})
+  string(REPLACE "/" "_" patch_name ${patch_name})
   add_test(NAME cli_check_${patch_name} COMMAND ratsnest check ${patch})
 endforeach()
 
 add_test(NAME cli_render
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first.wav)
-add_test(NAME cli_check_kick_sub
-  COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/patches/lib/kick.sub)
-
-file(GLOB MSKITSUBS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/patches/lib/kit/*.sub)
-foreach(subfile ${MSKITSUBS})
-  get_filename_component(sub_name ${subfile} NAME_WE)
-  add_test(NAME cli_check_kit_${sub_name} COMMAND ratsnest check ${subfile})
-endforeach()
-
 add_test(NAME cli_check_rejects_bad_patch
   COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
 set_tests_properties(cli_check_rejects_bad_patch PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli_describe COMMAND ratsnest describe additive)
+set_tests_properties(cli_describe PROPERTIES PASS_REGULAR_EXPRESSION "number_array")
+add_test(NAME cli_describe_unknown COMMAND ratsnest describe nonexistent)
+set_tests_properties(cli_describe_unknown PROPERTIES WILL_FAIL TRUE)

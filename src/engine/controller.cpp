@@ -38,13 +38,17 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
   if (shadow_) {
     auto plan = graph::plan_reload(*shadow_, *c.graph);
     if (!plan.topology) {
+      if (plan.params.size() > runner_.command_capacity()) {
+        res.errors.push_back({0, 0, "parameter command queue full; retry the edit", {}});
+        return res;
+      }
       for (const auto& pc : plan.params) {
         Command cmd;
         cmd.kind = Command::Kind::SetParam;
         cmd.node = static_cast<uint32_t>(pc.node);
         cmd.slot = static_cast<uint32_t>(pc.slot);
         cmd.value = pc.target;
-        if (!runner_.push(cmd)) break;  // full queue: next save re-syncs
+        runner_.push(cmd);  // capacity checked for the whole batch above
       }
       shadow_ = std::move(c.graph);  // same structure, fresh bases
       res.ok = true;
@@ -69,6 +73,7 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
     return res;
   }
   ++pushed_;
+  ++generation_;
   shadow_ = std::move(c2.graph);
   res.ok = true;
   res.topology = true;

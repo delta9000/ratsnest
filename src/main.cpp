@@ -31,11 +31,45 @@ namespace {
 int usage() {
   std::fprintf(stderr,
       "usage:\n"
+      "  ratsnest describe [module_type]   # JSON module interfaces from the registry\n"
       "  ratsnest check  <patch>\n"
       "  ratsnest render <patch> [-d <seconds|Ns>] [--start <seconds|Ns>] [-o <out.wav>]\n"
       "                          [--rate <hz>] [--stats [Ns]]\n"
       "  ratsnest play   <patch> [--latency <N/RATE>] [--rate <hz>] [--watch <mod[.port]>]\n");
   return 2;
+}
+
+// Registry names and enum values are built-in identifiers, never user strings.
+// Keep discovery beside validation's metadata so agents see the actual surface.
+void describe(const ms::dsp::ModuleInfo& m) {
+  std::printf("{\"type\":\"%s\",\"inputs\":[", m.type);
+  for (size_t i = 0; i < m.inputs.size(); ++i) {
+    const auto& in = m.inputs[i];
+    std::printf("%s{\"name\":\"%s\",\"base\":%.9g,\"glide\":%s}", i ? "," : "", in.name,
+                static_cast<double>(in.def), in.glide ? "true" : "false");
+  }
+  std::printf("],\"configs\":[");
+  for (size_t i = 0; i < m.configs.size(); ++i) {
+    const auto& c = m.configs[i];
+    using K = ms::dsp::ConfigKind;
+    const char* kind = c.kind == K::Enums ? "enum_array" : c.enum_vals ? "enum" :
+        c.kind == K::Numbers ? "number_array" : c.kind == K::Text ? "text" : "number";
+    std::printf("%s{\"name\":\"%s\",\"kind\":\"%s\"", i ? "," : "", c.name, kind);
+    if (c.enum_vals) {
+      std::printf(",\"values\":[");
+      for (size_t j = 0; c.enum_vals[j]; ++j)
+        std::printf("%s\"%s\"", j ? "," : "", c.enum_vals[j]);
+      std::printf("]");
+    }
+    std::printf("}");
+  }
+  std::printf("],\"outputs\":[");
+  for (size_t i = 0; i < m.outputs.size(); ++i)
+    std::printf("%s\"%s\"", i ? "," : "", m.outputs[i].name);
+  std::printf("],\"default_output\":");
+  if (m.outputs.empty()) std::printf("null");
+  else std::printf("\"%s\"", m.outputs[0].name);
+  std::printf("}");
 }
 
 bool read_file(const std::string& path, std::string& out) {
@@ -267,8 +301,31 @@ int cmd_play(const std::string& patch, const char* latency, double rate,
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc < 3) return usage();
+  if (argc < 2) return usage();
   const std::string cmd = argv[1];
+  if (cmd == "describe") {
+    if (argc > 3) return usage();
+    if (argc == 3) {
+      const auto* m = ms::dsp::find_module(argv[2]);
+      if (!m) {
+        std::fprintf(stderr, "error: unknown module type '%s'\n", argv[2]);
+        return 1;
+      }
+      describe(*m);
+    } else {
+      std::printf("[");
+      bool first = true;
+      for (const auto* m : ms::dsp::all_modules()) {
+        if (!first) std::printf(",\n");
+        describe(*m);
+        first = false;
+      }
+      std::printf("]");
+    }
+    std::printf("\n");
+    return 0;
+  }
+  if (argc < 3) return usage();
   const std::string patch = argv[2];
 
   if (cmd == "check") {

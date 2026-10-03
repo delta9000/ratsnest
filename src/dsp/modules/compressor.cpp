@@ -107,9 +107,8 @@ class Compressor final : public Module {
     const float wet_l = in_l * wet_gain;
     const float wet_r = in_r * wet_gain;
     
-    const float mix_angle = mix * (std::numbers::pi_v<float> / 2.0f);
-    const float gain_dry = std::cos(mix_angle);
-    const float gain_wet = std::sin(mix_angle);
+    const float gain_dry = 1.0f - mix;
+    const float gain_wet = mix;
     
     outs[0] = gain_dry * in_l + gain_wet * wet_l;
     outs[1] = gain_dry * in_r + gain_wet * wet_r;

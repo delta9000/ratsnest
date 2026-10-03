@@ -6,23 +6,33 @@ render, a failed check, or a quiet master to learn — not the things
 `docs/modules.md` already documents. Read `docs/modules.md` first; read this
 before writing a song-length or mastered patch.
 
-## Verify without ears: the `--stats` workflow
+## Measure the render; audition the music
 
-You cannot listen. `ratsnest render patch -d Ns -o out.wav --stats 4s` is
-your ears — a per-window peak/RMS timeline that validates almost everything:
+`ratsnest render patch -d Ns -o out.wav --stats 4s` produces a per-window
+peak/RMS timeline. It catches technical faults and helps locate arrangement
+changes. It cannot establish whether the balance, groove or transition works
+for a listener. A limited kick can still overwhelm the music.
 
 - **Arrangement timing**: each section boundary should show an RMS step at
   the expected second (drop slams +4 dB, breakdown dips −7 dB, fade reaches
   −240 by the end). If a boundary lands at the wrong time, the grid or a div
   is off.
-- **Loudness targets**: mastered EDM drop windows ≈ −12 dBFS RMS with
+- **Loudness examples**: mastered EDM drop windows ≈ −12 dBFS RMS with
   −0.4 dBFS peaks (crest ~11 dB = loud, not bricked). Breakdown should sit
   6–8 dB below the drops. Intro ≈ −25 dB RMS or lower.
 - **Hygiene**: overall peak ≤ the limiter threshold, `dc` ≈ 0, no flat
   peak==RMS windows (that's a brick), no dead air after the fade.
 
-Iterate on numbers, not vibes: change a level, re-render, re-read the
-timeline. Two or three iterations converges.
+Use measurements to investigate a specific concern, then audition the result.
+Float renders preserve overs, so a peak above 0 dBFS is useful evidence of
+overload. Live output clips at the device boundary; an explicit limiter remains
+the way to control peaks. Compressor/clipper dry-wet blends and hot reload now
+use linear interpolation, so old equal-power gain boosts are gone. Rebalance
+older mastered patches by measurement rather than assuming old numbers still hold.
+Those EDM levels are calibration examples, not acceptance criteria for every
+style. Compare at similar playback loudness. Render a short, full-tempo clip
+that includes the approach, entrance and settled groove; a good steady groove
+does not validate how it arrives. Treat listener feedback as musical evidence.
 
 `--start Ns` captures a later window (`--start 10m -d 60s`) and reports
 absolute offsets, but it does **not** skip the work: the graph is stateful,
@@ -50,11 +60,11 @@ choose a render duration that ends after the fade but before the wrap:
 Asymmetric rise/fall is the whole trick: risers attack slow (6–15 s) and
 release fast (0.4 s) so the drop lands clean.
 
-## Mastering: the calibration numbers
+## Mastering choices
 
-The proven chain is `dcblock → eq → compressor(external kick sidechain) →
+An explicit mastering recipe is `dcblock → eq → compressor(external kick sidechain) →
 stereo width → clipper(soft) → limiter` (see `halcyon`/`ion`/`mainstage`).
-What the docs don't tell you:
+These settings are starting points, not neutral defaults:
 
 - **A post-limiter attenuation scales the ceiling.** The idiom
   `-1 -> out.level; main_out -> out.level : 0.8` fades the whole track, but
@@ -77,34 +87,31 @@ Cables sum onto input bases. Two classic self-owns:
 - `tempo.seconds -> dly.time` with the default `time: 0.4` base gives a
   0.75 s delay, not a dotted 8th. Write `delay { time: 0ms }` and let the
   tempo module own the input outright.
-- **`math`'s `b` input defaults to 1, not 0.** `math { op: add }` with
-  `contour -> m.b` adds `1 + contour` -- the whole line comes out an octave
-  high, in tune, and sounds like a voicing choice rather than a bug. Write
-  `math { op: add, b: 0 }` and let the cable own the input. (By the same
-  arithmetic, the `1 -> m.b` octave-lift idiom in `mainstage` lands two
-  octaves up, not one.)
-- Filter cutoff is `base + env + LFO + ...` — the config value is the
-  *floor* of the sweep, not the sweep amount. Set the base to the darkest
-  sound you want and scale the env cables up from there.
+- `math` now defaults both inputs to zero. Multiplication needs an explicit
+  factor or a cable into `b`; addition no longer adds an accidental 1.
+- Filter `cutoff` sums in Hz, so bipolar modulation can move below the declared
+  base. Use `v_oct` for octave tracking: effective cutoff is
+  `(base + Hz cables) * 2^(v_oct cables)`. This keeps low notes from requesting
+  negative cutoffs.
 
-## Note names need a 220 Hz (or 110/440) oscillator base
+## Absolute pitch and transposition
 
-`A3v = 0.0` means "absolute pitch = 220 × 2^value". Note-name literals only
-land at written pitch on oscillators whose `freq` base is an A (220, 110,
-440, 55). If you copy a patch that sets `freq: 659hz` and feed it note
-names, everything is transposed. Detune via the freq base (219/221 Hz) or
-via `v_oct` constants (±0.007 ≈ ±12 cents); both keep note names intact.
-Offsets are bare fractions: `0.25 -> osc.v_oct` is up a minor third from
-whatever the pitch input carries — there is no note-name form for
-intervals.
+`A3v = 0.0` uses a 220 Hz reference. The default `vco`, `fm`, and `additive`
+base is 220 Hz, so note literals sound at their written pitch. Setting `freq`
+to 110/440 transposes one octave down/up; setting it to 55 transposes two down.
+Other bases transpose by other intervals. Use bare fractions for relative
+intervals (`1` = octave, `0.0833333` = semitone), and uppercase note names for
+absolute pitch (`D2v`). Lowercase names in numeric arrays are validation errors.
 
-**The note letter must be uppercase, and a lowercase one fails silently.**
-`D2v` is a note; `d2v` is not, and it does not raise — it reads as `0.0`,
-so every voice sits at its oscillator's base frequency and the patch renders
-plausible-sounding nonsense. (Probed: a `stepseq { steps: [d2v, ...] }` puts
-out flat zero, the same patch with `D2v` puts out −1.58.) This is why
-identifiers must stay lowercase — the two namespaces are told apart by case
-alone.
+For a harmonic stack, use `additive { levels: [...] }` and one external
+amplitude envelope. Use `ratios` for inharmonic partials, `phases` for their
+relative phases, and `tilt` for live spectral balance. This avoids repeating
+FM envelope arrays when there is no phase-modulation routing.
+
+Noise choice is independent of envelope/filter choice: `noise` offers white,
+pink, brown, blue, and violet spectra; `dust` supplies irregular impulses;
+`random` supplies slow stepped/smooth CV. Different colors have different RMS
+levels. Render at comparable levels before judging timbre.
 
 ## Free-ringing voices ghost; ADSR voices don't
 
@@ -125,6 +132,16 @@ cleanly instead of leaving reverb ghosts.)
 
 Learned by diffing the good patches (`meridian`/`halcyon`/`ion`) against
 the flat ones:
+
+- **Entrances need phrase cues.** In the first `pressure-gradient`, a kick
+  faded up over about thirteen beats at bar 61. Its timing was regular, but
+  the listener found its arrival unpredictable. Gate the strikes on a clear
+  phrase boundary and let each envelope finish; keep long fades for the room
+  and sustained textures. Check the kick's tail against the bass onset.
+- **Activity changes alone do not create tension and release.** Establish a
+  motif, make a directed change in density or harmony, leave a deliberate
+  breath, then resolve on a recognizable downbeat. Keep the main rhythm
+  dependable while varying accents and tone around it.
 
 - **Chord lanes re-voice everything.** Three bar-clocked stepseqs — root,
   third, fifth as absolute v/oct (note names) — feed bass, pad, arp, and
@@ -166,6 +183,33 @@ inputs — timbre is modulatable), echo feedback/tone, and reverb decay, plus
 a low-probability `turing` for harmony drift. Do the render's fade-in/out
 **in post** (`ffmpeg -af "afade=t=in:st=0:d=4,afade=t=out:st=291:d=9"`),
 not in the patch — verify with `ffmpeg astats` on the first/last seconds.
+
+## Score-length patches: the form lane and the switch trap
+
+Learned building `patches/symphony/` (four movements, fifteen mono parts):
+
+- **The form is a `stepseq` whose `lens` are bars.** Clock it by the bar
+  divider; its `trig` fires once at every section start. Clock every role
+  and dynamics lane from that trig (one value per section, no block
+  arithmetic) and reset every theme from it, so a section always begins on
+  its theme's first note. Section boundaries then land exactly where the
+  bar count says; `--stats` verifies them at a glance.
+- **A theme carries its own harmony.** Melody and chord lanes in one `.sub`,
+  sharing `clock`/`reset`/`transpose`, mean "the horn plays the second
+  subject in Bb" is one transposition cable, not four.
+- **`switch` defaults to `mode: seq` and ignores `addr`.** A selector fed
+  by a lane without `mode: addr` sits on `in1` for the whole render -- and
+  since `in1` is conventionally silence, the symptom is an almost silent
+  render, not an error. (`check` cannot catch it: the patch is valid.)
+- **`quant` ties snap down**, so a minor-to-major "re-reading" through a
+  major quantizer turns F into E, not F#. Nudge the input up a quarter-tone
+  (`0.04167 -> q.in`) and every off-scale note snaps up while in-scale
+  notes stay put.
+- **Orchestral low end runs away.** Basses doubling cellos an octave down,
+  plus timpani, put half the mix's energy below 80 Hz before anyone
+  notices; keep the bass channel around a third of the cello's level and
+  shelve the master below 90 Hz. Check band-energy fractions (an FFT per 8 s window),
+  not just the RMS timeline.
 
 ## Small gotchas
 

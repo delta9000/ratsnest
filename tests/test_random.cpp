@@ -67,3 +67,18 @@ TEST_CASE("random smooth output is continuous") {
   // moves at most ~2*pi/960 per sample. Allow generous margin.
   CHECK(max_jump < 0.02f);
 }
+
+TEST_CASE("slow random reaches the next target without freezing") {
+  auto slow = make_random(9.0);
+  auto fast = make_random(9.0);
+  float ins[2] = {0.001f, 1.0f};
+  float out[2], reference[2];
+  slow->process(ins, out);
+  const float first = out[1];
+  float fast_ins[2] = {48000.0f, 1.0f};
+  fast->process(fast_ins, reference);
+  REQUIRE(reference[1] != first);
+  for (int i = 1; i < 48000000; ++i) slow->process(ins, out);
+  CHECK(out[1] == reference[1]);
+  CHECK(out[0] == doctest::Approx(first).epsilon(0.00001));
+}

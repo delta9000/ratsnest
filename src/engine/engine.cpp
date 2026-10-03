@@ -35,8 +35,8 @@ void Engine::process(float* left, float* right, size_t frames) {
         if (!std::isfinite(node_outs[o])) node_outs[o] = 0.0f;
     }
     const size_t oo = out_offset_[static_cast<size_t>(g_->out_node)];
-    left[f]  = std::clamp(outs_[oo],     -1.0f, 1.0f);
-    right[f] = std::clamp(outs_[oo + 1], -1.0f, 1.0f);
+    left[f]  = outs_[oo];
+    right[f] = outs_[oo + 1];
   }
 }
 
@@ -49,7 +49,7 @@ void Engine::set_param(size_t node, size_t slot, float target, size_t glide_samp
       glides_[i] = glides_[--n_glides_];  // replace in-flight glide on this param
       break;
     }
-  if (glide_samples == 0 || n_glides_ == kMaxGlides) {
+  if (!g_->nodes[node].info->inputs[slot].glide || glide_samples == 0 || n_glides_ == kMaxGlides) {
     base[slot] = target;
     return;
   }
@@ -75,6 +75,12 @@ float Engine::output_value(size_t node, size_t slot) const {
   if (node >= g_->nodes.size()) return 0.0f;
   if (slot >= g_->nodes[node].info->outputs.size()) return 0.0f;
   return outs_[out_offset_[node] + slot];
+}
+
+size_t Engine::copy_outputs(std::span<float> destination) const {
+  const size_t n = std::min(destination.size(), outs_.size());
+  std::copy_n(outs_.begin(), n, destination.begin());
+  return n;
 }
 
 void Engine::deliver_midi_event(const dsp::MidiEvent& e) {

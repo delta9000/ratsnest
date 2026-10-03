@@ -14,7 +14,7 @@ constexpr InputInfo kIns[] = {{"in", 0.f},          {"freq", 220.f},
                               {"v_oct", 0.f},       {"strike", 0.f},
                               {"structure", 0.25f}, {"brightness", 0.5f},
                               {"damping", 0.5f},    {"position", 0.25f}};
-constexpr ConfigInfo kCfgs[] = {{"modes", nullptr}, {"ratios", nullptr}};
+constexpr ConfigInfo kCfgs[] = {{"modes", nullptr}, {"ratios", nullptr, ConfigKind::Numbers}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"odd"}, {"even"}};
 // Coefficients refresh at block rate, Rings-style (24-sample blocks there).
 constexpr int kBlock = 32;

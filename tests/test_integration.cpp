@@ -45,7 +45,7 @@ TEST_CASE("first.patch compiles and renders with sane levels") {
   const double rms = std::sqrt(sum2 / static_cast<double>(n));
   CHECK(rms > 0.05);    // audibly present
   CHECK(rms < 0.7);     // not slammed
-  CHECK(peak <= 1.0f);  // master clip respected
+  CHECK(peak <= 1.0f);  // this patch stays below unity
 }
 
 TEST_CASE("render is deterministic") {

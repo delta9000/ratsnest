@@ -18,6 +18,18 @@ std::unique_ptr<Module> make_compressor(const char* sidechain = "internal") {
 }
 }  // namespace
 
+TEST_CASE("compressor dry-wet interpolation is neutral without gain reduction") {
+  for (float mix : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+    auto m = make_compressor();
+    float ins[11] = {0.2f, -0.3f, 0, 0, -18, 1, 0, 0.01f, 0.1f, 0, mix};
+    float outs[4];
+    m->process(ins, outs);
+    CHECK(outs[0] == doctest::Approx(0.2f));
+    CHECK(outs[1] == doctest::Approx(-0.3f));
+    CHECK(outs[2] == doctest::Approx(1.0f));
+  }
+}
+
 TEST_CASE("compressor: metadata and default parameters") {
   const ModuleInfo* info = find_module("compressor");
   REQUIRE(info != nullptr);

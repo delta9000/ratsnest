@@ -18,7 +18,7 @@ constexpr InputInfo kIns[] = {
     {"scatter", 0.f}, {"size", 0.1f},  {"pitch", 0.f},   {"density", 10.f},
     {"jitter", 0.5f}, {"shape", 0.5f}, {"spread", 0.5f}, {"reverse", 0.f}};
 constexpr ConfigInfo kCfg[] = {
-    {"secs", nullptr}, {"file", nullptr}, {"seed", nullptr}};
+    {"secs", nullptr}, {"file", nullptr, ConfigKind::Text}, {"seed", nullptr}};
 constexpr OutputInfo kOuts[] = {{"out_l"}, {"out_r"}, {"onset"}};
 
 constexpr int kMaxGrains = 64;  // fixed pool, like the Clouds firmware

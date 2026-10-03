@@ -11,7 +11,7 @@ constexpr InputInfo kIns[] = {
     {"in5", 0.f}, {"in6", 0.f}, {"in7", 0.f}, {"in8", 0.f},
     {"lvl1", 0.f}, {"lvl2", 0.f}, {"lvl3", 0.f}, {"lvl4", 0.f},
     {"lvl5", 0.f}, {"lvl6", 0.f}, {"lvl7", 0.f}, {"lvl8", 0.f}};
-constexpr ConfigInfo kCfg[] = {{"levels", nullptr}, {"pans", nullptr}};
+constexpr ConfigInfo kCfg[] = {{"levels", nullptr, ConfigKind::Numbers}, {"pans", nullptr, ConfigKind::Numbers}};
 constexpr OutputInfo kOuts[] = {{"out_l"}, {"out_r"}};
 constexpr int kCh = 8;
 

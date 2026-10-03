@@ -7,6 +7,7 @@
 #include <vector>
 #include "dsl/parser.h"
 #include "engine/rt_runner.h"
+#include "engine/controller.h"
 #include "graph/reload.h"
 
 using namespace ms;
@@ -68,7 +69,7 @@ TEST_CASE("SetParam commands glide on the running engine") {
   CHECK(bl[2047] == doctest::Approx(1.0f));
 }
 
-TEST_CASE("swap crossfades equal-power over 50ms and retires the old engine") {
+TEST_CASE("swap crossfades linearly over 50ms and retires the old engine") {
   RtRunner run(48000.0);
   engine::Engine* first = make_engine(kDcOne);
   REQUIRE(run.push(swap_cmd(first)));
@@ -83,8 +84,7 @@ TEST_CASE("swap crossfades equal-power over 50ms and retires the old engine") {
 
   auto expected = [&](size_t i) {
     const float t = static_cast<float>(i) / static_cast<float>(fade);
-    const float th = t * std::numbers::pi_v<float> / 2.0f;
-    return std::min(1.0f, 1.0f * std::cos(th) + 0.5f * std::sin(th));
+    return 1.0f * (1.0f - t) + 0.5f * t;
   };
   CHECK(bl[0] == doctest::Approx(expected(0)).epsilon(0.01));
   CHECK(bl[fade / 2] == doctest::Approx(expected(fade / 2)).epsilon(0.01));
@@ -125,7 +125,7 @@ TEST_CASE("migration keeps a vco phase-continuous across a swap") {
   std::vector<float> l2(64), r2(64);
   run.render(l2.data(), r2.data(), 64);
   // 441 Hz sine at 48kHz moves at most ~0.058 per sample; with migrated phase
-  // and equal-power fade of two aligned signals, successive samples stay close.
+  // and linear fade of two aligned signals, successive samples stay close.
   float prev = l[999];
   for (float x : l2) {
     CHECK(std::abs(x - prev) < 0.12f);  // no click; without migration the
@@ -189,4 +189,24 @@ TEST_CASE("oversized blocks are processed in chunks") {
   std::vector<float> l(RtRunner::kMaxBlock + 1000), r(RtRunner::kMaxBlock + 1000);
   run.render(l.data(), r.data(), l.size());
   CHECK(l.back() == doctest::Approx(1.0f));
+}
+
+TEST_CASE("observation telemetry follows graph generations and never blocks when unread") {
+  ms::engine::RtRunner runner(48000);
+  ms::engine::Controller controller(runner,48000);
+  REQUIRE(controller.load("1 -> out.in\n").ok);
+  ms::engine::Command observe;observe.kind=ms::engine::Command::Kind::Observe;observe.value=1;
+  REQUIRE(runner.push(observe));
+  std::vector<float> l(4096),r(4096);
+  for(int i=0;i<20;++i)runner.render(l.data(),r.data(),l.size());
+  CHECK(l.back()==1.f);
+  ms::engine::Observation snapshot;
+  REQUIRE(runner.try_observe(snapshot));CHECK(snapshot.generation==controller.generation());
+  CHECK(snapshot.size==2);CHECK(snapshot.values[0]==1.f);
+  while(runner.try_observe(snapshot)){}
+  REQUIRE(controller.load("a = vca {}\n2 -> a.in\na -> out.in\n").ok);
+  runner.render(l.data(),r.data(),l.size());
+  REQUIRE(runner.try_observe(snapshot));CHECK(snapshot.generation==controller.generation());
+  CHECK(snapshot.size==3);
+  controller.drain_retired();
 }

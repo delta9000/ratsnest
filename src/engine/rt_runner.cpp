@@ -29,6 +29,7 @@ void RtRunner::drain_commands() {
         if (current_) current_->set_param(c.node, c.slot, c.value, glide_samples_);
         break;
       case Command::Kind::Swap:
+        ++generation_;
         if (old_) {  // a second save landed mid-fade: retire the fading engine
           retired_.try_push(old_);  // capacity is gated by the controller
           old_ = nullptr;
@@ -41,6 +42,9 @@ void RtRunner::drain_commands() {
           current_ = c.engine;
           fade_pos_ = 0;
         }
+        break;
+      case Command::Kind::Observe:
+        observing_ = c.value > 0;
         break;
       case Command::Kind::Watch:
         watch_node_ = c.node;
@@ -80,19 +84,27 @@ void RtRunner::render_block(float* l, float* r, size_t frames) {
   AudioChunk audio_c;
   while (audio_ring_.try_pop(audio_c)) current_->deliver_audio(audio_c.s, audio_c.len);
   current_->process(l, r, frames);
+  frame_ += frames;
+  since_observation_ += frames;
+  if (observing_ && since_observation_ >= static_cast<size_t>(rate_ / 30)) {
+    observation_.generation = generation_;
+    observation_.frame = frame_;
+    observation_.size = current_->copy_outputs(observation_.values);
+    observations_.try_push(observation_);
+    since_observation_ = 0;
+  }
 
   if (old_) {
     old_->process(scratch_l_.data(), scratch_r_.data(), frames);
-    constexpr float kHalfPi = std::numbers::pi_v<float> / 2.0f;
     for (size_t i = 0; i < frames; ++i) {
       const size_t p = fade_pos_ + i;
       const float t = p >= fade_samples_
           ? 1.0f
           : static_cast<float>(p) / static_cast<float>(fade_samples_);
-      const float gn = std::sin(t * kHalfPi);
-      const float go = std::cos(t * kHalfPi);
-      l[i] = std::clamp(l[i] * gn + scratch_l_[i] * go, -1.0f, 1.0f);
-      r[i] = std::clamp(r[i] * gn + scratch_r_[i] * go, -1.0f, 1.0f);
+      // Migrated graphs are often identical or strongly correlated. A linear
+      // fade preserves their gain and the float headroom of each graph.
+      l[i] = l[i] * t + scratch_l_[i] * (1.0f - t);
+      r[i] = r[i] * t + scratch_r_[i] * (1.0f - t);
     }
     fade_pos_ += frames;
     if (fade_pos_ >= fade_samples_) {

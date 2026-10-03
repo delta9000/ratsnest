@@ -91,7 +91,7 @@ On save, the engine diffs old vs new IR:
 - **Topology change:** new graph built off-thread; every module whose
   `(name, type)` pair survives has its internal state migrated (oscillator
   phase, envelope stage, delay/register buffers); pointer-swap, then ~50 ms
-  equal-power crossfade old→new. Renaming a module intentionally resets it.
+  linear crossfade old→new. Renaming a module intentionally resets it.
 - **Parse/validation error:** last good graph keeps playing; error reported
   with line/column. The drone never stops because of a typo.
 
@@ -152,11 +152,11 @@ essentials.
 | `random` | smooth/stepped wandering voltage | `rate`, `smooth`, `seed` | out: `out` `stepped` |
 | `sh` | sample & hold / track & hold | `mode` (sample\|track) | `in` `trig` · out |
 | `quant` | quantizer | `scale` (array), `root`, `transpose` | `in` `transpose` · out: `out` `changed`(gate) |
-| `math` | signal math (= ring mod, rectifier, min/max, …) | `op` (add\|sub\|mult\|min\|max\|abs\|clip\|wrap), `b` | `a` `b` · out |
-| `xfade` | equal-power crossfader | `mix` | `a` `b` `mix` · out |
+| `math` | signal math (= ring mod, rectifier, min/max, …) | `op` (add\|sub\|mult\|min\|max\|abs\|clip\|wrap\|exp2), `b` | `a` `b` · out |
+| `xfade` | linear crossfader, optional equal-power law | `mix`, `law` | `a` `b` `mix` · out |
 | `mix` | stereo mixer | `levels` (array), `pans` (array); defaults 1.0 / center | `in1..in8` `lvl1..lvl8` · out: `out_l` `out_r` |
 | `scope` | probe/meter for TUI & logs | `label` | in |
-| `out` | master out: limiter + PipeWire sink | `level` | `left` `right` `in`(→both) |
+| `out` | master out: float sum; PipeWire boundary clips | `level` | `left` `right` `in`(→both) |
 
 Build order note: `svf` before `ladder` (much easier; instant gratification),
 `vco` first overall (polyBLEP is DSP lesson one).
@@ -178,7 +178,7 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 | `clock` | master clock | `bpm`; ins `run` `reset` · outs `out` + `run` gate |
 | `div` | clock divider | `by`; ins `in` `reset` · out. Multiplication deferred |
 | `euclid` | Euclidean rhythm | ins `clock` `reset` `steps`(1..64) `hits`(0..steps) `rot`(wrapped); outs `trig`(one sample) `gate`(clock width). Live integer params round; reset makes the coincident/next edge step zero |
-| `stepseq` | step sequencer | cfg `steps`/`gates` arrays, `dir` (forward\|reverse\|pingpong\|random), `seed`; ins `clock` `reset` `len` `transpose`; outs `cv` `trig` `gate` `eoc` |
+| `stepseq` | step sequencer | cfg `steps`/`gates`/`lens`/`ties`/`vels` arrays, `dir` (forward\|reverse\|pingpong\|random), `seed`; ins `clock` `reset` `len` `transpose`; outs `cv` `trig` `gate` `eoc` `vel` |
 | `turing` | lockable shift register | ins `clock` `write` `clear` `len`(1..16) `prob`; cfg `seed`; outs `out` `pulse` `bit1..bit8`. Volts/Pulses expanders = cables |
 | `bern` | Bernoulli gate | ins `gate` `prob`; cfg `seed`; mutually exclusive gate-width outs `a` `b` |
 | `logic` | gate logic + comparator | ins `a` `b` `threshold`; cfg `op` (and\|or\|xor\|not\|cmp); out |
@@ -274,7 +274,7 @@ patch.file ──▶ dsl/     lexer → parser → Patch IR (modules, cables, pa
   Static registry; no plugin loading.
 - **`engine/`** — RT runner, PipeWire backend (`pw_stream`), SPSC command
   queue in (param glides, graph swaps), ring buffers out (meters, scope taps,
-  record feed). Output limiter + NaN/denormal guards at the sink. (`pw_filter`
+  record feed). Float output preserves headroom; the device boundary clips. NaN/denormal guards protect the signal path. (`pw_filter`
   DSP nodes are never auto-routed by WirePlumber 0.5.15 — `create-item.lua`
   string-matches `media.class` "Audio" to `si-audio-adapter`, which requires
   node-level `EnumFormat` that filter nodes don't expose; `pw_stream` was
@@ -295,13 +295,15 @@ ratsnest play   drone.patch          # watch + play + meters
 ratsnest render drone.patch -d 30s -o take.wav   # offline, faster than RT
 ratsnest render drone.patch -d 300s --stats 8s   # + peak/RMS/DC level timeline
 ratsnest check  drone.patch          # parse/validate — editor lint
+ratsnest describe [module_type]      # JSON interfaces from the runtime registry
 ```
 
 ### 7.5 Error handling
 
 - Parse/validation errors: report, keep last good graph running (§3.3).
 - Runtime: denormal flushing (FTZ/DAZ), NaN guard per module output (replace
-  with 0, count + report), brickwall limiter on `out`.
+  with 0, count + report). Device output clips to -1..1; use an explicit
+  limiter for dynamics control.
 - PipeWire xruns/disconnects: reconnect with silence fill; never crash the
   session.
 

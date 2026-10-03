@@ -7,7 +7,7 @@ namespace {
 constexpr InputInfo kIns[] = {
     {"in1", 0.f}, {"in2", 0.f}, {"in3", 0.f}, {"in4", 0.f},
     {"in5", 0.f}, {"in6", 0.f}, {"in7", 0.f}, {"in8", 0.f},
-    {"clock", 0.f}, {"reset", 0.f}, {"addr", 0.f}, {"n", 8.f}};
+    {"clock", 0.f, false}, {"reset", 0.f, false}, {"addr", 0.f, false}, {"n", 8.f, false}};
 constexpr const char* kModes[] = {"seq", "addr", nullptr};
 constexpr ConfigInfo kCfg[] = {{"mode", kModes}};
 constexpr OutputInfo kOuts[] = {{"out"}};

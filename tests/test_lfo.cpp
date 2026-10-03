@@ -49,3 +49,15 @@ TEST_CASE("phase offset shifts start point") {
   l.ins[2] = 0.5f;
   CHECK(l.tick() == doctest::Approx(0.0f).epsilon(0.01));  // saw at half phase = 0
 }
+
+TEST_CASE("slow LFOs keep their period and do not stall") {
+  for (float freq : {0.0033333f, 0.001f}) {
+    CAPTURE(freq);
+    Lfo l("saw");
+    l.ins[0] = freq;
+    // At 3/4 cycle, even a 1000-second oscillator must still advance.
+    const int samples = static_cast<int>(0.75 * 48000.0 / freq);
+    for (int i = 0; i < samples; ++i) l.tick();
+    CHECK(l.tick() == doctest::Approx(0.5).epsilon(0.00001));
+  }
+}
