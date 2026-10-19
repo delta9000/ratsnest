@@ -1,0 +1,20 @@
+# Switch through five spectra every four seconds. Level choices are illustrative,
+# not perceptual loudness matching. Sparse impulses add a crackling resonant layer.
+clock = clock { bpm: 15 }
+select = switch { n: 5 }
+clock -> select.clock
+white = noise { color: white, seed: 11 }
+pink = noise { color: pink, seed: 11 }
+brown = noise { color: brown, seed: 11 }
+blue = noise { color: blue, seed: 11 }
+violet = noise { color: violet, seed: 11 }
+white -> select.in1 : 0.16
+pink -> select.in2 : 0.3
+brown -> select.in3 : 0.3
+blue -> select.in4 : 0.2
+violet -> select.in5 : 0.2
+select -> out.in
+specks = dust { rate: 18, seed: 23 }
+ring = svf { cutoff: 1600, res: 0.88 }
+specks.out -> ring.in
+ring.bp -> out.in : 0.3

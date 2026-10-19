@@ -18,7 +18,7 @@ std::unique_ptr<Module> make_svf(double rate = 48000.0) {
 double filtered_rms(float frequency, float cutoff) {
   constexpr double rate = 48000.0;
   auto module = make_svf(rate);
-  float ins[3] = {0.0f, cutoff, 0.0f};
+  float ins[4] = {0.0f, cutoff, 0.0f};
   float out[3];
   double sum = 0.0;
   constexpr int warmup = 4096;
@@ -45,7 +45,7 @@ TEST_CASE("svf exposes low band and high pass outputs") {
 
 TEST_CASE("svf low pass settles to DC") {
   auto module = make_svf();
-  const float ins[3] = {1.0f, 1000.0f, 0.0f};
+  const float ins[4] = {1.0f, 1000.0f, 0.0f};
   float out[3];
   for (int i = 0; i < 48000; ++i) module->process(ins, out);
   CHECK(out[0] == doctest::Approx(1.0f).epsilon(0.001));
@@ -63,7 +63,7 @@ TEST_CASE("svf low pass attenuates frequencies above cutoff") {
 
 TEST_CASE("svf outputs share one coherent filter state") {
   auto module = make_svf();
-  float ins[3] = {0.37f, 2400.0f, 0.0f};
+  float ins[4] = {0.37f, 2400.0f, 0.0f};
   float out[3];
   for (int i = 0; i < 100; ++i) module->process(ins, out);
   CHECK(out[0] + 2.0f * out[1] + out[2] == doctest::Approx(ins[0]).epsilon(0.0001));
@@ -71,7 +71,7 @@ TEST_CASE("svf outputs share one coherent filter state") {
 
 TEST_CASE("svf stays finite under extreme audio-rate modulation") {
   auto module = make_svf();
-  float ins[3] = {0.0f, 0.0f, 0.0f};
+  float ins[4] = {0.0f, 0.0f, 0.0f};
   float out[3];
   for (int i = 0; i < 200000; ++i) {
     ins[0] = i % 2 == 0 ? 1.0f : -1.0f;

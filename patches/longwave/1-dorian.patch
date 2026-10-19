@@ -1,0 +1,370 @@
+# longwave I -- "dorian" -- dub, 126 BPM, D dorian, 14:00 (+1:00 tail).
+#
+# =========================================================================
+# THE HOUR (this header is the plan; movements II-V reference it, not repeat)
+#
+# Five movements, assembled by `patches/longwave/assemble.sh` with 60-second
+# composed overlaps. One tonic, one motif, one room; the mode rotates.
+#
+#   I   dorian    dub          126 BPM  14:00  D dorian
+#   II  phrygian  IDM scherzo  168 BPM  13:00  D phrygian   (126 x 4/3)
+#   III aeolian   slow         84 BPM    9:00  D aeolian    (168 / 2)
+#   IV  lydian    EDM finale   126 BPM  17:00  F lydian     (84 x 3/2)
+#   V   coda      dub, at rest  63 BPM   7:00  D dorian     (126 / 2)
+#
+# TEMPO is one lattice, 63/84/126/168 = 3:4:6:8, so every seam is a metric
+# modulation and not a beat-match. A movement's tail ramps its clock to the
+# next movement's tempo, which means the crossfade never has to align two
+# different grids -- by the time they overlap they share one.
+#
+# MODE rotates on a fixed D, except the finale, which lifts the tonic to F.
+# F lydian and D dorian are the SAME SEVEN PITCHES, so the two most exposed
+# seams (III->IV and IV->V) change no notes at all -- only which one is home.
+# The collection genuinely changes exactly twice, at I->II and II->III.
+#
+# THROUGH-LINES, in every movement:
+#   * the room -- `lib/tape-echo.sub`, dotted-eighth and dotted-quarter
+#     echoes into a plate, never switched off across the hour.
+#   * the motif -- a fixed contour run through each movement's quantizer, so
+#     the same eight numbers re-colour themselves per mode without changing.
+#     MEASURED, not assumed (semitones above the chord root):
+#       dorian    0  7  3  10  7  3  0  -3
+#       phrygian  0  7  3  10  7  3  0  -4
+#       aeolian   0  7  3  10  7  3  0  -4
+#       lydian    0  7  2   9  7  2  0  -3
+#     The three minor modes are identical for seven notes and part company
+#     on exactly the eighth -- the one below the root, where dorian's major
+#     sixth and aeolian's minor sixth live. That note IS the mode.
+#     Lydian brightens the third and seventh into a second and sixth (the
+#     quantizer ties snap down, docs/modules.md `quant`), which leaves the
+#     finale's version pentatonic: no avoid notes over any of its chords.
+# =========================================================================
+#
+# THIS MOVEMENT -- 8-bar blocks of 15.238 s, 60 lane steps (wrap at 914.3 s;
+# render 900 s and stop short of it).
+#
+#   block  0   0:00  the room alone -- weather, plate, no pulse
+#   block  6   1:31  chord stack and offbeat dub stabs; the echoes establish
+#   block 12   3:03  half-time kick; the bass enters as sub only
+#   block 20   5:05  full groove -- MOTIF, statement 1, on the bell
+#   block 29   7:22  dub breakdown: drums out, feedback up, the room IS it
+#   block 37   9:24  return, denser -- MOTIF, statement 2, harmonised
+#   block 47  11:56  strip back toward room and sub
+#   block 51  12:57  the tempo ramp begins: 126 -> 168 over ~45 s. MEASURED
+#                    off the music clock: 126.0 held to 13:05, 145 at 13:15,
+#                    164 at 13:35, 168.0 settled by 13:50 -- ten seconds
+#                    before the crossfade, so II arrives onto a grid that
+#                    already agrees with it.
+#   block 55  13:58  tail at 168 BPM, room only, handing to II
+#
+#   ratsnest render patches/longwave/1-dorian.patch -d 900s --stats 30s
+#
+# HALF-TIME, not slow: the kick is on 1 and the "a" of 3 (steps 0 and 11 of
+# 16), so 126 BPM reads as 63 and the bass owns the space between.
+
+# === CLOCKS ===
+# TWO clocks, deliberately. The arrangement runs on a clock that never ramps,
+# so section boundaries stay at fixed wall-clock seconds and `--stats` can be
+# read against the map above; the music runs on a clock that DOES ramp at the
+# seam. They start in phase and diverge only in the tail, where the
+# arrangement is holding one value anyway.
+arr_clk = clock { bpm: 504 }             # 16ths at 126, never modulated
+blk     = div { by: 128 }                # ARRANGEMENT DIVISOR: 8 bars = 15.238 s
+arr_clk -> blk.in
+
+master  = clock { bpm: 504 }             # 16ths at 126, ramped at block 51
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+bar     = div { by: 4 }
+two_bar = div { by: 2 }
+master  -> eighth.in
+eighth  -> quarter.in
+quarter -> bar.in
+bar     -> two_bar.in
+
+# === ARRANGEMENT LANES -- one value per 8-bar block ===
+arr_room  = stepseq { steps: [0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+                          0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.42, 0.42, 0.42, 0.42,
+                          0.42, 0.42, 0.42, 0.42, 0.42, 0.78, 0.78, 0.78, 0.78, 0.78, 0.78, 0.78,
+                          0.78, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.62,
+                          0.62, 0.62, 0.62, 0.72, 0.72, 0.72, 0.72, 0.85, 0.85, 0.85, 0.85, 0.85] }
+arr_chord = stepseq { steps: [0, 0, 0, 0, 0, 0, 0.62, 0.62, 0.62, 0.62, 0.62, 0.62,
+                           0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.68, 0.68, 0.68, 0.68,
+                           0.68, 0.68, 0.68, 0.68, 0.68, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+                           0.3, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.28,
+                           0.28, 0.28, 0.28, 0.15, 0.15, 0.15, 0.15, 0, 0, 0, 0, 0] }
+arr_bass  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.74, 0.74, 0.74, 0.74,
+                          0.74, 0.74, 0.74, 0.74, 0.74, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15,
+                          0.15, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.3,
+                          0.3, 0.3, 0.3, 0.2, 0.2, 0.2, 0.2, 0, 0, 0, 0, 0] }
+arr_kick  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.92, 0.92, 0.92, 0.92,
+                          0.92, 0.92, 0.92, 0.92, 0.92, 0, 0, 0, 0, 0, 0, 0,
+                          0, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.28,
+                          0.28, 0.28, 0.28, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
+arr_hats  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                          0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.24, 0.62, 0.62, 0.62, 0.62,
+                          0.62, 0.62, 0.62, 0.62, 0.62, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12,
+                          0.12, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.3,
+                          0.3, 0.3, 0.3, 0.08, 0.08, 0.08, 0.08, 0.1, 0.1, 0.1, 0.1, 0.1] }
+arr_bell  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0.7, 0.7, 0.7, 0.7,
+                          0.7, 0.7, 0.7, 0.7, 0.7, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35,
+                          0.35, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.5,
+                          0.5, 0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.12, 0.12, 0.12, 0.12, 0.12] }
+arr_noise = stepseq { steps: [0.56, 0.56, 0.56, 0.56, 0.56, 0.56, 0.47, 0.47, 0.47, 0.47, 0.47, 0.47,
+                           0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.36, 0.25, 0.25, 0.25, 0.25,
+                           0.25, 0.25, 0.25, 0.25, 0.25, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45,
+                           0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.4,
+                           0.4, 0.4, 0.4, 0.5, 0.5, 0.5, 0.5, 0.55, 0.55, 0.55, 0.55, 0.55] }
+arr_brgt  = stepseq { steps: [0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+                          0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6, 0.6, 0.6, 0.6,
+                          0.6, 0.6, 0.6, 0.6, 0.6, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                          0.25, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.45,
+                          0.45, 0.45, 0.45, 0.2, 0.2, 0.2, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1] }
+arr_bpm   = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1] }
+blk -> arr_room.clock
+blk -> arr_chord.clock
+blk -> arr_bass.clock
+blk -> arr_kick.clock
+blk -> arr_hats.clock
+blk -> arr_bell.clock
+blk -> arr_noise.clock
+blk -> arr_brgt.clock
+blk -> arr_bpm.clock
+
+# Slew limiters turn lane steps into section crossfades. Dub sections breathe
+# in and out (8-15 s); the kick is the exception -- it arrives decisively.
+l_room  = func { rise: 10, fall: 12 }
+l_chord = func { rise: 8,  fall: 9 }
+l_bass  = func { rise: 6,  fall: 8 }
+l_kick  = func { rise: 1.5, fall: 2.5 }
+l_hats  = func { rise: 5,  fall: 6 }
+l_bell  = func { rise: 9,  fall: 11 }
+l_noise = func { rise: 12, fall: 14 }
+l_brgt  = func { rise: 11, fall: 13 }
+l_bpm   = func { rise: 45, fall: 45 }
+
+arr_room.cv  -> l_room.in
+arr_chord.cv -> l_chord.in
+arr_bass.cv  -> l_bass.in
+arr_kick.cv  -> l_kick.in
+arr_hats.cv  -> l_hats.in
+arr_bell.cv  -> l_bell.in
+arr_noise.cv -> l_noise.in
+arr_brgt.cv  -> l_brgt.in
+arr_bpm.cv   -> l_bpm.in
+
+# The tempo pivot: 504 -> 672 sixteenths is 126 -> 168 BPM.
+l_bpm -> master.bpm : 168
+
+# === HARMONY -- D dorian, one chord per 2 bars, four per block ===
+# Dm9 | G6/9 | Cmaj9 | Am7. The G carries the B natural: the raised sixth is
+# the whole reason this movement is dorian and not aeolian.
+ch_root  = stepseq { steps: [D3v, G3v, C3v, A2v] }
+ch_third = stepseq { steps: [F3v, B3v, E3v, C3v] }
+ch_fifth = stepseq { steps: [A3v, D4v, G3v, E3v] }
+two_bar -> ch_root.clock
+two_bar -> ch_third.clock
+two_bar -> ch_fifth.clock
+
+# === THE MOTIF -- degrees 0 4 2 6 4 2 0 -2, one note per bar ===
+# Written as v/oct offsets above the chord root and snapped by the movement's
+# quantizer, so the SAME EIGHT NUMBERS are re-read by every movement's mode.
+mot_seq = stepseq { steps: [0, 0.5833, 0.25, 0.8333, 0.5833, 0.25, 0, -0.3333],
+                    gates: [1, 0, 1, 1, 0, 1, 1, 0] }
+bar -> mot_seq.clock
+mot_add = math { op: add, b: 0 }
+ch_root.cv -> mot_add.a
+mot_seq.cv -> mot_add.b
+mot_q = quant { scale: [0, 2, 3, 5, 7, 9, 10], root: 5 }   # D dorian
+mot_add -> mot_q.in
+
+# === THE ROOM -- the through-line, fed the same tempo the clock is ramping ===
+room = sub { file: "../lib/tape-echo.sub", verb_decay: 0.88, fb_a: 0.64 }
+126 -> room.bpm
+l_bpm -> room.bpm : 42
+l_room -> room.fb_mod : 0.12
+l_room -> room.decay_mod : 0.05
+
+# === WEATHER -- the vinyl-ish bed under everything ===
+weather   = noise { color: pink, seed: 7 }
+weath_lp  = svf { cutoff: 700hz, res: 0.1 }
+weather -> weath_lp.in
+l_brgt  -> weath_lp.cutoff : 1800
+weath_amp = vca { gain: 0 }
+weath_lp.lp -> weath_amp.in
+l_noise -> weath_amp.cv : 0.55
+
+# === DRONE -- a fixed D/A fifth under everything ===
+# The opening is 90 seconds with no pulse; weather alone is not enough to
+# hold it. A pedal fifth is mode-invariant (no third), so the same two notes
+# survive every mode rotation in the hour. It shares the weather lane: the
+# atmosphere recedes together when the groove arrives.
+drone_a = vco { freq: 220hz, wave: saw }
+drone_b = vco { freq: 220hz, wave: saw }
+drone_c = vco { freq: 110hz, wave: sine }
+D2v -> drone_a.v_oct
+A2v -> drone_b.v_oct
+D2v -> drone_c.v_oct
+drone_drift = lfo { freq: 0.031hz, wave: tri }
+drone_drift -> drone_b.v_oct : 0.004
+drone_filt = ladder { cutoff: 210, res: 0.22, drive: 0.35 }
+drone_a -> drone_filt.in : 0.34
+drone_b -> drone_filt.in : 0.34
+drone_c -> drone_filt.in : 0.32
+l_brgt      -> drone_filt.cutoff : 700
+drone_drift -> drone_filt.cutoff : 90
+drone_amp = vca { gain: 0 }
+drone_filt -> drone_amp.in
+l_noise -> drone_amp.cv : 0.62
+
+# Lane gates use `threshold: 0.02`, not the default 0.5. An arrangement lane
+# carries a LEVEL, and `logic`'s boolean ops threshold both inputs -- so a
+# section whose lane sits at 0.24 gates its voice off entirely while the
+# mixer happily reports a fader move. The lane's job at this AND is only
+# "is this voice present at all"; how loud it is belongs on `mix.lvlN`.
+# === KICK -- half-time: 1 and the "a" of 3 ===
+kick_seq = stepseq { gates: [1,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0] }
+master -> kick_seq.clock
+# Gate the strike with the STEPPED lane, not the slewed one, so no kick
+# leaks into the breakdown while the fader is on its way down.
+kick_on = logic { op: and, threshold: 0.02 }
+kick_seq.gate -> kick_on.a
+arr_kick.cv   -> kick_on.b
+kck = sub { file: "../lib/kit/kick.sub", tune: 47hz, decay: 0.5 }
+kick_on -> kck.trig
+l_kick  -> kck.accent : 0.35
+0.55    -> kck.accent
+# A parallel envelope from the same trigger: the kit voices have no env out,
+# and every duck in the patch is derived from this one signal.
+kick_env = func { rise: 0.001, fall: 0.30, curve: exp }
+kick_on -> kick_env.trig
+
+# === HATS -- euclid, density on a lane ===
+hat_pat = euclid { steps: 16, hits: 2 }
+master  -> hat_pat.clock
+l_hats  -> hat_pat.hits : 6
+hat_on  = logic { op: and, threshold: 0.02 }
+hat_pat.gate -> hat_on.a
+arr_hats.cv  -> hat_on.b
+hat = sub { file: "../lib/kit/hat.sub", decay: 0.16, tone: 7khz }
+hat_on -> hat.trig
+l_hats -> hat.accent : 0.3
+0.35   -> hat.accent
+
+# === DUB STABS -- quiet dry, huge send. Offbeat = eighth AND NOT quarter. ===
+q_not = logic { op: not }
+quarter -> q_not.a
+offbeat = logic { op: and }
+eighth -> offbeat.a
+q_not  -> offbeat.b
+stab_on = logic { op: and, threshold: 0.02 }
+offbeat      -> stab_on.a
+arr_chord.cv -> stab_on.b
+
+stab_a = vco { freq: 220hz, wave: saw }
+stab_b = vco { freq: 220hz, wave: saw }
+stab_c = vco { freq: 220hz, wave: saw }
+ch_root.cv  -> stab_a.v_oct
+1           -> stab_a.v_oct
+ch_third.cv -> stab_b.v_oct
+ch_fifth.cv -> stab_c.v_oct
+stab_filt = ladder { cutoff: 380, res: 0.28, drive: 0.5 }
+stab_a -> stab_filt.in : 0.34
+stab_b -> stab_filt.in : 0.33
+stab_c -> stab_filt.in : 0.33
+l_brgt -> stab_filt.cutoff : 900
+stab_env = func { rise: 0.004, fall: 0.42, curve: exp }
+stab_on -> stab_env.trig
+stab_amp = vca { gain: 0 }
+stab_filt -> stab_amp.in
+stab_env  -> stab_amp.cv
+# Post-fader: sends are tapped AFTER this, so a muted stab leaves no ghost
+# ringing in the room (docs/patch-craft.md).
+stab_out = vca { gain: 0 }
+stab_amp -> stab_out.in
+l_chord  -> stab_out.cv : 1.0
+
+# === BASS -- split: the sine never moves ===
+bass = sub { file: "../lib/reese.sub", saw_cut: 260, sub_cut: 115 }
+ch_root.cv -> bass.voct
+l_bass     -> bass.level
+l_brgt     -> bass.cut_mod : 320
+
+# === THE MOTIF VOICE -- a modal bell, struck once per bar ===
+bell = modal { modes: 48, structure: 0.42, brightness: 0.45, damping: 0.72,
+               position: 0.28 }
+mot_q.out -> bell.v_oct
+1         -> bell.v_oct
+bell_on = logic { op: and, threshold: 0.02 }
+mot_seq.gate -> bell_on.a
+arr_bell.cv  -> bell_on.b
+bell_on -> bell.strike
+l_brgt  -> bell.brightness : 0.25
+bell_out = vca { gain: 0 }
+bell -> bell_out.in
+l_bell -> bell_out.cv : 0.8
+
+# === BAND MIX -- pump layer 1: every channel ducked by the kick ===
+band = mix { levels: [0.42, 0.62, 0.5, 0.46, 0.12, 0.42, 0.30, 0.55],
+             pans:   [0, 0, 0.15, -0.35, 0.4, 0.2, -0.15, 0] }
+kck        -> band.in1
+bass.sub_out -> band.in2
+bass.saw_out -> band.in3
+stab_out   -> band.in4
+hat        -> band.in5
+bell_out   -> band.in6
+weath_amp  -> band.in7
+drone_amp  -> band.in8
+# An accent lane is not a fader: `accent` shapes a hit's dynamics, it does
+# not set the channel's level. Without these two the kick and hats play at
+# full level the instant they are gated on, and "the kick arrives" sounds
+# identical to "everything is here".
+l_kick -> band.lvl1 : 0.50
+l_hats -> band.lvl5 : 0.36
+kick_env -> band.lvl2 : -0.22
+kick_env -> band.lvl3 : -0.20
+kick_env -> band.lvl4 : -0.20
+kick_env -> band.lvl5 : -0.12
+kick_env -> band.lvl6 : -0.14
+kick_env -> band.lvl7 : -0.10
+kick_env -> band.lvl8 : -0.16
+
+# === SENDS -- the dub doctrine: the dry is quiet, the room is the instrument
+stab_out  -> room.in : 0.85
+bell_out  -> room.in : 0.55
+hat       -> room.in : 0.18
+weath_amp -> room.in : 0.12
+drone_amp -> room.in : 0.30
+
+# === MASTER -- pump layer 2 on the return, layer 3 in the glue comp ===
+master_mix = mix { levels: [1, 1, 0.6, 0.6], pans: [-1, 1, -1, 1] }
+band.out_l -> master_mix.in1
+band.out_r -> master_mix.in2
+room.l     -> master_mix.in3
+room.r     -> master_mix.in4
+kick_env -> master_mix.lvl3 : -0.16
+kick_env -> master_mix.lvl4 : -0.16
+
+# Dub, not EDM: the glue comp is deliberately looser than mainstage's and
+# the clipper barely drives. A tight master bus flattens the difference
+# between "the kick has arrived" and "everything is here", and this movement
+# is built out of exactly that difference.
+mast = sub { file: "../lib/master-chain.sub", low_gain: 0.6, mid1_gain: -1.4,
+             high_gain: 0.4, comp_thr: -13, comp_ratio: 1.9, comp_makeup: 2.0,
+             clip_drive: 3.2, width: 1.1 }
+master_mix.out_l -> mast.in_l
+master_mix.out_r -> mast.in_r
+kck -> mast.side_l : 0.7
+kck -> mast.side_r : 0.7
+
+# The limiter owns the ceiling: out.level stays at 1.0, and the hour's fades
+# are applied in post by assemble.sh.
+mast.l -> out.left
+mast.r -> out.right

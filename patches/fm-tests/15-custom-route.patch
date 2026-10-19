@@ -1,7 +1,5 @@
-# fallback — `route: [1,2, 2,1]` is a cycle (1->2->1), which is illegal. Instead
-# of failing, the module falls back to `free` and keeps playing as an additive
-# stack (rule 6: a bad config never kills the session). Tests: route validation
-# + graceful fallback. Fix the route to hear the intended topology.
+# Custom routing with one modulator and four additional carriers.
+# A cyclic route such as [1,2,2,1] is rejected by check and hot reload.
 clk = clock { bpm: 200 }
 wander = random { rate: 2.3, smooth: 0, seed: 61 }
 notes = sh { mode: sample }
@@ -13,7 +11,7 @@ poly = alloc { n: 4 }
 clk -> poly.gate
 key -> poly.voct
 ep = voice { notes: poly }
-ep.fm = fm { algo: custom, route: [1, 2, 2, 1], freq: 165hz,
+ep.fm = fm { algo: custom, route: [2, 1], freq: 165hz,
              ratios: [1, 2, 3, 4, 5, 6],
              levels: [.5, .26, .17, .12, .09, .07],
              t2: [.05, .05, .05, .05, .05, .05], t3: [.1, .1, .1, .1, .1, .1],

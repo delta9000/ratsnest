@@ -38,7 +38,7 @@ TEST_CASE("eq: metadata and default parameters") {
   CHECK(std::string(info->inputs[1].name) == "in_r");
   CHECK(info->inputs[1].def == 0.0f);
   CHECK(std::string(info->inputs[2].name) == "hp_freq");
-  CHECK(info->inputs[2].def == 20.0f);
+  CHECK(info->inputs[2].def == 0.0f);
   CHECK(std::string(info->inputs[3].name) == "low_freq");
   CHECK(info->inputs[3].def == 120.0f);
   CHECK(std::string(info->inputs[4].name) == "low_gain");
@@ -65,22 +65,18 @@ TEST_CASE("eq: metadata and default parameters") {
   CHECK(std::string(info->outputs[1].name) == "out_r");
 }
 
-TEST_CASE("eq: zero-gain identity (bypass)") {
+TEST_CASE("eq: default controls preserve DC and audio exactly") {
+  const auto* info = find_module("eq");
   auto m = make_eq();
-  float ins[13] = {0.5f, -0.3f, 20.0f, 120.0f, 0.0f, 500.0f, 0.0f, 0.707f, 2500.0f, 0.0f, 0.707f, 10000.0f, 0.0f};
-  float outs[2] = {};
-  
-  // High pass at 20 Hz has negligible effect on a 1 kHz sine, but to make sure
-  // we are in absolute identity bypass for shelves/peaks, let's feed a test signal.
-  for (int i = 0; i < 100; ++i) {
-    ins[0] = static_cast<float>(i) * 0.01f;
+  float ins[13];
+  for (size_t i = 0; i < 13; ++i) ins[i] = info->inputs[i].def;
+  float outs[2];
+  for (int i = 0; i < 1000; ++i) {
+    ins[0] = static_cast<float>(i % 31) * 0.01f;
     ins[1] = -ins[0];
     m->process(ins, outs);
-    // Note: HPF is still active at 20Hz, so we might have minor phase/amplitude change at 20Hz.
-    // If we set hp_freq to a very low value (e.g. 1 Hz), it is closer to identity.
-    // Let's verify that the output remains finite and closely follows input.
-    CHECK(std::isfinite(outs[0]));
-    CHECK(std::isfinite(outs[1]));
+    CHECK(outs[0] == ins[0]);
+    CHECK(outs[1] == ins[1]);
   }
 }
 

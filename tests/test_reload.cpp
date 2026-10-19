@@ -53,6 +53,12 @@ TEST_CASE("config enum change is a topology change (needs re-init)") {
   CHECK(graph::plan_reload(*a, *b).topology);
 }
 
+TEST_CASE("operator waveform edits are not lost on hot reload") {
+  auto a = g("osc = fm { waves: [sine, sine] }\nosc -> out.in\n");
+  auto b = g("osc = fm { waves: [sine, fold] }\nosc -> out.in\n");
+  CHECK(graph::plan_reload(*a, *b).topology);
+}
+
 TEST_CASE("added module: topology plan pairs surviving (name,type) modules") {
   auto a = g("osc = vco\nosc -> out.in\n");
   auto b = g("osc = vco\nlfo1 = lfo\nosc -> out.in\nlfo1 -> osc.v_oct : 0.1\n");

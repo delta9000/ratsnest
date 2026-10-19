@@ -1,0 +1,106 @@
+# Keepsake: a generated motif becomes a remembered phrase.
+# 100 BPM, 16-bar form (38.4 seconds): discover 4 / bloom 8 / dissolve 4.
+# Audition the complete form: ratsnest render patches/keepsake.patch -d 40 --stats 2.4
+# To jump at the next bar, edit form.request to 0, 1 or 2. -1 cancels a pending jump.
+# form.hold: 1 holds a section. A pulse at form.launch restarts the requested section.
+time = transport { bpm: 100, beats: 4, bars: 4, division: 4, swing: 0.18 }
+form = scene { bars: [4, 8, 4] }
+time.bar -> form.clock
+
+# Named controls bind every scene change to the same address; no parallel counters.
+harmony = switch { mode: addr, n: 3, in1: 0, in2: 5, in3: 7 }
+remember = switch { mode: addr, n: 3, in1: 0, in2: 1, in3: 1 }
+rotation = switch { mode: addr, n: 3, in1: 0, in2: 0, in3: 4 }
+melody_level = switch { mode: addr, n: 3, in1: -19, in2: -16, in3: -22 }
+hat_density = switch { mode: addr, n: 3, in1: 0.3, in2: 0.8, in3: 0.2 }
+form.index -> harmony.addr
+form.index -> remember.addr
+form.index -> rotation.addr
+form.index -> melody_level.addr
+form.index -> hat_density.addr
+
+# The control loop repeats identically until rerolled; changing probability
+# does not disturb its values. Memory keeps the final captured bar into bloom.
+material = bern { seed: 81, length: 64, prob: 0.85 }
+time.clock -> material.gate
+time.phrase -> material.reset
+memory = phrase { length: 16, in: -1.2 }
+material.value -> memory.in : 0.9
+time.clock -> memory.clock
+remember -> memory.freeze
+rotation -> memory.rotate
+form.trig -> memory.reset
+key = quant { mode: clock, scale: [0, 2, 3, 5, 7, 8, 10] }
+memory -> key.in
+harmony -> key.root
+time.clock -> key.clock
+
+# A related slower voice reads the previous note, then moves by scale degrees.
+answer = quant { mode: clock, scale: [0, 2, 3, 5, 7, 8, 10], degree: -2 }
+memory.tap1 -> answer.in
+harmony -> answer.root
+time.beat -> answer.clock
+lead_env = func { rise: 0.004, fall: 0.24, curve: exp }
+material.a -> lead_env.trig
+lead = additive { levels: [0.7, 0.25, 0.14, 0.06], gain: 0, tilt: -4 }
+key -> lead.v_oct
+lead_env -> lead.gain
+# One slow sweep is tied to the phrase, so tempo edits retain its musical length.
+sweep = lfo { freq: 0, wave: sine }
+time.phrase_phase -> sweep.phase
+sweep -> lead.tilt : 3
+lead_ch = channel { level: 0, balance: -0.25, send: -12 }
+lead -> lead_ch.in_l
+lead -> lead_ch.in_r
+melody_level -> lead_ch.level
+
+answer_env = func { rise: 0.012, fall: 0.8, curve: exp }
+time.beat -> answer_env.trig
+bell = additive { levels: [0.7, 0.15, 0.05], ratios: [1, 2, 3.01], gain: 0 }
+answer -> bell.v_oct
+answer_env -> bell.gain
+bell_ch = channel { level: -23, balance: 0.35, send: -9 }
+bell -> bell_ch.in_l
+bell -> bell_ch.in_r
+
+kick = sub { file: "lib/kick.sub", tune: 48, decay: 0.12 }
+time.beat -> kick.trig
+kick_ch = channel { level: -12 }
+kick.main -> kick_ch.in_l
+kick.main -> kick_ch.in_r
+hats = bern { seed: 19, length: 16, prob: 0 }
+time.clock -> hats.gate
+time.phrase -> hats.reset
+hat_density -> hats.prob
+hat_env = func { rise: 0.0003, fall: 0.04, curve: exp }
+hats.a -> hat_env.trig
+hash = noise { color: blue, seed: 18 }
+hat = vca { gain: 0 }
+hash -> hat.in
+hat_env -> hat.cv
+hat_ch = channel { level: -23, balance: 0.2, send: -18 }
+hat -> hat_ch.in_l
+hat -> hat_ch.in_r
+
+# Post-fader sends: section fades also change the amount sent to the room.
+room = reverb { mix: 1, decay: 0.65, damp: 0.5 }
+lead_ch.send_l -> room.in_l
+lead_ch.send_r -> room.in_r
+bell_ch.send_l -> room.in_l
+bell_ch.send_r -> room.in_r
+hat_ch.send_l -> room.in_l
+hat_ch.send_r -> room.in_r
+master = channel { level: 0 }
+lead_ch.out_l -> master.in_l
+lead_ch.out_r -> master.in_r
+bell_ch.out_l -> master.in_l
+bell_ch.out_r -> master.in_r
+kick_ch.out_l -> master.in_l
+kick_ch.out_r -> master.in_r
+hat_ch.out_l -> master.in_l
+hat_ch.out_r -> master.in_r
+room.out_l -> master.in_l
+room.out_r -> master.in_r
+master.out_l -> out.left
+master.out_r -> out.right
+# Watch master.peak or master.rms in play mode; values are dBFS, not LUFS.

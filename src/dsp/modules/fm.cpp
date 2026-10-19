@@ -25,7 +25,7 @@ constexpr float kTwoPi = 2.0f * std::numbers::pi_v<float>;
 constexpr float kIndex = 4.0f * std::numbers::pi_v<float>;
 
 constexpr InputInfo kIns[] = {
-    {"gate", 0.f},   {"freq", 440.f}, {"v_oct", 0.f},  {"vel", 1.f},
+    {"gate", 0.f},   {"freq", 220.f}, {"v_oct", 0.f},  {"vel", 1.f},
     {"lvl1", 0.f},   {"lvl2", 0.f},   {"lvl3", 0.f},   {"lvl4", 0.f},
     {"lvl5", 0.f},   {"lvl6", 0.f},   {"ratio1", 0.f}, {"ratio2", 0.f},
     {"ratio3", 0.f}, {"ratio4", 0.f}, {"ratio5", 0.f}, {"ratio6", 0.f},
@@ -39,14 +39,14 @@ constexpr const char* kCurves[] = {"lin", "exp", "log", nullptr};
 constexpr const char* kSyncs[] = {"on", "off", nullptr};
 constexpr const char* kWaves[] = {"sine", "half", "abs", "quarter", "fold", nullptr};
 constexpr ConfigInfo kCfg[] = {
-    {"algo", kAlgos},    {"route", nullptr}, {"ratios", nullptr},
-    {"levels", nullptr}, {"fixed", nullptr}, {"fb", nullptr},
-    {"vel_sens", nullptr},
-    {"t1", nullptr},     {"t2", nullptr},    {"t3", nullptr},
-    {"t4", nullptr},     {"l1", nullptr},    {"l2", nullptr},
-    {"l3", nullptr},     {"curve", kCurves}, {"sync", kSyncs},
-    {"waves", nullptr},  {"key_break", nullptr},
-    {"key_level", nullptr}, {"key_rate", nullptr}};
+    {"algo", kAlgos},    {"route", nullptr, ConfigKind::Numbers}, {"ratios", nullptr, ConfigKind::Numbers},
+    {"levels", nullptr, ConfigKind::Numbers}, {"fixed", nullptr, ConfigKind::Numbers}, {"fb", nullptr, ConfigKind::Numbers},
+    {"vel_sens", nullptr, ConfigKind::Numbers},
+    {"t1", nullptr, ConfigKind::Numbers},     {"t2", nullptr, ConfigKind::Numbers},    {"t3", nullptr, ConfigKind::Numbers},
+    {"t4", nullptr, ConfigKind::Numbers},     {"l1", nullptr, ConfigKind::Numbers},    {"l2", nullptr, ConfigKind::Numbers},
+    {"l3", nullptr, ConfigKind::Numbers},     {"curve", kCurves}, {"sync", kSyncs},
+    {"waves", kWaves, ConfigKind::Enums},  {"key_break", nullptr},
+    {"key_level", nullptr, ConfigKind::Numbers}, {"key_rate", nullptr, ConfigKind::Numbers}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"op1"}, {"op2"}, {"op3"},
                                 {"op4"}, {"op5"}, {"op6"}};
 
@@ -177,6 +177,31 @@ std::vector<Edge> parse_route(const std::vector<double>& route) {
     edges.push_back(e);
   }
   return edges;
+}
+
+std::string validate(const Config& cfg) {
+  for (const auto& [name, value] : cfg) {
+    if (name != "route" && (value.arr.size() > kOps || value.strs.size() > kOps))
+      return "'" + name + "' accepts at most 6 operator entries";
+  }
+  const auto& route = cfg_arr(cfg, "route");
+  if (route.empty()) return {};
+  if (cfg_str(cfg, "algo", "free") != "custom")
+    return "'route' requires algo: custom";
+  const auto edges = parse_route(route);
+  if (edges.size() * 2 != route.size())
+    return "'route' expects distinct operator pairs 1..6, without self-edges (use fb)";
+  std::array<int, kOps> indegree{};
+  for (auto [s, d] : edges) { (void)s; ++indegree[static_cast<size_t>(d)]; }
+  for (int count = 0; count < kOps; ++count) {
+    auto it = std::find(indegree.begin(), indegree.end(), 0);
+    if (it == indegree.end()) return "'route' contains a cycle; use fb for operator self-feedback";
+    const int src = static_cast<int>(it - indegree.begin());
+    *it = -1;
+    for (auto [s, d] : edges)
+      if (s == src) --indegree[static_cast<size_t>(d)];
+  }
+  return {};
 }
 
 class Fm final : public Module {
@@ -405,5 +430,5 @@ class Fm final : public Module {
 std::unique_ptr<Module> make() { return std::make_unique<Fm>(); }
 }  // namespace
 
-const ModuleInfo fm_info{"fm", kIns, kCfg, kOuts, &make};
+const ModuleInfo fm_info{"fm", kIns, kCfg, kOuts, &make, false, false, &validate};
 }  // namespace ms::dsp

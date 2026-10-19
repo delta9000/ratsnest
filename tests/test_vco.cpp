@@ -17,7 +17,7 @@ std::vector<float> render(const char* wave, float freq, float v_oct, size_t n,
   cfg.push_back({"wave", ConfigValue{wave, 0, {}, false}});
   m->init(rate, cfg);
   std::vector<float> out(n);
-  float ins[6] = {freq, v_oct, 0.f, 0.5f, 0.f, 0.f};
+  float ins[7] = {freq, v_oct, 0.f, 0.5f, 0.f, 0.f};
   float o[1];
   for (size_t i = 0; i < n; ++i) { m->process(ins, o); out[i] = o[0]; }
   return out;
@@ -77,7 +77,7 @@ TEST_CASE("sync resets phase") {
   Config cfg;
   cfg.push_back({"wave", ConfigValue{"saw", 0, {}, false}});
   m->init(48000.0, cfg);
-  float ins[6] = {100.f, 0.f, 0.f, 0.5f, 0.f, 0.f};
+  float ins[7] = {100.f, 0.f, 0.f, 0.5f, 0.f, 0.f};
   float o[1];
   for (int i = 0; i < 100; ++i) m->process(ins, o);
   float before = o[0];
@@ -85,4 +85,16 @@ TEST_CASE("sync resets phase") {
   m->process(ins, o);
   CHECK(o[0] != doctest::Approx(before));
   CHECK(o[0] == doctest::Approx(-1.0f).epsilon(0.05));  // saw restarts near -1
+}
+
+TEST_CASE("vco phase is an offset in cycles including when stopped") {
+  const auto* info = find_module("vco");
+  auto m = info->create();
+  m->init(48000, {});
+  float ins[7] = {0,0,0,0.5f,0,0,0.25f}, out[1];
+  m->process(ins, out);
+  CHECK(out[0] == doctest::Approx(1.0f));
+  ins[6] = -0.25f;
+  m->process(ins, out);
+  CHECK(out[0] == doctest::Approx(-1.0f));
 }

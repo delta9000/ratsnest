@@ -12,7 +12,7 @@ constexpr InputInfo kIns[] = {
     {"gate", 1.0f},
 };
 constexpr ConfigInfo kCfg[] = {
-    {"file", nullptr},   // arbitrary path string (quoted in the patch)
+    {"file", nullptr, ConfigKind::Text},   // arbitrary path string (quoted in the patch)
     {"secs", nullptr},   // capture cap in seconds (numeric)
 };
 

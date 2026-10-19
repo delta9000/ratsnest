@@ -5,8 +5,14 @@ namespace ms::dsp {
 extern const ModuleInfo vca_info;
 extern const ModuleInfo out_info;
 extern const ModuleInfo vco_info;
+extern const ModuleInfo additive_info;
+extern const ModuleInfo dust_info;
 extern const ModuleInfo lfo_info;
 extern const ModuleInfo clock_info;
+extern const ModuleInfo transport_info;
+extern const ModuleInfo phrase_info;
+extern const ModuleInfo scene_info;
+extern const ModuleInfo channel_info;
 extern const ModuleInfo div_info;
 extern const ModuleInfo func_info;
 extern const ModuleInfo svf_info;

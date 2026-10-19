@@ -42,7 +42,16 @@ mise run render -- patches/first.patch -d 10s -o take.wav
 ```
 
 Renders 10 seconds of `patches/first.patch` to `take.wav`, no audio device
-needed.
+needed. `--start` captures a window from further in:
+
+```sh
+mise run render -- patches/longwave/4-lydian.patch --start 10m -d 60s --stats 10s
+```
+
+A stateful graph has no seek, so `--start` runs the patch from zero and
+discards the skipped samples — it costs the same time as rendering the whole
+span, but writes only the window you asked for, and `--stats` still reports
+absolute piece time.
 
 ### Play a patch live
 
@@ -54,6 +63,34 @@ Starts a PipeWire output stream and plays the patch. Edit and save the
 `.patch` file while it's running — the graph hot-reloads, keeping module
 state (filter memory, envelope phase, sequencer position, ...) intact
 wherever the module name and type haven't changed.
+
+### Discover module interfaces
+
+```sh
+mise run build
+./build/ratsnest describe          # JSON interfaces for all runtime modules
+./build/ratsnest describe additive     # one module: input bases, config types, enum values, outputs
+```
+
+For agent-driven work: discover the interface, consult `docs/modules.md` for
+units/ranges and recipes, run `check`, then render a short representative window
+with `--stats`. A successful check establishes syntax/configuration validity;
+listening and signal measurements establish whether a patch does what you want.
+
+### Musical patterns and live scenes
+
+`patches/keepsake.patch` demonstrates a shared swung transport, a generated motif
+captured into phrase memory, clocked harmony changes, bar-quantized scenes, and
+stereo channels with post-fader sends. Render its complete form:
+
+```sh
+mise run render -- patches/keepsake.patch -d 40 --stats 9.6 -o keepsake.wav
+```
+
+While playing, edit `form.request` to 0, 1, or 2 to queue a section for the next
+bar, or set `form.hold: 1` to remain in a section. The module reference describes
+`transport`, `scene`, `phrase`, and `channel`, plus repeat/reset controls on
+`bern` and clocked scale-degree transposition on `quant`.
 
 ### Validate a patch without running it
 
@@ -75,10 +112,12 @@ source_port -> dest.input_port : gain
 ```
 
 - Every signal is a float at audio rate — no separate control rate, no
-  events. Gates rise through `0.5`; audio/bipolar signals run `-1..1`;
-  unipolar signals run `0..1`; pitch is volts/octave.
-- Cables *sum* onto a declared input's base value — there's no implicit
+  events. Gates rise through `0.5`; audio/bipolar signals nominally run `-1..1`;
+  unipolar signals run `0..1`; pitch is volts/octave relative to A3/220 Hz by default.
+- Cables *sum* onto a built-in input's base value — there's no implicit
   normalling. An unpatched input just reads its default.
+- Float output preserves headroom; the live device boundary clips. Use an explicit
+  limiter when required.
 - Omitting a cable's output name reads the module's first/primary output
   (a bare `stepseq` reads `.cv`, a bare `svf` reads `.lp`).
 - `name = voice { notes: <alloc-or-midi> }` stamps a block of per-voice

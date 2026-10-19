@@ -14,7 +14,7 @@ constexpr OutputInfo kOuts[] = {{"out"}, {"stepped"}};
 class Random final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
-    rate_ = static_cast<float>(rate);
+    rate_ = rate;
     // Sanitize before the cast: double -> uint32_t is UB out of range.
     double s = cfg_num(cfg, "seed", 1.0);
     if (!std::isfinite(s)) s = 1.0;
@@ -28,7 +28,7 @@ class Random final : public Module {
   }
 
   void process(const float* ins, float* outs) override {
-    phase_ += std::max(ins[0], 0.0f) / rate_;
+    phase_ += static_cast<double>(std::max(ins[0], 0.0f)) / rate_;
     if (phase_ >= 1.0f) {
       phase_ -= std::floor(phase_);
       prev_ = next_;
@@ -37,7 +37,7 @@ class Random final : public Module {
     const float sm = std::clamp(ins[1], 0.0f, 1.0f);
     const float eased =
         prev_ + (next_ - prev_) *
-                    0.5f * (1.0f - std::cos(std::numbers::pi_v<float> * phase_));
+                    0.5f * (1.0f - std::cos(std::numbers::pi_v<float> * static_cast<float>(phase_)));
     outs[0] = next_ + (eased - next_) * sm;
     outs[1] = next_;
   }
@@ -61,9 +61,9 @@ class Random final : public Module {
     return 2.0f * (static_cast<float>(x) * (1.0f / 4294967296.0f)) - 1.0f;
   }
 
-  float rate_ = 48000.0f;
+  double rate_ = 48000.0;
   std::uint32_t state_ = 0x9E3779B9u;
-  float phase_ = 0.0f;
+  double phase_ = 0.0;
   float prev_ = 0.0f;
   float next_ = 0.0f;
 };

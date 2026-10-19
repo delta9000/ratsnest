@@ -10,7 +10,7 @@ namespace ms::dsp {
 namespace {
 
 constexpr InputInfo kIns[] = {
-    {"in", 0.f}, {"cutoff", 1000.f}, {"res", 0.f}, {"drive", 0.f}};
+    {"in", 0.f}, {"cutoff", 1000.f}, {"res", 0.f}, {"drive", 0.f}, {"v_oct", 0.f}};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
 class Ladder final : public Module {
@@ -21,7 +21,9 @@ class Ladder final : public Module {
   }
 
   void process(const float* ins, float* outs) override {
-    const float cutoff = std::clamp(ins[1], 5.0f, 0.45f * rate_);
+    const double oct = std::isfinite(ins[4]) ? std::clamp(static_cast<double>(ins[4]), -24.0, 24.0) : 0.0;
+    const float cutoff = static_cast<float>(std::clamp(
+        static_cast<double>(ins[1]) * std::exp2(oct), 5.0, 0.45 * rate_));
     const float res = std::clamp(ins[2], 0.0f, 1.0f);
     const float drive = std::clamp(ins[3], 0.0f, 4.0f);
     const float g = std::tan(std::numbers::pi_v<float> * cutoff / rate_);

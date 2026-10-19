@@ -46,18 +46,18 @@ TEST_CASE("default ports resolve to in/out") {
 }
 
 TEST_CASE("bareword arrays lower to strs; numeric arrays stay numeric") {
-  auto r = go("q = quant { scale: [sine, abs, fold] }\nq -> out.in\n");
+  auto r = go("q = fm { waves: [sine, abs, fold] }\nq -> out.in\n");
   REQUIRE(r.ok());
   int qi = -1;
   for (int i = 0; i < (int)r.graph->nodes.size(); ++i)
     if (r.graph->nodes[i].name == "q") qi = i;
   REQUIRE(qi >= 0);
-  const auto& strs = dsp::cfg_str_arr(r.graph->nodes[qi].config, "scale");
+  const auto& strs = dsp::cfg_str_arr(r.graph->nodes[qi].config, "waves");
   REQUIRE(strs.size() == 3);
   CHECK(strs[0] == "sine");
   CHECK(strs[1] == "abs");
   CHECK(strs[2] == "fold");
-  CHECK(dsp::cfg_arr(r.graph->nodes[qi].config, "scale").empty());
+  CHECK(dsp::cfg_arr(r.graph->nodes[qi].config, "waves").empty());
 
   auto r2 = go("p = quant { scale: [0, 3, 5] }\np -> out.in\n");
   REQUIRE(r2.ok());
@@ -70,6 +70,40 @@ TEST_CASE("bareword arrays lower to strs; numeric arrays stay numeric") {
   CHECK(a[0] == 0.0);
   CHECK(a[2] == 5.0);
   CHECK(dsp::cfg_str_arr(r2.graph->nodes[pi].config, "scale").empty());
+}
+
+TEST_CASE("config type mistakes fail before a graph can replace the running patch") {
+  for (const char* src : {
+           "s = stepseq { steps: [D2v, d2v] }\n",
+           "s = stepseq { steps: 2 }\n",
+           "q = quant { scale: [minor] }\n",
+           "m = mix { levels: [1, loud] }\n",
+           "f = fm { waves: [sine, typo] }\n",
+           "f = fm { waves: [1] }\n",
+           "n = noise { seed: random }\n",
+           "s = sampler { file: 123 }\n"}) {
+    CAPTURE(src);
+    const auto r = go(src);
+    REQUIRE_FALSE(r.ok());
+    CHECK(r.graph == nullptr);
+    CHECK(r.errors.front().line == 1);
+    CHECK(r.errors.front().msg.find("expects") != std::string::npos);
+  }
+}
+
+TEST_CASE("FM rejects malformed topology instead of playing a different instrument") {
+  for (const char* src : {
+           "f = fm { algo: custom, route: [1,2,2,1] }\n",
+           "f = fm { algo: custom, route: [2] }\n",
+           "f = fm { algo: custom, route: [2,2] }\n",
+           "f = fm { algo: custom, route: [7,1] }\n",
+           "f = fm { algo: custom, route: [2,1,2,1] }\n",
+           "f = fm { route: [2,1] }\n",
+           "f = fm { levels: [1,1,1,1,1,1,1] }\n"}) {
+    CAPTURE(src);
+    CHECK_FALSE(go(src).ok());
+  }
+  CHECK(go("f = fm { algo: custom, route: [6,5,5,4,4,3,3,2,2,1] }\n").ok());
 }
 
 TEST_CASE("literal source folds into base") {

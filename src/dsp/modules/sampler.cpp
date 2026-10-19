@@ -14,7 +14,7 @@ constexpr InputInfo kIns[] = {
 };
 constexpr const char* kLoop[] = {"off", "on", nullptr};
 constexpr ConfigInfo kCfg[] = {
-    {"file", nullptr},   // arbitrary path string (quoted in the patch)
+    {"file", nullptr, ConfigKind::Text},   // arbitrary path string (quoted in the patch)
     {"loop", kLoop},
 };
 constexpr OutputInfo kOuts[] = {

@@ -104,13 +104,11 @@ pad_vcf.lp -> pad_amp.in
 swell -> pad_amp.gain : 0.3
 
 # ---- ring bloom: lead x fifth-above sine, opened once a bar ----
-# math.b's neutral base is 1.0 (so unpatched mult passes through); the -1.0
-# constant cancels it, leaving pure oscillator on b -- true ring mod, not AM.
+# Both multiplier inputs have zero bases: pure oscillator multiplication.
 fifth = vco { freq: 440hz, wave: sine }
 melody -> fifth.v_oct
 ring = math { op: mult }
 lead_osc -> ring.a
--1.0 -> ring.b
 fifth -> ring.b
 ring_gate = lpg { damp: 0.6, decay: 0.8 }
 ring -> ring_gate.in

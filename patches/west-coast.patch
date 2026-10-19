@@ -30,7 +30,7 @@ half -> gate.strike
 
 # -- texture: pink noise, amplitude-modulated by the raw osc --
 hiss = noise { color: pink, seed: 3 }
-shimmer = math { op: mult }
+shimmer = math { op: mult, b: 1 }
 hiss -> shimmer.a
 osc -> shimmer.b : 0.6
 bed = xfade { mix: 0.25 }

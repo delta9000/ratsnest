@@ -135,7 +135,6 @@ hat_filter.hp -> hat_amp.in
 # lane is up, scaled so intro/break stay tickless without a negative bias.
 hat_mult = math { op: mult }
 hat_env -> hat_mult.a
--1 -> hat_mult.b           # cancel mult's default b base of 1
 perc_lvl -> hat_mult.b : 1.5
 hat_mult -> hat_amp.cv : 0.6
 

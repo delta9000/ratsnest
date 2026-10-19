@@ -1,0 +1,373 @@
+# longwave IV -- "lydian" -- EDM finale, 126 BPM, F lydian, 17:00 (+1:00 tail).
+#
+# The hour's plan lives in `1-dorian.patch`. This movement's place in it:
+#
+# THE LIFT. The tonic moves from D to F for the only time in the piece --
+# and F lydian is the SAME SEVEN PITCHES as D dorian, so not one note
+# changes at the seam. What changes is which note is home. The #4 (B over F)
+# is the brightest degree the hour ever reaches, and it is the same B that
+# has been the dorian sixth since minute one.
+#
+# The peak sits at 9:54 of this movement -- about 48 minutes into the hour,
+# roughly 80% through, where a symphony puts it.
+#
+#   block  0   0:00  the tonic reveal -- same pitches, F is now home
+#   block  8   2:02  build: kick and bass arrive, riser climbing
+#   block 16   4:04  DROP 1 -- four-on-the-floor, reese, trance-gate pad
+#   block 28   7:07  breakdown -- MOTIF in full over the #4
+#   block 35   8:53  the long riser, drums out
+#   block 39   9:54  DROP 2 -- the peak of the hour: hook and motif together
+#   block 55  13:58  false ending
+#   block 61  15:29  final statement
+#   block 67  17:01  ritardando: 126 -> 63 over ~30 s, into the coda
+#
+#   ratsnest render patches/longwave/4-lydian.patch -d 1080s --stats 30s
+#
+# 8-bar blocks of 15.238 s, 73 lane steps (wrap at 1112.4 s; render 1080 s).
+
+# === CLOCKS -- fixed for the arrangement, ramped for the music ===
+arr_clk = clock { bpm: 504 }
+blk     = div { by: 128 }                # ARRANGEMENT DIVISOR: 8 bars
+arr_clk -> blk.in
+
+master  = clock { bpm: 504 }
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+half    = div { by: 2 }
+bar     = div { by: 2 }
+master  -> eighth.in
+eighth  -> quarter.in
+quarter -> half.in
+half    -> bar.in
+
+# === ARRANGEMENT LANES ===
+arr_room  = stepseq { steps: [0.62, 0.62, 0.62, 0.62, 0.62, 0.62, 0.62, 0.62, 0.45, 0.45, 0.45, 0.45,
+                          0.45, 0.45, 0.45, 0.45, 0.32, 0.32, 0.32, 0.32, 0.32, 0.32, 0.32, 0.32,
+                          0.32, 0.32, 0.32, 0.32, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.45,
+                          0.45, 0.45, 0.45, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28,
+                          0.28, 0.28, 0.28, 0.28, 0.28, 0.28, 0.28, 0.68, 0.68, 0.68, 0.68, 0.68,
+                          0.68, 0.42, 0.42, 0.42, 0.42, 0.42, 0.42, 0.9, 0.9, 0.9, 0.9, 0.9,
+                          0.9] }
+arr_kick  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0.55, 0.55, 0.55, 0.55,
+                          0.55, 0.55, 0.55, 0.55, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95,
+                          0.95, 0.95, 0.95, 0.95, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                          1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+                          0, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0, 0, 0, 0, 0,
+                          0] }
+arr_clap  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0.35, 0.35, 0.35, 0.35,
+                          0.35, 0.35, 0.35, 0.35, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85,
+                          0.85, 0.85, 0.85, 0.85, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0, 0, 0, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95,
+                          0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0, 0, 0, 0, 0,
+                          0, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0, 0, 0, 0, 0,
+                          0] }
+arr_hats  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0.4, 0.4, 0.4, 0.4,
+                          0.4, 0.4, 0.4, 0.4, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7,
+                          0.7, 0.7, 0.7, 0.7, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.5,
+                          0.5, 0.5, 0.5, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85,
+                          0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.2, 0.2, 0.2, 0.2, 0.2,
+                          0.2, 0.65, 0.65, 0.65, 0.65, 0.65, 0.65, 0.12, 0.12, 0.12, 0.12, 0.12,
+                          0.12] }
+arr_bass  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5,
+                          0.5, 0.5, 0.5, 0.5, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
+                          0.9, 0.9, 0.9, 0.9, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.45,
+                          0.45, 0.45, 0.45, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                          1, 1, 1, 1, 1, 1, 1, 0.25, 0.25, 0.25, 0.25, 0.25,
+                          0.25, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0, 0, 0, 0, 0,
+                          0] }
+arr_pad   = stepseq { steps: [1, 1, 1, 1, 1, 1, 1, 1, 0.7, 0.7, 0.7, 0.7,
+                         0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7,
+                         0.7, 0.7, 0.7, 0.7, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.6,
+                         0.6, 0.6, 0.6, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75,
+                         0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.8, 0.8, 0.8, 0.8, 0.8,
+                         0.8, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.85, 0.85, 0.85, 0.85, 0.85,
+                         0.85] }
+arr_lead  = stepseq { steps: [0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.3, 0.3, 0.3, 0.3,
+                          0.3, 0.3, 0.3, 0.3, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6,
+                          0.6, 0.6, 0.6, 0.6, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.3,
+                          0.3, 0.3, 0.3, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95,
+                          0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.95, 0.35, 0.35, 0.35, 0.35, 0.35,
+                          0.35, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.5, 0.5, 0.5, 0.5, 0.5,
+                          0.5] }
+arr_rise  = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0.6, 0.6, 0.6,
+                          0.6, 0.6, 0.6, 0.6, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                          1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0] }
+arr_brgt  = stepseq { steps: [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.5, 0.5, 0.5, 0.5,
+                          0.5, 0.5, 0.5, 0.5, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75,
+                          0.75, 0.75, 0.75, 0.75, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.9,
+                          0.9, 0.9, 0.9, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                          1, 1, 1, 1, 1, 1, 1, 0.4, 0.4, 0.4, 0.4, 0.4,
+                          0.4, 0.85, 0.85, 0.85, 0.85, 0.85, 0.85, 0.32, 0.32, 0.32, 0.32, 0.32,
+                          0.32] }
+arr_bpm   = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
+                         1] }
+arr_fx    = stepseq { gates: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                       0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                       0] }
+blk -> arr_room.clock
+blk -> arr_kick.clock
+blk -> arr_clap.clock
+blk -> arr_hats.clock
+blk -> arr_bass.clock
+blk -> arr_pad.clock
+blk -> arr_lead.clock
+blk -> arr_rise.clock
+blk -> arr_brgt.clock
+blk -> arr_bpm.clock
+blk -> arr_fx.clock
+
+# Drops land clean because the risers release fast and the drums attack fast.
+l_room = func { rise: 8,  fall: 10 }
+l_kick = func { rise: 0.6, fall: 1.2 }
+l_clap = func { rise: 0.8, fall: 1.5 }
+l_hats = func { rise: 3,  fall: 4 }
+l_bass = func { rise: 2,  fall: 3 }
+l_pad  = func { rise: 7,  fall: 8 }
+l_lead = func { rise: 4,  fall: 5 }
+l_rise = func { rise: 40, fall: 0.4 }    # slow climb, instant release
+l_brgt = func { rise: 9,  fall: 10 }
+l_bpm  = func { rise: 30, fall: 30 }
+
+arr_room.cv -> l_room.in
+arr_kick.cv -> l_kick.in
+arr_clap.cv -> l_clap.in
+arr_hats.cv -> l_hats.in
+arr_bass.cv -> l_bass.in
+arr_pad.cv  -> l_pad.in
+arr_lead.cv -> l_lead.in
+arr_rise.cv -> l_rise.in
+arr_brgt.cv -> l_brgt.in
+arr_bpm.cv  -> l_bpm.in
+
+# The ritardando: 504 -> 252 sixteenths is 126 -> 63 BPM, handing to the coda.
+l_bpm -> master.bpm : -252
+
+# === HARMONY -- F lydian, one chord per bar: Fmaj9 | C | G | Am ===
+# The G is the lydian moment: II major, and the B in it is the #4 over F.
+ch_root  = stepseq { steps: [F2v, C3v, G2v, A2v] }
+ch_third = stepseq { steps: [A2v, E3v, B2v, C3v] }
+ch_fifth = stepseq { steps: [C3v, G3v, D3v, E3v] }
+bar -> ch_root.clock
+bar -> ch_third.clock
+bar -> ch_fifth.clock
+
+# === THE MOTIF -- the same eight numbers as movement I, read by lydian ===
+# The minor modes read this contour as 0/7/3/10 semitones; here the
+# quantizer rounds it into 0/7/2/9 (measured -- lydian's Ab and Eb both fall
+# exactly between two scale tones and ties snap down). Minor third and
+# seventh become major second and sixth: the tune brightens, and the
+# finale's version is pentatonic, so it has no avoid note over F, C, G or
+# Am. Not one number in the contour changed.
+mot_seq = stepseq { steps: [0, 0.5833, 0.25, 0.8333, 0.5833, 0.25, 0, -0.3333],
+                    gates: [1, 1, 1, 1, 1, 1, 1, 0] }
+half -> mot_seq.clock
+mot_add = math { op: add, b: 0 }
+ch_root.cv -> mot_add.a
+mot_seq.cv -> mot_add.b
+mot_q = quant { scale: [0, 2, 4, 6, 7, 9, 11], root: 8 }   # F lydian
+mot_add -> mot_q.in
+
+# === THE ROOM ===
+room = sub { file: "../lib/tape-echo.sub", verb_decay: 0.82, fb_a: 0.55 }
+126 -> room.bpm
+l_bpm -> room.bpm : -63
+l_room -> room.fb_mod : 0.10
+l_room -> room.decay_mod : 0.06
+
+# Lane gates use `threshold: 0.02`, not the default 0.5. An arrangement lane
+# carries a LEVEL, and `logic`'s boolean ops threshold both inputs -- so a
+# section whose lane sits at 0.24 gates its voice off entirely while the
+# mixer happily reports a fader move. The lane's job at this AND is only
+# "is this voice present at all"; how loud it is belongs on `mix.lvlN`.
+# === KICK -- four on the floor ===
+kick_on = logic { op: and, threshold: 0.02 }
+quarter     -> kick_on.a
+arr_kick.cv -> kick_on.b
+kck = sub { file: "../lib/kit/kick.sub", tune: 50hz, decay: 0.38 }
+kick_on -> kck.trig
+l_kick  -> kck.accent : 0.35
+0.6     -> kck.accent
+kick_env = func { rise: 0.001, fall: 0.22, curve: exp }
+kick_on -> kick_env.trig
+
+# === CLAP -- 2 and 4 ===
+clap_seq = stepseq { gates: [0, 1, 0, 1] }
+quarter -> clap_seq.clock
+clap_on = logic { op: and, threshold: 0.02 }
+clap_seq.gate -> clap_on.a
+arr_clap.cv   -> clap_on.b
+clp = sub { file: "../lib/kit/clap.sub" }
+clap_on -> clp.trig
+l_clap  -> clp.accent : 0.3
+0.55    -> clp.accent
+
+# === HATS -- closed euclid on sixteenths, open on the offbeat eighths ===
+hat_pat = euclid { steps: 16, hits: 4 }
+master  -> hat_pat.clock
+l_hats  -> hat_pat.hits : 8
+chat_on = logic { op: and, threshold: 0.02 }
+hat_pat.gate -> chat_on.a
+arr_hats.cv  -> chat_on.b
+chat = sub { file: "../lib/kit/hat.sub", decay: 0.11 }
+chat_on -> chat.trig
+l_hats  -> chat.accent : 0.3
+0.3     -> chat.accent
+
+q_not = logic { op: not }
+quarter -> q_not.a
+offbeat = logic { op: and }
+eighth -> offbeat.a
+q_not  -> offbeat.b
+ohat_on = logic { op: and, threshold: 0.02 }
+offbeat     -> ohat_on.a
+arr_hats.cv -> ohat_on.b
+ohat = sub { file: "../lib/kit/hat.sub", decay: 0.34 }
+ohat_on -> ohat.trig
+chat_on -> ohat.choke
+0.32    -> ohat.accent
+
+# === BASS -- sustained reese, ducked hard ===
+bass = sub { file: "../lib/reese.sub", saw_cut: 300, sub_cut: 125, detune: 0.008 }
+ch_root.cv -> bass.voct
+l_bass     -> bass.level
+l_brgt     -> bass.cut_mod : 420
+
+# === TRANCE-GATE PAD -- a saw stack chopped by a fixed sixteenth pattern ===
+pad_a = vco { freq: 220hz, wave: saw }
+pad_b = vco { freq: 220hz, wave: saw }
+pad_c = vco { freq: 440hz, wave: saw }
+ch_root.cv  -> pad_a.v_oct
+1           -> pad_a.v_oct
+ch_third.cv -> pad_b.v_oct
+1           -> pad_b.v_oct
+ch_fifth.cv -> pad_c.v_oct
+pad_filt = ladder { cutoff: 500, res: 0.2, drive: 0.4 }
+pad_a -> pad_filt.in : 0.34
+pad_b -> pad_filt.in : 0.33
+pad_c -> pad_filt.in : 0.33
+l_brgt -> pad_filt.cutoff : 2600
+gate_seq = stepseq { gates: [1,0,1,1, 0,1,1,0, 1,0,1,1, 0,1,0,1] }
+master -> gate_seq.clock
+gate_env = func { rise: 0.004, fall: 0.09 }
+gate_seq.gate -> gate_env.trig
+pad_amp = vca { gain: 0 }
+pad_filt -> pad_amp.in
+gate_env -> pad_amp.cv
+pad_out = vca { gain: 0 }
+pad_amp -> pad_out.in
+l_pad   -> pad_out.cv : 0.85
+
+# === LEAD -- supersaw carrying the motif ===
+lead_a = vco { freq: 220hz, wave: saw }
+lead_b = vco { freq: 220hz, wave: saw }
+lead_c = vco { freq: 220hz, wave: saw }
+mot_q.out -> lead_a.v_oct
+2         -> lead_a.v_oct
+mot_q.out -> lead_b.v_oct
+2         -> lead_b.v_oct
+mot_q.out -> lead_c.v_oct
+2         -> lead_c.v_oct
+lead_spread = lfo { freq: 0.09hz, wave: tri }
+lead_spread -> lead_b.v_oct : 0.007
+lead_spread -> lead_c.v_oct : -0.005
+lead_filt = svf { cutoff: 1200hz, res: 0.25 }
+lead_a -> lead_filt.in : 0.34
+lead_b -> lead_filt.in : 0.33
+lead_c -> lead_filt.in : 0.33
+l_brgt -> lead_filt.cutoff : 5200
+lead_on = logic { op: and, threshold: 0.02 }
+mot_seq.gate -> lead_on.a
+arr_lead.cv  -> lead_on.b
+lead_env = func { rise: 0.01, fall: 0.34, curve: exp }
+lead_on -> lead_env.trig
+lead_amp = vca { gain: 0 }
+lead_filt.lp -> lead_amp.in
+lead_env -> lead_amp.cv
+lead_out = vca { gain: 0 }
+lead_amp -> lead_out.in
+l_lead   -> lead_out.cv : 0.8
+
+# === DROP FX -- noise riser, plus a crash and a falling sub impact on each
+# drop downbeat (arr_fx.gate fires only on the marked blocks) ===
+rise_noise = noise { color: white, seed: 21 }
+rise_filt = svf { cutoff: 400hz, res: 0.55 }
+rise_noise -> rise_filt.in
+l_rise -> rise_filt.cutoff : 6500
+rise_amp = vca { gain: 0 }
+rise_filt.bp -> rise_amp.in
+l_rise -> rise_amp.cv : 0.55
+
+crash = sub { file: "../lib/kit/hat_model.sub", decay: 1.4s }
+arr_fx.gate -> crash.trig
+0.85 -> crash.accent
+
+imp_env = func { rise: 0.002, fall: 1.1, curve: exp }
+arr_fx.gate -> imp_env.trig
+imp_osc = vco { freq: 58hz, wave: sine }
+imp_env -> imp_osc.fm : 55
+imp_amp = vca { gain: 0 }
+imp_osc -> imp_amp.in
+imp_env -> imp_amp.cv : 0.8
+
+# === BAND MIX -- pump layer 1 ===
+band = mix { levels: [0.40, 0.18, 0.10, 0.6, 0.45, 0.46, 0.5, 0.5],
+             pans:   [0, 0.1, 0.45, 0, 0, -0.3, 0.15, 0] }
+kck          -> band.in1
+clp          -> band.in2
+chat         -> band.in3
+bass.sub_out -> band.in4
+bass.saw_out -> band.in5
+pad_out      -> band.in6
+lead_out     -> band.in7
+ohat         -> band.in3 : 0.7
+rise_amp     -> band.in8 : 0.5
+crash        -> band.in8 : 0.45
+imp_amp      -> band.in8 : 0.8
+# Lane faders on the drum channels -- `accent` is dynamics, not level.
+l_kick -> band.lvl1 : 0.50
+l_clap -> band.lvl2 : 0.40
+l_hats -> band.lvl3 : 0.28
+kick_env -> band.lvl4 : -0.26
+kick_env -> band.lvl5 : -0.24
+kick_env -> band.lvl6 : -0.22
+kick_env -> band.lvl7 : -0.16
+kick_env -> band.lvl8 : -0.12
+
+# === SENDS ===
+lead_out -> room.in : 0.55
+pad_out  -> room.in : 0.35
+clp      -> room.in : 0.30
+ohat     -> room.in : 0.15
+
+# === MASTER -- pump layers 2 and 3 ===
+master_mix = mix { levels: [1, 1, 0.5, 0.5], pans: [-1, 1, -1, 1] }
+band.out_l -> master_mix.in1
+band.out_r -> master_mix.in2
+room.l     -> master_mix.in3
+room.r     -> master_mix.in4
+kick_env -> master_mix.lvl3 : -0.14
+kick_env -> master_mix.lvl4 : -0.14
+
+mast = sub { file: "../lib/master-chain.sub", low_gain: 0.4, mid1_gain: -1.2,
+             high_gain: 1.0, comp_thr: -16, clip_drive: 6.5, width: 1.15 }
+master_mix.out_l -> mast.in_l
+master_mix.out_r -> mast.in_r
+kck -> mast.side_l : 0.7
+kck -> mast.side_r : 0.7
+
+mast.l -> out.left
+mast.r -> out.right

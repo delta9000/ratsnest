@@ -1,0 +1,89 @@
+# tape-echo.sub -- the dub room: two tempo-synced tape echoes (dotted eighth
+# and dotted quarter), a phase sweep on the long return, and a Dattorro plate
+# fed from both. Mono in, stereo out.
+#
+# Extracted by copy from `antigravity-dub.patch`, which still carries its own
+# inline copy. The dub doctrine (docs/patch-craft.md): the dry signal stays
+# quiet and THIS is the instrument -- send generously, and duck the return
+# with the kick on the movement's mixer, not in here.
+#
+# `bpm` is an input, not a config, so the echoes follow a clock that ramps:
+# feed the same lane that drives `clock.bpm` and the delay times track the
+# tempo pivot instead of drifting off the grid halfway through it.
+# `fb_mod` and `decay_mod` are the arc handles -- lane CV that grows the room
+# across a movement.
+
+beats_a    = param { default: 0.75 }    # dotted eighth
+beats_b    = param { default: 1.5 }     # dotted quarter
+fb_a       = param { default: 0.62 }
+fb_b       = param { default: 0.55 }
+tone_a     = param { default: 1600 }
+tone_b     = param { default: 1100 }
+verb_decay = param { default: 0.86 }
+verb_damp  = param { default: 0.44 }
+verb_send  = param { default: 0.6 }
+
+in        = input {}
+bpm       = input { default: 126 }
+fb_mod    = input {}
+decay_mod = input {}
+l = output {}
+r = output {}
+
+# tempo bases are zeroed: input bases SUM, and the default 120 would add to
+# whatever the movement's clock says (docs/patch-craft.md).
+ta = tempo { bpm: 0, beats: beats_a }
+tb = tempo { bpm: 0, beats: beats_b }
+bpm -> ta.bpm
+bpm -> tb.bpm
+
+drift = lfo { freq: 0.013hz, wave: sine }
+
+echo_a = delay { time: 0ms, feedback: fb_a, tone: tone_a, mix: 1.0, slew: 2.0 }
+echo_b = delay { time: 0ms, feedback: fb_b, tone: tone_b, mix: 1.0, slew: 3.0 }
+ta.seconds -> echo_a.time
+tb.seconds -> echo_b.time
+drift -> echo_a.time : 0.005
+drift -> echo_b.time : -0.008
+fb_mod -> echo_a.feedback
+fb_mod -> echo_b.feedback : 0.8
+
+in -> echo_a.in : 0.75
+in -> echo_b.in : 0.55
+
+sweep = phaser { stages: 6, rate: 0.12hz, depth: 0.65, feedback: 0.35, mix: 0.5 }
+echo_b -> sweep.in
+
+space = reverb { decay: verb_decay, damp: verb_damp, mix: 0.8,
+                 predelay: 0.042, bandwidth: 0.85, mod_rate: 0.32, mod_depth: 35 }
+echo_a -> space.in_l : verb_send
+echo_a -> space.in_r : 0.32
+sweep  -> space.in_l : 0.30
+sweep  -> space.in_r : verb_send
+in     -> space.in_l : 0.18
+in     -> space.in_r : 0.18
+decay_mod -> space.decay
+
+wet = mix { levels: [0.5, 0.45, 0.6, 0.6], pans: [-0.7, 0.7, -1, 1] }
+echo_a      -> wet.in1
+sweep       -> wet.in2
+space.out_l -> wet.in3
+space.out_r -> wet.in4
+wet.out_l -> l.in
+wet.out_r -> r.in
+
+# Audition: `mise run play -- patches/lib/tape-echo.sub` -- a sparse stab into
+# the room at the default 126 BPM, so the echo grid is audible on its own.
+demo.clk  = clock { bpm: 63 }
+demo.env  = func { rise: 0.002, fall: 0.18, curve: exp }
+demo.clk -> demo.env.trig
+demo.osc  = vco { freq: 220hz, wave: saw }
+demo.filt = svf { cutoff: 900hz, res: 0.3 }
+demo.osc -> demo.filt.in
+demo.amp  = vca { gain: 0 }
+demo.filt.lp -> demo.amp.in
+demo.env -> demo.amp.cv
+demo.amp -> in : 0.6
+demo.amp -> demo.out.in : 0.15
+l -> demo.out.left : 0.9
+r -> demo.out.right : 0.9

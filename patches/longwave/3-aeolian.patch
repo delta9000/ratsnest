@@ -1,0 +1,275 @@
+# longwave III -- "aeolian" -- the slow movement, 84 BPM, D aeolian, 9:00 (+1:00).
+#
+# The hour's plan lives in `1-dorian.patch`. This movement's place in it:
+#
+# NO KICK ANYWHERE. The hour needs one movement where the pulse genuinely
+# stops, or the finale's four-on-the-floor is not an arrival. 84 is exactly
+# half of the scherzo's 168, so the tempo did not change so much as thin out.
+#
+# The second and last change of pitch collection: phrygian's Eb becomes
+# aeolian's E and Bb, which is to say the mode stops being exotic. This is
+# the plainest harmony in the hour, and it is the emotional low point --
+# there is no strange degree left to hide behind.
+#
+# The one place in the piece where a generative module touches harmony: a
+# low-probability turing drifts the bell pitches within aeolian, so the slow
+# movement sounds like it is thinking rather than executing.
+#
+#   block  0   0:00  emergence -- euclidean bells over a near-infinite string
+#   block  7   2:40  MOTIF at full length, the slowest statement in the hour
+#   block 13   4:57  the low point: thinnest texture, plainest mode
+#   block 18   6:51  the finale's pulse arrives from far away -- as an ECHO
+#                    TIME (126 BPM quarters), not as a clock. Nothing is
+#                    playing it yet; the room is already in the next tempo.
+#   block 22   8:23  ramp 84 -> 126, finished before the crossfade begins
+#
+#   ratsnest render patches/longwave/3-aeolian.patch -d 600s --stats 30s
+#
+# 8-bar blocks of 22.857 s, 28 lane steps (wrap at 640 s; render 600 s).
+
+# === CLOCKS ===
+arr_clk = clock { bpm: 336 }             # 16ths at 84, never modulated
+blk     = div { by: 128 }                # ARRANGEMENT DIVISOR: 8 bars
+arr_clk -> blk.in
+
+master  = clock { bpm: 336 }
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+half    = div { by: 2 }
+bar     = div { by: 2 }
+two_bar = div { by: 2 }
+master  -> eighth.in
+eighth  -> quarter.in
+quarter -> half.in
+half    -> bar.in
+bar     -> two_bar.in
+
+# === ARRANGEMENT LANES ===
+arr_room  = stepseq { steps: [0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.7,
+                          0.7, 0.7, 0.7, 0.7, 0.62, 0.62, 0.62, 0.62, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55] }
+arr_bell  = stepseq { steps: [0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.3,
+                          0.3, 0.3, 0.3, 0.3, 0.55, 0.55, 0.55, 0.55, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4] }
+arr_strs  = stepseq { steps: [0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.28,
+                          0.28, 0.28, 0.28, 0.28, 0.5, 0.5, 0.5, 0.5, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35] }
+arr_pad   = stepseq { steps: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.22,
+                         0.22, 0.22, 0.22, 0.22, 0.45, 0.45, 0.45, 0.45, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55] }
+arr_sub   = stepseq { steps: [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.35,
+                         0.35, 0.35, 0.35, 0.35, 0.42, 0.42, 0.42, 0.42, 0.48, 0.48, 0.48, 0.48, 0.48, 0.48] }
+arr_motif = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.25,
+                           0.25, 0.25, 0.25, 0.25, 0.6, 0.6, 0.6, 0.6, 0.35, 0.35, 0.35, 0.35, 0.35, 0.35] }
+arr_far   = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05,
+                         0.05, 0.05, 0.05, 0.05, 0.55, 0.55, 0.55, 0.55, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75] }
+arr_brgt  = stepseq { steps: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.18,
+                          0.18, 0.18, 0.18, 0.18, 0.4, 0.4, 0.4, 0.4, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55] }
+arr_bpm   = stepseq { steps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                         0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1] }
+
+blk -> arr_room.clock
+blk -> arr_bell.clock
+blk -> arr_strs.clock
+blk -> arr_pad.clock
+blk -> arr_sub.clock
+blk -> arr_motif.clock
+blk -> arr_far.clock
+blk -> arr_brgt.clock
+blk -> arr_bpm.clock
+
+# Nothing here arrives; everything grows. Slews are the longest in the hour.
+l_room  = func { rise: 18, fall: 20 }
+l_bell  = func { rise: 14, fall: 16 }
+l_strs  = func { rise: 20, fall: 22 }
+l_pad   = func { rise: 22, fall: 24 }
+l_sub   = func { rise: 16, fall: 18 }
+l_motif = func { rise: 12, fall: 15 }
+l_far   = func { rise: 25, fall: 25 }
+l_brgt  = func { rise: 20, fall: 22 }
+l_bpm   = func { rise: 30, fall: 30 }
+
+arr_room.cv  -> l_room.in
+arr_bell.cv  -> l_bell.in
+arr_strs.cv  -> l_strs.in
+arr_pad.cv   -> l_pad.in
+arr_sub.cv   -> l_sub.in
+arr_motif.cv -> l_motif.in
+arr_far.cv   -> l_far.in
+arr_brgt.cv  -> l_brgt.in
+arr_bpm.cv   -> l_bpm.in
+
+# 336 -> 504 sixteenths is 84 -> 126 BPM, handing to the finale.
+l_bpm -> master.bpm : 168
+
+# === HARMONY -- D aeolian: Dm | Bb | F | Gm ===
+ch_root  = stepseq { steps: [D3v, Bb2v, F2v, G2v]  }
+ch_third = stepseq { steps: [F3v, D3v,  A2v, Bb2v] }
+ch_fifth = stepseq { steps: [A3v, F3v,  C3v, D3v]  }
+two_bar -> ch_root.clock
+two_bar -> ch_third.clock
+two_bar -> ch_fifth.clock
+
+# === THE MOTIF -- same eight numbers, one note per two bars ===
+mot_seq = stepseq { steps: [0, 0.5833, 0.25, 0.8333, 0.5833, 0.25, 0, -0.3333],
+                    gates: [1, 1, 1, 1, 1, 1, 1, 0] }
+two_bar -> mot_seq.clock
+mot_add = math { op: add, b: 0 }
+ch_root.cv -> mot_add.a
+mot_seq.cv -> mot_add.b
+mot_q = quant { scale: [0, 2, 3, 5, 7, 8, 10], root: 5 }   # D aeolian
+mot_add -> mot_q.in
+
+# === THE ROOM -- the longest plate in the hour ===
+room = sub { file: "../lib/tape-echo.sub", verb_decay: 0.94, verb_damp: 0.32,
+             fb_a: 0.70, fb_b: 0.62, verb_send: 0.75 }
+84 -> room.bpm
+l_bpm -> room.bpm : 42
+l_room -> room.fb_mod : 0.14
+l_room -> room.decay_mod : 0.04
+
+# === THE FAR PULSE -- the finale's tempo, heard as an echo before anything
+# plays it. A 126 BPM quarter is 0.476 s; nothing in this movement is on
+# that grid, so it reads as something approaching rather than something here.
+far_t = tempo { bpm: 126, beats: 1 }
+far   = delay { time: 0ms, feedback: 0.58, tone: 2400, mix: 1.0, slew: 1.5 }
+far_t.seconds -> far.time
+far_amp = vca { gain: 0 }
+far -> far_amp.in
+l_far -> far_amp.cv : 0.6
+
+# Lane gates use `threshold: 0.02`, not the default 0.5. An arrangement lane
+# carries a LEVEL, and `logic`'s boolean ops threshold both inputs -- so a
+# section whose lane sits at 0.24 gates its voice off entirely while the
+# mixer happily reports a fader move. The lane's job at this AND is only
+# "is this voice present at all"; how loud it is belongs on `mix.lvlN`.
+# === BELLS -- euclidean, turing-drifted within the mode ===
+bell_pat = euclid { steps: 12, hits: 4 }
+bar -> bell_pat.clock
+l_bell -> bell_pat.hits : 3
+drift = turing { len: 8, prob: 0.11, seed: 17 }
+bar -> drift.clock
+bell_add = math { op: add, b: 0 }
+ch_root.cv -> bell_add.a
+drift.out  -> bell_add.b : 0.9
+bell_q = quant { scale: [0, 2, 3, 5, 7, 8, 10], root: 5 }
+bell_add -> bell_q.in
+bell = modal { modes: 56, structure: 0.55, brightness: 0.4, damping: 0.86,
+               position: 0.31 }
+bell_q.out -> bell.v_oct
+1          -> bell.v_oct
+bell_on = logic { op: and, threshold: 0.02 }
+bell_pat.gate -> bell_on.a
+arr_bell.cv   -> bell_on.b
+bell_on -> bell.strike
+l_brgt  -> bell.brightness : 0.3
+bell_amp = vca { gain: 0 }
+bell -> bell_amp.in
+l_bell -> bell_amp.cv : 0.75
+
+# === STRINGS -- damping 0.96 is the near-infinite sustain: a drone that was
+# struck once and never stops (docs/modules.md `string`) ===
+str_a = string { seed: 5 }
+str_b = string { seed: 9 }
+D3v -> str_a.v_oct
+A3v -> str_b.v_oct
+0.96 -> str_a.damping
+0.95 -> str_b.damping
+0.42 -> str_a.brightness
+0.36 -> str_b.brightness
+l_brgt -> str_a.brightness : 0.3
+l_brgt -> str_b.brightness : 0.25
+str_exc = noise { color: pink, seed: 3 }
+str_exc_amp = vca { gain: 0 }
+str_exc -> str_exc_amp.in
+l_strs  -> str_exc_amp.cv : 0.06
+str_exc_amp -> str_a.in
+str_exc_amp -> str_b.in
+str_amp = vca { gain: 0 }
+str_a -> str_amp.in : 0.5
+str_b -> str_amp.in : 0.5
+l_strs -> str_amp.cv : 0.7
+
+# === PAD -- the chord stack, bowed rather than struck ===
+pad_a = vco { freq: 220hz, wave: saw }
+pad_b = vco { freq: 220hz, wave: saw }
+pad_c = vco { freq: 220hz, wave: saw }
+ch_root.cv  -> pad_a.v_oct
+ch_third.cv -> pad_b.v_oct
+ch_fifth.cv -> pad_c.v_oct
+pad_slow = lfo { freq: 0.023hz, wave: tri }
+pad_slow -> pad_b.v_oct : 0.005
+pad_filt = ladder { cutoff: 260, res: 0.18, drive: 0.3 }
+pad_a -> pad_filt.in : 0.34
+pad_b -> pad_filt.in : 0.33
+pad_c -> pad_filt.in : 0.33
+l_brgt   -> pad_filt.cutoff : 1100
+pad_slow -> pad_filt.cutoff : 120
+pad_amp = vca { gain: 0 }
+pad_filt -> pad_amp.in
+l_pad -> pad_amp.cv : 0.7
+
+# === SUB PEDAL -- a fixed D, the one thing that does not move all movement
+sub_osc = vco { freq: 110hz, wave: sine }
+D2v -> sub_osc.v_oct
+sub_lp = ladder { cutoff: 110, res: 0.08 }
+sub_osc -> sub_lp.in
+sub_amp = vca { gain: 0 }
+sub_lp -> sub_amp.in
+l_sub -> sub_amp.cv : 0.55
+
+# === THE MOTIF VOICE -- bell and string in octaves, the slowest statement ===
+mot_bell = modal { modes: 64, structure: 0.48, brightness: 0.5, damping: 0.9,
+                   position: 0.26 }
+mot_q.out -> mot_bell.v_oct
+2         -> mot_bell.v_oct
+mot_on = logic { op: and, threshold: 0.02 }
+mot_seq.gate  -> mot_on.a
+arr_motif.cv  -> mot_on.b
+mot_on -> mot_bell.strike
+mot_str = string { seed: 12 }
+mot_q.out -> mot_str.v_oct
+1         -> mot_str.v_oct
+0.72 -> mot_str.damping
+0.45 -> mot_str.brightness
+mot_on -> mot_str.strike
+mot_amp = vca { gain: 0 }
+mot_bell -> mot_amp.in : 0.6
+mot_str  -> mot_amp.in : 0.4
+l_motif -> mot_amp.cv : 0.8
+
+# === BAND MIX -- no kick, so nothing ducks anything ===
+band = mix { levels: [0.45, 0.5, 0.42, 0.55, 0.5, 0.4],
+             pans:   [-0.3, 0.35, 0, 0, 0.15, -0.2] }
+bell_amp -> band.in1
+str_amp  -> band.in2
+pad_amp  -> band.in3
+sub_amp  -> band.in4
+mot_amp  -> band.in5
+far_amp  -> band.in6
+
+# === SENDS -- everything pitched goes to the room, and the bells also feed
+# the far pulse, so the approaching tempo is made of this movement's material
+bell_amp -> room.in : 0.7
+mot_amp  -> room.in : 0.75
+pad_amp  -> room.in : 0.35
+str_amp  -> room.in : 0.3
+bell_amp -> far.in : 0.5
+mot_amp  -> far.in : 0.4
+
+# === MASTER -- no sidechain source exists here, and that is the point: the
+# only movement in the hour with no pump at all ===
+# Staged ~4.5 dB below the dub and EDM movements on purpose. The slow
+# movement is the hour's floor, not another peak: rendered hot it measured
+# -12.7 dBFS RMS with -0.4 peaks, i.e. as loud as the finale's drop and
+# touching the limiter, which makes the arrival at movement IV mean nothing.
+master_mix = mix { levels: [0.6, 0.6, 0.45, 0.45], pans: [-1, 1, -1, 1] }
+band.out_l -> master_mix.in1
+band.out_r -> master_mix.in2
+room.l     -> master_mix.in3
+room.r     -> master_mix.in4
+
+mast = sub { file: "../lib/master-chain.sub", low_gain: 0.8, mid1_gain: -0.8,
+             high_gain: 0.6, comp_thr: -10, comp_ratio: 1.5, comp_makeup: 1.0,
+             clip_drive: 1.5, width: 1.25 }
+master_mix.out_l -> mast.in_l
+master_mix.out_r -> mast.in_r
+
+mast.l -> out.left
+mast.r -> out.right

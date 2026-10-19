@@ -10,7 +10,8 @@ the runtime registry. It documents implemented behavior, not roadmap entries.
 - Gates are high above `0.5`. “Rising edge” means crossing from `<=0.5` to
   `>0.5`; a trigger is one sample, while a gate has duration.
 - Values in `{ ... }` set input bases or compile-time configs. Cables sum onto
-  input bases. Configs (waveform, mode, arrays, seed) cannot be modulated.
+  input bases. Configs (waveform, mode, arrays, seed) cannot be modulated. Config value
+  types and enum entries are checked before a graph is installed.
 - No normalling is implicit. Seeded modules are repeatable. Runtime state
   survives hot reload when module name and type remain unchanged.
 
@@ -28,6 +29,12 @@ Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output
 (a bare `stepseq` name reads its `cv`, a bare `svf` its `lp`). Validate with
 `ratsnest check patch.patch`; `ratsnest render ... --stats [Ns]` prints
 overall peak/RMS/DC plus a per-window level timeline for mix work.
+`ratsnest describe` lists the runtime modules as JSON; `ratsnest describe fm`
+returns one interface, including input bases, config types and enum choices,
+outputs, and the default output. It describes built-in modules; compile-time
+subpatch constructs are documented below. `check` validates the expanded patch
+and exits nonzero on errors. It does not establish musical balance or sound
+quality. A rejected hot reload leaves the previous graph playing.
 
 **Note names** are numeric literals, usable anywhere a number is (`freq: A4`,
 array elements, cable literals). Scientific pitch notation: an uppercase letter
@@ -112,11 +119,11 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 
 | Area | Modules |
 |---|---|
-| Sources | `vco`, `lfo`, `noise`, `random`, `sampler`, `modal`, `string`, `fm` |
+| Sources | `vco`, `additive`, `lfo`, `noise`, `dust`, `random`, `sampler`, `modal`, `string`, `fm` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
-| Sequencing | `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `out` |
+| Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
+| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `out` |
 
 ## `vca`
 
@@ -128,21 +135,53 @@ Typical use: `env -> amp.cv` with base gain zero.
 
 Inputs `in` 0 (both channels), `left` 0, `right` 0, `level` 1; engine outputs
 `l`, `r`. It sums mono into each side and applies level. Example:
-`mix.out_l -> out.left`, `mix.out_r -> out.right`.
+`mix.out_l -> out.left`, `mix.out_r -> out.right`. Graph output and float WAVs
+preserve finite values beyond ±1; use an explicit limiter for peak control.
+Only the live audio-device boundary clips to ±1. Internal sums are not normalized.
 
 ## `vco`
 
-`vco { freq: 440hz, wave: sine, pw: 0.5 }` — inputs `freq`, `v_oct`, relative
-linear `fm`, `pw`, `pwm`, rising-edge `sync`; output `out`. Waves: `sine`,
-`tri`, `saw`, `pulse`. `+1` v/oct doubles pitch; frequency is band-limited and
-clamped below Nyquist. A pulse at `pw != 0.5` carries a DC offset of about
+`vco { freq: 220hz, wave: sine, pw: 0.5, phase: 0 }` — inputs `freq`, `v_oct`, relative
+linear `fm`, `pw`, `pwm`, rising-edge `sync`, phase offset in cycles; output `out`. Waves: `sine`,
+`tri`, `saw`, `pulse`. Effective Hz = `freq * 2^v_oct + fm * freq`, clamped
+to `0..0.45*rate` (negative frequencies stop the phase). `+1` v/oct doubles pitch.
+Sine is analytic, saw/pulse use polyBLEP, triangle is naive; high notes,
+hard sync, FM, PWM, and phase modulation can alias. Phase wraps in cycles;
+`freq: 0` holds the oscillator while `phase` can drive it externally.
+The 220 Hz default makes `A3v` sound A3; another base deliberately transposes. A pulse at `pw != 0.5` carries a DC offset of about
 `2 * pw - 1` that low-pass filters (`svf.lp`, `ladder`) pass straight through;
 keep `pw` at `0.5` or block DC downstream if the path is DC-coupled.
+
+## `additive`
+
+`additive { freq: 220hz, levels: [0.6, 0.3, 0.15] }` — a free-running sine
+bank with 1..128 partials. Inputs `freq` 220 Hz, `v_oct` 0, `gain` 1
+(clamped −8..8), `tilt` 0 (dB/oct, clamped ±48), `phase` 0 (cycles added to
+every partial), and rising-edge `sync` 0. Output `out` is the straight sum,
+without normalization or embedded envelopes. Patch an external envelope into
+`gain` with declared `gain: 0`, or use a VCA after the bank.
+
+`levels` sets signed amplitudes in −1..1 (default `[1]`). Optional `ratios`
+sets positive frequency multipliers (default 1,2,3,...); optional `phases`
+sets offsets in cycles (default all zero). Supplied arrays must match the
+length of `levels`; ratios are limited to 1000000. Arrays are static configs.
+Use gain for overall articulation and tilt for live spectral changes:
+each amplitude is multiplied by `10^(tilt * log2(ratio) / 20)`, with that dB
+adjustment bounded to ±120. A −6.0206 dB/oct tilt halves successive octaves.
+
+Partial Hz = `freq * 2^v_oct * ratio`. Base freq clamps to `0..sample_rate`,
+v_oct to ±24. Partials fade linearly between 0.45 and 0.5 times sample rate
+and are silent at/above Nyquist; their phase continues advancing. This protects
+steady partials, not sidebands from fast gain/pitch/phase modulation.
+Sync resets all accumulators; configured offsets still apply. On reload,
+phase follows array position; new positions start at zero. A stopped bank
+(`freq: 0`) can produce DC according to its phases.
 
 ## `lfo`
 
 `lfo { freq: 1hz, wave: sine, phase: 0 }` — inputs `freq`, rising-edge `reset`,
-phase offset; bipolar output `out`. Waves: `sine`, `tri`, `saw`, `square`.
+phase offset in cycles; bipolar output `out`. Double-precision accumulation
+keeps minute-long periods accurate. Waves: `sine`, `tri`, `saw`, `square`.
 Example: `slow -> filter.cutoff : 300`.
 
 **Starting value at `phase: 0`** (measured) — this matters whenever an LFO is
@@ -165,6 +204,74 @@ same rate ramps the wrong way first.
 outputs 50%-duty `out` and normalized `run`. Stop forces clock low but holds
 phase. Use BPM 240 for eighth-note gates at a musical 120 BPM.
 
+## `transport`
+
+`transport { bpm: 120, beats: 4, bars: 4, division: 4, swing: 0 }` is a shared
+musical clock. BPM counts quarter notes. Config `beats` is quarter notes per bar
+(1..32), `bars` is bars per phrase (1..256), and `division` is subdivisions per
+quarter note (1 or an even integer through 32). Thus 6/8 uses `beats: 3`, and
+`division: 2` produces eighth notes. This is a quarter-note count, not a meter label.
+
+Outputs `clock`, `beat`, `bar`, and `phrase` are **one-sample pulses**, including
+at the first running sample. `gate` is high for half of each subdivision;
+`beat_phase`, `bar_phase`, and `phrase_phase` are ramps from 0 up to (not including)
+1. `running` reports playback state. Use `clock` for sequencing and `gate` when
+note duration should follow the subdivision. Use `phrase_phase` into an
+`lfo { freq: 0 }` phase input for tempo-locked slow modulation.
+
+Input `swing` clamps to 0..0.75 and delays every second subdivision in a pair;
+0.5 produces a 3:1 pair. Swing is latched at beat boundaries. Downbeats, bars,
+and phrase duration stay fixed. `run: 0` (or BPM <= 0) stops pulses and gate,
+freezing phase; resume continues there without an extra clock pulse. A gate may
+rise on resume if paused in its high half. Rising `reset` rewinds to the first
+beat, even while stopped; the downbeat fires when running. BPM clamps to 0..1000;
+invalid BPM stops. Timing/phase survive reload; configuration changes reinterpret
+that position. It does not yet follow external MIDI clock.
+
+## `scene`
+
+`scene { bars: [4,8,4], request: -1, hold: 0 }` advances an arrangement from
+bar-clock edges. Config `bars` requires 1..64 positive integer durations
+(1..65536 bars each). Connect `transport.bar` to `clock`.
+
+Outputs: zero-based `index`, entry pulse `trig`, zero-based local `bar`, and
+`pending` (-1 means none). First clock enters scene zero; durations expire into
+the next scene and the final scene wraps. Connect `index` to addressed `switch`
+modules to select section harmony, density, levels, and freeze controls from one
+shared address. Switches support eight alternatives each; larger forms can nest them.
+
+Changing input `request` queues a scene for the next bar; another request replaces
+it. Setting -1 cancels a pending request. A rising `launch` queues the current
+request again, allowing restart of the same scene. Requests clamp to valid indices.
+The request arriving on a bar edge wins on that edge. `hold: 1` repeats the current
+scene's duration without an entry trigger; an explicit launch still wins. Rising
+`reset` clears position and pending state; the next bar starts scene zero unless
+a new request is also made. Pending selection and position survive reload.
+
+Discrete inputs (including scene requests) jump on live parameter edits rather
+than sliding through intermediate indices. `describe` exposes this as
+`glide: false`. Cable values remain audio-rate; this flag only controls engine
+parameter glides. Scene indices are numeric; named scene authoring is not yet a
+DSL feature. See `patches/keepsake.patch` for discover/bloom/dissolve sections.
+
+## `phrase`
+
+`phrase { length: 16, freeze: 0, rotate: 0, transpose: 0 }` captures a control
+phrase into 256 preallocated slots. Each rising `clock` advances one step and,
+when `freeze` is low, writes `in`. `freeze: 1` loops the captured values without
+writing. `length` is rounded/clamped to 1..256; unwritten slots contain zero.
+Optional config `values: [...]` initializes up to 256 slots; set `freeze: 1` to
+play them unchanged. It does not set length automatically.
+
+`out` reads the current slot, `tap1..tap3` the preceding slots (wrapping within
+length); integer `rotate` shifts the read position, leaving write position alone.
+`transpose` adds to all four values (v/oct when carrying pitch). Outputs `trig`
+and `eoc` mark clock edges and wraps; `position` is the zero-based write/play step.
+Rising `reset` rewinds without erasing memory; a coincident clock reads/writes
+step zero. Frozen playback, read rotation, and transpose remain independent.
+Live memory and position survive reload; `values` is initialization data, so
+changing it on a migrated instance does not replace the captured phrase.
+
 ## `div`
 
 `div { by: 2 }` — inputs `in`, rounded positive `by`, rising-edge `reset`;
@@ -181,24 +288,59 @@ the intended way to smooth stepped CV (section fades, portamento).
 
 ## `svf`
 
-`svf { cutoff: 1000, res: 0 }` — inputs `in`, cutoff Hz, resonance `0..1`;
-outputs `lp`, `bp`, `hp`. Cutoff clamps to `5..0.45 * sample_rate`.
+`svf { cutoff: 1000, res: 0, v_oct: 0 }` — inputs `in`, cutoff Hz,
+resonance `0..1`, octave tracking `v_oct`; outputs `lp`, `bp`, `hp`.
+Effective cutoff = `cutoff * 2^v_oct`, clamped to `5..0.45 * sample_rate`.
+Patch note pitch into `v_oct` for musical tracking. Modulate `cutoff` for additive
+Hz movement, or `v_oct` for proportional movement; both remain audio-rate.
 
 ## `noise`
 
-`noise { color: white, seed: 1 }` — no inputs; bipolar `out`. Colors: `white`
-or `pink`. Equal seeds produce repeatable streams.
+`noise { color: white, seed: 1 }` — no inputs; bipolar `out`.
+Colors describe approximate power-spectrum slopes:
+
+| Color | Slope | Construction / use |
+| --- | --- | --- |
+| `white` | 0 dB/oct | Uniform random samples; broad hiss and excitation |
+| `pink` | −3 dB/oct | Economy pink filter; balanced octave energy |
+| `brown` | −6 dB/oct above 10 Hz | Leaky integration; rumble, finite DC power |
+| `blue` | +3 dB/oct below Nyquist | Differentiated pink; brighter air |
+| `violet` | +6 dB/oct below Nyquist | Differentiated white; high-frequency emphasis |
+
+Slopes are approximations over the audio band, not exact at DC or Nyquist.
+Pink coefficients are calibrated around 44.1/48 kHz and shift in Hz with sample
+rate. Brown's 10 Hz corner scales with sample rate. Colors have different RMS
+levels; there is no loudness matching or hard clipping. White/violet are bounded
+by ±1; filtered colors may exceed ±1. Equal seeds and rates reproduce streams;
+filter/RNG state survives reload. Use `random` for slow wandering CV.
+
+## `dust`
+
+`dust { rate: 10hz, seed: 1 }` — audio-rate input `rate` is average events per
+second, clamped to `0..sample_rate`. Outputs `out` (uniform bipolar random
+impulses, zero between events) and `trig` (1 on event samples, otherwise 0).
+This is a Bernoulli trial per sample; timing is irregular, not a clock.
+Adjacent events can keep `trig` high across samples, so rising-edge destinations
+can merge them at high rates. Zero rate silences both outputs. Seeded and
+state-migratable. Use `out` to excite a resonator or filter for crackle; use
+`trig` for sparse irregular envelope strikes.
 
 ## `math`
 
-`math { op: add }` — inputs `a` 0, `b` 1; output `out`. Ops: `add`, `sub`,
-`mult`, `min`, `max`, `abs`, `clip`, `wrap`. `abs` ignores b; clip/wrap use
-`abs(b)` as the symmetric range. `mult` is ring modulation.
+`math { op: add }` — inputs `a` 0, `b` 0; output `out`. Ops: `add`, `sub`,
+`mult`, `min`, `max`, `abs`, `clip`, `wrap`, `exp2`. `abs` and `exp2` ignore b;
+clip/wrap use `abs(b)` as the symmetric range. `mult` is ring modulation;
+set `b` or patch it explicitly. `exp2` computes `2^a` (a clamped to ±126;
+non-finite a gives zero). For absolute pitch-to-Hz conversion, feed note CV
+into `exp2.a`, then cable its output at depth 220 into a destination with Hz
+base zero. Prefer a filter's `v_oct` input for direct key tracking.
 
 ## `xfade`
 
-Inputs `a` 0, `b` 0, `mix` 0.5 (`0..1`); output `out`. Equal-power rather
-than linear, so both inputs are -3 dB at midpoint.
+`xfade { law: linear }` — inputs `a` 0, `b` 0, `mix` 0.5 (`0..1`); output
+`out`. Default linear interpolation preserves identical signals and works for
+CV. `law: equal_power` gives each input −3 dB at midpoint, useful for unrelated
+audio; correlated inputs can gain 3 dB at the midpoint.
 
 ## `drive`
 
@@ -221,8 +363,10 @@ while low.
 
 ## `ladder`
 
-Inputs `in` 0, `cutoff` 1000 Hz, `res` 0 (`0..1`), `drive` 0 (`0..4`);
-four-pole low-pass output `out`. Example: `env -> filter.cutoff : 1800`.
+Inputs `in` 0, `cutoff` 1000 Hz, `res` 0 (`0..1`), `drive` 0 (`0..4`),
+`v_oct` 0; four-pole low-pass output `out`. Effective cutoff = `cutoff * 2^v_oct`,
+clamped to `5..0.45*rate`. Example: `env -> filter.cutoff : 1800` adds Hz;
+`notes.cv -> filter.v_oct` tracks pitch by octaves without a negative cutoff.
 
 ## `lpg`
 
@@ -239,14 +383,41 @@ to `0..1`.
 ## `quant`
 
 `quant { scale: [0,2,3,5,7,9,10], root: 0, transpose: 0 }` — inputs `in`
-v/oct, root semitones, transpose v/oct; outputs quantized `out` and one-sample
-`changed`. Empty scale is chromatic; ties snap down.
+v/oct, root semitones relative to A, transpose v/oct; outputs quantized `out`
+and one-sample `changed`. Scale entries are integer semitones reduced modulo 12;
+an empty scale is chromatic. Ties snap down. Fractional scale entries are rejected.
+
+Config `mode: continuous` (default) updates every sample. `mode: clock` captures
+pitch, root, mask, and degree only on rising `clock`; output starts at zero and
+holds between edges. `mask` (default 4095) is a 12-bit allowed-note mask relative
+to the root, intersected with the configured scale. An empty intersection holds
+the previous pitch. `degree` (rounded, -128..128) transposes through the remaining
+scale degrees *after* quantization, including across octaves. `transpose` remains
+pre-quantization v/oct. Root clamps to +/-1200 semitones and the relative input to
++/-12000 semitones. `changed` detects final pitch changes, including root changes,
+and is silent on the first captured note. Use the clock to articulate repeated
+notes; `changed` deliberately does not retrigger them.
 
 ## `mix`
 
 Eight inputs `in1..in8` and additive level CVs `lvl1..lvl8`; configs `levels`
 (missing = 1) and `pans` (`-1` left, `0` center, `1` right; missing = center).
 Outputs `out_l`, `out_r`. Negative level CV is useful for sidechain ducking.
+
+## `channel`
+
+`channel { level: 0, balance: 0, mute: 0, send: -96, send_mode: post }` is a
+stereo channel or bus. `in_l` and `in_r` stay separate; connect a mono source to
+both explicitly. Level and send are dB (-96..24); -96 is silence. Stereo balance
+(-1..1) attenuates the opposite channel, with unity on both channels at center.
+This is a balance control, not a constant-power mono panner. Gain, balance, mute,
+and send changes are smoothed over 5 ms. No normalization or clipping is applied.
+
+`out_l/out_r` are the main outputs; `send_l/send_r` feed a shared effect. Config
+`send_mode: pre` taps before fader/balance, while `post` taps after; mute affects
+both. Effects returns can feed another channel. `peak` is a stereo sample-peak
+meter with 300 ms decay; `rms` is stereo mean-square power smoothed over 300 ms,
+converted to dBFS. Neither is LUFS or true peak. Meter floor is -240 dBFS.
 
 ## `scope`
 
@@ -281,9 +452,19 @@ Example: `euclid { steps: 16, hits: 5, rot: 3 }`.
 
 ## `bern`
 
-`bern { prob: .5, seed: 1 }` — input `gate`; mutually exclusive gate-width
-outputs `a`, `b`. Each rising edge routes to a with probability `prob`, else b.
-Use after Euclid for repeatable variations.
+`bern { prob: .5, seed: 1, length: 0 }` routes each rising `gate` to either
+`a` or `b`, retaining the input gate width. `prob` is the probability of A.
+Held output `value` exposes the random draw, useful for pitch and accents.
+
+`length` (rounded 0..65536) repeats the random stream every N incoming edges;
+0 free-runs. Rising `reset` rewinds the current seed; rising `reroll` selects a
+new deterministic seed and rewinds. Both take effect before a coincident gate.
+Probability changes do not change the sequence of random values: even 0 and 1
+consume one draw per edge. This corrects the old density-dependent random stream.
+For a beat-length loop, reset from `transport.phrase` and clock from its regular
+subdivision output. Clocking only on Euclidean hits counts *hits*, not elapsed
+musical time. The decision for an already-high gate stays fixed until the next
+edge. Random state, loop position, and held decision survive reload.
 
 ## `logic`
 
@@ -294,8 +475,11 @@ not negates a, and cmp tests `a > b`.
 ## `switch`
 
 Eight signal inputs, plus `clock`, rising-edge `reset`, zero-based `addr`, and
-`n` 8 (`1..8`); output `out`. Config mode `seq` advances on clock; `addr`
-rounds/clamps the live address. Example: `switch { mode: seq, n: 4 }`.
+`n` 8 (`1..8`); output `out`. Config `mode`: `seq` (the **default**) advances
+on clock and ignores `addr`; `addr` reads the live address (rounded, clamped
+to `0..n-1`) and ignores the clock. A selector driven by a lane must say
+`switch { mode: addr }`, or it sits on `in1` forever, silently. Example:
+`switch { mode: seq, n: 4 }`.
 
 ## `turing`
 
@@ -306,16 +490,44 @@ loop; write forces a high incoming bit; clear zeros the whole register.
 
 ## `stepseq`
 
-Configs `steps` CV array (default `[0]`), `gates` array (missing = on), `dir`
-(`forward`, `reverse`, `pingpong`, `random`), `seed`. Inputs `clock`, reset,
-`len` (0 = full array), transpose. Outputs held `cv`, one-sample `trig`,
-clock-width `gate`, and forward/reverse wrap `eoc`.
+Configs `steps` CV array, `gates` array (missing = on),
+`lens` (clock ticks per step, missing = 1), `ties` (missing = 0), `vels`
+(missing = 1), `dir` (`forward`, `reverse`, `pingpong`, `random`), `seed`.
+Inputs `clock`, reset, `len` (0 = full array; counts steps, not ticks),
+transpose. Outputs held `cv`, one-sample `trig`, `gate`, forward/reverse
+wrap `eoc`, and held `vel`.
+
+An omitted or empty `steps` supplies zero pitches for the longest of
+`gates`/`lens`/`ties`/`vels`, or `[0]` if all are empty. This lets rhythm-only
+patterns such as `stepseq { gates: [1, 0, 1, 0] }` run all four steps.
+An explicit nonempty `steps` sets the pattern length; extra companion entries
+are ignored. Shortening `len` or hot-reloading a shorter note list moves a
+removed current step to the last remaining step, starting its tick count
+over and preserving clock-edge memory.
 
 ```text
 s = stepseq { steps: [0, .25, .58333], gates: [1, 0, 1] }
 clock -> s.clock
 s.cv -> osc.v_oct
 s.trig -> env.trig
+```
+
+The four arrays are parallel to `steps`; together they are a note list. A
+step lasts `lens[i]` rising clock edges, and its `gate` stays high across the
+clock's low halves until the step's **last** tick, where it follows the clock
+down so the next step re-articulates. A step marked in `ties` continues the
+previous note: no `trig`, and the gate never drops into it — a tie when the
+pitch is the same, a slur when it moves. (A tied step after a rest simply
+starts a note; the lookahead is forward-order, so slurs are a `forward`
+feature.) `vel` holds `vels[i]` for the step, for accents. Note lengths round
+to the nearest integer and clamp to `1..2147483647`; non-finite lengths use 1.
+
+```text
+# 4/4 at a sixteenth clock: half note, quarter slurred into an eighth,
+# a sixteenth rest, an accented sixteenth. 16 ticks, five entries.
+mel = stepseq { steps: [D4v, F4v, E4v, 0, A4v], gates: [1, 1, 1, 0, 1],
+                lens: [8, 4, 2, 1, 1], ties: [0, 0, 1, 0, 0],
+                vels: [.8, .7, .7, 0, 1] }
 ```
 
 ## `tempo`
@@ -405,18 +617,18 @@ feed-forward log-domain compressor.
 *   `knee` (clamped `0..40`, default 6): Soft-knee width in dB. `0` = hard knee.
 *   `attack` / `release` (clamped `0.0001..10`, default 0.01 / 0.1): Time constants in seconds.
 *   `makeup` (clamped `-40..40`, default 0): Output gain makeup in dB.
-*   `mix` (clamped `0..1`, default 1): Equal-power dry/wet crossfade mix.
+*   `mix` (clamped `0..1`, default 1): Linear dry/wet interpolation (no gain boost for identical signals).
 *   `gain`: Output. Linear gain reduction factor (excluding makeup).
 *   `gr`: Output. Current gain reduction in positive dB.
 
 ## `eq`
 
-`eq` — inputs `in_l` 0, `in_r` 0, `hp_freq` 20, `low_freq` 120, `low_gain` 0,
+`eq` — inputs `in_l` 0, `in_r` 0, `hp_freq` 0, `low_freq` 120, `low_gain` 0,
 `mid1_freq` 500, `mid1_gain` 0, `mid1_q` 0.707, `mid2_freq` 2500, `mid2_gain` 0,
 `mid2_q` 0.707, `high_freq` 10000, `high_gain` 0; outputs `out_l`, `out_r`.
 A stereo parametric mastering equalizer with 20 ms parameter smoothing.
 Consists of five cascaded biquad sections per channel:
-1.  **HPF**: Second-order high-pass filter. Frequency clamped `5..0.45*rate`, Q fixed to `0.707`.
+1.  **HPF**: `hp_freq: 0` bypasses it (the default). Positive values enable a second-order high-pass, clamped `5..0.45*rate`, Q fixed to `0.707`.
 2.  **Low Shelf**: Low shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. Slope fixed to `1.0`.
 3.  **Mid1 Peaking**: Peaking/bell filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB, Q clamped `0.1..18`.
 4.  **Mid2 Peaking**: Peaking/bell filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB, Q clamped `0.1..18`.
@@ -432,7 +644,7 @@ Zero-gain sections are optimized with exact bypass coefficients.
     (normalized tanh soft clipping at threshold).
 *   `threshold` (clamped `-120..0`, default -1): Output ceiling threshold in dBFS.
 *   `drive` (clamped `-40..40`, default 0): Input gain boost applied before clipping in dB.
-*   `mix` (clamped `0..1`, default 1): Equal-power dry/wet crossfade mix.
+*   `mix` (clamped `0..1`, default 1): Linear dry/wet interpolation (no gain boost for identical signals).
 
 Internally oversampled at 4x using a cascade of highly optimized 2-path polyphase allpass IIR half-band filters.
 The dry branch is delay-aligned by exactly 1 sample to match the filter's peak latency.
@@ -622,7 +834,7 @@ time/level envelopes; routing from a named algorithm set or a custom edge
 list. Mono; polyphony via `voice` groups.
 
 Inputs: `gate` 0 (rising fires all envelopes and, with `sync: on`, resets
-phases; unpatched gate = silence), `freq` 440 Hz, `v_oct`, `vel` 1, per-op
+phases; unpatched gate = silence), `freq` 220 Hz, `v_oct`, `vel` 1, per-op
 `lvl1..lvl6` 0, `ratio1..ratio6` 0, `fbmod` 0 (adds to every op's feedback;
 named apart from the `fb` config array so the DSL can tell them apart).
 Outputs: `out` (straight sum of the carriers — gain-stage at the cable) and
@@ -635,10 +847,10 @@ stack), `triad` (2→1, 4→3, 6→5), `dual` (3→2→1, 6→5→4), `cascade`
 (6→5→4→3→2→1), `crown` (2..6→1), `weave` (6,5→4→2, 3→2, 2→1). `algo:
 custom` reads `route` as flat pairs — `route: [2,1, 3,2]` = 2→1, 3→2.
 Pairs must be integral 1..6, no self-edges, no duplicates, acyclic; a
-malformed route falls back to `free` (the session never dies).
+malformed route fails `check`; hot reload keeps the last good graph.
 
-Configs (all arrays are per-op, padded with the slot default, extras
-ignored): `ratios` (all 1), `levels` (`[1,0,0,0,0,0]` — ops 2..6 stay off
+Configs (all arrays are per-op, padded with the slot default; more than six
+entries is an error): `ratios` (all 1), `levels` (`[1,0,0,0,0,0]` — ops 2..6 stay off
 until asked), `fixed` (per-op Hz; >0 pins the op off `v_oct`/`ratio` for
 clicks and body resonances), `fb` (0..0.999; `fb[k] > 0` is itself the
 self-edge — never put self-edges in `route`), `vel_sens` (0..1; op level ×=
@@ -653,8 +865,8 @@ is a plain gated sine (op 1 only).
 Operator waveform per op, `waves` (bareword array, default `sine`): `half`
 (half-wave rectified), `abs` (full-wave rectified, octave-up), `quarter`
 (bright windowed pulse), `fold` (triangle-wavefolded). All are DC-centered;
-rich waves alias when pushed, by design. An unknown name falls back to
-`sine` — e.g. `waves: [sine, abs, fold, sine, abs, fold]`.
+rich waves and high-index/high-frequency FM can alias. Ratio-mode operators
+can also exceed Nyquist; use `additive` for a sine bank that removes out-of-band partials. An unknown name is a validation error — e.g. `waves: [sine, abs, fold, sine, abs, fold]`.
 
 Keyboard scaling, latched from `v_oct` at the gate's rising edge (so a
 mid-note pitch glide never warps level or envelope): `key_break` (scalar
@@ -870,3 +1082,50 @@ bern.a -> chat.accent        # per-hit dynamics from any 0..1 source (cabling ac
 ```
 
 Full groove: `patches/kit.patch`.
+
+### An orchestra (`lib/orch/*.sub`) and a score
+
+Seven orchestral voices share one contract: `voct` + `gate` say what is
+played, `dyn` (0..1, the part's dynamic marking) and `vel` (a per-note accent,
+typically `stepseq.vel`) say how loud, and level is `(dyn*vel)^2` with the
+filter opening alongside it. `strings.sub` (bowed section, stereo out via a
+chorus), `brass.sub` (horn by default; trumpet by params), `wind.sub` (flute
+by default; oboe, clarinet, bassoon recipes in its header), and the struck
+voices `timpani.sub`, `harp.sub` (pizzicato by params) and `bell.sub`
+(glockenspiel) with the kit-style `trig` + `accent`; `hall.sub` is the room.
+
+A score is `stepseq` note lists. Each theme lives in its own `.sub`
+(`patches/symphony/themes/`) with `steps`/`lens`/`ties`/`vels` for the
+melody and three harmony lanes with matching `lens`, so the accompaniment
+re-voices from the same chords and `transpose` moves everything together;
+`len`/`hlen` params loop the theme's head. The movement's FORM is one
+`stepseq` whose `lens` are bar counts, clocked by the bar; its `trig`
+clocks one-value-per-section role and dynamics lanes and resets every
+theme. A part's `switch { mode: addr }` (three of them: pitch, gate, accent)
+picks what it plays each section. `patches/symphony/1-allegro.patch` is the
+worked example; its header holds the plan for the whole work.
+
+### Song subpatches (`lib/master-chain.sub`, `lib/tape-echo.sub`, `lib/reese.sub`)
+
+Three shared voices for song-length patches, extracted by copy from
+`mainstage`, `antigravity-dub` and `nightbus` (which still carry their own
+inline versions — the duplication is deliberate, not an oversight).
+
+```text
+room = sub { file: "lib/tape-echo.sub", verb_decay: 0.9 }
+bpm_lane -> room.bpm          # echoes follow a clock that ramps
+bass = sub { file: "lib/reese.sub", saw_cut: 300 }
+mast = sub { file: "lib/master-chain.sub", ceiling: -0.4 }
+kick_drive -> mast.side_l     # external sidechain: unpatched = no pump
+mast.l -> out.left
+mast.r -> out.right
+```
+
+`master-chain.sub` is the full `dcblock -> eq -> glue comp -> stereo -> clip
+-> limiter` bus and owns the ceiling (never scale it again with `out.level`).
+`tape-echo.sub` is the dub room — dotted-eighth and dotted-quarter echoes, a
+phase sweep on the long return, and a plate fed by both; its `bpm` is an
+input so delay times track a tempo ramp. `reese.sub` keeps the split-bass
+discipline: the sine sub is untouched by every modulation the saws receive,
+and `sub_out`/`saw_out` come out separately so they can be ducked at
+different depths.

@@ -16,7 +16,7 @@ std::unique_ptr<Module> make_ladder() {
 
 double ladder_rms(float frequency, float cutoff, float res) {
   auto m = make_ladder();
-  float ins[4] = {0.0f, cutoff, res, 0.0f};
+  float ins[5] = {0.0f, cutoff, res, 0.0f};
   float out[1];
   double sum = 0.0;
   constexpr int warmup = 4096;
@@ -33,7 +33,7 @@ double ladder_rms(float frequency, float cutoff, float res) {
 
 TEST_CASE("ladder settles to DC with no resonance") {
   auto m = make_ladder();
-  const float ins[4] = {0.5f, 1000.0f, 0.0f, 0.0f};
+  const float ins[5] = {0.5f, 1000.0f, 0.0f, 0.0f};
   float out[1];
   for (int i = 0; i < 48000; ++i) m->process(ins, out);
   CHECK(out[0] == doctest::Approx(0.5f).epsilon(0.01));
@@ -54,7 +54,7 @@ TEST_CASE("ladder resonance boosts near the cutoff") {
 
 TEST_CASE("ladder stays finite under extreme modulation") {
   auto m = make_ladder();
-  float ins[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  float ins[5] = {0.0f, 0.0f, 0.0f, 0.0f};
   float out[1];
   for (int i = 0; i < 100000; ++i) {
     ins[0] = i % 2 == 0 ? 1.0f : -1.0f;

@@ -10,8 +10,14 @@
 
 namespace ms::dsp {
 
-struct InputInfo  { const char* name; float def; };
-struct ConfigInfo { const char* name; const char* const* enum_vals; };
+// Discrete controls bypass parameter glides on reload/live edits.
+struct InputInfo  { const char* name; float def; bool glide = true; };
+enum class ConfigKind { Number, Text, Numbers, Enums };
+struct ConfigInfo {
+  const char* name;
+  const char* const* enum_vals;
+  ConfigKind kind = ConfigKind::Number;
+};
 struct OutputInfo { const char* name; };
 
 struct ConfigValue {

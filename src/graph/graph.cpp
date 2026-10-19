@@ -1,5 +1,7 @@
 #include "graph/graph.h"
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include "graph/voices.h"
@@ -30,6 +32,37 @@ dsp::ConfigValue to_config_value(const dsl::Value& v) {
       break;
   }
   return cv;
+}
+
+std::string config_error(const dsp::ConfigInfo& ci, const dsl::Value& v) {
+  using K = dsl::Value::Kind;
+  using C = dsp::ConfigKind;
+  if (ci.enum_vals) {
+    auto valid = [&](const dsl::Value& item) {
+      if (item.kind != K::Ident && item.kind != K::Str) return false;
+      for (const char* const* e = ci.enum_vals; *e; ++e)
+        if (item.str == *e) return true;
+      return false;
+    };
+    const bool array = ci.kind == C::Enums;
+    if (array ? (v.kind == K::Array && std::all_of(v.items.begin(), v.items.end(), valid))
+              : valid(v)) return {};
+    std::string opts;
+    for (const char* const* e = ci.enum_vals; *e; ++e) {
+      if (!opts.empty()) opts += ", ";
+      opts += *e;
+    }
+    return std::string(array ? "expects an array of: " : "expects one of: ") + opts;
+  }
+  if (ci.kind == C::Text)
+    return v.kind == K::Str || v.kind == K::Ident ? "" : "expects text";
+  if (ci.kind == C::Numbers) {
+    if (v.kind == K::Array && std::all_of(v.items.begin(), v.items.end(), [](const auto& item) {
+          return item.kind == K::Num && std::isfinite(item.num);
+        })) return {};
+    return "expects an array of finite numbers (note names use uppercase, e.g. D2v)";
+  }
+  return v.kind == K::Num && std::isfinite(v.num) ? "" : "expects a finite number";
 }
 
 // Resolve a dotted chain to a node index + port via the shared split rule
@@ -79,30 +112,21 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
     for (const auto& p : m.params) {
       int slot = info->input_index(p.name);
       if (slot >= 0) {
-        if (p.value.kind != dsl::Value::Kind::Num) {
-          err(p.line, p.col, "parameter '" + p.name + "' expects a number", m.file);
+        if (p.value.kind != dsl::Value::Kind::Num || !std::isfinite(p.value.num) ||
+            std::abs(p.value.num) > std::numeric_limits<float>::max()) {
+          err(p.line, p.col, "parameter '" + p.name + "' expects a finite float number", m.file);
         } else {
           n.input_base[static_cast<size_t>(slot)] = static_cast<float>(p.value.num);
         }
         continue;
       }
       if (const dsp::ConfigInfo* ci = info->config(p.name)) {
-        dsp::ConfigValue cv = to_config_value(p.value);
-        if (ci->enum_vals) {
-          bool valid = false;
-          for (const char* const* e = ci->enum_vals; *e; ++e)
-            if (cv.str == *e) valid = true;
-          if (!valid) {
-            std::string opts;
-            for (const char* const* e = ci->enum_vals; *e; ++e) {
-              if (!opts.empty()) opts += ", ";
-              opts += *e;
-            }
-            err(p.line, p.col, "invalid value for '" + p.name + "' (one of: " + opts + ")", m.file);
-            continue;
-          }
+        const std::string problem = config_error(*ci, p.value);
+        if (!problem.empty()) {
+          err(p.line, p.col, "parameter '" + p.name + "' " + problem, m.file);
+          continue;
         }
-        n.config.push_back({p.name, std::move(cv)});
+        n.config.push_back({p.name, to_config_value(p.value)});
         continue;
       }
       err(p.line, p.col, "module type '" + m.type + "' has no parameter '" + p.name +

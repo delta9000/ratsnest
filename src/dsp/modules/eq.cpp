@@ -10,7 +10,7 @@ namespace {
 constexpr InputInfo kIns[] = {
     {"in_l", 0.0f},
     {"in_r", 0.0f},
-    {"hp_freq", 20.0f},
+    {"hp_freq", 0.0f},
     {"low_freq", 120.0f},
     {"low_gain", 0.0f},       // dB
     {"mid1_freq", 500.0f},
@@ -47,7 +47,7 @@ class Eq final : public Module {
     high_gain_smooth_.set_time(0.020f, rate_);
     
     // Set initial values
-    hp_freq_smooth_.init(20.0f);
+    hp_freq_smooth_.init(0.0f);
     low_freq_smooth_.init(120.0f);
     low_gain_smooth_.init(0.0f);
     mid1_freq_smooth_.init(500.0f);
@@ -79,7 +79,7 @@ class Eq final : public Module {
     const float max_freq = 0.45f * rate_;
     
     // Sanitize and clamp control parameters
-    const float raw_hp_freq = sanitize_clamp(ins[2], 5.0f, max_freq, 20.0f);
+    const float raw_hp_freq = sanitize_clamp(ins[2], 0.0f, max_freq, 0.0f);
     const float raw_low_freq = sanitize_clamp(ins[3], 5.0f, max_freq, 120.0f);
     const float raw_low_gain = sanitize_clamp(ins[4], -24.0f, 24.0f, 0.0f);
     const float raw_mid1_freq = sanitize_clamp(ins[5], 5.0f, max_freq, 500.0f);
@@ -107,7 +107,7 @@ class Eq final : public Module {
     // Recompute biquad coefficients only when smoothed params have changed.
     // Settled patches avoid all cos/sin/pow calls on the hot path.
     if (hp_freq != prev_hp_freq_) {
-      c_hp_ = make_hpf(hp_freq, rate_);
+      c_hp_ = raw_hp_freq == 0.0f ? make_bypass() : make_hpf(std::max(hp_freq, 5.0f), rate_);
       prev_hp_freq_ = hp_freq;
     }
     if (low_freq != prev_low_freq_ || low_gain != prev_low_gain_) {
@@ -129,7 +129,8 @@ class Eq final : public Module {
 
     // Left channel cascade processing
     float x_l = sanitize(ins[0], 0.0f);
-    x_l = Biquad::process(x_l, c_hp_,   state_hp_l_);
+    if (raw_hp_freq > 0.0f) x_l = Biquad::process(x_l, c_hp_, state_hp_l_);
+    else state_hp_l_.clear();
     x_l = Biquad::process(x_l, c_low_,  state_low_l_);
     x_l = Biquad::process(x_l, c_mid1_, state_mid1_l_);
     x_l = Biquad::process(x_l, c_mid2_, state_mid2_l_);
@@ -138,7 +139,8 @@ class Eq final : public Module {
 
     // Right channel cascade processing
     float x_r = sanitize(ins[1], 0.0f);
-    x_r = Biquad::process(x_r, c_hp_,   state_hp_r_);
+    if (raw_hp_freq > 0.0f) x_r = Biquad::process(x_r, c_hp_, state_hp_r_);
+    else state_hp_r_.clear();
     x_r = Biquad::process(x_r, c_low_,  state_low_r_);
     x_r = Biquad::process(x_r, c_mid1_, state_mid1_r_);
     x_r = Biquad::process(x_r, c_mid2_, state_mid2_r_);

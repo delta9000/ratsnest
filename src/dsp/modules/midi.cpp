@@ -13,7 +13,7 @@ namespace {
 constexpr const char* kModes[] = {"last", "lowest", nullptr};
 constexpr ConfigInfo kCfg[] = {{"channel", nullptr}, {"voices", nullptr},
                                {"mode", kModes},       {"bend", nullptr},
-                               {"cc", nullptr}};
+                               {"cc", nullptr, ConfigKind::Numbers}};
 constexpr OutputInfo kOuts[] = {
     {"gate1"}, {"gate2"}, {"gate3"}, {"gate4"},
     {"gate5"}, {"gate6"}, {"gate7"}, {"gate8"},

@@ -1,0 +1,13 @@
+# A harmonic bank with one external envelope and slow spectral tilt.
+clk = clock { bpm: 90 }
+notes = stepseq { steps: [D2v, F2v, A2v, C3v] }
+clk -> notes.clock
+env = adsr { attack: 0.02, decay: 0.15, sustain: 0.6, release: 0.25 }
+notes.gate -> env.gate
+tone = additive { levels: [0.6, 0.25, 0.15, 0.1, 0.06, 0.04], gain: 0, tilt: -3 }
+notes.cv -> tone.v_oct
+notes.trig -> tone.sync
+env -> tone.gain
+motion = lfo { freq: 0.01 }
+motion -> tone.tilt : 3
+tone -> out.in : 0.5

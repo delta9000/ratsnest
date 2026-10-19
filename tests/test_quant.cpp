@@ -6,7 +6,7 @@ using namespace ms::dsp;
 namespace {
 struct QuantRig {
   std::unique_ptr<Module> module;
-  float ins[3] = {0.0f, 0.0f, 0.0f};  // in, root, transpose
+  float ins[6] = {0.0f, 0.0f, 0.0f, 0.0f, 4095.0f, 0.0f};  // in, root, transpose
 
   explicit QuantRig(std::vector<double> scale = {}) {
     const ModuleInfo* info = find_module("quant");

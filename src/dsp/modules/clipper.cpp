@@ -98,10 +98,9 @@ class Clipper final : public Module {
     const float wet_l = decimator_l_.downsample(ys_l);
     const float wet_r = decimator_r_.downsample(ys_r);
     
-    // 5. Equal-power dry/wet mix
-    const float mix_angle = mix * (std::numbers::pi_v<float> / 2.0f);
-    const float gain_dry = std::cos(mix_angle);
-    const float gain_wet = std::sin(mix_angle);
+    // 5. Linear blend of correlated dry/wet signals.
+    const float gain_dry = 1.0f - mix;
+    const float gain_wet = mix;
     
     outs[0] = gain_dry * dry_l + gain_wet * wet_l;
     outs[1] = gain_dry * dry_r + gain_wet * wet_r;

@@ -5,9 +5,9 @@
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"a", 0.f}, {"b", 1.f}};
+constexpr InputInfo kIns[] = {{"a", 0.f}, {"b", 0.f}};
 constexpr const char* kOps[] = {"add", "sub", "mult", "min", "max",
-                                "abs", "clip", "wrap", nullptr};
+                                "abs", "clip", "wrap", "exp2", nullptr};
 constexpr ConfigInfo kCfg[] = {{"op", kOps}};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
@@ -42,6 +42,7 @@ class MathModule final : public Module {
         outs[0] = x - r;
         break;
       }
+      case 8: outs[0] = std::isfinite(a) ? std::exp2(std::clamp(a, -126.0f, 126.0f)) : 0.0f; break;
     }
   }
 
