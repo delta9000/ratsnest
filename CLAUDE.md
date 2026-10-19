@@ -5,6 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A software modular synthesizer for Linux where **the patch is a plain-text file**.
 Hand-written C++20 DSP, PipeWire out, hot-reload on save. Personal instrument;
 single author. Non-goals: DAW, plugin host, livecoding language, marketplace.
+The GUI (node editor) is shelved; current focus is correctness and performance
+of the DSP core (spec §10).
 
 Authoritative design: `docs/superpowers/specs/2026-07-10-ratsnest-design.md`.
 Implemented module palette and patch syntax: `docs/modules.md` (read this before

@@ -100,8 +100,8 @@ The hats keep sixteenth density on top.
 ### 3. Reese: detune, then carve the notch by subtraction
 
 There is no notch output on `svf`. Build one: take the dry sum, subtract a
-resonant bandpass from it, and sweep the bandpass. `math { op: sub }` defaults
-`b: 1`, which would add a constant — zero it.
+resonant bandpass from it, and sweep the bandpass. `math` inputs default
+to 0, so the bandpass cable into `b` owns the subtraction outright.
 
 ```text
 r1 = vco { wave: saw, freq: 55hz }

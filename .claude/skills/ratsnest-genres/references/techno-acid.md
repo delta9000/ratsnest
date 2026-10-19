@@ -46,7 +46,7 @@ bar -> four_bar.in
 
 Roland called it the gimmick circuit. An accented step is louder *and* the
 filter envelope reaches further — the whole "wow". Do not sum a DC offset onto
-cutoff; multiply the envelope. `math`'s `b` base is 1, so an unaccented note
+cutoff; multiply the envelope. Give `math` a `b: 1` base so an unaccented note
 passes its envelope through untouched and an accented one scales it.
 
 ```text
@@ -70,7 +70,7 @@ acid_seq.gate -> acid_env.trig
 acc_env = func { rise: 0.001, fall: 0.14, curve: exp }
 acid_acc.gate -> acc_env.trig
 
-acid_depth = math { op: mult }        # b base 1 -> unaccented = env x 1
+acid_depth = math { op: mult, b: 1 }  # unaccented = env x 1
 acid_env -> acid_depth.a
 acc_env -> acid_depth.b : 0.9         # accented    = env x 1.9
 ```
@@ -191,8 +191,8 @@ re_a -> re_sum.in1
 re_b -> re_sum.in2
 re_bp = svf { cutoff: 420, res: 0.75 }
 re_sum.out_l -> re_bp.in
-re_notch = math { op: sub, b: 0 }     # in - bp = notch; b base is 1, zero it
-                                      # or you ship a -1 DC offset
+re_notch = math { op: sub, b: 0 }     # in - bp = notch (b already defaults
+                                      # to 0; explicit for the reader)
 re_sum.out_l -> re_notch.a
 re_bp.bp -> re_notch.b
 re_sweep = lfo { wave: tri, freq: 0.09hz }

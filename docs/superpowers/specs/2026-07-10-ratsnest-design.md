@@ -348,6 +348,13 @@ ratsnest/
 5. **Later** — GUI canvas over the same file (layout sidecar), granular,
    physical modeling.
 
+**GUI: shelved (2026-10-19).** A native SDL3/ImGui node editor plus a stdio
+MCP bridge ("studio") was built as commit `4858f5d` on `feat/longwave` and
+deliberately not merged: it pulled effort away from the engine. Current
+priority is correctness and performance of the CLI/DSP core. The commit stays
+on that branch for reference; reviving it is a fresh design decision, and
+rule 1 (the patch file is the source of truth) still binds any GUI.
+
 ## 11. Prior art notes
 
 - **DROID** — hardware CV computer programmed via plain-text config; closest

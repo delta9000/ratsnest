@@ -209,10 +209,10 @@ fundamental — compensate with the sine sub layer, not with more gain.
 
 ## Gotchas
 
-- **`math { op: sub }` defaults `b: 1`.** Every subtraction-built notch, every
-  inverted CV: write the zero base or eat the DC.
-- **Note names need a 220/110/440 Hz oscillator base.** `freq: 55hz` with
-  `A1v` is two octaves down.
+- **`math` defaults both inputs to 0.** `op: mult` with nothing on `b` is
+  silence; write `b: 1` (or patch `b`) when you mean "pass through".
+- **Note names land at written pitch on the default 220 Hz base.** `freq: 55hz`
+  with `A1v` is two octaves down.
 - **Mono below ~120 Hz.** `pans: [0, 0]`, no `chorus`, no `stereo` width on
   the bass channel. Width goes on the growl layer above 250 Hz, never on the
   sub. Check with `stereo.corr` if you're unsure.

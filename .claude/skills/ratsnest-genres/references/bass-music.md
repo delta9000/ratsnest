@@ -138,8 +138,8 @@ noise floor that reads as grit. Detune `idx.freq` a few Hz per section and the
 ### 4. Formant morphing from parallel bandpasses
 
 Three resonant `svf.bp` at vowel-ish frequencies, crossfaded by one LFO
-through a chain of two `xfade`s. Equal-power crossfade means both bands sit
-−3 dB at the midpoint, which is exactly the vowel-in-between you want.
+through a chain of two `xfade { law: equal_power }`s (the default law is now
+linear). Equal-power means both bands sit −3 dB at the midpoint, which is exactly the vowel-in-between you want.
 
 ```text
 f1 = svf { cutoff: 700,  res: 0.85 }
@@ -149,11 +149,11 @@ growl -> f1.in
 growl -> f2.in
 growl -> f3.in
 vow = lfo { freq: 0.6hz, wave: tri }
-x1 = xfade { mix: 0.5 }
+x1 = xfade { mix: 0.5, law: equal_power }
 f1.bp -> x1.a
 f2.bp -> x1.b
 vow -> x1.mix : 0.5
-x2 = xfade { mix: 0.35 }
+x2 = xfade { mix: 0.35, law: equal_power }
 x1    -> x2.a
 f3.bp -> x2.b
 vow -> x2.mix : 0.25

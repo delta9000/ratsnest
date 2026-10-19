@@ -60,7 +60,8 @@ Iterate on numbers, not vibes. Two or three passes converges.
    `cutoff:` config is the *floor* of the sweep, not the amount.
 2. **Note names are Hz; `…v` names are v/oct.** `A3v = 0.0`, and a `vco`
    computes `freq_base × 2^v_oct` — so a note name lands at its written pitch
-   **only on a 220 Hz base**. 110 is an octave down, 55 is two octaves down
+   **only on a 220 Hz base** (the `vco`/`fm`/`additive` default, so leave
+   `freq` unset). 110 is an octave down, 55 is two octaves down
    (inaudible, and `--stats` reads identical), 440 is an octave up. Reaching
    for `freq: 55hz` on a sub voice is the classic silent-bass bug. Intervals
    are bare fractions — `0.5833 -> osc.v_oct` is a fifth up. There is no
