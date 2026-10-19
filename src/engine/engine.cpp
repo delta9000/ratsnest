@@ -5,38 +5,60 @@
 namespace ms::engine {
 
 Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
-  size_t total = 0, max_ins = 1;
+  size_t total = 0, max_ins = 1, n_cables = 0;
   for (size_t ni = 0; ni < g_->nodes.size(); ++ni) {
     const graph::Node& n = g_->nodes[ni];
     out_offset_.push_back(total);
     total += n.info->outputs.size();
     max_ins = std::max(max_ins, n.info->inputs.size());
+    n_cables += g_->in_cables[ni].size();
     if (n.info->wants_midi) g_->midi_nodes.push_back(static_cast<int>(ni));
     if (n.info->wants_audio_in) g_->audio_in_nodes.push_back(static_cast<int>(ni));
   }
   outs_.assign(total, 0.0f);
   ins_.assign(max_ins, 0.0f);
+
+  // Flatten the graph into one contiguous schedule so the per-sample loop
+  // touches no ModuleInfo, no nested vectors and no offset lookups. The graph
+  // is immutable once wrapped (param changes write input_base in place, never
+  // resize it), so these pointers stay valid for the Engine's lifetime.
+  cables_.reserve(n_cables);
+  steps_.reserve(g_->nodes.size());
+  for (size_t ni = 0; ni < g_->nodes.size(); ++ni) {
+    graph::Node& n = g_->nodes[ni];
+    Step st;
+    st.mod = n.instance.get();
+    st.base = n.input_base.data();
+    st.outs = outs_.data() + out_offset_[ni];
+    st.n_ins = n.info->inputs.size();
+    st.n_outs = n.info->outputs.size();
+    st.cable_begin = cables_.size();
+    for (const graph::Cable& c : g_->in_cables[ni])
+      cables_.push_back(FlatCable{static_cast<size_t>(c.dst_in),
+          out_offset_[static_cast<size_t>(c.src_mod)] + static_cast<size_t>(c.src_out),
+          c.depth});
+    st.cable_end = cables_.size();
+    steps_.push_back(st);
+  }
+  out_index_ = out_offset_[static_cast<size_t>(g_->out_node)];
 }
 
 void Engine::process(float* left, float* right, size_t frames) {
-  const auto& nodes = g_->nodes;
+  float* const ins = ins_.data();
+  const float* const outs = outs_.data();
+  const FlatCable* const cables = cables_.data();
   for (size_t f = 0; f < frames; ++f) {
-    step_glides();
-    for (size_t ni = 0; ni < nodes.size(); ++ni) {
-      const graph::Node& n = nodes[ni];
-      const size_t n_ins = n.info->inputs.size();
-      for (size_t s = 0; s < n_ins; ++s) ins_[s] = n.input_base[s];
-      for (const graph::Cable& c : g_->in_cables[ni])
-        ins_[static_cast<size_t>(c.dst_in)] +=
-            outs_[out_offset_[static_cast<size_t>(c.src_mod)] + static_cast<size_t>(c.src_out)] * c.depth;
-      float* node_outs = &outs_[out_offset_[ni]];
-      n.instance->process(ins_.data(), node_outs);
-      for (size_t o = 0; o < n.info->outputs.size(); ++o)
-        if (!std::isfinite(node_outs[o])) node_outs[o] = 0.0f;
+    if (n_glides_ != 0) step_glides();
+    for (const Step& st : steps_) {
+      std::copy_n(st.base, st.n_ins, ins);
+      for (size_t c = st.cable_begin; c < st.cable_end; ++c)
+        ins[cables[c].dst_in] += outs[cables[c].src] * cables[c].depth;
+      st.mod->process(ins, st.outs);
+      for (size_t o = 0; o < st.n_outs; ++o)
+        if (!std::isfinite(st.outs[o])) st.outs[o] = 0.0f;
     }
-    const size_t oo = out_offset_[static_cast<size_t>(g_->out_node)];
-    left[f]  = outs_[oo];
-    right[f] = outs_[oo + 1];
+    left[f]  = outs[out_index_];
+    right[f] = outs[out_index_ + 1];
   }
 }
 

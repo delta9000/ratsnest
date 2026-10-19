@@ -56,6 +56,21 @@ class Engine {
   std::vector<float> outs_;        // flat persistent [node][out_slot]
   std::vector<size_t> out_offset_; // per node
   std::vector<float> ins_;         // scratch, sized to max input count
+  struct Step {
+    dsp::Module* mod = nullptr;
+    const float* base = nullptr;  // the node's input_base
+    float* outs = nullptr;        // the node's slice of outs_
+    size_t n_ins = 0, n_outs = 0;
+    size_t cable_begin = 0, cable_end = 0;  // range in cables_
+  };
+  struct FlatCable {
+    size_t dst_in;  // slot in the destination node's inputs
+    size_t src;     // flat index into outs_
+    float depth;
+  };
+  std::vector<Step> steps_;        // one per node, in schedule order
+  std::vector<FlatCable> cables_;  // grouped by destination node
+  size_t out_index_ = 0;           // flat outs_ index of the out node's left
   std::array<Glide, kMaxGlides> glides_{};
   size_t n_glides_ = 0;
 };
