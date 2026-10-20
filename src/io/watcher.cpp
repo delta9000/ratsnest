@@ -4,6 +4,7 @@
 #include <sys/inotify.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <climits>
 #include <filesystem>
 
@@ -42,10 +43,9 @@ PatchWatcher::~PatchWatcher() {
 }
 
 bool PatchWatcher::ok() const {
-  if (fd_ < 0 || watches_.empty()) return false;
-  for (const auto& w : watches_)
-    if (w.wd < 0) return false;
-  return true;
+  return fd_ >= 0 && !watches_.empty() &&
+         std::all_of(watches_.begin(), watches_.end(),
+                     [](const DirWatch& w) { return w.wd >= 0; });
 }
 
 void PatchWatcher::arm(DirWatch& w) {
