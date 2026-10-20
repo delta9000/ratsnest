@@ -14,6 +14,10 @@
 namespace ms::graph {
 
 bool read_text_file(const std::string& path, std::string& out) {
+  // Only regular files: a directory "opens" and reads as empty, and a device
+  // or FIFO (/dev/zero) would never finish reading.
+  std::error_code ec;
+  if (!std::filesystem::is_regular_file(path, ec)) return false;
   std::ifstream f(path);
   if (!f) return false;
   std::ostringstream ss;
@@ -25,6 +29,11 @@ bool read_text_file(const std::string& path, std::string& out) {
 namespace {
 
 constexpr size_t kMaxDepth = 16;
+// Nesting alone does not bound the work: a file that instantiates its child
+// four times, nine deep, is already 4^9 modules, and an input fanned out at
+// every level multiplies cables the same way. Cap the expanded size so a
+// runaway patch reports line:col instead of hanging the session.
+constexpr size_t kMaxExpanded = 1 << 16;
 
 bool is_iface(const std::string& t) {
   return t == "param" || t == "input" || t == "output";
@@ -35,6 +44,11 @@ bool chain_under(const std::string& chain, const std::string& name) {
          chain.compare(0, name.size(), name) == 0 && chain[name.size()] == '.';
 }
 
+// `name` itself or anything under it.
+bool chain_in(const std::string& chain, const std::string& name) {
+  return chain == name || chain_under(chain, name);
+}
+
 const dsl::ParamDecl* find_param(const dsl::ModuleDecl& m, const std::string& n) {
   for (const auto& p : m.params)
     if (p.name == n) return &p;
@@ -42,6 +56,7 @@ const dsl::ParamDecl* find_param(const dsl::ModuleDecl& m, const std::string& n)
 }
 
 using ParamMap = std::unordered_map<std::string, dsl::Value>;
+using TemplateMap = std::unordered_map<std::string, dsl::PatchAst>;
 
 struct Ctx {
   const FileReader& read;
@@ -69,6 +84,8 @@ struct Ctx {
   }
 };
 
+// --- Param substitution ------------------------------------------------------
+
 void subst_value(const ParamMap& params, dsl::Value& v) {
   if (v.kind == dsl::Value::Kind::Ident) {
     auto it = params.find(v.str);
@@ -76,6 +93,19 @@ void subst_value(const ParamMap& params, dsl::Value& v) {
   } else if (v.kind == dsl::Value::Kind::Array) {
     for (auto& item : v.items) subst_value(params, item);
   }
+}
+
+// The numeric value of param `name`, if `name` is a param; reports (and
+// returns null) when it is one but not a number. `what` names the use.
+const double* numeric_param(Ctx& ctx, const std::string& file, const ParamMap& params,
+                            const std::string& name, int line, int col, const char* what) {
+  auto it = params.find(name);
+  if (it == params.end()) return nullptr;
+  if (it->second.kind != dsl::Value::Kind::Num) {
+    ctx.err(file, line, col, "param '" + name + "' used as a " + what + " must be a number");
+    return nullptr;
+  }
+  return &it->second.num;
 }
 
 void substitute(Ctx& ctx, const std::string& file, dsl::PatchAst& body,
@@ -87,305 +117,351 @@ void substitute(Ctx& ctx, const std::string& file, dsl::PatchAst& body,
     }
   for (auto& c : body.cables) {
     if (!c.src.is_literal) {
-      auto it = params.find(c.src.module);
-      if (it != params.end()) {
-        if (it->second.kind != dsl::Value::Kind::Num) {
-          ctx.err(file, c.src.line, c.src.col,
-                  "param '" + c.src.module + "' used as a cable source must be a number");
-        } else {
-          c.src.is_literal = true;
-          c.src.literal = it->second.num;
-          c.src.module.clear();
-        }
+      if (const double* v = numeric_param(ctx, file, params, c.src.module, c.src.line,
+                                          c.src.col, "cable source")) {
+        c.src.is_literal = true;
+        c.src.literal = *v;
+        c.src.module.clear();
       }
     }
     if (!c.depth_ident.empty()) {
-      auto it = params.find(c.depth_ident);
-      if (it != params.end()) {
-        if (it->second.kind != dsl::Value::Kind::Num) {
-          ctx.err(file, c.line, c.col,
-                  "param '" + c.depth_ident + "' used as a cable depth must be a number");
-        } else {
-          c.depth = it->second.num;
-          c.depth_ident.clear();
-        }
+      if (const double* v = numeric_param(ctx, file, params, c.depth_ident, c.line, c.col,
+                                          "cable depth")) {
+        c.depth = *v;
+        c.depth_ident.clear();
       }
     }
   }
 }
+
+// --- Interface ---------------------------------------------------------------
 
 struct Interface {
   ParamMap params;
   std::vector<std::pair<std::string, double>> inputs;
   std::vector<std::string> outputs;
   bool any() const { return !params.empty() || !inputs.empty() || !outputs.empty(); }
-  const double* input_def(const std::string& n) const {
-    for (const auto& [name, d] : inputs)
-      if (name == n) return &d;
-    return nullptr;
+  bool is_input(const std::string& n) const {
+    return std::any_of(inputs.begin(), inputs.end(), [&](const auto& i) { return i.first == n; });
   }
   bool is_output(const std::string& n) const {
     return std::find(outputs.begin(), outputs.end(), n) != outputs.end();
   }
 };
 
+// Declared top-level subdef names; their `name.*` members belong to the
+// template, not to the enclosing file's interface.
+std::vector<std::string> subdef_names(const dsl::PatchAst& body) {
+  std::vector<std::string> out;
+  for (const auto& m : body.modules)
+    if (m.type == "subdef" && m.name.find('.') == std::string::npos) out.push_back(m.name);
+  return out;
+}
+
+void scan_decl(Ctx& ctx, const std::string& file, const dsl::ModuleDecl& m, Interface& f) {
+  const dsl::ParamDecl* d = find_param(m, "default");
+  if (m.type == "param") {
+    if (!d) return ctx.err(file, m.line, m.col, "param '" + m.name + "' requires 'default:'");
+    f.params.emplace(m.name, d->value);
+  } else if (m.type == "input") {
+    const bool numeric = !d || d->value.kind == dsl::Value::Kind::Num;
+    if (!numeric) ctx.err(file, d->line, d->col, "input '" + m.name + "' default must be a number");
+    f.inputs.emplace_back(m.name, d && numeric ? d->value.num : 0.0);
+  } else if (m.type == "output") {
+    f.outputs.push_back(m.name);
+  }
+}
+
 Interface scan_interface(Ctx& ctx, const std::string& file, const dsl::PatchAst& body) {
   Interface f;
+  const std::vector<std::string> subdefs = subdef_names(body);
   for (const auto& m : body.modules) {
-    if (m.type == "param") {
-      const dsl::ParamDecl* d = find_param(m, "default");
-      if (!d) {
-        ctx.err(file, m.line, m.col, "param '" + m.name + "' requires 'default:'");
-        continue;
-      }
-      f.params.emplace(m.name, d->value);
-    } else if (m.type == "input") {
-      double def = 0.0;
-      if (const dsl::ParamDecl* d = find_param(m, "default")) {
-        if (d->value.kind != dsl::Value::Kind::Num)
-          ctx.err(file, d->line, d->col, "input '" + m.name + "' default must be a number");
-        else
-          def = d->value.num;
-      }
-      f.inputs.emplace_back(m.name, def);
-    } else if (m.type == "output") {
-      f.outputs.push_back(m.name);
-    }
+    if (std::none_of(subdefs.begin(), subdefs.end(),
+                     [&](const std::string& sd) { return chain_under(m.name, sd); }))
+      scan_decl(ctx, file, m, f);
   }
   return f;
 }
 
-void splice_ports(Ctx& ctx, const std::string& file, dsl::PatchAst& parent,
-                  const std::string& inst, dsl::PatchAst& body, const Interface& f) {
-  auto ref = [&](const std::string& port) {
-    return inst.empty() ? port : inst + "." + port;
-  };
-  auto is_input = [&](const std::string& n) { return f.input_def(n) != nullptr; };
+// --- Splicing an instance's ports into its parent ----------------------------
+//
+// Body cables touching the interface are lifted out: those reading an input
+// become that input's targets, those driving an output become its sources.
+// Each parent cable reading an instance output is then replaced by the
+// output's sources, and each feeding an instance input fans out to the
+// input's targets (depths multiply). Unfed inputs with a default drive their
+// targets with it. `inst` is empty for a top-level patch splicing itself.
+class Splice {
+ public:
+  Splice(Ctx& ctx, const std::string& body_file, const std::string& parent_file,
+         const std::string& inst, const Interface& f)
+      : ctx_(ctx), file_(body_file), parent_file_(parent_file), inst_(inst), f_(f) {}
 
-  std::unordered_map<std::string, std::vector<dsl::CableDecl>> in_targets;
-  std::unordered_map<std::string, std::vector<dsl::CableDecl>> out_sources;
-  {
+  void run(dsl::PatchAst& parent, dsl::PatchAst& body) {
+    if (!lift_ports(body)) return;
+    for (const auto& c : parent.cables)
+      if (!route(c)) return;
+    drive_defaults();
+    parent.cables = std::move(out_);
+    std::erase_if(body.modules, [](const dsl::ModuleDecl& m) { return is_iface(m.type); });
+  }
+
+ private:
+  // The parent-side name of a body chain (port or internal module).
+  std::string qualify(const std::string& chain) const {
+    return inst_.empty() ? chain : inst_ + "." + chain;
+  }
+
+  // The output a body cable drives, through `o` or `o.in`; "" for none.
+  std::string driven_output(const std::string& dst) const {
+    if (f_.is_output(dst)) return dst;
+    if (dst.size() > 3 && dst.ends_with(".in")) {
+      std::string head = dst.substr(0, dst.size() - 3);
+      if (f_.is_output(head)) return head;
+    }
+    return "";
+  }
+
+  bool lift_ports(dsl::PatchAst& body) {
     std::vector<dsl::CableDecl> kept;
     for (auto& c : body.cables) {
-      const bool src_is_input = !c.src.is_literal && is_input(c.src.module);
-      std::string out_name;
-      if (f.is_output(c.dst.module)) out_name = c.dst.module;
-      else if (c.dst.module.size() > 3 && c.dst.module.rfind(".in") == c.dst.module.size() - 3) {
-        std::string head = c.dst.module.substr(0, c.dst.module.size() - 3);
-        if (f.is_output(head)) out_name = head;
+      const bool from_input = !c.src.is_literal && f_.is_input(c.src.module);
+      const std::string out_name = driven_output(c.dst.module);
+      if (from_input && !out_name.empty()) {
+        ctx_.err(file_, c.line, c.col, "cable may not connect input '" + c.src.module +
+                                           "' directly to output '" + out_name + "'");
+        return false;
       }
-      if (src_is_input && !out_name.empty()) {
-        ctx.err(file, c.line, c.col,
-                "cable may not connect input '" + c.src.module +
-                "' directly to output '" + out_name + "'");
-        return;
-      }
-      if (src_is_input) in_targets[c.src.module].push_back(c);
-      else if (!out_name.empty()) out_sources[out_name].push_back(c);
+      if (from_input) in_targets_[c.src.module].push_back(c);
+      else if (!out_name.empty()) out_sources_[out_name].push_back(c);
       else kept.push_back(std::move(c));
     }
     body.cables = std::move(kept);
+    for (const auto& c : body.cables)
+      if (!c.src.is_literal && f_.is_output(c.src.module) && !inst_.empty())
+        ctx_.err(file_, c.src.line, c.src.col,
+                 "output '" + c.src.module + "' cannot be read inside its own subpatch");
+    return !ctx_.failed();
   }
-  for (const auto& c : body.cables)
-    if (!c.src.is_literal && f.is_output(c.src.module) && !inst.empty())
-      ctx.err(file, c.src.line, c.src.col,
-              "output '" + c.src.module + "' cannot be read inside its own subpatch");
-  if (ctx.failed()) return;
 
-  auto stamp = [&](const std::string& chain) {
-    return inst.empty() ? chain : inst + "." + chain;
-  };
-  std::vector<dsl::CableDecl> out_cables;
-  std::unordered_set<std::string> fed_inputs;
-  for (const auto& c : parent.cables) {
+  bool route(const dsl::CableDecl& c) {
+    // Errors here are about this parent-side cable: attribute them to the
+    // file it was written in (empty = the parent itself), not the body.
+    const std::string& pfile = c.file.empty() ? parent_file_ : c.file;
     std::vector<dsl::CableDecl> stage{c};
-    if (!c.src.is_literal) {
-      std::string out_name;
-      if (!inst.empty() && c.src.module == inst) {
-        if (f.outputs.empty()) {
-          ctx.err(file, c.src.line, c.src.col,
-                  "subpatch '" + inst + "' has no outputs");
-          return;
-        }
-        out_name = f.outputs[0];
-      } else {
-        for (const auto& o : f.outputs)
-          if (c.src.module == ref(o)) out_name = o;
+    if (!c.src.is_literal && !read_outputs(c, pfile, stage)) return false;
+    for (const auto& sc : stage)
+      if (!check_dst(sc, pfile) || !feed(sc, pfile)) return false;
+    return true;
+  }
+
+  // A parent cable reading an instance output becomes one cable per source
+  // driving that output inside the body.
+  bool read_outputs(const dsl::CableDecl& c, const std::string& pfile,
+                    std::vector<dsl::CableDecl>& stage) {
+    std::string out_name;
+    if (!inst_.empty() && c.src.module == inst_) {
+      if (f_.outputs.empty()) {
+        ctx_.err(pfile, c.src.line, c.src.col, "subpatch '" + inst_ + "' has no outputs");
+        return false;
       }
-      for (const auto& i : f.inputs)
-        if (c.src.module == ref(i.first)) {
-          ctx.err(file, c.src.line, c.src.col,
-                  "input '" + i.first + "' of '" + inst + "' cannot be a source");
-          return;
-        }
-      if (!out_name.empty()) {
-        auto srcs = out_sources.find(out_name);
-        if (srcs == out_sources.end() || srcs->second.empty()) {
-          // The offending read lives in the parent cable, so attribute to its
-          // own file, not this body's (body_file is `file` here).
-          ctx.err(c.file, c.src.line, c.src.col,
-                  "output '" + out_name + "'" +
-                      (inst.empty() ? "" : " of '" + inst + "'") +
-                      " is never driven inside the subpatch");
-          return;
-        }
-        stage.clear();
-        for (const auto& s : srcs->second) {
-          dsl::CableDecl nc = c;
-          nc.src = s.src;
-          if (!nc.src.is_literal) nc.src.module = stamp(s.src.module);
-          nc.depth = c.depth * s.depth;
-          stage.push_back(std::move(nc));
-        }
+      out_name = f_.outputs[0];
+    } else {
+      for (const auto& o : f_.outputs)
+        if (c.src.module == qualify(o)) out_name = o;
+    }
+    for (const auto& i : f_.inputs)
+      if (c.src.module == qualify(i.first)) {
+        ctx_.err(pfile, c.src.line, c.src.col,
+                 "input '" + i.first + "' of '" + inst_ + "' cannot be a source");
+        return false;
+      }
+    if (out_name.empty()) return true;
+    auto srcs = out_sources_.find(out_name);
+    if (srcs == out_sources_.end() || srcs->second.empty()) {
+      ctx_.err(pfile, c.src.line, c.src.col,
+               "output '" + out_name + "'" + (inst_.empty() ? "" : " of '" + inst_ + "'") +
+                   " is never driven inside the subpatch");
+      return false;
+    }
+    stage.clear();
+    for (const auto& s : srcs->second) {
+      dsl::CableDecl nc = c;
+      nc.src = s.src;
+      if (!nc.src.is_literal) nc.src.module = qualify(s.src.module);
+      nc.depth = c.depth * s.depth;
+      stage.push_back(std::move(nc));
+    }
+    return true;
+  }
+
+  // Outputs are not destinations, and ports have no members.
+  bool check_dst(const dsl::CableDecl& sc, const std::string& pfile) {
+    const std::string& dst = sc.dst.module;
+    for (const auto& o : f_.outputs) {
+      if (dst == qualify(o)) {
+        ctx_.err(pfile, sc.dst.line, sc.dst.col,
+                 "output '" + o + "' of '" + inst_ + "' cannot be a destination");
+        return false;
+      }
+      if (chain_under(dst, qualify(o))) {
+        ctx_.err(pfile, sc.dst.line, sc.dst.col, "port '" + o + "' has no members");
+        return false;
       }
     }
-    for (const auto& sc : stage) {
-      std::string in_name;
-      for (const auto& i : f.inputs)
-        if (sc.dst.module == ref(i.first)) in_name = i.first;
-      for (const auto& o : f.outputs) {
-        if (sc.dst.module == ref(o)) {
-          ctx.err(file, sc.dst.line, sc.dst.col,
-                  "output '" + o + "' of '" + inst + "' cannot be a destination");
-          return;
-        }
-        if (chain_under(sc.dst.module, ref(o))) {
-          ctx.err(file, sc.dst.line, sc.dst.col, "port '" + o + "' has no members");
-          return;
-        }
+    for (const auto& i : f_.inputs)
+      if (chain_under(dst, qualify(i.first))) {
+        ctx_.err(pfile, sc.dst.line, sc.dst.col, "port '" + i.first + "' has no members");
+        return false;
       }
-      for (const auto& i : f.inputs)
-        if (chain_under(sc.dst.module, ref(i.first))) {
-          ctx.err(file, sc.dst.line, sc.dst.col, "port '" + i.first + "' has no members");
-          return;
-        }
-      if (in_name.empty()) {
-        out_cables.push_back(sc);
-        continue;
-      }
-      fed_inputs.insert(in_name);
-      for (const auto& t : in_targets[in_name]) {
-        dsl::CableDecl nc = sc;
-        nc.dst = t.dst;
-        nc.dst.module = stamp(t.dst.module);
-        nc.depth = sc.depth * t.depth;
-        out_cables.push_back(std::move(nc));
+    return true;
+  }
+
+  // A cable into an instance input fans out to the input's targets; any
+  // other cable passes through.
+  bool feed(const dsl::CableDecl& sc, const std::string& pfile) {
+    std::string in_name;
+    for (const auto& i : f_.inputs)
+      if (sc.dst.module == qualify(i.first)) in_name = i.first;
+    if (in_name.empty()) {
+      out_.push_back(sc);
+      return true;
+    }
+    fed_inputs_.insert(in_name);
+    const auto& targets = in_targets_[in_name];
+    if (out_.size() + targets.size() > kMaxExpanded) {
+      ctx_.err(pfile, sc.line, sc.col,
+               "subpatch expansion exceeds " + std::to_string(kMaxExpanded) + " cables");
+      return false;
+    }
+    for (const auto& t : targets) {
+      dsl::CableDecl nc = sc;
+      nc.dst = t.dst;
+      nc.dst.module = qualify(t.dst.module);
+      nc.depth = sc.depth * t.depth;
+      out_.push_back(std::move(nc));
+    }
+    return true;
+  }
+
+  void drive_defaults() {
+    for (const auto& [name, def] : f_.inputs) {
+      if (fed_inputs_.count(name) || def == 0.0) continue;
+      for (const auto& t : in_targets_[name]) {
+        dsl::CableDecl nc = t;
+        nc.src = {};
+        nc.src.is_literal = true;
+        nc.src.literal = def;
+        nc.dst.module = qualify(t.dst.module);
+        out_.push_back(std::move(nc));
       }
     }
   }
 
-  for (const auto& [name, def] : f.inputs) {
-    if (fed_inputs.count(name) || def == 0.0) continue;
-    for (const auto& t : in_targets[name]) {
-      dsl::CableDecl nc = t;
-      nc.src = {};
-      nc.src.is_literal = true;
-      nc.src.literal = def;
-      nc.dst.module = stamp(t.dst.module);
-      out_cables.push_back(std::move(nc));
-    }
-  }
-  parent.cables = std::move(out_cables);
+  Ctx& ctx_;
+  const std::string file_;
+  const std::string parent_file_;
+  const std::string inst_;
+  const Interface& f_;
+  std::unordered_map<std::string, std::vector<dsl::CableDecl>> in_targets_, out_sources_;
+  std::unordered_set<std::string> fed_inputs_;
+  std::vector<dsl::CableDecl> out_;
+};
 
-  std::vector<dsl::ModuleDecl> keep;
-  for (auto& m : body.modules)
-    if (!is_iface(m.type)) keep.push_back(std::move(m));
-  body.modules = std::move(keep);
+// --- demo.* sections -----------------------------------------------------------
+
+bool in_demo(const std::string& chain) { return chain_in(chain, "demo"); }
+
+bool refs_out(const dsl::Endpoint& e) { return !e.is_literal && chain_in(e.module, "out"); }
+
+// A top-level subpatch file plays its demo section: demo.out becomes out.
+void demo_out_to_out(dsl::Endpoint& e) {
+  if (!e.is_literal && chain_in(e.module, "demo.out")) e.module.erase(0, std::string("demo.").size());
 }
 
-void expand_in(Ctx& ctx, dsl::PatchAst& ast, const std::string& dir,
-               const std::string& file);
-
+// A body may not reach the real `out`; at top level demo.* plays, inside an
+// instance it is dropped.
 void handle_demo(Ctx& ctx, const std::string& file, dsl::PatchAst& body, bool top) {
-  auto in_demo = [](const std::string& chain) {
-    return chain == "demo" || chain_under(chain, "demo");
-  };
   for (const auto& m : body.modules)
     if (is_iface(m.type) && in_demo(m.name))
       ctx.err(file, m.line, m.col,
               "'" + m.name + "': interface declarations may not live under demo.*");
-  for (const auto& c : body.cables) {
-    auto bad_out = [&](const dsl::Endpoint& e) {
-      if (e.is_literal) return false;
-      return e.module == "out" || chain_under(e.module, "out");
-    };
-    if (bad_out(c.src) || bad_out(c.dst))
+  for (const auto& c : body.cables)
+    if (refs_out(c.src) || refs_out(c.dst))
       ctx.err(file, c.line, c.col,
               "subpatch bodies may not reference 'out' (use demo.out in a demo section)");
-  }
   if (ctx.failed()) return;
 
   if (top) {
     for (auto& c : body.cables) {
-      auto rename_demo_out = [](dsl::Endpoint& e) {
-        if (e.is_literal) return;
-        if (e.module == "demo.out") e.module = "out";
-        else if (chain_under(e.module, "demo.out"))
-          e.module = "out" + e.module.substr(std::string("demo.out").size());
-      };
-      rename_demo_out(c.src);
-      rename_demo_out(c.dst);
+      demo_out_to_out(c.src);
+      demo_out_to_out(c.dst);
     }
     return;
   }
-  std::vector<dsl::ModuleDecl> keep_m;
-  for (auto& m : body.modules)
-    if (!in_demo(m.name)) keep_m.push_back(std::move(m));
-  body.modules = std::move(keep_m);
-  std::vector<dsl::CableDecl> keep_c;
-  for (auto& c : body.cables) {
-    const bool touches = (!c.src.is_literal && in_demo(c.src.module)) || in_demo(c.dst.module);
-    if (!touches) keep_c.push_back(std::move(c));
+  std::erase_if(body.modules, [](const dsl::ModuleDecl& m) { return in_demo(m.name); });
+  std::erase_if(body.cables, [](const dsl::CableDecl& c) {
+    return (!c.src.is_literal && in_demo(c.src.module)) || in_demo(c.dst.module);
+  });
+}
+
+// --- Instantiation ---------------------------------------------------------------
+
+void expand_in(Ctx& ctx, dsl::PatchAst& ast, const std::string& dir,
+               const std::string& file);
+
+// The template's params with the instance's overrides applied.
+ParamMap bind_params(Ctx& ctx, const dsl::ModuleDecl& decl, const std::string& parent_file,
+                     ParamMap params) {
+  for (const auto& o : decl.params) {
+    if (o.name == "file" || o.name == "def") continue;
+    auto it = params.find(o.name);
+    if (it == params.end())
+      ctx.err(parent_file, o.line, o.col, "sub '" + decl.name + "' has no param '" + o.name + "'");
+    else
+      it->second = o.value;
   }
-  body.cables = std::move(keep_c);
+  return params;
+}
+
+// Prefix every body name (and every config value naming one) with `inst.`.
+void stamp_body(dsl::PatchAst& body, const std::string& inst, const std::string& body_file) {
+  std::unordered_set<std::string> internal;
+  for (const auto& m : body.modules) internal.insert(m.name);
+  for (auto& m : body.modules) {
+    for (auto& p : m.params)
+      if (p.value.kind == dsl::Value::Kind::Ident && internal.count(p.value.str))
+        p.value.str = inst + "." + p.value.str;
+    m.name = inst + "." + m.name;
+    if (m.file.empty()) m.file = body_file;
+  }
+  for (auto& c : body.cables) {
+    if (!c.src.is_literal) c.src.module = inst + "." + c.src.module;
+    c.dst.module = inst + "." + c.dst.module;
+    if (c.file.empty()) c.file = body_file;
+  }
 }
 
 void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl& decl,
              const std::string& parent_file, dsl::PatchAst body,
              const std::string& body_dir, const std::string& body_file) {
-  Interface f = scan_interface(ctx, body_file, body);
+  const Interface f = scan_interface(ctx, body_file, body);
   if (ctx.failed()) return;
-
-  ParamMap params = f.params;
-  for (const auto& o : decl.params) {
-    if (o.name == "file" || o.name == "def") continue;
-    auto it = params.find(o.name);
-    if (it == params.end())
-      ctx.err(parent_file, o.line, o.col,
-              "sub '" + decl.name + "' has no param '" + o.name + "'");
-    else
-      it->second = o.value;
-  }
+  const ParamMap params = bind_params(ctx, decl, parent_file, f.params);
   if (ctx.failed()) return;
-
   substitute(ctx, body_file, body, params);
   if (ctx.failed()) return;
-
   handle_demo(ctx, body_file, body, /*top=*/false);
   if (ctx.failed()) return;
-
   expand_in(ctx, body, body_dir, body_file);
   if (ctx.failed()) return;
-
-  splice_ports(ctx, body_file, parent, decl.name, body, f);
+  if (parent.modules.size() + body.modules.size() > kMaxExpanded)
+    return ctx.err(parent_file, decl.line, decl.col,
+                   "subpatch expansion exceeds " + std::to_string(kMaxExpanded) + " modules");
+  Splice(ctx, body_file, parent_file, decl.name, f).run(parent, body);
   if (ctx.failed()) return;
 
-  std::unordered_set<std::string> internal;
-  for (const auto& m : body.modules) internal.insert(m.name);
-  for (auto& m : body.modules)
-    for (auto& p : m.params)
-      if (p.value.kind == dsl::Value::Kind::Ident && internal.count(p.value.str))
-        p.value.str = decl.name + "." + p.value.str;
-
-  for (auto& m : body.modules) {
-    m.name = decl.name + "." + m.name;
-    if (m.file.empty()) m.file = body_file;
-  }
-  for (auto& c : body.cables) {
-    if (!c.src.is_literal) c.src.module = decl.name + "." + c.src.module;
-    c.dst.module = decl.name + "." + c.dst.module;
-    if (c.file.empty()) c.file = body_file;
-  }
+  stamp_body(body, decl.name, body_file);
   parent.modules.erase(parent.modules.begin() + static_cast<long>(idx));
   parent.modules.insert(parent.modules.begin() + static_cast<long>(idx),
                         std::make_move_iterator(body.modules.begin()),
@@ -395,160 +471,179 @@ void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl&
                        std::make_move_iterator(body.cables.end()));
 }
 
-void instantiate(Ctx& ctx, dsl::PatchAst& parent, size_t idx,
-                 const std::unordered_map<std::string, dsl::PatchAst>& templates,
-                 const std::string& dir, const std::string& file) {
-  const dsl::ModuleDecl decl = parent.modules[idx];
-  const dsl::ParamDecl* pf = find_param(decl, "file");
-  const dsl::ParamDecl* pd = find_param(decl, "def");
-  if ((pf != nullptr) == (pd != nullptr)) {
-    ctx.err(file, decl.line, decl.col,
-            "sub '" + decl.name + "' requires exactly one of 'file:' or 'def:'");
-    return;
-  }
-  if (pd) {
-    if (pd->value.kind != dsl::Value::Kind::Ident) {
-      ctx.err(file, pd->line, pd->col, "sub 'def:' expects a template name");
-      return;
-    }
-    auto it = templates.find(pd->value.str);
-    if (it == templates.end()) {
-      ctx.err(file, pd->line, pd->col, "unknown subdef '" + pd->value.str + "'");
-      return;
-    }
-    if (ctx.stack.size() >= kMaxDepth) {
-      ctx.err(file, decl.line, decl.col, "subpatch nesting deeper than 16");
-      return;
-    }
-    const std::string key = "def:" + pd->value.str + "@" + file;
-    ctx.stack.insert(key);
-    ctx.labels.push_back(decl.name + " at " + (file.empty() ? "patch" : file) + ":" +
-                         std::to_string(decl.line));
-    do_body(ctx, parent, idx, decl, file, it->second, dir, file);
-    ctx.labels.pop_back();
-    ctx.stack.erase(key);
-    return;
-  }
-  if (pf->value.kind != dsl::Value::Kind::Str) {
-    ctx.err(file, pf->line, pf->col, "sub 'file:' expects a quoted path");
-    return;
-  }
+// Where an instance's body comes from: a template AST plus the directory and
+// file its own includes and diagnostics resolve against. `key` marks it on
+// the include stack for cycle detection.
+struct Source {
+  const dsl::PatchAst* ast = nullptr;
+  std::string dir, file, key;
+};
 
-  const std::filesystem::path p =
-      (std::filesystem::path(dir) / pf->value.str).lexically_normal();
+Source def_source(Ctx& ctx, const dsl::ModuleDecl& decl, const dsl::ParamDecl& pd,
+                  const TemplateMap& templates, const std::string& dir, const std::string& file) {
+  if (pd.value.kind != dsl::Value::Kind::Ident) {
+    ctx.err(file, pd.line, pd.col, "sub 'def:' expects a template name");
+    return {};
+  }
+  auto it = templates.find(pd.value.str);
+  if (it == templates.end()) {
+    ctx.err(file, pd.line, pd.col, "unknown subdef '" + pd.value.str + "'");
+    return {};
+  }
+  if (ctx.stack.size() >= kMaxDepth) {
+    ctx.err(file, decl.line, decl.col, "subpatch nesting deeper than 16");
+    return {};
+  }
+  return {&it->second, dir, file, "def:" + pd.value.str + "@" + file};
+}
+
+// Parse a subpatch file once per expansion; later instances reuse the AST.
+const dsl::PatchAst* load_file(Ctx& ctx, const std::string& path, const dsl::ParamDecl& pf,
+                               const std::string& file) {
+  auto it = ctx.cache.find(path);
+  if (it != ctx.cache.end()) return &it->second;
+  std::string src;
+  if (!ctx.read(path, src)) {
+    ctx.err(file, pf.line, pf.col, "cannot read subpatch '" + path + "'");
+    return nullptr;
+  }
+  auto pr = dsl::parse(src);
+  if (!pr.ok()) {
+    for (const auto& d : pr.errors) ctx.err(path, d.line, d.col, d.msg);
+    return nullptr;
+  }
+  if (ctx.file_set.insert(path).second) ctx.files.push_back(path);
+  return &ctx.cache.emplace(path, std::move(pr.ast)).first->second;
+}
+
+Source file_source(Ctx& ctx, const dsl::ModuleDecl& decl, const dsl::ParamDecl& pf,
+                   const std::string& dir, const std::string& file) {
+  if (pf.value.kind != dsl::Value::Kind::Str) {
+    ctx.err(file, pf.line, pf.col, "sub 'file:' expects a quoted path");
+    return {};
+  }
+  const std::filesystem::path p = (std::filesystem::path(dir) / pf.value.str).lexically_normal();
   const std::string path = p.string();
   const std::string key = "file:" + path;
   if (ctx.stack.count(key)) {
     ctx.err(file, decl.line, decl.col, "subpatch include cycle at '" + path + "'");
-    return;
+    return {};
   }
   if (ctx.stack.size() >= kMaxDepth) {
     ctx.err(file, decl.line, decl.col, "subpatch nesting deeper than 16");
-    return;
+    return {};
   }
-
-  auto it = ctx.cache.find(path);
-  if (it == ctx.cache.end()) {
-    std::string src;
-    if (!ctx.read(path, src)) {
-      ctx.err(file, pf->line, pf->col, "cannot read subpatch '" + path + "'");
-      return;
-    }
-    auto pr = dsl::parse(src);
-    if (!pr.ok()) {
-      for (const auto& d : pr.errors) ctx.err(path, d.line, d.col, d.msg);
-      return;
-    }
-    it = ctx.cache.emplace(path, std::move(pr.ast)).first;
-    if (ctx.file_set.insert(path).second) ctx.files.push_back(path);
-  }
-
-  ctx.stack.insert(key);
-  ctx.labels.push_back(decl.name + " at " + (file.empty() ? "patch" : file) + ":" +
-                       std::to_string(decl.line));
-  do_body(ctx, parent, idx, decl, file, it->second, p.parent_path().string(), path);
-  ctx.labels.pop_back();
-  ctx.stack.erase(key);
+  return {load_file(ctx, path, pf, file), p.parent_path().string(), path, key};
 }
 
-std::unordered_map<std::string, dsl::PatchAst> collect_subdefs(
-    Ctx& ctx, const std::string& file, dsl::PatchAst& ast) {
-  std::unordered_map<std::string, dsl::PatchAst> out;
-  std::vector<std::pair<std::string, int>> order;
+void instantiate(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const TemplateMap& templates,
+                 const std::string& dir, const std::string& file) {
+  const dsl::ModuleDecl decl = parent.modules[idx];
+  const dsl::ParamDecl* pf = find_param(decl, "file");
+  const dsl::ParamDecl* pd = find_param(decl, "def");
+  if ((pf != nullptr) == (pd != nullptr))
+    return ctx.err(file, decl.line, decl.col,
+                   "sub '" + decl.name + "' requires exactly one of 'file:' or 'def:'");
+  const Source src = pd ? def_source(ctx, decl, *pd, templates, dir, file)
+                        : file_source(ctx, decl, *pf, dir, file);
+  if (!src.ast) return;
+  ctx.stack.insert(src.key);
+  ctx.labels.push_back(decl.name + " at " + (file.empty() ? "patch" : file) + ":" +
+                       std::to_string(decl.line));
+  do_body(ctx, parent, idx, decl, file, *src.ast, src.dir, src.file);
+  ctx.labels.pop_back();
+  ctx.stack.erase(src.key);
+}
+
+// --- Inline subdef templates -----------------------------------------------------
+
+struct SubdefDecl { std::string name; int line, col; };
+
+std::vector<SubdefDecl> find_subdefs(Ctx& ctx, const std::string& file, const dsl::PatchAst& ast) {
+  std::vector<SubdefDecl> out;
   for (const auto& m : ast.modules) {
     if (m.type != "subdef") continue;
-    if (m.name.find('.') != std::string::npos) {
+    if (m.name.find('.') != std::string::npos)
       ctx.err(file, m.line, m.col, "subdef '" + m.name + "' may not be nested (dotted name)");
-      continue;
-    }
-    out.emplace(m.name, dsl::PatchAst{});
-    order.emplace_back(m.name, m.line);
+    else
+      out.push_back({m.name, m.line, m.col});
   }
-  if (out.empty() || ctx.failed()) return out;
+  return out;
+}
 
-  auto owner = [&](const std::string& chain) -> std::string {
-    for (const auto& [name, line] : order)
-      if (chain_under(chain, name)) return name;
-    return "";
-  };
-  auto strip = [](const std::string& chain, const std::string& prefix) {
-    return chain.substr(prefix.size() + 1);
-  };
+std::string subdef_owner(const std::vector<SubdefDecl>& defs, const std::string& chain) {
+  for (const auto& d : defs)
+    if (chain_under(chain, d.name)) return d.name;
+  return "";
+}
 
+// `g.x` -> `x` when the name lives under template `g`.
+void unprefix(std::string& chain, const std::string& g) {
+  if (chain_under(chain, g)) chain.erase(0, g.size() + 1);
+}
+
+// Move each template member (`g.*` modules, then the cables among them) out
+// of `ast` into its template, with the `g.` prefix removed.
+void take_modules(dsl::PatchAst& ast, const std::vector<SubdefDecl>& defs, TemplateMap& out) {
   std::vector<dsl::ModuleDecl> keep_m;
   for (auto& m : ast.modules) {
     if (m.type == "subdef") continue;
-    std::string g = owner(m.name);
+    const std::string g = subdef_owner(defs, m.name);
     if (g.empty()) {
       keep_m.push_back(std::move(m));
       continue;
     }
-    dsl::ModuleDecl copy = std::move(m);
-    copy.name = strip(copy.name, g);
-    for (auto& p : copy.params) {
-      if (p.value.kind == dsl::Value::Kind::Ident && chain_under(p.value.str, g))
-        p.value.str = strip(p.value.str, g);
+    unprefix(m.name, g);
+    for (auto& p : m.params) {
+      if (p.value.kind == dsl::Value::Kind::Ident) unprefix(p.value.str, g);
       if (p.value.kind == dsl::Value::Kind::Array)
         for (auto& item : p.value.items)
-          if (item.kind == dsl::Value::Kind::Ident && chain_under(item.str, g))
-            item.str = strip(item.str, g);
+          if (item.kind == dsl::Value::Kind::Ident) unprefix(item.str, g);
     }
-    out[g].modules.push_back(std::move(copy));
+    out[g].modules.push_back(std::move(m));
   }
   ast.modules = std::move(keep_m);
+}
 
+void take_cables(Ctx& ctx, const std::string& file, dsl::PatchAst& ast,
+                 const std::vector<SubdefDecl>& defs, TemplateMap& out) {
   std::vector<dsl::CableDecl> keep_c;
   for (auto& c : ast.cables) {
-    std::string sg = c.src.is_literal ? "" : owner(c.src.module);
-    std::string dg = owner(c.dst.module);
+    const std::string sg = c.src.is_literal ? "" : subdef_owner(defs, c.src.module);
+    const std::string dg = subdef_owner(defs, c.dst.module);
     if (sg.empty() && dg.empty()) {
       keep_c.push_back(std::move(c));
       continue;
     }
-    if (sg != dg && !(c.src.is_literal && !dg.empty())) {
-      ctx.err(file, c.line, c.col,
-              "cable crosses subdef '" + (sg.empty() ? dg : sg) + "' boundary");
+    // A literal may feed a member; anything else must stay inside one template.
+    if (!c.src.is_literal && sg != dg) {
+      ctx.err(file, c.line, c.col, "cable crosses subdef '" + (sg.empty() ? dg : sg) + "' boundary");
       continue;
     }
-    dsl::CableDecl copy = std::move(c);
-    if (!copy.src.is_literal) copy.src.module = strip(copy.src.module, dg);
-    copy.dst.module = strip(copy.dst.module, dg);
-    if (!copy.depth_ident.empty() && chain_under(copy.depth_ident, dg))
-      copy.depth_ident = strip(copy.depth_ident, dg);
-    out[dg].cables.push_back(std::move(copy));
+    if (!c.src.is_literal) unprefix(c.src.module, dg);
+    unprefix(c.dst.module, dg);
+    unprefix(c.depth_ident, dg);
+    out[dg].cables.push_back(std::move(c));
   }
   ast.cables = std::move(keep_c);
+}
 
-  for (const auto& [name, line] : order)
-    if (out.count(name) && out[name].modules.empty())
-      ctx.err(file, line, 0, "subdef '" + name + "' has no members");
+TemplateMap collect_subdefs(Ctx& ctx, const std::string& file, dsl::PatchAst& ast) {
+  TemplateMap out;
+  const std::vector<SubdefDecl> defs = find_subdefs(ctx, file, ast);
+  for (const auto& d : defs) out.emplace(d.name, dsl::PatchAst{});
+  if (out.empty() || ctx.failed()) return out;
+  take_modules(ast, defs, out);
+  take_cables(ctx, file, ast, defs, out);
+  for (const auto& d : defs)
+    if (out.at(d.name).modules.empty())
+      ctx.err(file, d.line, d.col, "subdef '" + d.name + "' has no members");
   return out;
 }
 
 void expand_in(Ctx& ctx, dsl::PatchAst& ast, const std::string& dir,
                const std::string& file) {
-  std::unordered_map<std::string, dsl::PatchAst> templates =
-      collect_subdefs(ctx, file, ast);
+  const TemplateMap templates = collect_subdefs(ctx, file, ast);
   if (ctx.failed()) return;
   for (size_t i = 0; i < ast.modules.size();) {
     if (ast.modules[i].type != "sub") {
@@ -565,60 +660,22 @@ void expand_in(Ctx& ctx, dsl::PatchAst& ast, const std::string& dir,
 SubExpansion expand_subs(dsl::PatchAst& ast, const std::string& patch_dir,
                          const FileReader& read, Diags& errors) {
   SubExpansion out;
-  bool any = false;
-  for (const auto& m : ast.modules)
-    if (m.type == "sub" || m.type == "subdef" || is_iface(m.type)) {
-      any = true;
-      break;
-    }
-  if (!any) return out;
+  if (std::none_of(ast.modules.begin(), ast.modules.end(), [](const dsl::ModuleDecl& m) {
+        return m.type == "sub" || m.type == "subdef" || is_iface(m.type);
+      }))
+    return out;
 
   Ctx ctx{read, errors, errors.size(), {}, {}, {}, {}, {}};
   dsl::PatchAst work = ast;
-
-  std::unordered_set<std::string> subdef_names;
-  for (const auto& m : work.modules)
-    if (m.type == "subdef" && m.name.find('.') == std::string::npos)
-      subdef_names.insert(m.name);
-
-  Interface top;
-  for (const auto& m : work.modules) {
-    bool owned = false;
-    for (const auto& sd : subdef_names)
-      if (chain_under(m.name, sd)) { owned = true; break; }
-    if (owned) continue;
-    if (!is_iface(m.type)) continue;
-    // Inline the scan_interface logic:
-    if (m.type == "param") {
-      const dsl::ParamDecl* d = find_param(m, "default");
-      if (!d) {
-        ctx.err("", m.line, m.col, "param '" + m.name + "' requires 'default:'");
-        continue;
-      }
-      top.params.emplace(m.name, d->value);
-    } else if (m.type == "input") {
-      double def = 0.0;
-      if (const dsl::ParamDecl* d = find_param(m, "default")) {
-        if (d->value.kind != dsl::Value::Kind::Num)
-          ctx.err("", d->line, d->col, "input '" + m.name + "' default must be a number");
-        else
-          def = d->value.num;
-      }
-      top.inputs.emplace_back(m.name, def);
-    } else if (m.type == "output") {
-      top.outputs.push_back(m.name);
-    }
-  }
-
+  // A subpatch file checked on its own is its own instance: its params take
+  // their defaults, its demo section plays, and its ports splice into itself.
+  const Interface top = scan_interface(ctx, "", work);
   if (top.any() && !ctx.failed()) substitute(ctx, "", work, top.params);
-
   if (!ctx.failed()) expand_in(ctx, work, patch_dir, "");
-
   if (top.any() && !ctx.failed()) {
     handle_demo(ctx, "", work, /*top=*/true);
-    if (!ctx.failed()) splice_ports(ctx, "", work, "", work, top);
+    if (!ctx.failed()) Splice(ctx, "", "", "", top).run(work, work);
   }
-
   if (!ctx.failed()) {
     ast = std::move(work);
     out.files = std::move(ctx.files);

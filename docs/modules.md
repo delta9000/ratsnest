@@ -938,7 +938,8 @@ like module ports (`clk -> k.trig`, `k.main -> mix.in1`; bare `k` reads the
 first declared output). Stamped internals stay addressable
 (`0.1 -> k.kosc.v_oct`) — the declared interface is the stable surface, not
 a wall. Same file, different params: separate instances, one parse.
-Nesting is fine (16 deep, cycles rejected); `sub` composes with `voice`
+Nesting is fine (16 deep, cycles rejected, at most 65536 modules or cables
+once expanded); `sub` composes with `voice`
 groups in both directions. Saving an included `.sub` hot-reloads every
 patch using it.
 

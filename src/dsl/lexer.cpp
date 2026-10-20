@@ -1,14 +1,19 @@
 #include "dsl/lexer.h"
+#include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <string_view>
 
 namespace ms::dsl {
 namespace {
 
+bool is_digit(char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; }
+bool is_space(char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; }
 bool ident_start(char c) { return std::islower(static_cast<unsigned char>(c)) || c == '_'; }
-bool ident_char(char c) { return ident_start(c) || std::isdigit(static_cast<unsigned char>(c)); }
+bool ident_char(char c) { return ident_start(c) || is_digit(c); }
 
 // A note-name literal: uppercase letter A-G, optional accidental (s = sharp,
 // b = flat — '#' is unavailable, it starts a comment), one octave digit 0-9,
@@ -18,25 +23,32 @@ bool ident_char(char c) { return ident_start(c) || std::isdigit(static_cast<unsi
 // summed modulation. Uppercase letters are otherwise unused in the grammar, so
 // this is unambiguous with identifiers (which are lowercase).
 bool note_num(std::string_view s, double& out) {
-  bool voct = false;
-  if (!s.empty() && s.back() == 'v') { voct = true; s.remove_suffix(1); }
-  if (s.size() < 2 || s.size() > 3) return false;
-  int pc = 0;
-  switch (s[0]) {
-    case 'C': pc = 0;  break; case 'D': pc = 2;  break; case 'E': pc = 4;  break;
-    case 'F': pc = 5;  break; case 'G': pc = 7;  break; case 'A': pc = 9;  break;
-    case 'B': pc = 11; break; default: return false;
+  const bool voct = !s.empty() && s.back() == 'v';
+  if (voct) s.remove_suffix(1);
+  if (s.size() < 2 || s.size() > 3 || !is_digit(s.back())) return false;
+  // Semitones above C, found by the letter's position; gaps are not notes.
+  constexpr std::string_view kLetters = "C?D?EF?G?A?B";
+  const auto letter = kLetters.find(s[0]);
+  if (s[0] == '?' || letter == std::string_view::npos) return false;
+  int pc = static_cast<int>(letter);
+  if (s.size() == 3) {
+    if (s[1] != 's' && s[1] != 'b') return false;
+    pc += s[1] == 's' ? 1 : -1;
   }
-  std::size_t idx = 1;
-  if (s[idx] == 's') { pc += 1; ++idx; }
-  else if (s[idx] == 'b') { pc -= 1; ++idx; }
-  if (idx != s.size() - 1) return false;
-  const char d = s[idx];
-  if (d < '0' || d > '9') return false;
-  const int midi = (d - '0' + 1) * 12 + pc;  // scientific: C4 -> MIDI 60
+  const int midi = (s.back() - '0' + 1) * 12 + pc;  // scientific: C4 -> MIDI 60
   out = voct ? static_cast<double>(midi - 57) / 12.0            // A3 = 0.0
              : 440.0 * std::exp2(static_cast<double>(midi - 69) / 12.0);
   return true;
+}
+
+// A stray byte, made safe to print inside a one-line diagnostic: control
+// bytes and lone high bytes (a fragment of UTF-8) become \xNN.
+std::string printable(char c) {
+  const auto u = static_cast<unsigned char>(c);
+  if (u >= 0x20 && u < 0x7f) return std::string(1, c);
+  char buf[8];
+  std::snprintf(buf, sizeof buf, "\\x%02x", u);
+  return buf;
 }
 
 bool unit_factor(std::string_view u, double& factor) {
@@ -46,117 +58,140 @@ bool unit_factor(std::string_view u, double& factor) {
   return false;
 }
 
-}  // namespace
+// Single-character tokens; `nest` tracks {} and [] depth, inside which
+// newlines are not statement breaks.
+struct Punct { char c; Tok kind; int nest; };
+constexpr Punct kPunct[] = {
+    {'{', Tok::LBrace, 1},   {'}', Tok::RBrace, -1}, {'[', Tok::LBracket, 1},
+    {']', Tok::RBracket, -1}, {':', Tok::Colon, 0},  {',', Tok::Comma, 0},
+    {'=', Tok::Equals, 0},   {'.', Tok::Dot, 0},
+};
 
-LexResult lex(std::string_view src) {
-  LexResult r;
-  size_t i = 0;
-  int line = 1, col = 1;
-  int depth = 0;  // {} and [] nesting; newlines suppressed inside
+class Lexer {
+ public:
+  explicit Lexer(std::string_view src) : src_(src) {}
 
-  auto push = [&](Tok k, std::string text, double num, int l, int c) {
-    r.tokens.push_back(Token{k, std::move(text), num, l, c});
-  };
-  auto err = [&](int l, int c, std::string msg) {
-    r.errors.push_back(Diag{l, c, std::move(msg), {}});
-  };
-  auto advance = [&](size_t n) {
-    for (size_t k = 0; k < n && i < src.size(); ++k, ++i) {
-      if (src[i] == '\n') { ++line; col = 1; } else { ++col; }
-    }
-  };
+  LexResult run() {
+    while (i_ < src_.size()) step();
+    push(Tok::End, "", 0, line_, col_);
+    return std::move(r_);
+  }
 
-  while (i < src.size()) {
-    char c = src[i];
-    int tl = line, tc = col;
-    if (c == '#') {
-      while (i < src.size() && src[i] != '\n') advance(1);
-      continue;
-    }
-    if (c == '\n') {
-      advance(1);
-      if (depth == 0) push(Tok::Newline, "\n", 0, line, col);
-      continue;
-    }
-    if (std::isspace(static_cast<unsigned char>(c))) { advance(1); continue; }
+ private:
+  // The byte k ahead of the cursor, or '\0' past the end (which no rule
+  // below accepts, so it reads as "no such character").
+  char at(size_t k = 0) const { return i_ + k < src_.size() ? src_[i_ + k] : '\0'; }
 
-    if (c == '-' && i + 1 < src.size() && src[i + 1] == '>') {
-      push(Tok::Arrow, "->", 0, tl, tc); advance(2); continue;
+  void push(Tok k, std::string text, double num, int l, int c) {
+    r_.tokens.push_back(Token{k, std::move(text), num, l, c});
+  }
+  void err(int l, int c, std::string msg) {
+    r_.errors.push_back(Diag{l, c, std::move(msg), {}});
+  }
+  void advance(size_t n) {
+    for (size_t k = 0; k < n && i_ < src_.size(); ++k, ++i_) {
+      if (src_[i_] == '\n') { ++line_; col_ = 1; } else { ++col_; }
     }
+  }
+  template <class Pred>
+  std::string_view take_while(Pred pred) {
+    const size_t start = i_;
+    while (i_ < src_.size() && pred(src_[i_])) advance(1);
+    return src_.substr(start, i_ - start);
+  }
 
-    bool neg = false;
-    if (c == '-' && i + 1 < src.size() &&
-        (std::isdigit(static_cast<unsigned char>(src[i + 1])) || src[i + 1] == '.')) {
-      neg = true; advance(1); c = src[i];
-    }
-    if (std::isdigit(static_cast<unsigned char>(c)) || (c == '.' && i + 1 < src.size() &&
-        std::isdigit(static_cast<unsigned char>(src[i + 1])))) {
-      size_t start = i;
-      while (i < src.size() && (std::isdigit(static_cast<unsigned char>(src[i])) || src[i] == '.'))
-        advance(1);
-      double v = std::strtod(std::string(src.substr(start, i - start)).c_str(), nullptr);
-      size_t ustart = i;
-      while (i < src.size() && ident_char(src[i])) advance(1);
-      std::string_view unit = src.substr(ustart, i - ustart);
-      double factor = 1.0;
-      if (!unit.empty() && !unit_factor(unit, factor)) {
-        err(tl, tc, "unknown unit '" + std::string(unit) + "' (hz, khz, ms, s, bpm)");
-      }
-      push(Tok::Number, "", (neg ? -v : v) * factor, tl, tc);
-      continue;
-    }
-
+  void step() {
+    if (skip_trivia()) return;
+    const int tl = line_, tc = col_;
+    if (at() == '-' && at(1) == '>') { push(Tok::Arrow, "->", 0, tl, tc); advance(2); return; }
+    // A '-' directly before a digit or '.' negates the number that follows.
+    const bool neg = at() == '-' && (is_digit(at(1)) || at(1) == '.');
+    if (neg) advance(1);
+    const char c = at();
+    if (is_digit(c) || (c == '.' && is_digit(at(1)))) return number(neg, tl, tc);
     if (ident_start(c)) {
-      size_t start = i;
-      while (i < src.size() && ident_char(src[i])) advance(1);
-      push(Tok::Ident, std::string(src.substr(start, i - start)), 0, tl, tc);
-      continue;
+      push(Tok::Ident, std::string(take_while(ident_char)), 0, tl, tc);
+      return;
     }
+    if (c >= 'A' && c <= 'G') return note(tl, tc);
+    if (c == '"') return quoted(tl, tc);
+    punct(c, tl, tc);
+  }
 
-    // Note-name literal (A4, Cs4, Bb2). Uppercase A-G is otherwise unused, so
-    // consume the run and validate it as a note -> a Number token in Hz.
-    if (c >= 'A' && c <= 'G') {
-      size_t start = i;
+  // Comments, whitespace, and newlines (a token only outside {} and []).
+  bool skip_trivia() {
+    const char c = at();
+    if (c == '#') {
+      take_while([](char ch) { return ch != '\n'; });
+    } else if (c == '\n') {
       advance(1);
-      while (i < src.size() && ident_char(src[i])) advance(1);
-      std::string_view tok = src.substr(start, i - start);
-      double val = 0.0;
-      if (note_num(tok, val)) {
-        push(Tok::Number, "", val, tl, tc);
-      } else {
-        err(tl, tc, "invalid note name '" + std::string(tok) +
-                        "' (use e.g. A4, Cs4 for sharp, Bb2 for flat, A4v for v/oct)");
-      }
-      continue;
-    }
-
-    if (c == '"') {
+      if (depth_ == 0) push(Tok::Newline, "\n", 0, line_, col_);
+    } else if (is_space(c)) {
       advance(1);
-      size_t start = i;
-      while (i < src.size() && src[i] != '"' && src[i] != '\n') advance(1);
-      if (i >= src.size() || src[i] != '"') {
-        err(tl, tc, "unterminated string");
-      } else {
-        push(Tok::Str, std::string(src.substr(start, i - start)), 0, tl, tc);
-        advance(1);
-      }
-      continue;
+    } else {
+      return false;
     }
+    return true;
+  }
 
-    switch (c) {
-      case '{': ++depth; push(Tok::LBrace, "{", 0, tl, tc); break;
-      case '}': if (depth > 0) --depth; push(Tok::RBrace, "}", 0, tl, tc); break;
-      case '[': ++depth; push(Tok::LBracket, "[", 0, tl, tc); break;
-      case ']': if (depth > 0) --depth; push(Tok::RBracket, "]", 0, tl, tc); break;
-      case ':': push(Tok::Colon, ":", 0, tl, tc); break;
-      case ',': push(Tok::Comma, ",", 0, tl, tc); break;
-      case '=': push(Tok::Equals, "=", 0, tl, tc); break;
-      case '.': push(Tok::Dot, ".", 0, tl, tc); break;
-      default: err(tl, tc, std::string("unexpected character '") + c + "'"); break;
+  void number(bool neg, int tl, int tc) {
+    const std::string_view digits = take_while([](char ch) { return is_digit(ch) || ch == '.'; });
+    const double v = std::strtod(std::string(digits).c_str(), nullptr);
+    const std::string_view unit = take_while(ident_char);
+    double factor = 1.0;
+    if (!unit.empty() && !unit_factor(unit, factor))
+      err(tl, tc, "unknown unit '" + std::string(unit) + "' (hz, khz, ms, s, bpm)");
+    push(Tok::Number, "", (neg ? -v : v) * factor, tl, tc);
+  }
+
+  // Note-name literal (A4, Cs4, Bb2). Uppercase A-G is otherwise unused, so
+  // consume the run and validate it as a note -> a Number token in Hz.
+  void note(int tl, int tc) {
+    const size_t start = i_;
+    advance(1);
+    take_while(ident_char);
+    const std::string_view tok = src_.substr(start, i_ - start);
+    double val = 0.0;
+    if (note_num(tok, val)) {
+      push(Tok::Number, "", val, tl, tc);
+    } else {
+      err(tl, tc, "invalid note name '" + std::string(tok) +
+                      "' (use e.g. A4, Cs4 for sharp, Bb2 for flat, A4v for v/oct)");
+    }
+  }
+
+  void quoted(int tl, int tc) {
+    advance(1);
+    const std::string_view body = take_while([](char ch) { return ch != '"' && ch != '\n'; });
+    if (at() != '"') {
+      err(tl, tc, "unterminated string");
+      return;
+    }
+    push(Tok::Str, std::string(body), 0, tl, tc);
+    advance(1);
+  }
+
+  void punct(char c, int tl, int tc) {
+    const auto* p = std::find_if(std::begin(kPunct), std::end(kPunct),
+                                 [c](const Punct& q) { return q.c == c; });
+    if (p == std::end(kPunct)) {
+      err(tl, tc, "unexpected character '" + printable(c) + "'");
+    } else {
+      depth_ = std::max(0, depth_ + p->nest);
+      push(p->kind, std::string(1, c), 0, tl, tc);
     }
     advance(1);
   }
-  push(Tok::End, "", 0, line, col);
-  return r;
-}
+
+  std::string_view src_;
+  size_t i_ = 0;
+  int line_ = 1, col_ = 1;
+  int depth_ = 0;
+  LexResult r_;
+};
+
+}  // namespace
+
+LexResult lex(std::string_view src) { return Lexer(src).run(); }
+
 }  // namespace ms::dsl
