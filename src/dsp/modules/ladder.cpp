@@ -1,6 +1,9 @@
 #include <algorithm>
+#include <bit>
+#include <cstdint>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 // Paper/technical-note-derived Zavalishin topology-preserving four-stage
@@ -21,20 +24,26 @@ class Ladder final : public Module {
   }
 
   void process(const float* ins, float* outs) override {
-    const double oct = std::isfinite(ins[4]) ? std::clamp(static_cast<double>(ins[4]), -24.0, 24.0) : 0.0;
-    const float cutoff = static_cast<float>(std::clamp(
-        static_cast<double>(ins[1]) * std::exp2(oct), 5.0, 0.45 * rate_));
+    if (key_.changed({ins[1], ins[4]})) {  // skip exp2/tan when still
+      const double oct = std::isfinite(ins[4]) ? std::clamp(static_cast<double>(ins[4]), -24.0, 24.0) : 0.0;
+      const float cutoff = static_cast<float>(std::clamp(
+          static_cast<double>(ins[1]) * std::exp2(oct), 5.0, 0.45 * rate_));
+      const float g = std::tan(std::numbers::pi_v<float> * cutoff / rate_);
+      G_ = g / (1.0f + g);
+    }
+    const float G = G_;
     const float res = std::clamp(ins[2], 0.0f, 1.0f);
     const float drive = std::clamp(ins[3], 0.0f, 4.0f);
-    const float g = std::tan(std::numbers::pi_v<float> * cutoff / rate_);
-    const float G = g / (1.0f + g);
     const float k = 4.0f * res;
     // Drive is a bypass at its default (0): blend linearly between the clean
     // input and the driven tanh(in*(1+4*drive)) saturation so drive==0 is an
     // exact identity (per-sample defaults must be neutral), and full drive
     // reaches the fully saturated stage.
-    const float driven = std::tanh(ins[0] * (1.0f + 4.0f * drive));
-    const float x = ins[0] + 0.25f * drive * (driven - ins[0]);
+    // At drive == +0 and a finite input the blend term is a signed zero
+    // whose sign works out to +0 either way, so skip the tanh.
+    const float x = std::bit_cast<std::uint32_t>(drive) == 0u && std::isfinite(ins[0])
+        ? ins[0] + 0.0f
+        : ins[0] + 0.25f * drive * (std::tanh(ins[0] * (1.0f + 4.0f * drive)) - ins[0]);
 
     // TPT one-pole per stage: y = G*x + (1-G)*s.  Zero-delay feedback:
     // y4 = G^4*u + S with u = x - k*y4, solved for y4 before updating states.
@@ -67,6 +76,8 @@ class Ladder final : public Module {
  private:
   float rate_ = 48000.0f;
   float s1_ = 0.0f, s2_ = 0.0f, s3_ = 0.0f, s4_ = 0.0f;
+  InputKey<2> key_;  // cutoff, v_oct -> G_
+  float G_ = 0.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Ladder>(); }

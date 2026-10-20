@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 #include "dsp/mastering.h"
 
@@ -94,8 +95,11 @@ class Limiter final : public Module {
     if (g_target < 0.0f) g_target = 0.0f;
     
     // 5. Smooth gain reduction with fast attack (0.1 ms) and variable release
-    const float alpha_a = 1.0f - std::exp(-1.0f / (0.0001f * rate_));
-    const float alpha_r = 1.0f - std::exp(-1.0f / (release * rate_));
+    if (release_key_.changed({release})) {  // skip exp while release holds
+      alpha_a_ = 1.0f - std::exp(-1.0f / (0.0001f * rate_));
+      alpha_r_ = 1.0f - std::exp(-1.0f / (release * rate_));
+    }
+    const float alpha_a = alpha_a_, alpha_r = alpha_r_;
     
     if (g_target > g_smooth_) {
       g_smooth_ += alpha_a * (g_target - g_smooth_);
@@ -105,7 +109,8 @@ class Limiter final : public Module {
     g_smooth_ = flush_denormal(g_smooth_);
     
     // 6. Convert gain reduction to linear factor
-    const float g_linear = std::pow(10.0f, -g_smooth_ / 20.0f);
+    if (gain_key_.changed({g_smooth_})) g_linear_ = std::pow(10.0f, -g_smooth_ / 20.0f);
+    const float g_linear = g_linear_;
     
     // 7. Process delayed audio from the ring buffer
     const int read_idx = (write_idx_ - delay_samples + 512) % 512;
@@ -134,7 +139,9 @@ class Limiter final : public Module {
  private:
   float rate_ = 48000.0f;
   float g_smooth_ = 0.0f;
-  
+  // Memoized libm results; see dsp/input_key.h.
+  InputKey<1> release_key_, gain_key_;
+  float alpha_a_ = 0.0f, alpha_r_ = 0.0f, g_linear_ = 1.0f;
   // Ring buffers
   float buffer_l_[512] = {};
   float buffer_r_[512] = {};

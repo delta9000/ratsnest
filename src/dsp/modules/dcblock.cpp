@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 #include "dsp/mastering.h"
 
@@ -43,8 +44,11 @@ class DcBlock final : public Module {
     
     // Compute alpha coefficient based on sample rate and cutoff
     // alpha = exp(-2 * pi * cutoff / rate_)
-    const float alpha = std::exp(-2.0f * std::numbers::pi_v<float> * cutoff / rate_);
-    const float lp_coeff = 1.0f - alpha;
+    if (cutoff_key_.changed({cutoff})) {  // skip exp once the smoother settles
+      const float alpha = std::exp(-2.0f * std::numbers::pi_v<float> * cutoff / rate_);
+      lp_coeff_ = 1.0f - alpha;
+    }
+    const float lp_coeff = lp_coeff_;
     
     // Update left channel low-pass state
     lp_l_ += lp_coeff * (raw_in_l - lp_l_);
@@ -69,6 +73,8 @@ class DcBlock final : public Module {
   OnePole cutoff_smooth_;
   float lp_l_ = 0.0f;
   float lp_r_ = 0.0f;
+  InputKey<1> cutoff_key_;
+  float lp_coeff_ = 0.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<DcBlock>(); }

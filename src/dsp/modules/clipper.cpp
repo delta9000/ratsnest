@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 #include "dsp/oversample.h"
 #include "dsp/mastering.h"
@@ -65,8 +66,12 @@ class Clipper final : public Module {
     delay_idx_ = (delay_idx_ + 1) % 8;
     
     // 1. Convert DB control parameters to linear
-    const float threshold_linear = std::pow(10.0f, threshold / 20.0f);
-    const float drive_linear = std::pow(10.0f, drive / 20.0f);
+    if (db_key_.changed({threshold, drive})) {  // skip pow while dB controls hold
+      threshold_linear_ = std::pow(10.0f, threshold / 20.0f);
+      drive_linear_ = std::pow(10.0f, drive / 20.0f);
+    }
+    const float threshold_linear = threshold_linear_;
+    const float drive_linear = drive_linear_;
     
     // 2. Upsample to 4x
     float xs_l[4] = {};
@@ -124,6 +129,8 @@ class Clipper final : public Module {
  private:
   float rate_ = 48000.0f;
   bool is_soft_ = false;
+  InputKey<2> db_key_;  // threshold, drive -> linear gains
+  float threshold_linear_ = 1.0f, drive_linear_ = 1.0f;
   
   // Left oversampler/decimator
   Oversampler4x oversampler_l_;

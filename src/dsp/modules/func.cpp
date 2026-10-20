@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 namespace ms::dsp {
@@ -29,7 +30,7 @@ class FuncModule final : public Module {
     if (triggered) start_rise();
 
     if (stage_ == Stage::Rise) {
-      progress_ = std::min(1.0, progress_ + increment(ins[2]));
+      progress_ = std::min(1.0, progress_ + rise_increment(ins[2]));
       level_ = rise_start_ + (1.0 - rise_start_) * shape(progress_);
       if (progress_ >= 1.0) {
         level_ = 1.0;
@@ -38,7 +39,7 @@ class FuncModule final : public Module {
         outs[1] = 1.0f;
       }
     } else if (stage_ == Stage::Fall) {
-      progress_ = std::min(1.0, progress_ + increment(ins[3]));
+      progress_ = std::min(1.0, progress_ + fall_increment(ins[3]));
       level_ = 1.0 - shape(progress_);
       if (progress_ >= 1.0) {
         level_ = 0.0;
@@ -48,7 +49,7 @@ class FuncModule final : public Module {
       }
     } else {
       level_ = std::clamp(static_cast<double>(ins[1]),
-                          level_ - increment(ins[3]), level_ + increment(ins[2]));
+                          level_ - fall_increment(ins[3]), level_ + rise_increment(ins[2]));
     }
 
     outs[0] = static_cast<float>(level_);
@@ -74,6 +75,16 @@ class FuncModule final : public Module {
     return samples <= 1.0 ? 1.0 : 1.0 / samples;
   }
 
+  // The division above, memoized while the time input holds still.
+  double rise_increment(float seconds) {
+    if (rise_key_.changed({seconds})) rise_inc_ = increment(seconds);
+    return rise_inc_;
+  }
+  double fall_increment(float seconds) {
+    if (fall_key_.changed({seconds})) fall_inc_ = increment(seconds);
+    return fall_inc_;
+  }
+
   double shape(double x) const {
     if (curve_ == 1) return x * x;
     if (curve_ == 2) return std::sqrt(x);
@@ -94,6 +105,8 @@ class FuncModule final : public Module {
   float prev_trig_ = 0.0f;
   int curve_ = 0;
   bool cycle_ = false;
+  InputKey<1> rise_key_, fall_key_;
+  double rise_inc_ = 1.0, fall_inc_ = 1.0;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<FuncModule>(); }

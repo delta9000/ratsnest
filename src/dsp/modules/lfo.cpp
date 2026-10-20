@@ -1,5 +1,6 @@
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 namespace ms::dsp {
@@ -35,7 +36,9 @@ class Lfo final : public Module {
       case 3: outs[0] = p < 0.5f ? 1.0f : -1.0f; break;
     }
 
-    phase_ += static_cast<double>(std::max(ins[0], 0.0f)) / rate_;
+    if (freq_key_.changed({ins[0]}))  // skip the division at a held rate
+      inc_ = static_cast<double>(std::max(ins[0], 0.0f)) / rate_;
+    phase_ += inc_;
     phase_ -= std::floor(phase_);
   }
 
@@ -50,6 +53,8 @@ class Lfo final : public Module {
   int wave_ = 0;
   double phase_ = 0.0;
   float prev_reset_ = 0.0f;
+  InputKey<1> freq_key_;
+  double inc_ = 0.0;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Lfo>(); }

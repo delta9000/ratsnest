@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 namespace ms::dsp {
@@ -19,14 +20,20 @@ class Xfade final : public Module {
   void process(const float* ins, float* outs) override {
     const float m = std::clamp(ins[2], 0.0f, 1.0f);
     if (power_) {
-      const float angle = m * (std::numbers::pi_v<float> / 2.0f);
-      outs[0] = ins[0] * std::cos(angle) + ins[1] * std::sin(angle);
+      if (key_.changed({m})) {  // skip cos/sin while the fade holds
+        const float angle = m * (std::numbers::pi_v<float> / 2.0f);
+        ga_ = std::cos(angle);
+        gb_ = std::sin(angle);
+      }
+      outs[0] = ins[0] * ga_ + ins[1] * gb_;
     } else {
       outs[0] = ins[0] * (1.0f - m) + ins[1] * m;
     }
   }
  private:
   bool power_ = false;
+  InputKey<1> key_;
+  float ga_ = 1.0f, gb_ = 0.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Xfade>(); }

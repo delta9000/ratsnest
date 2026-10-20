@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 #include "dsp/mastering.h"
 
@@ -87,8 +88,11 @@ class Compressor final : public Module {
     if (g_target < 0.0f) g_target = 0.0f;
     
     // 3. Separate smoothed attack/release
-    const float alpha_a = 1.0f - std::exp(-1.0f / (attack * rate_));
-    const float alpha_r = 1.0f - std::exp(-1.0f / (release * rate_));
+    if (time_key_.changed({attack, release})) {  // skip exp while times hold
+      alpha_a_ = 1.0f - std::exp(-1.0f / (attack * rate_));
+      alpha_r_ = 1.0f - std::exp(-1.0f / (release * rate_));
+    }
+    const float alpha_a = alpha_a_, alpha_r = alpha_r_;
     
     if (g_target > g_smooth_) {
       g_smooth_ += alpha_a * (g_target - g_smooth_);
@@ -98,10 +102,12 @@ class Compressor final : public Module {
     g_smooth_ = flush_denormal(g_smooth_);
     
     // 4. Convert back to linear gain reduction
-    const float g_linear = std::pow(10.0f, -g_smooth_ / 20.0f);
+    if (gain_key_.changed({g_smooth_})) g_linear_ = std::pow(10.0f, -g_smooth_ / 20.0f);
+    const float g_linear = g_linear_;
     
     // 5. Apply makeup and crossfade mix
-    const float makeup_linear = std::pow(10.0f, makeup / 20.0f);
+    if (makeup_key_.changed({makeup})) makeup_linear_ = std::pow(10.0f, makeup / 20.0f);
+    const float makeup_linear = makeup_linear_;
     const float wet_gain = g_linear * makeup_linear;
     
     const float wet_l = in_l * wet_gain;
@@ -125,6 +131,10 @@ class Compressor final : public Module {
   float rate_ = 48000.0f;
   bool is_external_ = false;
   float g_smooth_ = 0.0f;
+  // Memoized libm results; see dsp/input_key.h.
+  InputKey<2> time_key_;
+  InputKey<1> gain_key_, makeup_key_;
+  float alpha_a_ = 0.0f, alpha_r_ = 0.0f, g_linear_ = 1.0f, makeup_linear_ = 1.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Compressor>(); }
