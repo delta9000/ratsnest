@@ -69,8 +69,8 @@ BandlimitedOsc::BandlimitedOsc() {
   }
 }
 
-float BandlimitedOsc::sample(const std::vector<float>& tables, float phase,
-                             float frequency, float sample_rate) const {
+BandlimitedOsc::Band BandlimitedOsc::band(float frequency,
+                                          float sample_rate) const {
   int harmonics = kMaxHarmonics;
   float harmonic_capacity = std::numeric_limits<float>::infinity();
   if (std::isfinite(frequency) && frequency > 0.0f &&
@@ -83,44 +83,50 @@ float BandlimitedOsc::sample(const std::vector<float>& tables, float phase,
                     : std::clamp(static_cast<int>(harmonic_capacity), 1,
                                  kMaxHarmonics);
   }
-  const std::size_t level = level_for_harmonics_[static_cast<std::size_t>(harmonics)];
+  Band b;
+  b.level = level_for_harmonics_[static_cast<std::size_t>(harmonics)];
+  if (b.level == 0 || !std::isfinite(harmonic_capacity)) return b;
+
+  // Fade a newly safe table in over the interval before the next table can
+  // become safe. At the next threshold its lower endpoint is therefore
+  // exactly the preceding table, so pitch sweeps have no waveform jump.
+  const float ceiling = static_cast<float>(ceilings_[b.level]);
+  const float next_ceiling =
+      b.level + 1 < ceilings_.size()
+          ? static_cast<float>(ceilings_[b.level + 1])
+          : ceiling + 1.0f;
+  b.mix = std::clamp((harmonic_capacity - ceiling) / (next_ceiling - ceiling),
+                     0.0f, 1.0f);
+  b.blend_lower = !(b.mix >= 1.0f);
+  return b;
+}
+
+float BandlimitedOsc::read(const std::vector<float>& tables, float phase,
+                           const Band& band) const {
   phase = std::isfinite(phase) ? phase - std::floor(phase) : 0.0f;
   const float position = phase * static_cast<float>(kTableSize);
   const auto index = static_cast<std::size_t>(position);
   const float fraction = position - static_cast<float>(index);
-  const auto read = [&](std::size_t table_level) {
+  const auto at = [&](std::size_t table_level) {
     const std::size_t base = table_level * kTableSize;
     const float a = tables[base + index];
     const float b = tables[base + ((index + 1) & (kTableSize - 1))];
     return a + fraction * (b - a);
   };
 
-  const float selected = read(level);
-  if (level == 0 || !std::isfinite(harmonic_capacity)) return selected;
-
-  // Fade a newly safe table in over the interval before the next table can
-  // become safe. At the next threshold its lower endpoint is therefore
-  // exactly the preceding table, so pitch sweeps have no waveform jump.
-  const float ceiling = static_cast<float>(ceilings_[level]);
-  const float next_ceiling =
-      level + 1 < ceilings_.size()
-          ? static_cast<float>(ceilings_[level + 1])
-          : ceiling + 1.0f;
-  const float mix =
-      std::clamp((harmonic_capacity - ceiling) / (next_ceiling - ceiling),
-                 0.0f, 1.0f);
-  if (mix >= 1.0f) return selected;
-  const float lower = read(level - 1);
-  return lower + mix * (selected - lower);
+  const float selected = at(band.level);
+  if (!band.blend_lower) return selected;
+  const float lower = at(band.level - 1);
+  return lower + band.mix * (selected - lower);
 }
 
 float BandlimitedOsc::saw(float phase, float frequency, float sample_rate) const {
-  return sample(saw_, phase, frequency, sample_rate);
+  return read(saw_, phase, band(frequency, sample_rate));
 }
 
 float BandlimitedOsc::triangle(float phase, float frequency,
                                float sample_rate) const {
-  return sample(triangle_, phase, frequency, sample_rate);
+  return read(triangle_, phase, band(frequency, sample_rate));
 }
 
 }  // namespace ms::dsp

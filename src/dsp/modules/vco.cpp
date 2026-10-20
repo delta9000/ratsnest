@@ -2,6 +2,7 @@
 #include <cmath>
 #include <numbers>
 #include "dsp/bandlimited_osc.h"
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 namespace ms::dsp {
@@ -26,11 +27,15 @@ class Vco final : public Module {
   }
 
   void process(const float* ins, float* outs) override {
-    double f = static_cast<double>(ins[0]) * std::exp2(static_cast<double>(ins[1])) +
-               static_cast<double>(ins[2]) * static_cast<double>(ins[0]);
-    if (!std::isfinite(f)) f = 0.0;
-    f = std::clamp(f, 0.0, 0.45 * static_cast<double>(rate_));
-    const double dt = f / static_cast<double>(rate_);
+    if (key_.changed({ins[0], ins[1], ins[2]})) {  // skip exp2 at a held pitch
+      double f = static_cast<double>(ins[0]) * std::exp2(static_cast<double>(ins[1])) +
+                 static_cast<double>(ins[2]) * static_cast<double>(ins[0]);
+      if (!std::isfinite(f)) f = 0.0;
+      f = std::clamp(f, 0.0, 0.45 * static_cast<double>(rate_));
+      dt_ = f / static_cast<double>(rate_);
+      band_ = bank_->band(static_cast<float>(f), rate_);
+    }
+    const double dt = dt_;
 
     const float sync = std::isfinite(ins[5]) ? ins[5] : 0.0f;
     if (sync > 0.5f && prev_sync_ <= 0.5f) phase_ = 0.0;
@@ -43,7 +48,6 @@ class Vco final : public Module {
     double offset = phase_ + (std::isfinite(ins[6]) ? static_cast<double>(ins[6]) : 0.0);
     offset -= std::floor(offset);
     const float ph = static_cast<float>(offset);
-    const float ff = static_cast<float>(f);
 
     float v = 0.0f;
     switch (wave_) {
@@ -51,10 +55,10 @@ class Vco final : public Module {
         v = std::sin(2.0f * std::numbers::pi_v<float> * ph);
         break;
       case 1:  // band-limited triangle table
-        v = bank_->triangle(ph, ff, rate_);
+        v = bank_->triangle(ph, band_);
         break;
       case 2:  // band-limited saw table
-        v = bank_->saw(ph, ff, rate_);
+        v = bank_->saw(ph, band_);
         break;
       case 3: {  // difference of two band-limited saws, plus exact DC term
         const float raw_pw = ins[3] + ins[4];
@@ -63,7 +67,7 @@ class Vco final : public Module {
                              : 0.5f;
         float shifted = ph - pw;
         shifted -= std::floor(shifted);
-        v = bank_->saw(shifted, ff, rate_) - bank_->saw(ph, ff, rate_) +
+        v = bank_->saw(shifted, band_) - bank_->saw(ph, band_) +
             2.0f * pw - 1.0f;
         break;
       }
@@ -83,6 +87,9 @@ class Vco final : public Module {
   double phase_ = 0.0;
   float prev_sync_ = 0.0f;
   const BandlimitedOsc* bank_ = nullptr;
+  InputKey<3> key_;  // freq, v_oct, fm -> dt_, band_
+  double dt_ = 0.0;
+  BandlimitedOsc::Band band_{};
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Vco>(); }

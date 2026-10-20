@@ -89,7 +89,7 @@ class StepSeq final : public Module {
     // last tick and the next step re-articulates. Lookahead is forward-order;
     // slurs are a phrasing feature and phrases run forward.
     const bool last_tick = tick_ + 1 >= step_len(current);
-    const int next = (current + 1) % len;
+    const int next = current + 1 < len ? current + 1 : 0;  // current < len here
     const bool sustain = !last_tick || (tied(next) && gate_on(next));
     outs[0] = static_cast<float>(steps_[static_cast<size_t>(current)]) + ins[3];
     outs[1] = trig ? 1.0f : 0.0f;

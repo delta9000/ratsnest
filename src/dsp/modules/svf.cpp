@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 // Paper/technical-note-derived Zavalishin/Simper trapezoidal-integrator TPT
@@ -21,15 +22,18 @@ class SvfModule final : public Module {
   }
 
   void process(const float* ins, float* outs) override {
-    const double oct = std::isfinite(ins[3]) ? std::clamp(static_cast<double>(ins[3]), -24.0, 24.0) : 0.0;
-    const float cutoff = static_cast<float>(std::clamp(
-        static_cast<double>(ins[1]) * std::exp2(oct), 5.0, 0.45 * rate_));
-    const float resonance = std::clamp(ins[2], 0.0f, 1.0f);
-    const float g = std::tan(std::numbers::pi_v<float> * cutoff / rate_);
-    const float k = 2.0f * (1.0f - resonance) + 0.02f * resonance;
-    const float a1 = 1.0f / (1.0f + g * (g + k));
-    const float a2 = g * a1;
-    const float a3 = g * a2;
+    if (key_.changed({ins[1], ins[2], ins[3]})) {  // skip exp2/tan when still
+      const double oct = std::isfinite(ins[3]) ? std::clamp(static_cast<double>(ins[3]), -24.0, 24.0) : 0.0;
+      const float cutoff = static_cast<float>(std::clamp(
+          static_cast<double>(ins[1]) * std::exp2(oct), 5.0, 0.45 * rate_));
+      const float resonance = std::clamp(ins[2], 0.0f, 1.0f);
+      const float g = std::tan(std::numbers::pi_v<float> * cutoff / rate_);
+      k_ = 2.0f * (1.0f - resonance) + 0.02f * resonance;
+      a1_ = 1.0f / (1.0f + g * (g + k_));
+      a2_ = g * a1_;
+      a3_ = g * a2_;
+    }
+    const float k = k_, a1 = a1_, a2 = a2_, a3 = a3_;
 
     const float v3 = ins[0] - ic2eq_;
     const float bp = a1 * ic1eq_ + a2 * v3;
@@ -54,6 +58,8 @@ class SvfModule final : public Module {
   float rate_ = 48000.0f;
   float ic1eq_ = 0.0f;
   float ic2eq_ = 0.0f;
+  InputKey<3> key_;  // cutoff, res, v_oct -> k_, a1_..a3_
+  float k_ = 0.0f, a1_ = 0.0f, a2_ = 0.0f, a3_ = 0.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<SvfModule>(); }

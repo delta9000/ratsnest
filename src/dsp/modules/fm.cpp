@@ -13,6 +13,7 @@
 #include <numbers>
 #include <utility>
 #include <vector>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 namespace ms::dsp {
@@ -292,9 +293,7 @@ class Fm final : public Module {
     }
     for (auto& e : envs_) env_gate(e, rising, falling);
 
-    const double base =
-        static_cast<double>(clampn(ins[1], 0.0f, 0.45f * static_cast<float>(rate_))) *
-        std::exp2(static_cast<double>(clampn(ins[2], -24.f, 24.f)));
+    const double base = base_freq(ins[1], ins[2]);
     const float vel = clampn(ins[3], 0.0f, 1.0f);
     const float fb_cv = ins[16];
 
@@ -406,7 +405,17 @@ class Fm final : public Module {
       carrier_[static_cast<size_t>(k)] = !has_out[static_cast<size_t>(k)];
   }
 
+  // freq * 2^v_oct, memoized while both hold still (skips exp2 per sample).
+  double base_freq(float freq, float v_oct) {
+    if (pitch_key_.changed({freq, v_oct}))
+      base_ = static_cast<double>(clampn(freq, 0.0f, 0.45f * static_cast<float>(rate_))) *
+              std::exp2(static_cast<double>(clampn(v_oct, -24.f, 24.f)));
+    return base_;
+  }
+
   double rate_ = 48000.0;
+  InputKey<2> pitch_key_;  // freq, v_oct -> base_
+  double base_ = 0.0;
   int algo_ = 0;
   int curve_ = 0;
   bool sync_ = true;

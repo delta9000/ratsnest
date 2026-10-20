@@ -5,18 +5,19 @@
 namespace ms::engine {
 
 Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
-  size_t total = 0, max_ins = 1, n_cables = 0;
+  size_t total = 0, total_ins = 0, n_cables = 0;
   for (size_t ni = 0; ni < g_->nodes.size(); ++ni) {
     const graph::Node& n = g_->nodes[ni];
     out_offset_.push_back(total);
+    in_offset_.push_back(total_ins);
     total += n.info->outputs.size();
-    max_ins = std::max(max_ins, n.info->inputs.size());
+    total_ins += n.info->inputs.size();
     n_cables += g_->in_cables[ni].size();
     if (n.info->wants_midi) g_->midi_nodes.push_back(static_cast<int>(ni));
     if (n.info->wants_audio_in) g_->audio_in_nodes.push_back(static_cast<int>(ni));
   }
   outs_.assign(total, 0.0f);
-  ins_.assign(max_ins, 0.0f);
+  ins_.assign(std::max<size_t>(total_ins, 1), 0.0f);  // never an empty slice
 
   // Flatten the graph into one contiguous schedule so the per-sample loop
   // touches no ModuleInfo, no nested vectors and no offset lookups. The graph
@@ -26,17 +27,24 @@ Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
   steps_.reserve(g_->nodes.size());
   for (size_t ni = 0; ni < g_->nodes.size(); ++ni) {
     graph::Node& n = g_->nodes[ni];
+    float* const ins = ins_.data() + in_offset_[ni];
+    std::copy(n.input_base.begin(), n.input_base.end(), ins);
     Step st;
     st.mod = n.instance.get();
-    st.base = n.input_base.data();
+    st.ins = ins;
     st.outs = outs_.data() + out_offset_[ni];
-    st.n_ins = n.info->inputs.size();
     st.n_outs = n.info->outputs.size();
     st.cable_begin = cables_.size();
-    for (const graph::Cable& c : g_->in_cables[ni])
-      cables_.push_back(FlatCable{static_cast<size_t>(c.dst_in),
-          out_offset_[static_cast<size_t>(c.src_mod)] + static_cast<size_t>(c.src_out),
+    for (const graph::Cable& c : g_->in_cables[ni]) {
+      float* const dst = ins + static_cast<size_t>(c.dst_in);
+      const bool first = std::none_of(
+          cables_.begin() + static_cast<std::ptrdiff_t>(st.cable_begin), cables_.end(),
+          [dst](const FlatCable& fc) { return fc.dst == dst; });
+      cables_.push_back(FlatCable{dst,
+          first ? n.input_base.data() + c.dst_in : dst,
+          outs_.data() + out_offset_[static_cast<size_t>(c.src_mod)] + static_cast<size_t>(c.src_out),
           c.depth});
+    }
     st.cable_end = cables_.size();
     steps_.push_back(st);
   }
@@ -44,16 +52,14 @@ Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
 }
 
 void Engine::process(float* left, float* right, size_t frames) {
-  float* const ins = ins_.data();
   const float* const outs = outs_.data();
   const FlatCable* const cables = cables_.data();
   for (size_t f = 0; f < frames; ++f) {
     if (n_glides_ != 0) step_glides();
     for (const Step& st : steps_) {
-      std::copy_n(st.base, st.n_ins, ins);
       for (size_t c = st.cable_begin; c < st.cable_end; ++c)
-        ins[cables[c].dst_in] += outs[cables[c].src] * cables[c].depth;
-      st.mod->process(ins, st.outs);
+        *cables[c].dst = *cables[c].init + *cables[c].src * cables[c].depth;
+      st.mod->process(st.ins, st.outs);
       for (size_t o = 0; o < st.n_outs; ++o)
         if (!std::isfinite(st.outs[o])) st.outs[o] = 0.0f;
     }
@@ -62,9 +68,14 @@ void Engine::process(float* left, float* right, size_t frames) {
   }
 }
 
+void Engine::write_base(size_t node, size_t slot, float v) {
+  g_->nodes[node].input_base[slot] = v;
+  ins_[in_offset_[node] + slot] = v;  // rebuilt every sample if cabled
+}
+
 void Engine::set_param(size_t node, size_t slot, float target, size_t glide_samples) {
   if (node >= g_->nodes.size()) return;
-  auto& base = g_->nodes[node].input_base;
+  const auto& base = g_->nodes[node].input_base;
   if (slot >= base.size()) return;
   for (size_t i = 0; i < n_glides_; ++i)
     if (glides_[i].node == node && glides_[i].slot == slot) {
@@ -72,7 +83,7 @@ void Engine::set_param(size_t node, size_t slot, float target, size_t glide_samp
       break;
     }
   if (!g_->nodes[node].info->inputs[slot].glide || glide_samples == 0 || n_glides_ == kMaxGlides) {
-    base[slot] = target;
+    write_base(node, slot, target);
     return;
   }
   glides_[n_glides_++] = Glide{node, slot, target,
@@ -82,12 +93,11 @@ void Engine::set_param(size_t node, size_t slot, float target, size_t glide_samp
 void Engine::step_glides() {
   for (size_t i = 0; i < n_glides_;) {
     Glide& gl = glides_[i];
-    float& base = g_->nodes[gl.node].input_base[gl.slot];
-    base += gl.step;
     if (--gl.remaining == 0) {
-      base = gl.target;                 // land exactly, no float drift
+      write_base(gl.node, gl.slot, gl.target);  // land exactly, no float drift
       glides_[i] = glides_[--n_glides_];
     } else {
+      write_base(gl.node, gl.slot, g_->nodes[gl.node].input_base[gl.slot] + gl.step);
       ++i;
     }
   }

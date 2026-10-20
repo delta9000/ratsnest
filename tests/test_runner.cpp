@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <memory>
 #include <numbers>
@@ -88,6 +89,7 @@ TEST_CASE("swap crossfades linearly over 50ms and retires the old engine") {
   };
   CHECK(bl[0] == doctest::Approx(expected(0)).epsilon(0.01));
   CHECK(bl[fade / 2] == doctest::Approx(expected(fade / 2)).epsilon(0.01));
+  CHECK(bl[fade / 2] < 1.0f);  // linear: no equal-power bump on correlated graphs
   CHECK(bl[fade + 100] == doctest::Approx(0.5f).epsilon(0.001));  // fade done
 
   engine::Engine* retired = nullptr;
@@ -165,6 +167,7 @@ TEST_CASE("meters report a decaying peak") {
 TEST_CASE("threaded stress: commands pushed while rendering (run under san)") {
   RtRunner run(48000.0);
   REQUIRE(run.push(swap_cmd(make_engine(kDcHalf))));
+  std::atomic<bool> done{false};
   std::thread producer([&] {
     for (int i = 0; i < 20000; ++i) {
       Command c;
@@ -174,13 +177,18 @@ TEST_CASE("threaded stress: commands pushed while rendering (run under san)") {
       c.value = (i % 2) ? 1.0f : 0.0f;
       while (!run.push(c)) std::this_thread::yield();
     }
+    done.store(true, std::memory_order_release);
   });
+  // Keep consuming until the producer is through: stopping after a fixed
+  // block count can leave it spinning on a full queue, and join() then hangs.
   float l[512], r[512];
-  for (int b = 0; b < 500; ++b) {
+  bool finite = true;
+  for (int b = 0; b < 500 || !done.load(std::memory_order_acquire); ++b) {
     run.render(l, r, 512);
-    for (float x : l) REQUIRE(std::isfinite(x));
+    for (float x : l) finite = finite && std::isfinite(x);
   }
   producer.join();
+  CHECK(finite);
 }
 
 TEST_CASE("oversized blocks are processed in chunks") {
