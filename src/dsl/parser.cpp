@@ -1,9 +1,14 @@
 #include "dsl/parser.h"
+#include <string>
 #include <unordered_set>
 #include "dsl/lexer.h"
 
 namespace ms::dsl {
 namespace {
+
+// Array values recurse; a bound keeps hostile input (`[[[[...`) from
+// overflowing the stack (rule 6: a bad patch reports, never crashes).
+constexpr int kMaxArrayDepth = 64;
 
 class Parser {
  public:
@@ -96,7 +101,7 @@ class Parser {
     return &r_.ast.modules.back();
   }
 
-  bool value(Value& v) {
+  bool value(Value& v, int depth = 0) {
     if (at(Tok::Number)) { v.kind = Value::Kind::Num; v.num = next().num; return true; }
     if (at(Tok::Ident)) {
       v.kind = Value::Kind::Ident;
@@ -110,11 +115,16 @@ class Parser {
     }
     if (at(Tok::Str))    { v.kind = Value::Kind::Str; v.str = next().text; return true; }
     if (at(Tok::LBracket)) {
+      if (depth >= kMaxArrayDepth) {
+        err(cur().line, cur().col, "arrays nested deeper than " + std::to_string(kMaxArrayDepth));
+        sync();
+        return false;
+      }
       next();
       v.kind = Value::Kind::Array;
       while (!at(Tok::RBracket) && !at(Tok::End)) {
         Value item;
-        if (!value(item)) return false;
+        if (!value(item, depth + 1)) return false;
         v.items.push_back(std::move(item));
         if (at(Tok::Comma)) next(); else break;
       }

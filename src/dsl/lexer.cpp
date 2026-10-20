@@ -1,7 +1,9 @@
 #include "dsl/lexer.h"
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <string_view>
 
 namespace ms::dsl {
@@ -37,6 +39,16 @@ bool note_num(std::string_view s, double& out) {
   out = voct ? static_cast<double>(midi - 57) / 12.0            // A3 = 0.0
              : 440.0 * std::exp2(static_cast<double>(midi - 69) / 12.0);
   return true;
+}
+
+// A stray byte, made safe to print inside a one-line diagnostic: control
+// bytes and lone high bytes (a fragment of UTF-8) become \xNN.
+std::string printable(char c) {
+  const auto u = static_cast<unsigned char>(c);
+  if (u >= 0x20 && u < 0x7f) return std::string(1, c);
+  char buf[8];
+  std::snprintf(buf, sizeof buf, "\\x%02x", u);
+  return buf;
 }
 
 bool unit_factor(std::string_view u, double& factor) {
@@ -152,7 +164,7 @@ LexResult lex(std::string_view src) {
       case ',': push(Tok::Comma, ",", 0, tl, tc); break;
       case '=': push(Tok::Equals, "=", 0, tl, tc); break;
       case '.': push(Tok::Dot, ".", 0, tl, tc); break;
-      default: err(tl, tc, std::string("unexpected character '") + c + "'"); break;
+      default: err(tl, tc, "unexpected character '" + printable(c) + "'"); break;
     }
     advance(1);
   }

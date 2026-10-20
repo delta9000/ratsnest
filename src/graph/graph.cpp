@@ -107,6 +107,12 @@ CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
     if (m.name == "out") { err(m.line, m.col, "'out' is a reserved built-in module name", m.file); continue; }
     const dsp::ModuleInfo* info = dsp::find_module(m.type);
     if (!info) { err(m.line, m.col, "unknown module type '" + m.type + "'", m.file); continue; }
+    // The parser rejects duplicates as written; this catches a declared name
+    // colliding with one a subpatch stamps (`t.osc` beside `t = sub {..}`).
+    if (index_of.count(m.name)) {
+      err(m.line, m.col, "duplicate module name '" + m.name + "' (also stamped by a subpatch)", m.file);
+      continue;
+    }
     add_node(m.name, info);
     Node& n = g->nodes.back();
     for (const auto& p : m.params) {

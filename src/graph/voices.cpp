@@ -27,6 +27,16 @@ const dsl::ParamDecl* find_param(const dsl::ModuleDecl& m, const std::string& na
   return nullptr;
 }
 
+// A count read from the AST before any validation has run: the value may be
+// huge or non-finite, and a plain cast of an out-of-range double to int is
+// undefined behaviour. Saturate instead; the caller clamps to a sane range.
+int count_of(const dsl::ParamDecl& p) {
+  const double v = p.value.num;
+  if (!(v > -1e9)) return -1000000000;  // also catches NaN
+  if (v > 1e9) return 1000000000;
+  return static_cast<int>(v);
+}
+
 // A member instance endpoint, e.g. base "lead.osc", i 0, port "v_oct" ->
 // "lead.osc#0.v_oct"; empty port -> "lead.osc#0" (default port, resolved later).
 std::string inst_chain(const std::string& base, int i, const std::string& port) {
@@ -80,8 +90,8 @@ void expand_voices(dsl::PatchAst& ast, Diags& errors) {
           // Voice count from the bound module's config: `n`, else `voices`,
           // else the type default (alloc 4, otherwise 1).
           int n = -1;
-          if (const dsl::ParamDecl* pn = find_param(b, "n")) n = static_cast<int>(pn->value.num);
-          else if (const dsl::ParamDecl* pv = find_param(b, "voices")) n = static_cast<int>(pv->value.num);
+          if (const dsl::ParamDecl* pn = find_param(b, "n")) n = count_of(*pn);
+          else if (const dsl::ParamDecl* pv = find_param(b, "voices")) n = count_of(*pv);
           if (n < 0) n = (b.type == "alloc") ? 4 : 1;
           g.n = std::clamp(n, 1, 8);
 
@@ -106,7 +116,7 @@ void expand_voices(dsl::PatchAst& ast, Diags& errors) {
 
           // An explicit n: on the voice decl must match the inherited count.
           if (const dsl::ParamDecl* vn = find_param(m, "n")) {
-            int voice_n = static_cast<int>(vn->value.num);
+            int voice_n = count_of(*vn);
             if (voice_n != n)
               err(vn->line, vn->col, "voice '" + m.name + "' n: " + std::to_string(voice_n) +
                                          " does not match notes source n " + std::to_string(n));
