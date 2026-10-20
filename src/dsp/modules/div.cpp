@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -11,10 +12,8 @@ constexpr OutputInfo kOuts[] = {{"out"}};
 class DivModule final : public Module {
  public:
   void process(const float* ins, float* outs) override {
-    const bool reset = ins[2] > 0.5f && prev_reset_ <= 0.5f;
-    prev_reset_ = ins[2];
-    const bool rising = ins[0] > 0.5f && prev_in_ <= 0.5f;
-    prev_in_ = ins[0];
+    const bool reset = reset_edge_(ins[2]);
+    const bool rising = in_edge_(ins[0]);
 
     if (reset) {
       count_ = -1;
@@ -32,15 +31,15 @@ class DivModule final : public Module {
     const auto& o = static_cast<const DivModule&>(other);
     count_ = o.count_;
     gate_ = o.gate_;
-    prev_in_ = o.prev_in_;
-    prev_reset_ = o.prev_reset_;
+    in_edge_ = o.in_edge_;
+    reset_edge_ = o.reset_edge_;
   }
 
  private:
   int count_ = -1;
   float gate_ = 0.0f;
-  float prev_in_ = 0.0f;
-  float prev_reset_ = 0.0f;
+  RisingEdge in_edge_;
+  RisingEdge reset_edge_;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<DivModule>(); }

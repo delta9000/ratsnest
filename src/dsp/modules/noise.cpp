@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <numbers>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -14,8 +15,7 @@ constexpr OutputInfo kOuts[] = {{"out"}};
 class Noise final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
-    const auto color = cfg_str(cfg, "color", "white");
-    for (int i = 0; kColors[i]; ++i) if (color == kColors[i]) color_ = i;
+    color_ = cfg_enum(cfg, "color", kColors);
     // Leaky integration: -6 dB/oct above 10 Hz, finite power at DC.
     // Gain fixes the stationary variance as rate changes. Locally derived;
     // spectral-color definitions and existing pink provenance: docs/attribution.md.
@@ -24,23 +24,12 @@ class Noise final : public Module {
     brown_ = 0.0;
     previous_ = 0.0f;
     // Sanitize before the cast: double -> uint32_t is UB out of range.
-    double s = cfg_num(cfg, "seed", 1.0);
-    if (!std::isfinite(s)) s = 1.0;
-    const auto seed =
-        static_cast<std::uint32_t>(std::clamp(std::abs(s), 0.0, 4294967295.0));
-    state_ = seed * 2654435761u;
-    if (state_ == 0) state_ = 0x9E3779B9u;
+    state_ = cfg_seed(cfg);
     b0_ = b1_ = b2_ = 0.0f;
   }
 
   void process(const float*, float* outs) override {
-    // Marsaglia xorshift32; see docs/attribution.md.
-    std::uint32_t x = state_;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    state_ = x;
-    const float w = 2.0f * (static_cast<float>(x) * (1.0f / 4294967296.0f)) - 1.0f;
+    const float w = 2.0f * unit_float(xorshift32(state_)) - 1.0f;
     if (color_ == 0) {
       outs[0] = w;
       return;

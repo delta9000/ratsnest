@@ -2,6 +2,7 @@
 #include <cmath>
 #include <vector>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 #include "dsp/resonate.h"
 
 // Code-derived from Mutable Instruments Rings (MIT), substantially adapted.
@@ -18,12 +19,6 @@ constexpr ConfigInfo kCfgs[] = {{"modes", nullptr}, {"ratios", nullptr, ConfigKi
 constexpr OutputInfo kOuts[] = {{"out"}, {"odd"}, {"even"}};
 // Coefficients refresh at block rate, Rings-style (24-sample blocks there).
 constexpr int kBlock = 32;
-
-// NaN-proof clamp: !(x >= lo) also catches NaN (delay.cpp precedent).
-float sane(float x, float lo, float hi) {
-  if (!(x >= lo)) return lo;
-  return x > hi ? hi : x;
-}
 
 bool has_cfg(const Config& cfg, std::string_view name) {
   for (const auto& [k, v] : cfg)
@@ -68,15 +63,14 @@ class Modal final : public Module {
     position_ = 0.25f;
     position_step_ = 0.0f;
     fc_ = 0.01f;
-    prev_strike_ = 0.0f;
+    strike_edge_ = RisingEdge{};
   }
 
   void process(const float* ins, float* outs) override {
     if (countdown_ == 0) update_block(ins);
     --countdown_;
 
-    const bool strike = ins[3] > 0.5f && prev_strike_ <= 0.5f;
-    prev_strike_ = ins[3];
+    const bool strike = strike_edge_(ins[3]);
 
     // The bank is a feedback-free but long-ringing structure; one hostile
     // sample would ring as NaN forever.
@@ -111,7 +105,7 @@ class Modal final : public Module {
     position_ = o.position_;
     position_step_ = o.position_step_;
     fc_ = o.fc_;
-    prev_strike_ = o.prev_strike_;
+    strike_edge_ = o.strike_edge_;
     num_active_ = std::min(o.num_active_, static_cast<int>(modes_.size()));
     countdown_ = 0;  // recompute coefficients for this instance's bank size
   }
@@ -119,15 +113,15 @@ class Modal final : public Module {
  private:
   void update_block(const float* ins) {
     countdown_ = kBlock;
-    const float freq = sane(ins[1], 0.0f, 24000.0f);
-    const float voct = sane(ins[2], -10.0f, 10.0f);
+    const float freq = clamp_nan(ins[1], 0.0f, 24000.0f);
+    const float voct = clamp_nan(ins[2], -10.0f, 10.0f);
     float f = freq * std::exp2(voct) / rate_;
-    f = sane(f, 1e-4f, 0.25f);
+    f = clamp_nan(f, 1e-4f, 0.25f);
 
-    const float structure = sane(ins[4], 0.0f, 0.9995f);
-    const float b_knob = sane(ins[5], 0.0f, 1.0f);
-    const float damping = sane(ins[6], 0.0f, 1.0f);
-    const float pos = sane(ins[7], 0.0f, 1.0f);
+    const float structure = clamp_nan(ins[4], 0.0f, 0.9995f);
+    const float b_knob = clamp_nan(ins[5], 0.0f, 1.0f);
+    const float damping = clamp_nan(ins[6], 0.0f, 1.0f);
+    const float pos = clamp_nan(ins[7], 0.0f, 1.0f);
 
     // Mode placement and Q ladder (resonator.cc ComputeFilters).
     float stiffness = resonate::stiffness_curve(structure);
@@ -195,7 +189,7 @@ class Modal final : public Module {
   float position_ = 0.25f;
   float position_step_ = 0.0f;
   float fc_ = 0.01f;
-  float prev_strike_ = 0.0f;
+  RisingEdge strike_edge_;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Modal>(); }

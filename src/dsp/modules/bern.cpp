@@ -1,4 +1,5 @@
 #include "dsp/modules.h"
+#include "dsp/util.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -19,21 +20,14 @@ constexpr OutputInfo kOuts[] = {{"a"}, {"b"}, {"value"}};
 class Bern final : public Module {
 public:
   void init(double, const Config &cfg) override {
-    double seed = cfg_num(cfg, "seed", 1.0);
-    if (!std::isfinite(seed))
-      seed = 1.0;
-    state_ = static_cast<std::uint32_t>(
-                 std::clamp(std::abs(seed), 0.0, 4294967295.0)) *
-             2654435761u;
-    if (state_ == 0)
-      state_ = 0x9E3779B9u;
+    state_ = cfg_seed(cfg);
     seed_ = state_;
   }
   void process(const float *ins, float *outs) override {
     const bool reset = ins[2] > .5f, reroll = ins[4] > .5f;
     if (reroll && !prev_reroll_) {
       state_ = seed_;
-      draw();
+      xorshift32(state_);
       seed_ = state_;
       position_ = 0;
     }
@@ -43,30 +37,11 @@ public:
     }
     prev_reset_ = reset;
     prev_reroll_ = reroll;
-    const bool rising = ins[0] > 0.5f && prev_gate_ <= 0.5f;
-    prev_gate_ = ins[0];
-    if (rising) {
-      const float p = std::clamp(ins[1], 0.0f, 1.0f);
-      const int length =
-          std::isfinite(ins[3])
-              ? static_cast<int>(std::round(std::clamp(ins[3], 0.f, 65536.f)))
-              : 0;
-      if (length > 0 && position_ >= length) {
-        state_ = seed_;
-        position_ = 0;
-      }
-      // Consume one draw even at probability extremes: density changes must
-      // not change random values at subsequent positions.
-      value_ = draw();
-      selected_a_ = p >= 1.f || value_ < p;
-      if (length > 0)
-        ++position_;
-      else
-        position_ = 0;
-    }
+    if (gate_edge_(ins[0]))
+      choose(ins[1], round_clamp(ins[3], 0, 65536, 0));
     const bool high = ins[0] > 0.5f;
-    outs[0] = high && selected_a_ ? 1.0f : 0.0f;
-    outs[1] = high && !selected_a_ ? 1.0f : 0.0f;
+    outs[0] = as_gate(high && selected_a_);
+    outs[1] = as_gate(high && !selected_a_);
     outs[2] = value_;
   }
   void copy_state_from(const Module &other) override {
@@ -78,18 +53,23 @@ public:
     prev_reset_ = o.prev_reset_;
     prev_reroll_ = o.prev_reroll_;
     selected_a_ = o.selected_a_;
-    prev_gate_ = o.prev_gate_;
+    gate_edge_ = o.gate_edge_;
   }
 
 private:
-  // Marsaglia xorshift32; see docs/attribution.md.
-  float draw() {
-    std::uint32_t x = state_;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    state_ = x;
-    return static_cast<float>(x) * (1.0f / 4294967296.0f);
+  // One coin toss. A positive `length` loops the sequence of tosses every
+  // `length` gates.
+  void choose(float prob, int length) {
+    const float p = std::clamp(prob, 0.0f, 1.0f);
+    if (length > 0 && position_ >= length) {
+      state_ = seed_;
+      position_ = 0;
+    }
+    // Consume one draw even at probability extremes: density changes must
+    // not change random values at subsequent positions.
+    value_ = unit_float(xorshift32(state_));
+    selected_a_ = p >= 1.f || value_ < p;
+    position_ = length > 0 ? position_ + 1 : 0;
   }
   std::uint32_t state_ = 0x9E3779B9u;
   std::uint32_t seed_ = 0x9E3779B9u;
@@ -97,7 +77,7 @@ private:
   float value_ = 0;
   bool prev_reset_ = false, prev_reroll_ = false;
   bool selected_a_ = false;
-  float prev_gate_ = 0.0f;
+  RisingEdge gate_edge_;
 };
 std::unique_ptr<Module> make() { return std::make_unique<Bern>(); }
 } // namespace

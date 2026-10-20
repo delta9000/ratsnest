@@ -75,15 +75,18 @@ void PatchWatcher::drain() {
   }
 }
 
+// Reports a pending change once its debounce window has passed.
+bool PatchWatcher::settled() {
+  if (!pending_ || std::chrono::steady_clock::now() < deadline_) return false;
+  pending_ = false;
+  return true;
+}
+
 bool PatchWatcher::poll_changed(int timeout_ms) {
   if (!ok()) return false;
 
   drain();
-
-  if (pending_ && std::chrono::steady_clock::now() >= deadline_) {
-    pending_ = false;
-    return true;
-  }
+  if (settled()) return true;
 
   int wait_ms = timeout_ms;
   if (pending_) {
@@ -96,12 +99,7 @@ bool PatchWatcher::poll_changed(int timeout_ms) {
   if (poll(&pfd, 1, wait_ms) > 0 && (pfd.revents & POLLIN)) {
     drain();
   }
-
-  if (pending_ && std::chrono::steady_clock::now() >= deadline_) {
-    pending_ = false;
-    return true;
-  }
-  return false;
+  return settled();
 }
 
 }  // namespace ms::io

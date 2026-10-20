@@ -3,6 +3,7 @@
 #include <numbers>
 #include <string>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 #include "dsp/biquad.h"
 #include "dsp/mastering.h"
 #include "dsp/oversample.h"
@@ -58,12 +59,6 @@ Voice voice_for(const std::string& m) {
     return {0.f, Curve::Soft, 0.0f, 7.f, 2000.f, 12000.f, 0.f, 0.f, false, 0.f, 0.f};
   // tubescreamer (default / unknown model)
   return {720.f, Curve::Soft, 0.12f, 10.f, 2000.f, 6000.f, 0.f, 0.f, false, 0.f, 0.f};
-}
-
-// NaN-proof clamp for unipolar control inputs.
-float sane01(float x) {
-  if (!(x >= 0.0f)) return 0.0f;
-  return x > 1.0f ? 1.0f : x;
 }
 
 class Overdrive final : public Module {
@@ -185,10 +180,10 @@ class Overdrive final : public Module {
 
   void update_block(const float* ins) {
     countdown_ = kBlock;
-    const float drive = sane01(ins[1]);
-    const float tone = sane01(ins[2]);
-    const float level = sane01(ins[3]);
-    mix_target_ = sane01(ins[4]);
+    const float drive = clamp_nan(ins[1], 0.0f, 1.0f);
+    const float tone = clamp_nan(ins[2], 0.0f, 1.0f);
+    const float level = clamp_nan(ins[3], 0.0f, 1.0f);
+    mix_target_ = clamp_nan(ins[4], 0.0f, 1.0f);
 
     drive_gain_ = std::exp2(drive * voice_.drive_span);
     level_target_ = std::exp2((level - 0.5f) * 4.0f);  // +/-2 octaves makeup

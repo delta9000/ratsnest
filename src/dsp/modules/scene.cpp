@@ -1,7 +1,9 @@
 #include "dsp/mastering.h"
 #include "dsp/modules.h"
+#include "dsp/util.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 namespace ms::dsp {
@@ -39,40 +41,15 @@ public:
       bar_ = 0;
       pending_ = -1;
     }
-    // Changed addresses queue once; launch can explicitly restart the same
-    // scene.
-    if (request >= 0 && (request != request_ || (launch && !launch_)))
-      pending_ = request;
-    if (request < 0 && request != request_)
-      pending_ = -1;
-    request_ = request;
+    queue(request, launch && !launch_);
     clock_ = clock;
     launch_ = launch;
     reset_ = reset;
     index_ = std::min(index_, static_cast<int>(bars_.size()) - 1);
     pending_ = std::min(pending_, static_cast<int>(bars_.size()) - 1);
-    bool changed = false;
-    if (edge) {
-      if (pending_ >= 0) {
-        index_ = pending_;
-        pending_ = -1;
-        bar_ = 0;
-        changed = true;
-      } else if (index_ < 0) {
-        index_ = 0;
-        bar_ = 0;
-        changed = true;
-      } else if (++bar_ >=
-                 static_cast<int>(bars_[static_cast<size_t>(index_)])) {
-        bar_ = 0;
-        if (in[4] <= .5f) {
-          index_ = (index_ + 1) % static_cast<int>(bars_.size());
-          changed = true;
-        }
-      }
-    }
+    const bool changed = edge && next_bar(in[4] <= .5f);
     out[0] = static_cast<float>(std::max(0, index_));
-    out[1] = changed ? 1.f : 0.f;
+    out[1] = as_gate(changed);
     out[2] = static_cast<float>(bar_);
     out[3] = static_cast<float>(pending_);
   }
@@ -88,6 +65,38 @@ public:
   }
 
 private:
+  // Changed addresses queue once; launch can explicitly restart the same
+  // scene. Moving the address to "none" cancels the queue.
+  void queue(int request, bool launched) {
+    if (request >= 0 && (request != request_ || launched))
+      pending_ = request;
+    if (request < 0 && request != request_)
+      pending_ = -1;
+    request_ = request;
+  }
+  // One bar clock: start a queued scene, start scene 0 from idle, or count a
+  // bar and move on at the end of the scene unless held. Returns whether the
+  // scene changed.
+  bool next_bar(bool unheld) {
+    if (pending_ >= 0) {
+      index_ = std::exchange(pending_, -1);
+      bar_ = 0;
+      return true;
+    }
+    if (index_ < 0) {
+      index_ = 0;
+      bar_ = 0;
+      return true;
+    }
+    if (++bar_ < static_cast<int>(bars_[static_cast<size_t>(index_)]))
+      return false;
+    bar_ = 0;
+    if (!unheld)
+      return false;
+    index_ = (index_ + 1) % static_cast<int>(bars_.size());
+    return true;
+  }
+
   std::vector<double> bars_;
   int index_ = -1, bar_ = 0, pending_ = -1, request_ = -1;
   bool clock_ = false, launch_ = false, reset_ = false;

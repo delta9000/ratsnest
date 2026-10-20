@@ -1,4 +1,5 @@
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -13,29 +14,25 @@ class Sh final : public Module {
   void init(double, const Config& cfg) override {
     track_ = cfg_str(cfg, "mode", "sample") == "track";
     held_ = 0.0f;
-    prev_trig_ = 0.0f;
+    trig_edge_ = RisingEdge{};
   }
 
   void process(const float* ins, float* outs) override {
-    if (track_) {
-      if (ins[1] > 0.5f) held_ = ins[0];
-    } else {
-      if (ins[1] > 0.5f && prev_trig_ <= 0.5f) held_ = ins[0];
-    }
-    prev_trig_ = ins[1];
+    const bool rose = trig_edge_(ins[1]);
+    if (track_ ? ins[1] > 0.5f : rose) held_ = ins[0];
     outs[0] = held_;
   }
 
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Sh&>(other);
     held_ = o.held_;
-    prev_trig_ = o.prev_trig_;
+    trig_edge_ = o.trig_edge_;
   }
 
  private:
   bool track_ = false;
   float held_ = 0.0f;
-  float prev_trig_ = 0.0f;
+  RisingEdge trig_edge_;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Sh>(); }

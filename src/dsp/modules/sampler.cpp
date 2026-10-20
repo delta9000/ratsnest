@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 #include "io/wav.h"
 
 namespace ms::dsp {
@@ -47,7 +48,7 @@ class Sampler final : public Module {
     }
     pos_ = 0.0;
     playing_ = !buf_.empty();  // play once at load; trig can restart
-    prev_trig_ = 0.0f;
+    trig_edge_ = RisingEdge{};
   }
 
   void process(const float* ins, float* outs) override {
@@ -58,11 +59,10 @@ class Sampler final : public Module {
     const float level = ins[2];
 
     // Rising edge on trig restarts playback from the beginning.
-    if (prev_trig_ <= 0.5f && trig > 0.5f) {
+    if (trig_edge_(trig)) {
       pos_ = 0.0;
       playing_ = !buf_.empty();
     }
-    prev_trig_ = trig;
 
     float out = 0.0f;
     float eos = 0.0f;
@@ -96,7 +96,7 @@ class Sampler final : public Module {
     const auto& o = static_cast<const Sampler&>(other);
     pos_ = o.pos_;
     playing_ = o.playing_;
-    prev_trig_ = o.prev_trig_;
+    trig_edge_ = o.trig_edge_;
     // A reload may have loaded a shorter buffer; keep the read position valid.
     if (pos_ >= static_cast<double>(buf_.size())) {
       pos_ = 0.0;
@@ -111,7 +111,7 @@ class Sampler final : public Module {
   std::vector<float> buf_;
   double pos_ = 0.0;
   bool playing_ = false;
-  float prev_trig_ = 0.0f;
+  RisingEdge trig_edge_;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Sampler>(); }

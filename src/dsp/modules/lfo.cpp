@@ -2,6 +2,7 @@
 #include <numbers>
 #include "dsp/input_key.h"
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -15,15 +16,13 @@ class Lfo final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = rate;
-    const std::string w = cfg_str(cfg, "wave", "sine");
-    wave_ = w == "tri" ? 1 : w == "saw" ? 2 : w == "square" ? 3 : 0;
+    wave_ = cfg_enum(cfg, "wave", kWaves);
     phase_ = 0.0f;
-    prev_reset_ = 0.0f;
+    reset_edge_ = RisingEdge{};
   }
 
   void process(const float* ins, float* outs) override {
-    if (ins[1] > 0.5f && prev_reset_ <= 0.5f) phase_ = 0.0f;
-    prev_reset_ = ins[1];
+    if (reset_edge_(ins[1])) phase_ = 0.0f;
 
     double phase = phase_ + static_cast<double>(ins[2]);
     phase -= std::floor(phase);
@@ -45,14 +44,14 @@ class Lfo final : public Module {
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Lfo&>(other);
     phase_ = o.phase_;
-    prev_reset_ = o.prev_reset_;
+    reset_edge_ = o.reset_edge_;
   }
 
  private:
   double rate_ = 48000.0;
   int wave_ = 0;
   double phase_ = 0.0;
-  float prev_reset_ = 0.0f;
+  RisingEdge reset_edge_;
   InputKey<1> freq_key_;
   double inc_ = 0.0;
 };

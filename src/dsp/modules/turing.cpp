@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdint>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 // Concept-inspired by the Music Thing Modular Turing Machine; no firmware
 // code was copied. See docs/attribution.md.
@@ -14,26 +15,17 @@ constexpr ConfigInfo kCfg[] = {{"seed", nullptr}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"pulse"}, {"bit1"}, {"bit2"},
                                 {"bit3"}, {"bit4"}, {"bit5"}, {"bit6"},
                                 {"bit7"}, {"bit8"}};
-int length(float value) {
-  if (!std::isfinite(value)) return 8;
-  return static_cast<int>(std::lround(std::clamp(value, 1.0f, 16.0f)));
-}
 class Turing final : public Module {
  public:
   void init(double, const Config& cfg) override {
-    double seed = cfg_num(cfg, "seed", 1.0);
-    if (!std::isfinite(seed)) seed = 1.0;
-    rng_ = static_cast<std::uint32_t>(
-               std::clamp(std::abs(seed), 0.0, 4294967295.0)) * 2654435761u;
-    if (rng_ == 0) rng_ = 0x9E3779B9u;
+    rng_ = cfg_seed(cfg);
     reg_ = static_cast<std::uint16_t>(rng_ ^ (rng_ >> 16));
   }
   void process(const float* ins, float* outs) override {
-    const bool rising = ins[0] > 0.5f && prev_clock_ <= 0.5f;
-    prev_clock_ = ins[0];
+    const bool rising = clock_edge_(ins[0]);
     bool pulse = false;
     if (rising) {
-      const int len = length(ins[3]);
+      const int len = round_clamp(ins[3], 1, 16, 8);
       const std::uint32_t mask = (1u << len) - 1u;
       if (ins[2] > 0.5f) {
         reg_ = 0;
@@ -53,19 +45,13 @@ class Turing final : public Module {
   }
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Turing&>(other);
-    rng_ = o.rng_; reg_ = o.reg_; prev_clock_ = o.prev_clock_;
+    rng_ = o.rng_; reg_ = o.reg_; clock_edge_ = o.clock_edge_;
  }
  private:
-  // Marsaglia xorshift32; see docs/attribution.md.
-  float draw() {
-    std::uint32_t x = rng_;
-    x ^= x << 13; x ^= x >> 17; x ^= x << 5;
-    rng_ = x;
-    return static_cast<float>(x) * (1.0f / 4294967296.0f);
-  }
+  float draw() { return unit_float(xorshift32(rng_)); }
   std::uint32_t rng_ = 0x9E3779B9u;
   std::uint16_t reg_ = 1;
-  float prev_clock_ = 0.0f;
+  RisingEdge clock_edge_;
 };
 std::unique_ptr<Module> make() { return std::make_unique<Turing>(); }
 }  // namespace
