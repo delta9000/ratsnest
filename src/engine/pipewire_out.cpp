@@ -16,13 +16,12 @@
 #include <cstdio>
 #include <mutex>
 
+#include "engine/audio_safety.h"
 #include "rt/denormal.h"
 
 namespace ms::engine {
 
-float device_sample(float sample) {
-  return std::isfinite(sample) ? std::clamp(sample, -1.0f, 1.0f) : 0.0f;
-}
+float device_sample(float sample) { return clamp_device_sample(sample); }
 
 struct PipewireOut::Impl {
   RenderFn fn = nullptr;
@@ -63,10 +62,7 @@ struct PipewireOut::Impl {
       auto* l = static_cast<float*>(buf->datas[0].data);
       auto* r = static_cast<float*>(buf->datas[1].data);
       self->fn(self->user, l, r, frames);
-      for (uint32_t i = 0; i < frames; ++i) {
-        l[i] = device_sample(l[i]);
-        r[i] = device_sample(r[i]);
-      }
+      clamp_device_buffer(l, r, frames);
 
       for (uint32_t c = 0; c < 2; ++c) {
         buf->datas[c].chunk->offset = 0;

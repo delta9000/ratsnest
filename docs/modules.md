@@ -145,9 +145,13 @@ Only the live audio-device boundary clips to ±1. Internal sums are not normaliz
 linear `fm`, `pw`, `pwm`, rising-edge `sync`, phase offset in cycles; output `out`. Waves: `sine`,
 `tri`, `saw`, `pulse`. Effective Hz = `freq * 2^v_oct + fm * freq`, clamped
 to `0..0.45*rate` (negative frequencies stop the phase). `+1` v/oct doubles pitch.
-Sine is analytic, saw/pulse use polyBLEP, triangle is naive; high notes,
-hard sync, FM, PWM, and phase modulation can alias. Phase wraps in cycles;
-`freq: 0` holds the oscillator while `phase` can drive it externally.
+Sine is analytic. Free-running triangle, saw, and pulse morph between shared
+Fourier-series tables whose highest partial stays below Nyquist; hard sync,
+fast FM, PWM, and phase modulation still create discontinuities and can alias.
+The saw's Fourier reconstruction has brief Gibbs peaks up to about `+/-1.2`,
+and a band-limited pulse rings up to about `+/-1.3`; leave headroom downstream
+if it must reach the live device unclipped. Phase wraps in cycles; `freq: 0`
+holds the oscillator while `phase` can drive it externally.
 The 220 Hz default makes `A3v` sound A3; another base deliberately transposes. A pulse at `pw != 0.5` carries a DC offset of about
 `2 * pw - 1` that low-pass filters (`svf.lp`, `ladder`) pass straight through;
 keep `pw` at `0.5` or block DC downstream if the path is DC-coupled.
@@ -344,16 +348,29 @@ audio; correlated inputs can gain 3 dB at the midpoint.
 
 ## `drive`
 
-`drive { amount: 0.5, mode: soft }` — inputs `in`, amount `0..1`; output
+`drive { amount: 0.5, mode: soft, quality: raw }` — inputs `in`, amount `0..1`; output
 `out`. The pre-gain is `1 + 9 * amount`, so `soft` computes
 `tanh(in * (1 + 9 * amount))` and `hard` clamps the same product to `-1..1`.
 Note even `amount: 0.1` is a ~2x boost into the curve; on a full mix that is
-a limiter, not glue.
+a limiter, not glue. Config `quality` is `raw` (default) or `clean`. Raw is the
+original zero-latency path, including its useful aliasing character. Clean runs
+the same curve through an 8x elliptic oversampler, has a four-sample peak
+latency (0.083 ms at 48 kHz), and costs more CPU. Its reconstruction filter can
+ring beyond `+/-1` on transients even though the shaping curve itself is
+bounded, so leave downstream headroom. Align parallel raw/clean paths manually;
+the graph does not add hidden delay compensation.
 
 ## `fold`
 
-Inputs `in` 0, non-negative `fold` 1, symmetry offset `sym` 0; output `out`
-folded into `-1..1`. Best paired with a triangle oscillator and modulated fold.
+`fold { quality: raw }` — inputs `in` 0, non-negative `fold` 1, symmetry offset
+`sym` 0; output `out` nominally folded into `-1..1`. Config `quality` is `raw`
+(default) or `clean`. Raw preserves the original zero-latency corner-rich
+character. Clean combines first-order antiderivative antialiasing with 8x elliptic
+oversampling and has a four-sample peak latency (0.083 ms at 48 kHz). It is the
+more CPU-intensive option and is intended for exposed or high-frequency folds.
+Its reconstruction filter can overshoot the nominal range on transients; leave
+downstream headroom. Align parallel paths manually. Best paired with a triangle
+oscillator and modulated fold.
 
 ## `sh`
 

@@ -61,7 +61,7 @@ TEST_CASE("license and attribution records cover implementation provenance") {
   for (const char* required : {
            "Mutable Instruments Rings", "Karplus", "Dattorro",
            "Giannoulis", "Bristow-Johnson", "Parker", "Vicanek",
-           "polyBLEP", "Zavalishin", "Simper", "Toussaint",
+           "Fourier series", "Zavalishin", "Simper", "Toussaint",
            "Marsaglia", "readerwriterqueue", "PipeWire", "doctest",
        }) {
     check_contains(attribution, required);

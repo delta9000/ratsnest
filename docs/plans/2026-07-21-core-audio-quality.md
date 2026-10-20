@@ -67,14 +67,14 @@ Use 2048-sample tables and linear wraparound interpolation. Store all samples co
 
 **Step 2: Generate closely spaced harmonic ceilings during initialization**
 
-Generate exact ceilings `1..64`, followed by approximately semitone-spaced ceilings up to 2048 harmonics. For every level, construct:
+Generate exact ceilings `1..64`, followed by approximately semitone-spaced ceilings up to 1023 harmonics, the highest non-Nyquist bin representable by a 2048-point table. For every level, construct:
 
 ```text
 saw(p) = -(2/pi) * sum(sin(2*pi*h*p)/h, h=1..H)
 triangle(p) = (8/pi^2) * sum(cos(2*pi*h*p)/(h*h), odd h<=H)
 ```
 
-Use double-precision oscillator recurrences while constructing tables, normalize tables consistently to the `±1` signal convention, then store floats. Construction occurs through the function-local static returned by `instance()` and is first requested from `Vco::init()`, never from `process()`.
+Use double-precision oscillator recurrences while constructing tables, retain one consistent Fourier-series gain across every level, then store floats. Construction occurs through the function-local static returned by `instance()` and is first requested from `Vco::init()`, never from `process()`.
 
 For a current frequency, choose the table with the largest ceiling no greater than `floor(0.5*sample_rate/frequency)`, capped to the bank. Handle zero/non-finite frequency defensively.
 

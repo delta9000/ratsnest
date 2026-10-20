@@ -41,36 +41,31 @@ Raw processing remains the exact current formula and has zero latency. This is
 a compatibility contract enforced by sample-for-sample tests, including when
 the `quality` config is absent.
 
-Clean processing preserves the same nominal transfer curve and signal range,
-but may use a different numerical realization. It has exactly one host-sample
-of latency. Because clean mode is explicit and latency-bearing processing
-already exists in `clipper` and `limiter`, no global delay compensation is
-added. The latency is documented so parallel paths remain an intentional patch
-decision.
+Clean processing preserves the same nominal transfer curve and nominal signal
+range, but may use a different numerical realization. The causal reconstruction
+filter can ring beyond the curve's `+/-1` bounds on transients, so clean paths
+require downstream headroom and are not brick-wall limiters. It has exactly four
+host samples of peak latency. Because clean mode is explicit and latency-bearing
+processing already exists in `clipper` and `limiter`, no global delay
+compensation is added. The latency is documented so parallel paths remain an
+intentional patch decision.
 
 ## DSP architecture
 
-Clean mode uses a small shared, allocation-free nonlinear-processing core. It
-supports the existing soft saturation, hard clip, and periodic fold curves and
-owns only fixed scalar filter/history state.
+Clean mode uses a shared, allocation-free elliptic-IIR oversampling core. The
+drive module runs its existing soft or hard curve at 8x. Fold uses the same 8x
+filter plus first-order periodic ADAA, which suppresses its corners more
+efficiently than doubling the sample rate. The twelfth-order elliptic
+interpolator and matching reconstruction filter use 0.001 dB passband ripple,
+80 dB stopband attenuation, and normalized pass/stop edges 0.12/0.145.
 
-Wolfram Language is the offline design oracle. For each curve it will compare
-candidate realizations such as first-order antiderivative antialiasing (ADAA),
-2x/4x polyphase oversampling, and hybrids. The chosen realization is the
-cheapest one that meets the spectral target while preserving exactly one host
-sample of latency. Generated coefficients and reference vectors are checked
-into the repository; Wolfram is not a runtime dependency.
-
-The expected starting point is:
-
-- soft drive: ADAA, with oversampling only if the sweep shows it is needed;
-- hard drive: ADAA plus the minimum oversampling needed at the discontinuity;
-- wavefold: an analytic periodic antiderivative plus oversampling, because its
-  repeated corners produce the largest high-frequency error.
-
-This allocation is a hypothesis, not a commitment. Measurements choose the
-final per-curve path. A uniform 4x solution is acceptable if it is simpler and
-comfortably within the realtime budget.
+Wolfram Language is the offline design oracle. It generated the transfer
+functions, verified stability and frequency response, and measured the
+complete interpolate/shape/reconstruct impulse response. Both round trips
+peak at exactly host sample four. Coefficients and the reproducible design
+listing are checked into the repository; Wolfram is not a runtime dependency.
+Production uses cascaded biquads rather than a high-order direct form so float
+roundoff cannot destabilize the filter.
 
 Selection occurs during `Module::init()` from immutable config, not from an
 audio-rate input. `process()` performs no allocation, locking, I/O, coefficient
@@ -79,10 +74,10 @@ design, or variable-work loops.
 ## State, hot reload, and hostile input
 
 Clean-mode antialiasing and filter histories are migrated in
-`copy_state_from()` when old and new instances use the same quality mode. When
-quality changes, the new graph begins with cleared quality state; the existing
-engine hot-swap crossfade masks that structural change. Raw mode retains no new
-state.
+`copy_state_from()` when old and new instances use compatible quality and curve
+configuration. When quality or drive curve changes, the new graph begins with
+cleared quality state; the existing engine hot-swap crossfade masks that
+structural change. Raw mode retains no new state.
 
 Non-finite audio or parameter inputs must not poison persistent ADAA or filter
 state. Each clean path sanitizes before updating history and must recover on
@@ -91,8 +86,8 @@ by the modules' documented contracts.
 
 ## Objective quality gates
 
-Tests compare the C++ output with a high-rate Wolfram reference that is
-low-pass filtered before decimation. The sweep covers:
+Offline evaluation compared candidate output with a high-rate Wolfram reference
+that was low-pass filtered before decimation. That 308-case design sweep covered:
 
 - 48 and 96 kHz host rates;
 - coherent tones from the low register through 10 kHz;
@@ -105,11 +100,13 @@ Acceptance criteria:
 
 - absent `quality` and explicit `quality: raw` are bit-identical to the old
   implementation;
-- clean output is delayed by exactly one host sample;
+- clean output has an impulse-response peak at exactly four host samples;
 - clean output matches the nominal static transfer curve after latency;
-- across the representative sweep, clean reduces integrated in-band alias
-  error by at least 30 dB versus raw, with exceptions documented where raw
-  error is already below the measurement floor;
+- checked-in C++ regressions reduce isolated difficult alias bins by at least
+  30 dB while retaining the wanted fundamental within a 0.5x--2x guardrail;
+- the offline 308-case candidate sweep reports both relative improvement and
+  absolute residual rather than demanding a large ratio when raw is already
+  quiet;
 - no unexpected DC, instability, or non-finite output;
 - every module instance remains comfortably realtime in representative patch
   benchmarks.

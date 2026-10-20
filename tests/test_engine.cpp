@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
+#include <cmath>
 #include "dsl/parser.h"
+#include "engine/audio_safety.h"
 #include "engine/engine.h"
 #include "engine/pipewire_out.h"
 #include <limits>
@@ -47,8 +49,8 @@ TEST_CASE("feedback edge delivers previous sample (one-sample delay)") {
   float l[3], r[3];
   e.process(l, r, 3);
   CHECK(l[0] == doctest::Approx(1.0f));  // cv sees b's initial 0
-  CHECK(l[1] == doctest::Approx(2.0f));
-  CHECK(l[2] == doctest::Approx(3.0f));
+  CHECK(l[1] == doctest::Approx(2.0f));  // cv sees b's previous-sample 1
+  CHECK(l[2] == doctest::Approx(3.0f));  // float headroom exposes the ramp
 }
 
 TEST_CASE("feedback ramp observed below clip") {
@@ -75,4 +77,18 @@ TEST_CASE("device boundary contains overload and non-finite samples") {
   CHECK(engine::device_sample(0.25f) == 0.25f);
   CHECK(engine::device_sample(std::numeric_limits<float>::infinity()) == 0.0f);
   CHECK(engine::device_sample(std::numeric_limits<float>::quiet_NaN()) == 0.0f);
+}
+
+TEST_CASE("audio device safety clamps and sanitizes its final buffers") {
+  float l[4] = {2.0f, -2.0f, NAN, 0.5f};
+  float r[4] = {-4.0f, 4.0f, INFINITY, -0.5f};
+  engine::clamp_device_buffer(l, r, 4);
+  CHECK(l[0] == 1.0f);
+  CHECK(l[1] == -1.0f);
+  CHECK(l[2] == 0.0f);
+  CHECK(l[3] == 0.5f);
+  CHECK(r[0] == -1.0f);
+  CHECK(r[1] == 1.0f);
+  CHECK(r[2] == 0.0f);
+  CHECK(r[3] == -0.5f);
 }

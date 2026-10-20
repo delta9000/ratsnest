@@ -53,6 +53,11 @@ discards the skipped samples — it costs the same time as rendering the whole
 span, but writes only the window you asked for, and `--stats` still reports
 absolute piece time.
 
+Offline renders are stereo float32 WAVs and preserve headroom above 0 dBFS;
+they are not silently hard-clipped. Live PipeWire playback is safety-clamped
+only at the audio-device boundary. Put an explicit `clipper` or `limiter` in
+the patch when peak control is part of the sound.
+
 ### Play a patch live
 
 ```sh

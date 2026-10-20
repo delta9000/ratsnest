@@ -26,9 +26,9 @@ headroom that a float WAV can represent.
 Add a shared, immutable bank of band-limited saw and triangle tables. Build it
 once on the non-realtime initialization path using additive harmonic series;
 all VCO instances share it. Tables use 2048 samples and linear interpolation.
-The bank provides sufficiently close harmonic ceilings that selecting the
-brightest table whose highest partial remains below Nyquist does not audibly
-dull notes near a table boundary.
+The bank provides sufficiently close harmonic ceilings and morphs from the
+preceding table toward the brightest Nyquist-safe table, avoiding a waveform
+step when a new partial becomes available.
 
 Sine remains analytic. Saw reads the selected saw table. Triangle reads the
 selected triangle table. Pulse is constructed from two phase-shifted

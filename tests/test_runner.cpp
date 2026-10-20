@@ -88,6 +88,7 @@ TEST_CASE("swap crossfades linearly over 50ms and retires the old engine") {
   };
   CHECK(bl[0] == doctest::Approx(expected(0)).epsilon(0.01));
   CHECK(bl[fade / 2] == doctest::Approx(expected(fade / 2)).epsilon(0.01));
+  CHECK(bl[fade / 2] > 1.0f);
   CHECK(bl[fade + 100] == doctest::Approx(0.5f).epsilon(0.001));  // fade done
 
   engine::Engine* retired = nullptr;
