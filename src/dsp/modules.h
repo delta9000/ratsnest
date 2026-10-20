@@ -1,4 +1,5 @@
 #pragma once
+#include "dsp/mastering.h"  // sanitize(): the shared non-finite guard
 #include "dsp/module.h"
 
 namespace ms::dsp {

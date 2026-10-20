@@ -36,8 +36,9 @@ class SvfModule final : public Module {
     const float lp = ic2eq_ + a2 * ic1eq_ + a3 * v3;
     const float hp = ins[0] - k * bp - lp;
 
-    ic1eq_ = 2.0f * bp - ic1eq_;
-    ic2eq_ = 2.0f * lp - ic2eq_;
+    // Sanitized so a non-finite input or control cannot poison the filter.
+    ic1eq_ = sanitize(2.0f * bp - ic1eq_);
+    ic2eq_ = sanitize(2.0f * lp - ic2eq_);
     outs[0] = lp;
     outs[1] = bp;
     outs[2] = hp;

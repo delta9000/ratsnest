@@ -74,11 +74,11 @@ class Phaser final : public Module {
       const float t = std::tan(kPi * fck / rate_);
       const float a = (t - 1.0f) / (t + 1.0f);
       const float y = a * x + ap_[static_cast<size_t>(k)];
-      ap_[static_cast<size_t>(k)] = x - a * y;
+      ap_[static_cast<size_t>(k)] = sanitize(x - a * y);
       if (std::fabs(ap_[static_cast<size_t>(k)]) < 1e-20f) ap_[static_cast<size_t>(k)] = 0.0f;
       x = y;
     }
-    fb_ = x;
+    fb_ = sanitize(x);  // a non-finite input must not poison the loop
     if (std::fabs(fb_) < 1e-20f) fb_ = 0.0f;
 
     outs[0] = (1.0f - mix) * in + mix * x;

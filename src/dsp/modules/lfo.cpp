@@ -35,7 +35,7 @@ class Lfo final : public Module {
       case 3: outs[0] = p < 0.5f ? 1.0f : -1.0f; break;
     }
 
-    phase_ += static_cast<double>(std::max(ins[0], 0.0f)) / rate_;
+    phase_ += static_cast<double>(std::max(sanitize(ins[0]), 0.0f)) / rate_;
     phase_ -= std::floor(phase_);
   }
 
