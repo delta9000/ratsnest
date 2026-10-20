@@ -1,5 +1,6 @@
 #include "dsp/mastering.h"
 #include "dsp/modules.h"
+#include "dsp/util.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -35,49 +36,31 @@ public:
   }
   void process(const float *in, float *out) override {
     const bool reset = in[2] > .5f;
-    if (reset && !reset_) {
-      phase_ = 0;
-      beat_ = 0;
-      boundary_ = true;
-      step_ = -1;
-    }
+    if (reset && !reset_)
+      restart();
     reset_ = reset;
     const double bpm = sanitize_clamp(in[0], 0, 1000);
     const bool run = in[1] > .5f && bpm > 0;
     if (boundary_)
       swing_ = sanitize_clamp(in[3], 0, .75f);
-    const double x = phase_ * division_;
-    const int pair = static_cast<int>(x / 2);
-    const double p = x - 2 * pair;
-    const double split = division_ == 1 ? 1 : 1 + swing_;
-    const bool second = p >= split;
-    const int step = 2 * pair + (second ? 1 : 0);
-    const double local = second ? (p - split) / (2 - split) : p / split;
-    out[0] = run && (boundary_ || step != step_) ? 1.f : 0.f;
-    out[1] = run && local < .5 ? 1.f : 0.f;
-    out[2] = run && boundary_ ? 1.f : 0.f;
-    out[3] = run && boundary_ && beat_ % static_cast<unsigned>(beats_) == 0
-                 ? 1.f
-                 : 0.f;
+    double local = 0;
+    const int step = swung_step(local);
+    const bool beat = run && boundary_;
+    const auto beats = static_cast<unsigned>(beats_);
     const auto length = static_cast<unsigned>(beats_ * bars_);
-    out[4] = run && boundary_ && beat_ % length == 0 ? 1.f : 0.f;
+    out[0] = as_gate(run && (boundary_ || step != step_));
+    out[1] = as_gate(run && local < .5);
+    out[2] = as_gate(beat);
+    out[3] = as_gate(beat && beat_ % beats == 0);
+    out[4] = as_gate(beat && beat_ % length == 0);
     out[5] = static_cast<float>(phase_);
     out[6] = static_cast<float>(
-        (static_cast<double>(beat_ % static_cast<unsigned>(beats_)) + phase_) /
-        beats_);
+        (static_cast<double>(beat_ % beats) + phase_) / beats_);
     out[7] = static_cast<float>((static_cast<double>(beat_ % length) + phase_) /
                                 length);
-    out[8] = run ? 1.f : 0.f;
-    if (!run)
-      return;
-    step_ = step;
-    boundary_ = false;
-    phase_ += bpm / (60.0 * rate_);
-    if (phase_ >= 1.0 - 1e-12) {
-      phase_ = std::max(0.0, phase_ - 1);
-      ++beat_;
-      boundary_ = true;
-    }
+    out[8] = as_gate(run);
+    if (run)
+      tick(step, bpm);
   }
   void copy_state_from(const Module &other) override {
     const auto &o = static_cast<const Transport &>(other);
@@ -90,6 +73,34 @@ public:
   }
 
 private:
+  void restart() {
+    phase_ = 0;
+    beat_ = 0;
+    boundary_ = true;
+    step_ = -1;
+  }
+  // Index of the current `division` step within the beat, with every second
+  // step of a pair delayed by swing; `local` is the phase within that step.
+  int swung_step(double &local) const {
+    const double x = phase_ * division_;
+    const int pair = static_cast<int>(x / 2);
+    const double p = x - 2 * pair;
+    const double split = division_ == 1 ? 1 : 1 + swing_;
+    const bool second = p >= split;
+    local = second ? (p - split) / (2 - split) : p / split;
+    return 2 * pair + (second ? 1 : 0);
+  }
+  void tick(int step, double bpm) {
+    step_ = step;
+    boundary_ = false;
+    phase_ += bpm / (60.0 * rate_);
+    if (phase_ >= 1.0 - 1e-12) {
+      phase_ = std::max(0.0, phase_ - 1);
+      ++beat_;
+      boundary_ = true;
+    }
+  }
+
   double rate_ = 48000, phase_ = 0;
   std::uint64_t beat_ = 0;
   int beats_ = 4, bars_ = 4, division_ = 4, step_ = -1;

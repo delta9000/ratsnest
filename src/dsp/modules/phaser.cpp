@@ -10,12 +10,12 @@
 #include <numbers>
 #include <string>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
 
 constexpr int kMaxStages = 12;
-constexpr float kTwoPi = 2.0f * std::numbers::pi_v<float>;
 constexpr float kPi = std::numbers::pi_v<float>;
 constexpr float kFMin = 100.0f;
 constexpr float kFMax = 4000.0f;
@@ -27,23 +27,14 @@ constexpr ConfigInfo kCfg[] = {
     {"stages", nullptr}, {"spread", nullptr}, {"shape", kShapes}};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
-float clampn(float x, float lo, float hi) {
-  if (!(x >= lo)) return lo;
-  return x > hi ? hi : x;
-}
-float lfo_shape(int shape, float ph) {  // ph in [0,1) -> [-1,1]
-  if (shape == 1) return std::sin(kTwoPi * ph);
-  return 1.0f - 4.0f * std::fabs(ph - 0.5f);  // triangle
-}
-
 class Phaser final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = static_cast<float>(rate);
-    stages_ = static_cast<int>(clampn(static_cast<float>(cfg_num(cfg, "stages", 6.0)),
+    stages_ = static_cast<int>(clamp_nan(static_cast<float>(cfg_num(cfg, "stages", 6.0)),
                                       2.0f, static_cast<float>(kMaxStages)) + 0.5f);
-    spread_ = clampn(static_cast<float>(cfg_num(cfg, "spread", 0.0)), 0.0f, 1.0f);
-    shape_ = cfg_str(cfg, "shape", "tri") == "sine" ? 1 : 0;
+    spread_ = clamp_nan(static_cast<float>(cfg_num(cfg, "spread", 0.0)), 0.0f, 1.0f);
+    shape_ = cfg_enum(cfg, "shape", kShapes);
     ap_.fill(0.0f);
     fb_ = 0.0f;
     phase_ = 0.0f;
@@ -51,23 +42,23 @@ class Phaser final : public Module {
 
   void process(const float* ins, float* outs) override {
     const float in = ins[0];
-    const float rate = clampn(ins[1], 0.0f, 100.0f);
-    const float depth = clampn(ins[2], 0.0f, 1.0f);
-    const float feedback = clampn(ins[3], 0.0f, 0.95f);
-    const float mix = clampn(ins[4], 0.0f, 1.0f);
+    const float rate = clamp_nan(ins[1], 0.0f, 100.0f);
+    const float depth = clamp_nan(ins[2], 0.0f, 1.0f);
+    const float feedback = clamp_nan(ins[3], 0.0f, 0.95f);
+    const float mix = clamp_nan(ins[4], 0.0f, 1.0f);
 
-    const float m = lfo_shape(shape_, phase_);
+    const float m = mod_lfo(shape_, phase_);
     phase_ += rate / rate_;
     phase_ -= std::floor(phase_);
 
     const float nyq = 0.45f * rate_;
-    const float fc = clampn(kFMin * std::pow(kFMax / kFMin, 0.5f * (depth * m + 1.0f)),
+    const float fc = clamp_nan(kFMin * std::pow(kFMax / kFMin, 0.5f * (depth * m + 1.0f)),
                             20.0f, nyq);
     const float centre = 0.5f * static_cast<float>(stages_ - 1);
 
     float x = in + feedback * fb_;
     for (int k = 0; k < stages_; ++k) {
-      const float fck = clampn(
+      const float fck = clamp_nan(
           fc * std::exp2(spread_ * (static_cast<float>(k) - centre) /
                          static_cast<float>(stages_)),
           20.0f, nyq);

@@ -8,6 +8,7 @@
 #include <vector>
 #include "dsp/mastering.h"
 #include "dsp/modules.h"
+#include "dsp/util.h"
 #include "io/wav.h"
 
 namespace ms::dsp {
@@ -95,7 +96,7 @@ class Grains final : public Module {
     tail_len_ = 0;
     xfade_pos_ = kTail;
     was_frozen_ = false;
-    prev_trig_ = 0.0f;
+    trig_edge_ = RisingEdge{};
     countdown_ = 0.0;
     norm_ = 1.0f;
     norm_a_ = 1.0f - std::exp(-1.0f / (0.010f * rate_));
@@ -110,8 +111,7 @@ class Grains final : public Module {
 
     // External trig: exactly one grain per rising edge, any density.
     bool seeded = false;
-    if (prev_trig_ <= 0.5f && trig > 0.5f) seeded = seed_grain(ins);
-    prev_trig_ = trig;
+    if (trig_edge_(trig)) seeded = seed_grain(ins);
     seeded = schedule(ins) || seeded;
 
     float sum_l = 0.0f;
@@ -149,7 +149,7 @@ class Grains final : public Module {
     const std::size_t n = std::min(buf_.size(), o.buf_.size());
     std::copy_n(o.buf_.begin(), n, buf_.begin());
     write_abs_ = o.write_abs_;
-    prev_trig_ = o.prev_trig_;
+    trig_edge_ = o.trig_edge_;
     was_frozen_ = o.was_frozen_;
     tail_ = o.tail_;
     tail_len_ = o.tail_len_;
@@ -318,12 +318,9 @@ class Grains final : public Module {
     return ((c3 * f + c2) * f + c1) * f + x1;
   }
 
-  // Marsaglia xorshift32; see docs/attribution.md. Deterministic per seed.
+  // 24-bit uniform draw in [0, 1); deterministic per seed.
   float frand() {
-    rng_ ^= rng_ << 13;
-    rng_ ^= rng_ >> 17;
-    rng_ ^= rng_ << 5;
-    return static_cast<float>(rng_ >> 8) * (1.0f / 16777216.0f);
+    return static_cast<float>(xorshift32(rng_) >> 8) * (1.0f / 16777216.0f);
   }
 
   float rate_ = 48000.0f;
@@ -337,7 +334,7 @@ class Grains final : public Module {
   int tail_len_ = 0;
   int xfade_pos_ = kTail;
   bool was_frozen_ = false;
-  float prev_trig_ = 0.0f;
+  RisingEdge trig_edge_;
   double countdown_ = 0.0;
   uint32_t rng_ = 1;
   float norm_ = 1.0f;

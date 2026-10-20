@@ -2,6 +2,7 @@
 #include <cmath>
 #include <numbers>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -19,12 +20,11 @@ class Lpg final : public Module {
     rate_ = static_cast<float>(rate);
     env_ = 0.0f;
     lp1_ = lp2_ = 0.0f;
-    prev_strike_ = 0.0f;
+    strike_edge_ = RisingEdge{};
   }
 
   void process(const float* ins, float* outs) override {
-    if (ins[2] > 0.5f && prev_strike_ <= 0.5f) env_ = 1.0f;
-    prev_strike_ = ins[2];
+    if (strike_edge_(ins[2])) env_ = 1.0f;
 
     const float target = std::clamp(ins[1], 0.0f, 1.0f);
     if (target > env_) {
@@ -51,14 +51,14 @@ class Lpg final : public Module {
     env_ = o.env_;
     lp1_ = o.lp1_;
     lp2_ = o.lp2_;
-    prev_strike_ = o.prev_strike_;
+    strike_edge_ = o.strike_edge_;
   }
 
  private:
   float rate_ = 48000.0f;
   float env_ = 0.0f;
   float lp1_ = 0.0f, lp2_ = 0.0f;
-  float prev_strike_ = 0.0f;
+  RisingEdge strike_edge_;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Lpg>(); }

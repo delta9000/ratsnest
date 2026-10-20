@@ -9,12 +9,12 @@
 #include <string>
 #include <vector>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
 
 constexpr int kMaxVoices = 4;
-constexpr float kTwoPi = 2.0f * std::numbers::pi_v<float>;
 
 constexpr InputInfo kIns[] = {
     {"in_l", 0.f}, {"in_r", 0.f}, {"rate", 0.5f}, {"depth", 0.5f}, {"mix", 0.5f}};
@@ -23,24 +23,15 @@ constexpr ConfigInfo kCfg[] = {
     {"voices", nullptr}, {"delay", nullptr}, {"swing", nullptr}, {"shape", kShapes}};
 constexpr OutputInfo kOuts[] = {{"out_l"}, {"out_r"}};
 
-float clampn(float x, float lo, float hi) {
-  if (!(x >= lo)) return lo;
-  return x > hi ? hi : x;
-}
-float lfo_shape(int shape, float ph) {  // ph in [0,1) -> [-1,1]
-  if (shape == 1) return std::sin(kTwoPi * ph);
-  return 1.0f - 4.0f * std::fabs(ph - 0.5f);  // triangle
-}
-
 class Chorus final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = static_cast<float>(rate);
-    voices_ = static_cast<int>(clampn(static_cast<float>(cfg_num(cfg, "voices", 3.0)),
+    voices_ = static_cast<int>(clamp_nan(static_cast<float>(cfg_num(cfg, "voices", 3.0)),
                                       1.0f, static_cast<float>(kMaxVoices)) + 0.5f);
-    delay_ms_ = clampn(static_cast<float>(cfg_num(cfg, "delay", 12.0)), 1.0f, 40.0f);
-    swing_ms_ = clampn(static_cast<float>(cfg_num(cfg, "swing", 6.0)), 0.0f, 20.0f);
-    shape_ = cfg_str(cfg, "shape", "tri") == "sine" ? 1 : 0;
+    delay_ms_ = clamp_nan(static_cast<float>(cfg_num(cfg, "delay", 12.0)), 1.0f, 40.0f);
+    swing_ms_ = clamp_nan(static_cast<float>(cfg_num(cfg, "swing", 6.0)), 0.0f, 20.0f);
+    shape_ = cfg_enum(cfg, "shape", kShapes);
 
     const auto need =
         static_cast<std::size_t>((delay_ms_ + swing_ms_) * 1e-3f * rate_) + 4;
@@ -55,9 +46,9 @@ class Chorus final : public Module {
 
   void process(const float* ins, float* outs) override {
     const float in_l = ins[0], in_r = ins[1];
-    const float rate = clampn(ins[2], 0.0f, 100.0f);
-    const float depth = clampn(ins[3], 0.0f, 1.0f);
-    const float mix = clampn(ins[4], 0.0f, 1.0f);
+    const float rate = clamp_nan(ins[2], 0.0f, 100.0f);
+    const float depth = clamp_nan(ins[3], 0.0f, 1.0f);
+    const float mix = clamp_nan(ins[4], 0.0f, 1.0f);
 
     bufL_[write_] = in_l;
     bufR_[write_] = in_r;
@@ -69,8 +60,8 @@ class Chorus final : public Module {
       const float off = static_cast<float>(i) / static_cast<float>(voices_);
       const float phL = phase_ + off;
       const float phR = phase_ + off + 0.5f;  // R half-cycle out of phase
-      const float dL = base + depth * swing * lfo_shape(shape_, phL - std::floor(phL));
-      const float dR = base + depth * swing * lfo_shape(shape_, phR - std::floor(phR));
+      const float dL = base + depth * swing * mod_lfo(shape_, phL - std::floor(phL));
+      const float dR = base + depth * swing * mod_lfo(shape_, phR - std::floor(phR));
       wetL += read(bufL_, dL);
       wetR += read(bufR_, dR);
     }

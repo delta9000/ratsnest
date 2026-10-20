@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <numbers>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -15,13 +16,7 @@ class Random final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = rate;
-    // Sanitize before the cast: double -> uint32_t is UB out of range.
-    double s = cfg_num(cfg, "seed", 1.0);
-    if (!std::isfinite(s)) s = 1.0;
-    const auto seed =
-        static_cast<std::uint32_t>(std::clamp(std::abs(s), 0.0, 4294967295.0));
-    state_ = seed * 2654435761u;
-    if (state_ == 0) state_ = 0x9E3779B9u;
+    state_ = cfg_seed(cfg);
     phase_ = 0.0f;
     prev_ = draw();
     next_ = draw();
@@ -51,15 +46,7 @@ class Random final : public Module {
   }
 
  private:
-  // Marsaglia xorshift32; see docs/attribution.md.
-  float draw() {
-    std::uint32_t x = state_;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    state_ = x;
-    return 2.0f * (static_cast<float>(x) * (1.0f / 4294967296.0f)) - 1.0f;
-  }
+  float draw() { return 2.0f * unit_float(xorshift32(state_)) - 1.0f; }
 
   double rate_ = 48000.0;
   std::uint32_t state_ = 0x9E3779B9u;

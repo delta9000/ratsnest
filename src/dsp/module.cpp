@@ -28,6 +28,18 @@ const std::vector<std::string>& cfg_str_arr(const Config& c, std::string_view na
   return kEmpty;
 }
 
+int enum_index(const char* const* vals, std::string_view s, int def) {
+  for (int i = 0; vals[i]; ++i)
+    if (s == vals[i]) return i;
+  return def;
+}
+
+int cfg_enum(const Config& c, std::string_view name, const char* const* vals, int def) {
+  for (const auto& [k, v] : c)
+    if (k == name) return enum_index(vals, v.str, def);
+  return def;
+}
+
 int ModuleInfo::input_index(std::string_view name) const {
   for (size_t i = 0; i < inputs.size(); ++i)
     if (name == inputs[i].name) return static_cast<int>(i);

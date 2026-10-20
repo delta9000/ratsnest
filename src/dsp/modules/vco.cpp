@@ -3,6 +3,7 @@
 #include <numbers>
 #include "dsp/bandlimited_osc.h"
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -21,7 +22,7 @@ class Vco final : public Module {
     const std::string w = cfg_str(cfg, "wave", "sine");
     wave_ = w == "tri" ? 1 : w == "saw" ? 2 : w == "pulse" ? 3 : 0;
     phase_ = 0.0f;
-    prev_sync_ = 0.0f;
+    sync_edge_ = RisingEdge{};
     bank_ = &BandlimitedOsc::instance();
   }
 
@@ -33,8 +34,7 @@ class Vco final : public Module {
     const double dt = f / static_cast<double>(rate_);
 
     const float sync = std::isfinite(ins[5]) ? ins[5] : 0.0f;
-    if (sync > 0.5f && prev_sync_ <= 0.5f) phase_ = 0.0;
-    prev_sync_ = sync;
+    if (sync_edge_(sync)) phase_ = 0.0;
 
     // Advance first (double phase): a k-Hz tone then completes exactly k cycles
     // over rate samples, and a sync reset lands the next sample near -1.
@@ -74,14 +74,14 @@ class Vco final : public Module {
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Vco&>(other);
     phase_ = o.phase_;
-    prev_sync_ = o.prev_sync_;
+    sync_edge_ = o.sync_edge_;
   }
 
  private:
   float rate_ = 48000.0f;
   int wave_ = 0;
   double phase_ = 0.0;
-  float prev_sync_ = 0.0f;
+  RisingEdge sync_edge_;
   const BandlimitedOsc* bank_ = nullptr;
 };
 

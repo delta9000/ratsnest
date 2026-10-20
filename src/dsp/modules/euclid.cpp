@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 // Toussaint's Euclidean-rhythm framing, concept/paper-derived; this uses a
 // modular bucket test rather than a Bjorklund code port. See docs/attribution.md.
@@ -13,20 +14,11 @@ constexpr InputInfo kIns[] = {{"clock", 0.f}, {"reset", 0.f},
                               {"rot", 0.f}};
 constexpr OutputInfo kOuts[] = {{"trig"}, {"gate"}};
 
-int rounded_clamp(float value, int lo, int hi, int fallback) {
-  if (!std::isfinite(value)) return fallback;
-  return static_cast<int>(
-      std::lround(std::clamp(value, static_cast<float>(lo),
-                             static_cast<float>(hi))));
-}
-
 class Euclid final : public Module {
  public:
   void process(const float* ins, float* outs) override {
-    const bool reset = ins[1] > 0.5f && prev_reset_ <= 0.5f;
-    const bool rising = ins[0] > 0.5f && prev_clock_ <= 0.5f;
-    prev_reset_ = ins[1];
-    prev_clock_ = ins[0];
+    const bool reset = reset_edge_(ins[1]);
+    const bool rising = clock_edge_(ins[0]);
 
     if (reset) {
       step_ = -1;
@@ -35,8 +27,8 @@ class Euclid final : public Module {
 
     bool trigger = false;
     if (rising) {
-      const int steps = rounded_clamp(ins[2], 1, 64, 16);
-      const int hits = rounded_clamp(ins[3], 0, steps, 4);
+      const int steps = round_clamp(ins[2], 1, 64, 16);
+      const int hits = round_clamp(ins[3], 0, steps, 4);
       step_ = (step_ + 1) % steps;
 
       double rot_value = std::isfinite(ins[4]) ? static_cast<double>(ins[4]) : 0.0;
@@ -56,15 +48,15 @@ class Euclid final : public Module {
     const auto& o = static_cast<const Euclid&>(other);
     step_ = o.step_;
     hit_ = o.hit_;
-    prev_clock_ = o.prev_clock_;
-    prev_reset_ = o.prev_reset_;
+    clock_edge_ = o.clock_edge_;
+    reset_edge_ = o.reset_edge_;
   }
 
  private:
   int step_ = -1;
   bool hit_ = false;
-  float prev_clock_ = 0.0f;
-  float prev_reset_ = 0.0f;
+  RisingEdge clock_edge_;
+  RisingEdge reset_edge_;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Euclid>(); }

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <numbers>
 #include <vector>
+#include "dsp/util.h"
 
 namespace ms::dsp::resonate {
 
@@ -228,10 +229,7 @@ class Rng {
   explicit Rng(uint32_t seed = 1u) : s_(seed ? seed : 1u) {}
   void seed(uint32_t s) { s_ = s ? s : 1u; }
   float bipolar() {
-    s_ ^= s_ << 13;
-    s_ ^= s_ >> 17;
-    s_ ^= s_ << 5;
-    return static_cast<float>(s_) * (2.0f / 4294967296.0f) - 1.0f;
+    return static_cast<float>(xorshift32(s_)) * (2.0f / 4294967296.0f) - 1.0f;
   }
 
  private:
