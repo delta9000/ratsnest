@@ -47,8 +47,10 @@ struct PipewireOut::Impl {
     spa_buffer* buf = b->buffer;
     if (buf->n_datas >= 2 && buf->datas[0].data != nullptr &&
         buf->datas[1].data != nullptr) {
+      // Both planes are written for `frames`: bound by the smaller one.
       const uint32_t cap =
-          buf->datas[0].maxsize / static_cast<uint32_t>(sizeof(float));
+          std::min(buf->datas[0].maxsize, buf->datas[1].maxsize) /
+          static_cast<uint32_t>(sizeof(float));
       uint32_t want =
           b->requested != 0 ? static_cast<uint32_t>(b->requested) : cap;
       const uint32_t frames = want < cap ? want : cap;
