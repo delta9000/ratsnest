@@ -236,7 +236,6 @@ class Fm final : public Module {
 
     const double base = base_freq(ins[1], ins[2]);
     const float vel = clamp_nan(ins[3], 0.0f, 1.0f);
-    const float fb_cv = ins[16];
 
     std::array<double, kOps> post{};
     for (const int op : order_) {
