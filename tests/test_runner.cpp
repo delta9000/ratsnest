@@ -218,3 +218,84 @@ TEST_CASE("observation telemetry follows graph generations and never blocks when
   CHECK(snapshot.size==3);
   controller.drain_retired();
 }
+
+// Regression: a Swap landing while the retire queue was full used to drop the
+// fading engine's pointer (leak). Now the Swap -- and every command behind
+// it -- waits until the non-RT side reaps; every engine is retired exactly once.
+TEST_CASE("swaps beyond retire-queue capacity are deferred, never leaked") {
+  RtRunner run(48000.0);
+  constexpr int kSwaps = 20;  // retire queue holds 7
+  for (int i = 0; i < kSwaps; ++i)
+    REQUIRE(run.push(swap_cmd(make_engine(i % 2 ? kDcOne : kDcHalf))));
+  Command c;
+  c.kind = Command::Kind::SetParam;
+  c.node = 0;  // 'a' vca
+  c.slot = 2;  // gain: queued behind the swaps, must reach the final engine
+  c.value = 0.25f;
+  REQUIRE(run.push(c));
+
+  std::vector<float> l(4096), r(4096);
+  for (int b = 0; b < 8; ++b) run.render(l.data(), r.data(), l.size());  // nobody reaps
+  int retired = 0;
+  engine::Engine* e = nullptr;
+  while (run.try_retire(e)) {
+    delete e;
+    ++retired;
+  }
+  CHECK(retired <= 7);
+  for (int b = 0; b < 200 && retired < kSwaps - 1; ++b) {
+    run.render(l.data(), r.data(), l.size());
+    while (run.try_retire(e)) {
+      delete e;
+      ++retired;
+    }
+  }
+  CHECK(retired == kSwaps - 1);  // all but the live engine came back
+  run.render(l.data(), r.data(), l.size());
+  CHECK(l.back() == doctest::Approx(0.25f));
+}
+
+// Drains are capped per block at one ring's worth: a full queue still lands
+// in a single block (a controller batch stays atomic).
+TEST_CASE("a full command ring drains within one block") {
+  RtRunner run(48000.0);
+  REQUIRE(run.push(swap_cmd(make_engine(kDcOne))));
+  Command off;
+  off.kind = Command::Kind::Watch;
+  off.node = RtRunner::kWatchOff;
+  while (run.command_capacity() > 1) REQUIRE(run.push(off));
+  Command w;
+  w.kind = Command::Kind::Watch;
+  w.node = 0;  // last command in a full ring
+  w.slot = 0;
+  REQUIRE(run.push(w));
+  REQUIRE(run.command_capacity() == 0);
+  float l[64], r[64];
+  run.render(l, r, 64);
+  float v = 0.0f;
+  REQUIRE(run.try_watch_value(v));
+  CHECK(v == doctest::Approx(1.0f));
+}
+
+// A producer that never stops pushing must not stall a block: each drain
+// is bounded, so render() returns while the flood continues.
+TEST_CASE("flooding MIDI and audio producers cannot stall a block") {
+  RtRunner run(48000.0);
+  REQUIRE(run.push(swap_cmd(make_engine(kDcOne))));
+  std::atomic<bool> stop{false};
+  std::thread midi([&] {
+    const dsp::MidiEvent ev{{0x90, 60, 100, 0}, 3};
+    while (!stop.load(std::memory_order_acquire)) run.push_midi(ev);
+  });
+  std::thread audio([&] {
+    engine::AudioChunk chunk{};
+    chunk.len = 64;
+    while (!stop.load(std::memory_order_acquire)) run.push_audio(chunk);
+  });
+  float l[64], r[64];
+  for (int b = 0; b < 2000; ++b) run.render(l, r, 64);
+  stop.store(true, std::memory_order_release);
+  midi.join();
+  audio.join();
+  CHECK(l[63] == doctest::Approx(1.0f));
+}

@@ -42,6 +42,11 @@ class RtRunner {
  public:
   static constexpr size_t kMaxBlock = 8192;
   static constexpr uint32_t kWatchOff = 0xffffffffu;
+  // Ring sizes double as per-block drain caps: one ring's worth each.
+  // Everything queued before a block starts still lands in that block (a
+  // controller batch stays atomic), but a producer pushing concurrently
+  // cannot keep a drain loop alive; leftovers wait for the next block.
+  static constexpr size_t kCommandRing = 1024, kMidiRing = 256, kAudioRing = 128;
 
   explicit RtRunner(double sample_rate);
   ~RtRunner();
@@ -81,6 +86,7 @@ class RtRunner {
 
  private:
   void drain_commands();
+  void drain_inputs();
   void render_block(float* l, float* r, size_t frames);
 
   rt::SpscQueue<Observation, 4> observations_;
@@ -91,13 +97,13 @@ class RtRunner {
   double rate_;
   size_t glide_samples_;  // 20ms
   size_t fade_samples_;   // 50ms
-  rt::SpscQueue<Command, 1024> commands_;
+  rt::SpscQueue<Command, kCommandRing> commands_;
   rt::SpscQueue<Engine*, 8> retired_;
   rt::SpscQueue<float, 4096> watch_;
-  rt::SpscQueue<dsp::MidiEvent, 256> midi_ring_;
-  rt::SpscQueue<AudioChunk, 128> audio_ring_;
+  rt::SpscQueue<dsp::MidiEvent, kMidiRing> midi_ring_;
+  rt::SpscQueue<AudioChunk, kAudioRing> audio_ring_;
   Engine* current_ = nullptr;
-  Engine* old_ = nullptr;  // non-null while crossfading
+  Engine* old_ = nullptr;  // non-null while crossfading or awaiting retire room
   size_t fade_pos_ = 0;
   uint32_t watch_node_ = kWatchOff, watch_slot_ = 0;
   std::atomic<float> peak_l_{0.0f}, peak_r_{0.0f};
