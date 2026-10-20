@@ -92,6 +92,8 @@ On save, the engine diffs old vs new IR:
   `(name, type)` pair survives has its internal state migrated (oscillator
   phase, envelope stage, delay/register buffers); pointer-swap, then ~50 ms
   linear crossfade old→new. Renaming a module intentionally resets it.
+  A topology save that lands during that crossfade is held, newest only,
+  and applied as soon as the fade completes; it is never dropped.
 - **Parse/validation error:** last good graph keeps playing; error reported
   with line/column. The drone never stops because of a typo.
 

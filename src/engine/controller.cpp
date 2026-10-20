@@ -13,6 +13,7 @@ Controller::Controller(RtRunner& runner, double sample_rate)
 Controller::LoadResult Controller::load(std::string_view src, const std::string& patch_path) {
   LoadResult res;
   drain_retired();
+  pending_ = false;  // this edit is newer than anything held back
 
   auto p = dsl::parse(src);
   if (!p.ok()) {
@@ -20,11 +21,8 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
     return res;
   }
 
-  std::string dir = ".";
-  if (!patch_path.empty()) {
-    std::filesystem::path pp(patch_path);
-    if (pp.has_parent_path()) dir = pp.parent_path().string();
-  }
+  const std::filesystem::path parent = std::filesystem::path(patch_path).parent_path();
+  const std::string dir = parent.empty() ? "." : parent.string();
   auto sx = graph::expand_subs(p.ast, dir, graph::read_text_file, res.errors);
   if (!res.errors.empty()) return res;
   res.files = std::move(sx.files);
@@ -57,8 +55,12 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
   }
 
   // Topology path (or first load). Gate: keep the retire queue unfillable.
+  // A save during the crossfade is held (newest wins) for apply_pending().
   if (engines_in_flight() >= 2) {
-    res.errors.push_back({0, 0, "reload still in flight; save again in a moment", {}});
+    pending_ = true;
+    pending_src_ = std::string(src);
+    pending_path_ = patch_path;
+    res.deferred = true;
     return res;
   }
 
@@ -77,8 +79,16 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
   shadow_ = std::move(c2.graph);
   res.ok = true;
   res.topology = true;
-  if (!watch_spec_.empty()) push_watch_for_shadow();
+  push_watch_for_shadow();  // no-op without a watch spec
   return res;
+}
+
+std::optional<Controller::LoadResult> Controller::apply_pending() {
+  drain_retired();
+  if (!pending_ || engines_in_flight() >= 2) return std::nullopt;
+  const std::string src = std::move(pending_src_);
+  const std::string path = std::move(pending_path_);
+  return load(src, path);
 }
 
 bool Controller::set_watch(std::string_view spec) {
@@ -98,33 +108,27 @@ void Controller::clear_watch() {
 }
 
 bool Controller::push_watch_for_shadow() {
-  if (!shadow_ || watch_spec_.empty()) return false;
+  if (!shadow_) return false;
   // Node names may themselves contain dots (voice members: `lead.osc`,
   // instanced as `lead.osc#0`), so the watch spec must be split by the same
   // longest-declared-name rule as ordinary endpoint resolution, not by its
-  // first dot.
-  auto is_node_name = [&](const std::string& n) {
-    for (const auto& node : shadow_->nodes)
-      if (node.name == n) return true;
-    return false;
+  // first dot. A failed split (or empty spec) yields module "", never a node.
+  auto node_index = [&](const std::string& n) {
+    for (size_t i = 0; i < shadow_->nodes.size(); ++i)
+      if (shadow_->nodes[i].name == n) return static_cast<int>(i);
+    return -1;
   };
-  graph::SplitEndpoint s = graph::split_endpoint(is_node_name, watch_spec_);
-  if (!s.ok) return false;
-  for (size_t i = 0; i < shadow_->nodes.size(); ++i) {
-    const auto& n = shadow_->nodes[i];
-    if (n.name != s.module) continue;
-    int slot = 0;
-    if (!s.port.empty()) {
-      slot = n.info->output_index(s.port);
-      if (slot < 0) return false;
-    }
-    Command cmd;
-    cmd.kind = Command::Kind::Watch;
-    cmd.node = static_cast<uint32_t>(i);
-    cmd.slot = static_cast<uint32_t>(slot);
-    return runner_.push(cmd);
-  }
-  return false;
+  const graph::SplitEndpoint s = graph::split_endpoint(
+      [&](const std::string& n) { return node_index(n) >= 0; }, watch_spec_);
+  const int node = node_index(s.module);
+  if (node < 0) return false;
+  const int slot = s.port.empty() ? 0 : shadow_->nodes[node].info->output_index(s.port);
+  if (slot < 0) return false;
+  Command cmd;
+  cmd.kind = Command::Kind::Watch;
+  cmd.node = static_cast<uint32_t>(node);
+  cmd.slot = static_cast<uint32_t>(slot);
+  return runner_.push(cmd);
 }
 
 void Controller::drain_retired() {

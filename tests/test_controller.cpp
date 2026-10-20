@@ -55,6 +55,58 @@ TEST_CASE("topology reload swaps, old engine is retired and reaped") {
   CHECK(rig.ctl.engines_in_flight() == 1);
 }
 
+// Regression: a topology save during the 50 ms crossfade used to be rejected
+// ("reload still in flight"), losing the edit until the next save. It is now
+// held -- newest only -- and applied once the fading engine is reaped.
+TEST_CASE("topology saves during a crossfade coalesce and apply after the fade") {
+  Rig rig;
+  REQUIRE(rig.ctl.load("a = vca { gain: 1.0 }\n1 -> a.in\na -> out.in\n").ok);
+  rig.spin(64);
+  REQUIRE(rig.ctl.load(
+      "a = vca { gain: 1.0 }\nb = lfo\n1 -> a.in\na -> out.in\nb -> out.in : 0\n").topology);
+  auto held = rig.ctl.load(
+      "a = vca { gain: 0.3 }\nc = noise\n1 -> a.in\na -> out.in\nc -> out.in : 0\n");
+  CHECK(!held.ok);
+  CHECK(held.deferred);
+  CHECK(held.errors.empty());
+  auto newest = rig.ctl.load("a = vca { gain: 0.7 }\nd = lfo\n1 -> a.in\na -> out.in\n"
+                             "d -> out.in : 0\n");
+  CHECK(newest.deferred);
+  CHECK(rig.ctl.has_pending());
+  CHECK(!rig.ctl.apply_pending());  // still fading: nothing applied
+  CHECK(rig.ctl.engines_in_flight() == 2);
+
+  rig.spin(4096);  // fade done, old engine retired
+  auto applied = rig.ctl.apply_pending();
+  REQUIRE(applied);
+  CHECK(applied->ok);
+  CHECK(applied->topology);
+  CHECK(!rig.ctl.has_pending());
+  CHECK(!rig.ctl.apply_pending());  // applied once
+  rig.spin(4096);
+  rig.spin(64);
+  CHECK(rig.l[63] == doctest::Approx(0.7f));  // the newest held edit won
+}
+
+TEST_CASE("a later applied edit supersedes a held one") {
+  Rig rig;
+  REQUIRE(rig.ctl.load("a = vca { gain: 1.0 }\n1 -> a.in\na -> out.in\n").ok);
+  rig.spin(64);
+  const char* b = "a = vca { gain: 1.0 }\nb = lfo\n1 -> a.in\na -> out.in\nb -> out.in : 0\n";
+  REQUIRE(rig.ctl.load(b).topology);
+  CHECK(rig.ctl.load("a = vca { gain: 0.3 }\n1 -> a.in\na -> out.in\n").deferred);
+  // Params-only relative to the live graph: applies now, so the held edit is stale.
+  auto p = rig.ctl.load(
+      "a = vca { gain: 0.6 }\nb = lfo\n1 -> a.in\na -> out.in\nb -> out.in : 0\n");
+  REQUIRE(p.ok);
+  CHECK(!p.topology);
+  CHECK(!rig.ctl.has_pending());
+  rig.spin(4096);
+  CHECK(!rig.ctl.apply_pending());
+  rig.spin(64);
+  CHECK(rig.l[63] == doctest::Approx(0.6f));
+}
+
 TEST_CASE("bad patch reports diagnostics and keeps the last good graph") {
   Rig rig;
   REQUIRE(rig.ctl.load("a = vca { gain: 1.0 }\n1 -> a.in\na -> out.in\n").ok);

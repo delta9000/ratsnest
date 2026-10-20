@@ -339,7 +339,8 @@ class HotReload {
                    patch_.c_str());
   }
 
-  // Waits ~100 ms for a save, then reloads if one arrived.
+  // Waits ~100 ms for a save, then reloads if one arrived. With no new save,
+  // applies an edit held back while an earlier reload was crossfading.
   void poll(ms::engine::Controller& ctl) {
     if (!watching_) {
       // poll_changed() would return immediately instead of blocking, so
@@ -349,6 +350,7 @@ class HotReload {
       return;
     }
     if (watcher_->poll_changed(100)) reload(ctl);
+    else if (auto res = ctl.apply_pending()) finish(*res);
   }
 
  private:
@@ -367,7 +369,14 @@ class HotReload {
       std::fprintf(stderr, "\nerror: cannot re-read '%s'\n", patch_.c_str());
       return;
     }
-    auto res = ctl.load(src, patch_);
+    finish(ctl.load(src, patch_));
+  }
+
+  void finish(const ms::engine::Controller::LoadResult& res) {
+    if (res.deferred) {
+      std::fputs("\nqueued (previous reload still crossfading)\n", stderr);
+      return;
+    }
     if (!res.ok) {
       std::fputs("\n", stderr);
       report(patch_, res.errors);
