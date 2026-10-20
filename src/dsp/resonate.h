@@ -251,6 +251,11 @@ class Plucker {
   void trigger(float f, float cutoff, float position) {
     const float ratio = position * 0.9f + 0.05f;
     float period = ratio / f;
+    // Bound before the int cast and the halving loop: f <= 0 or NaN would
+    // otherwise give an infinite loop / UB cast (fmax maps NaN to 0). 2^24
+    // samples (~6 min) is far below any audible pitch: normal triggers are
+    // untouched.
+    period = std::fmin(std::fmax(period, 0.0f), 16777216.0f);
     remaining_ = static_cast<int>(period);
     while (period >= 255.0f) period *= 0.5f;
     comb_period_ = period;

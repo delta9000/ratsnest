@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <vector>
 #include "dsp/resonate.h"
@@ -121,6 +122,21 @@ TEST_CASE("resonate: dc blocker removes a constant input") {
   float y = 1.0f;
   for (int i = 0; i < 48000; ++i) y = dc.process(1.0f);
   CHECK(std::abs(y) < 1e-3f);
+}
+
+// Regression: trigger() halved the period until < 255, which never exits for
+// an infinite period (f == 0) and cast inf/NaN to int. Bounded regardless of
+// caller clamps; output stays finite.
+TEST_CASE("resonate: plucker trigger terminates on degenerate frequencies") {
+  for (float f : {0.0f, -0.0f, -0.1f, 1e-30f, std::numeric_limits<float>::quiet_NaN(),
+                  std::numeric_limits<float>::infinity()}) {
+    Plucker p;
+    p.init(3);
+    p.trigger(f, 0.1f, 0.3f);
+    bool finite = true;
+    for (int i = 0; i < 4096; ++i) finite = finite && std::isfinite(p.process());
+    CHECK(finite);
+  }
 }
 
 TEST_CASE("resonate: plucker is seed-deterministic") {
