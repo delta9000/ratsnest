@@ -87,13 +87,14 @@ class Reverb final : public Module {
     freeze_ += (ftarget - freeze_) * fa;
     if (freeze_ < 1e-20f) freeze_ = 0.0f;
 
-    const float decay_in = std::clamp(ins[2], 0.0f, 0.9995f);
+    const float decay_in = std::clamp(sanitize(ins[2]), 0.0f, 0.9995f);
     const float decay = decay_in + (1.0f - decay_in) * freeze_;
-    const float damp = std::clamp(ins[3], 0.0f, 1.0f) * (1.0f - freeze_);
+    const float damp = std::clamp(sanitize(ins[3]), 0.0f, 1.0f) * (1.0f - freeze_);
     const float kd2 = std::clamp(decay + 0.15f, 0.25f, 0.5f);
 
     // mono sum -> predelay -> bandwidth lowpass -> 4 input diffusers
-    float x = 0.5f * (ins[0] + ins[1]) * (1.0f - freeze_);
+    // Non-finite input never enters the tank: it would circulate forever.
+    float x = 0.5f * (sanitize(ins[0]) + sanitize(ins[1])) * (1.0f - freeze_);
     const float delayed = dread(ln_[kPre], pre_back_);
     dwrite(ln_[kPre], x);
     x = delayed;

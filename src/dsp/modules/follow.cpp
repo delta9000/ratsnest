@@ -1,6 +1,5 @@
 #include <cmath>
 #include "dsp/modules.h"
-#include "dsp/mastering.h"
 
 namespace ms::dsp {
 namespace {
@@ -36,7 +35,8 @@ class Follow final : public Module {
     const float thresh = sanitize_clamp(ins[3], 0.0f, 8.0f, 0.1f);
 
     // 1. Rectify by mode: peak follows |in|, rms follows in^2 (energy).
-    const float x = is_rms_ ? in * in : std::abs(in);
+    //    Energy saturates just below FLT_MAX: inf would poison state_ for good.
+    const float x = is_rms_ ? std::fmin(in * in, 3.4e38f) : std::abs(in);
 
     // 2. One-pole ballistics with asymmetric attack/release coefficients.
     const float alpha_a = 1.0f - std::exp(-1.0f / (attack * rate_));

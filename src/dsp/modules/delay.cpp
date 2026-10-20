@@ -40,7 +40,7 @@ class Delay final : public Module {
     if (!(target >= 2.0)) target = 2.0;
     target = std::min(target, static_cast<double>(buf_.size() - 4));
     if (delay_ < 0.0) delay_ = target;
-    const float slew_samples = std::max(ins[6], 0.0f) * rate_;
+    const float slew_samples = std::max(sanitize(ins[6]), 0.0f) * rate_;
     const double a =
         slew_samples <= 1.0f
             ? 1.0
@@ -61,7 +61,7 @@ class Delay final : public Module {
     const float wet = ((c3 * f + c2) * f + c1) * f + x1;
 
     // Feedback path: darken, block DC, saturate, write.
-    const float fc = std::clamp(ins[5], 20.0f, 0.45f * rate_);
+    const float fc = std::clamp(sanitize(ins[5]), 20.0f, 0.45f * rate_);
     const float g =
         1.0f - std::exp(-2.0f * std::numbers::pi_v<float> * fc / rate_);
     lp_ += g * (wet - lp_);
@@ -79,7 +79,8 @@ class Delay final : public Module {
     if (std::abs(dc_x_) < 1e-20f) dc_x_ = 0.0f;
     if (std::abs(dc_y_) < 1e-20f) dc_y_ = 0.0f;
     const float fb = std::clamp(ins[3], 0.0f, 1.2f);
-    buf_[w] = ins[0] + std::tanh(fb * dc);
+    // Never store a non-finite sample: it would replay for up to 10 s.
+    buf_[w] = sanitize(ins[0] + std::tanh(fb * dc));
     write_ = (w + 1) & mask_;
 
     const float m = std::clamp(ins[4], 0.0f, 1.0f);

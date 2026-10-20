@@ -52,7 +52,9 @@ class Sampler final : public Module {
 
   void process(const float* ins, float* outs) override {
     const float trig = ins[0];
-    const float pitch = ins[1];
+    // Clamped like svf/ladder v_oct: a non-finite or absurd pitch would make
+    // pos_ non-finite, and casting that to an index is undefined.
+    const float pitch = sanitize_clamp(ins[1], -24.0f, 24.0f);
     const float level = ins[2];
 
     // Rising edge on trig restarts playback from the beginning.

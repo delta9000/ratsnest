@@ -28,7 +28,7 @@ class Random final : public Module {
   }
 
   void process(const float* ins, float* outs) override {
-    phase_ += static_cast<double>(std::max(ins[0], 0.0f)) / rate_;
+    phase_ += static_cast<double>(std::max(sanitize(ins[0]), 0.0f)) / rate_;
     if (phase_ >= 1.0f) {
       phase_ -= std::floor(phase_);
       prev_ = next_;

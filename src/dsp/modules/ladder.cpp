@@ -44,14 +44,16 @@ class Ladder final : public Module {
     const float y4 = (G2 * G2 * x + S) / (1.0f + k * G2 * G2);
     const float u = x - k * y4;
 
+    // States are sanitized so a non-finite input or control yields one bad
+    // output sample (zeroed by the engine), not a permanently poisoned filter.
     const float y1 = G * u + zf * s1_;
-    s1_ = 2.0f * y1 - s1_;
+    s1_ = sanitize(2.0f * y1 - s1_);
     const float y2 = G * y1 + zf * s2_;
-    s2_ = 2.0f * y2 - s2_;
+    s2_ = sanitize(2.0f * y2 - s2_);
     const float y3 = G * y2 + zf * s3_;
-    s3_ = 2.0f * y3 - s3_;
+    s3_ = sanitize(2.0f * y3 - s3_);
     const float y4b = G * y3 + zf * s4_;
-    s4_ = 2.0f * y4b - s4_;
+    s4_ = sanitize(2.0f * y4b - s4_);
 
     outs[0] = y4b;
   }

@@ -116,7 +116,9 @@ class Overdrive final : public Module {
     if (countdown_ == 0) update_block(ins);
     --countdown_;
 
-    const float in0 = sanitize(ins[0]);
+    // Bounded far above any audio level so the ADAA antiderivative's x*x
+    // cannot overflow to inf and poison the oversampler and filter states.
+    const float in0 = sanitize_clamp(ins[0], -1e6f, 1e6f);
     const float x = in0 * drive_gain_;
     const float xf = Biquad::process(x, pre_coeffs_, pre_state_);
 

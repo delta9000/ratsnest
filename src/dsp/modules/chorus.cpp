@@ -59,8 +59,10 @@ class Chorus final : public Module {
     const float depth = clampn(ins[3], 0.0f, 1.0f);
     const float mix = clampn(ins[4], 0.0f, 1.0f);
 
-    bufL_[write_] = in_l;
-    bufR_[write_] = in_r;
+    // Non-finite input must not reach the delay lines: it would replay from
+    // every tap for a full buffer length after the input recovers.
+    bufL_[write_] = sanitize(in_l);
+    bufR_[write_] = sanitize(in_r);
 
     const float base = delay_ms_ * 1e-3f * rate_;   // samples
     const float swing = swing_ms_ * 1e-3f * rate_;  // samples

@@ -33,7 +33,7 @@ class Lpg final : public Module {
     } else {
       const float tau = std::max(ins[4], 0.001f);
       const float a_dec = 1.0f - std::exp(-1.0f / (tau * rate_));
-      env_ += (target - env_) * a_dec;
+      env_ = sanitize(env_ + (target - env_) * a_dec);  // NaN cv/decay land here
     }
 
     const float damp = std::clamp(ins[3], 0.0f, 1.0f);
@@ -41,8 +41,9 @@ class Lpg final : public Module {
                               0.45f * rate_);
     const float a =
         1.0f - std::exp(-2.0f * std::numbers::pi_v<float> * fc / rate_);
-    lp1_ += a * (ins[0] - lp1_);
-    lp2_ += a * (lp1_ - lp2_);
+    // Sanitized so a non-finite input or control cannot poison the state.
+    lp1_ = sanitize(lp1_ + a * (ins[0] - lp1_));
+    lp2_ = sanitize(lp2_ + a * (lp1_ - lp2_));
     outs[0] = lp2_ * env_;
   }
 
