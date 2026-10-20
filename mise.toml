@@ -65,3 +65,7 @@ run = "./build/ratsnest render"
 description = "Play a patch live with hot-reload. Usage: mise run play -- patches/first.patch"
 depends = ["build"]
 run = "./build/ratsnest play"
+
+[tasks.complexity]
+description = "Complexity score for src/; fails if it grows past docs/complexity.json. --hotspots lists the worst functions."
+run = "python3 tools/complexity.py --check"
