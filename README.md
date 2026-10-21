@@ -48,7 +48,9 @@ needed. `--start` captures a window from further in:
 mise run render -- patches/longwave/4-lydian.patch --start 10m -d 60s --stats 10s
 ```
 
-A stateful graph has no seek, so `--start` runs the patch from zero and
+Durations take `90`, `90s`, `500ms` or `2m`; run `./build/ratsnest` with no
+arguments for every option and its default (`-d 10s`, `-o out.wav`,
+`--rate 48000`). A stateful graph has no seek, so `--start` runs the patch from zero and
 discards the skipped samples — it costs the same time as rendering the whole
 span, but writes only the window you asked for, and `--stats` still reports
 absolute piece time.
@@ -104,7 +106,8 @@ mise run check -- patches/first.patch
 ```
 
 Parses and type-checks the patch, reporting `line:col` diagnostics for
-anything wrong. A bad patch never kills a running session — `play`/`render`
+anything wrong — a misspelled module, port or parameter comes with its closest
+valid name — and warns when nothing is cabled into `out`. A bad patch never kills a running session — `play`/`render`
 keep the last good graph going and report errors the same way.
 
 ## Writing a patch

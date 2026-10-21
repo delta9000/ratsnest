@@ -6,14 +6,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
-#include <fstream>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
-#include "dsl/parser.h"
+#include "dsl/suggest.h"
 #include "engine/controller.h"
 #include "engine/engine.h"
 #include "engine/audio_in.h"
@@ -31,11 +28,19 @@ namespace {
 int usage() {
   std::fprintf(stderr,
       "usage:\n"
-      "  ratsnest describe [module_type]   # JSON module interfaces from the registry\n"
-      "  ratsnest check  <patch>\n"
-      "  ratsnest render <patch> [-d <seconds|Ns>] [--start <seconds|Ns>] [-o <out.wav>]\n"
-      "                          [--rate <hz>] [--stats [Ns]]\n"
-      "  ratsnest play   <patch> [--latency <N/RATE>] [--rate <hz>] [--watch <mod[.port]>]\n");
+      "  ratsnest check  <patch>             validate; errors print as file:line:col\n"
+      "  ratsnest render <patch> [options]   offline render to a stereo float WAV\n"
+      "      -d <dur>          length (default 10s)\n"
+      "      --start <dur>     begin the take this far in (the skipped part still runs)\n"
+      "      -o <file.wav>     output path (default out.wav)\n"
+      "      --rate <hz>       sample rate (default 48000)\n"
+      "      --stats [<dur>]   print peak/RMS/DC and a level timeline per window (default 10s)\n"
+      "  ratsnest play   <patch> [options]   live PipeWire output; hot-reloads on save\n"
+      "      --latency <N/RATE>  e.g. 256/48000\n"
+      "      --rate <hz>         sample rate (default 48000)\n"
+      "      --watch <mod[.port]>  show that signal's value in the status line\n"
+      "  ratsnest describe [module_type]     module interfaces as JSON\n"
+      "durations: 90, 90s, 500ms, 2m.  Modules and patch syntax: docs/modules.md\n");
   return 2;
 }
 
@@ -43,6 +48,9 @@ int usage() {
 
 // Registry names and enum values are built-in identifiers, never user strings.
 // Keep discovery beside validation's metadata so agents see the actual surface.
+// The comma before every JSON array element but the first.
+const char* sep(size_t i) { return i ? "," : ""; }
+
 const char* config_kind(const ms::dsp::ConfigInfo& c) {
   using K = ms::dsp::ConfigKind;
   if (c.kind == K::Enums) return "enum_array";
@@ -56,7 +64,7 @@ void describe_config(const ms::dsp::ConfigInfo& c) {
   if (c.enum_vals) {
     std::printf(",\"values\":[");
     for (size_t j = 0; c.enum_vals[j]; ++j)
-      std::printf("%s\"%s\"", j ? "," : "", c.enum_vals[j]);
+      std::printf("%s\"%s\"", sep(j), c.enum_vals[j]);
     std::printf("]");
   }
   std::printf("}");
@@ -66,17 +74,17 @@ void describe(const ms::dsp::ModuleInfo& m) {
   std::printf("{\"type\":\"%s\",\"inputs\":[", m.type);
   for (size_t i = 0; i < m.inputs.size(); ++i) {
     const auto& in = m.inputs[i];
-    std::printf("%s{\"name\":\"%s\",\"base\":%.9g,\"glide\":%s}", i ? "," : "", in.name,
+    std::printf("%s{\"name\":\"%s\",\"base\":%.9g,\"glide\":%s}", sep(i), in.name,
                 static_cast<double>(in.def), in.glide ? "true" : "false");
   }
   std::printf("],\"configs\":[");
   for (size_t i = 0; i < m.configs.size(); ++i) {
-    std::printf("%s", i ? "," : "");
+    std::printf("%s", sep(i));
     describe_config(m.configs[i]);
   }
   std::printf("],\"outputs\":[");
   for (size_t i = 0; i < m.outputs.size(); ++i)
-    std::printf("%s\"%s\"", i ? "," : "", m.outputs[i].name);
+    std::printf("%s\"%s\"", sep(i), m.outputs[i].name);
   std::printf("],\"default_output\":");
   if (m.outputs.empty()) std::printf("null");
   else std::printf("\"%s\"", m.outputs[0].name);
@@ -88,7 +96,8 @@ int cmd_describe(int argc, char** argv) {
   if (argc == 3) {
     const auto* m = ms::dsp::find_module(argv[2]);
     if (!m) {
-      std::fprintf(stderr, "error: unknown module type '%s'\n", argv[2]);
+      std::fprintf(stderr, "error: unknown module type '%s'%s\n", argv[2],
+                   ms::dsl::did_you_mean(argv[2], ms::graph::module_types()).c_str());
       return 1;
     }
     describe(*m);
@@ -108,15 +117,6 @@ int cmd_describe(int argc, char** argv) {
 
 // ---- loading ----------------------------------------------------------------
 
-bool read_file(const std::string& path, std::string& out) {
-  std::ifstream f(path);
-  if (!f) return false;
-  std::ostringstream ss;
-  ss << f.rdbuf();
-  out = ss.str();
-  return true;
-}
-
 // Diagnostics without a file of their own belong to the patch itself.
 void report(const std::string& patch, const ms::Diags& ds) {
   for (const auto& d : ds)
@@ -128,18 +128,15 @@ void report(const std::string& patch, const ms::Diags& ds) {
 // Returns compiled graph or nullptr after printing diagnostics.
 std::unique_ptr<ms::graph::Graph> load(const std::string& path, double rate) {
   std::string src;
-  if (!read_file(path, src)) {
+  if (!ms::graph::read_text_file(path, src)) {
     std::fprintf(stderr, "error: cannot read '%s'\n", path.c_str());
     return nullptr;
   }
-  auto p = ms::dsl::parse(src);
-  if (!p.ok()) { report(path, p.errors); return nullptr; }
-  std::filesystem::path pp(path);
-  const std::string dir = pp.has_parent_path() ? pp.parent_path().string() : ".";
-  ms::graph::expand_subs(p.ast, dir, ms::graph::read_text_file, p.errors);
-  if (!p.errors.empty()) { report(path, p.errors); return nullptr; }
-  auto c = ms::graph::compile(p.ast, rate);
+  auto c = ms::graph::build_patch(src, path, rate).compiled;
   if (!c.ok()) { report(path, c.errors); return nullptr; }
+  if (c.graph->in_cables[static_cast<size_t>(c.graph->out_node)].empty())
+    std::fprintf(stderr, "%s: warning: nothing is cabled into 'out'; the patch is silent\n",
+                 path.c_str());
   return std::move(c.graph);
 }
 
@@ -151,10 +148,21 @@ int cmd_check(const std::string& patch) {
 
 // ---- argument parsing -------------------------------------------------------
 
+// Seconds from "90", "90s", "500ms" or "2m"; NaN for anything else, so a
+// typo is an error rather than a silently different length.
 double parse_duration(const char* s) {
-  std::string v(s);
-  if (!v.empty() && v.back() == 's') v.pop_back();
-  return std::atof(v.c_str());
+  char* end = nullptr;
+  const double v = std::strtod(s, &end);
+  const std::string unit = end;
+  for (const auto& [u, k] : {std::pair{"", 1.0}, {"s", 1.0}, {"ms", 0.001}, {"m", 60.0}})
+    if (end != s && unit == u) return v * k;
+  return std::nan("");
+}
+
+// A flag the command does not take, or one missing its value.
+bool bad_option(const char* arg) {
+  std::fprintf(stderr, "error: unknown option '%s', or it is missing its value\n", arg);
+  return false;
 }
 
 // When argv[i] is `name` and a value follows, consumes both and returns the
@@ -191,7 +199,7 @@ bool parse_render(int argc, char** argv, RenderOpts& o) {
       if (i + 1 < argc && parse_duration(argv[i + 1]) > 0.0)
         o.stats_window = parse_duration(argv[++i]);
     }
-    else return false;
+    else return bad_option(argv[i]);
   }
   return true;
 }
@@ -261,8 +269,9 @@ bool write_stereo(const RenderOpts& o, const std::vector<float>& l,
 int cmd_render(const std::string& patch, int argc, char** argv) {
   RenderOpts o;
   if (!parse_render(argc, argv, o)) return usage();
-  if (o.seconds <= 0.0) { std::fprintf(stderr, "error: duration must be positive\n"); return 2; }
-  if (o.start_sec < 0.0) { std::fprintf(stderr, "error: --start must not be negative\n"); return 2; }
+  // Negated so a NaN (an unparsable duration) fails too.
+  if (!(o.seconds > 0.0)) { std::fprintf(stderr, "error: -d needs a positive duration (90, 90s, 500ms, 2m)\n"); return 2; }
+  if (!(o.start_sec >= 0.0)) { std::fprintf(stderr, "error: --start needs a duration >= 0 (90, 90s, 500ms, 2m)\n"); return 2; }
 
   auto g = load(patch, o.rate);
   if (!g) return 1;
@@ -365,7 +374,7 @@ class HotReload {
 
   void reload(ms::engine::Controller& ctl) {
     std::string src;
-    if (!read_file(patch_, src)) {
+    if (!ms::graph::read_text_file(patch_, src)) {
       std::fprintf(stderr, "\nerror: cannot re-read '%s'\n", patch_.c_str());
       return;
     }
@@ -478,7 +487,7 @@ bool parse_play(int argc, char** argv, PlayOpts& o) {
     if (const char* v = option(argc, argv, i, "--latency")) o.latency = v;
     else if (const char* v = option(argc, argv, i, "--rate")) o.rate = std::atof(v);
     else if (const char* v = option(argc, argv, i, "--watch")) o.watch = v;
-    else return false;
+    else return bad_option(argv[i]);
   }
   return true;
 }
@@ -487,7 +496,7 @@ int cmd_play(const std::string& patch, int argc, char** argv) {
   PlayOpts o;
   if (!parse_play(argc, argv, o)) return usage();
   std::string src;
-  if (!read_file(patch, src)) {
+  if (!ms::graph::read_text_file(patch, src)) {
     std::fprintf(stderr, "error: cannot read '%s'\n", patch.c_str());
     return 1;
   }

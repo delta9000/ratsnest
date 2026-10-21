@@ -1,0 +1,4 @@
+# A patch that makes sound nowhere: nothing reaches out.
+osc = vco { freq: 110hz }
+f = svf
+osc -> f.in
