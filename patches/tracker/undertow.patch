@@ -178,8 +178,8 @@ duck -> fx.lvl3 : -0.2
 duck -> fx.lvl4 : -0.2
 duck -> fx.lvl5 : -0.2
 
-mast = sub { file: "../lib/master-chain.sub", width: 0,
-             comp_makeup: 8, clip_drive: 10.5, clip_blend: 1,
+mast = sub { file: "../lib/master-chain.sub",
+             clip_drive: 10.5, clip_blend: 1,
              comp_thr: -18, ceiling: -2.5 }
 band.out_l -> mast.in_l
 band.out_r -> mast.in_r
@@ -187,6 +187,7 @@ fx.out_l -> mast.in_l
 fx.out_r -> mast.in_r
 kdrv -> mast.side_l : 0.7
 kdrv -> mast.side_r : 0.7
-width_lvl -> mast.field.width
+width_lvl -> mast.width
+8 -> mast.makeup
 mast.l -> out.left
 mast.r -> out.right

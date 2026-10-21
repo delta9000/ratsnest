@@ -167,8 +167,10 @@ room.l     -> master_mix.in3
 room.r     -> master_mix.in4
 
 mast = sub { file: "../lib/master-chain.sub", low_gain: 0.9, mid1_gain: -0.6,
-             high_gain: 0.3, comp_thr: -10, comp_ratio: 1.4, comp_makeup: 0.5,
-             clip_drive: 1.0, width: 1.2 }
+             high_gain: 0.3, comp_thr: -10, comp_ratio: 1.4,
+             clip_drive: 1.0 }
+1.2 -> mast.width
+0.5 -> mast.makeup
 master_mix.out_l -> mast.in_l
 master_mix.out_r -> mast.in_r
 

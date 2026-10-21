@@ -73,6 +73,41 @@ raise makeup by the difference rather than lowering the threshold. The limiter
 holds the same way, which costs a brickwalled master (≈ −8 LUFS) about 0.5 dB;
 that is the price of a clean low end, not a reason for more drive.
 
+## The lib chains: `master-chain.sub` and `club-master.sub`
+
+`patches/lib/master-chain.sub` is the chain above as one instance; its
+`width` and `makeup` are inputs, so form lanes can ride them. Measured on two
+full songs (glasshouse, synth-pop; undertow, melodic techno), four things it
+does that you have to plan around:
+
+- **Polite by default.** All defaults on whole-step: −13.5 LUFS integrated;
+  the synth-pop mix, staged lower, came back at −16.7. Loudness comes from
+  `makeup` and `clip_drive`, about 0.5 LUFS per dB of either near the top.
+- **Kick-keyed compression leaves kick-less sections uncompressed — and
+  still adds `makeup`.** The key is external (`side_l`/`side_r` ← kick), so a
+  breakdown with no kick gets no gain reduction but the full makeup: one
+  measured breakdown came back 1 dB under the chorus it was mixed 6 dB
+  below. Mix kick-less sections ~6 dB lower than you want them, ride
+  `makeup` down with the form lane, or key from the bus too
+  (`key_bus: 0.35` adds that share of the bus to the key, so the glue holds
+  every section).
+- **The clipper overshoots its threshold.** At the default `clip_blend` 0.32
+  the clip is parallel: the dry 68 % passes unclipped, so the clipper's
+  output overshoots its −2.5 dB threshold by 2.4–3.4 dB. It rounds peaks; the
+  limiter sets the ceiling. `clip_blend: 1` makes it a real (serial) clipper.
+- **The limiter is sample-peak unless told otherwise.** With the default
+  `true_peak: off`, inter-sample peaks exceed `ceiling` by 1.6–2.3 dB on a
+  loud master (whole-step: −0.4 dBFS sample peak, +1.7 dBTP). Set
+  `true_peak: on`, or keep the ceiling at −2.5 dBFS or lower, for a release.
+
+`patches/lib/club-master.sub` is the club preset: glue at −18 dB 3:1 keyed
+by kick plus 35 % bus, serial soft clip at `drive` 12.5 dB, makeup 10.5 dB
+(an input), true-peak limiter at −1.0 dBTP. On undertow's bus it measured
+**−8.5 LUFS integrated, −1.0 dBFS sample peak, −0.5 dBTP**, drops −7.8 dBFS
+RMS (crest ~7 dB: loud, as club masters are). `drive: 13` with `makeup` 11
+reaches −8.0. At that density a kick-less break sits only ~2.3 dB under the
+drop, so mix breaks lower still.
+
 ## The self-own that costs 2 dB
 
 A post-limiter attenuation scales the ceiling. The fade idiom

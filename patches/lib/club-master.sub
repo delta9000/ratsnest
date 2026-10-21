@@ -1,0 +1,72 @@
+# club-master.sub -- master-chain.sub preset for club loudness (about -9 to
+# -8 LUFS integrated on a full techno mix), true-peak safe.
+#
+#   mast = sub { file: "lib/club-master.sub" }
+#   bus_l -> mast.in_l
+#   bus_r -> mast.in_r
+#   kick  -> mast.side_l : 0.7      # saturated kick as the comp key
+#   kick  -> mast.side_r : 0.7
+#   mast.l -> out.left
+#   mast.r -> out.right
+#
+# Same ports as master-chain.sub (`width` default 1.0 and `makeup` default
+# 10.5 dB are inputs, so lanes can ride them). What changes against its
+# defaults: a firmer glue (-18 dB, 3:1) keyed partly from the bus itself
+# (`key_bus` 0.35, so a kick-less breakdown is still held, not handed +8 dB
+# of makeup uncompressed); the soft clipper SERIAL (`clip_blend` 1) at
+# `drive` dB, so it does the loudness work instead of the limiter; and the
+# limiter in `true_peak: on` mode at `ceiling` -1.0 dBTP.
+#
+# Measured on patches/tracker/undertow.patch's bus (kick at 0.7, sidechain
+# 0.7), mastered with this preset in place of its own chain: -8.5 LUFS
+# integrated, sample peak -1.0 dBFS, true peak -0.5 dBTP (ffmpeg ebur128);
+# drops -7.8 dBFS RMS, the kick-less break -10.1. Each dB of `drive` or
+# `makeup` is roughly 0.5 dB of LUFS (drive 13 + makeup 11: -8.0). At this
+# loudness the break sits only 2.3 dB under the drop -- mix it lower than
+# you think (the whole song measured -10.5 LUFS on its gentler chain).
+
+ceiling = param { default: -1.0 }   # dBTP
+drive   = param { default: 12.5 }    # clipper drive, dB: the loudness knob
+key_bus = param { default: 0.35 }
+
+in_l   = input {}
+in_r   = input {}
+side_l = input {}
+side_r = input {}
+width  = input { default: 1.0 }
+makeup = input { default: 10.5 }
+l = output {}
+r = output {}
+
+mc = sub { file: "master-chain.sub", comp_thr: -18, comp_ratio: 3,
+           key_bus: key_bus, clip_drive: drive, clip_blend: 1,
+           ceiling: ceiling, true_peak: on }
+in_l -> mc.in_l
+in_r -> mc.in_r
+side_l -> mc.side_l
+side_r -> mc.side_r
+width -> mc.width
+makeup -> mc.makeup
+mc.l -> l.in
+mc.r -> r.in
+
+# Audition: `mise run play -- patches/lib/club-master.sub`
+demo.clk  = clock { bpm: 126 }
+demo.beat = div { by: 2 }
+demo.clk -> demo.beat.in
+demo.kenv = func { rise: 0.001, fall: 0.48, curve: exp }
+demo.beat -> demo.kenv.trig
+demo.kosc = vco { freq: 52hz, wave: sine }
+demo.kenv -> demo.kosc.fm : 40
+demo.kamp = vca { gain: 0 }
+demo.kosc -> demo.kamp.in
+demo.kenv -> demo.kamp.cv
+demo.pad  = vco { freq: 110hz, wave: saw }
+demo.pad -> in_l : 0.3
+demo.pad -> in_r : 0.3
+demo.kamp -> in_l : 0.7
+demo.kamp -> in_r : 0.7
+demo.kamp -> side_l : 0.7
+demo.kamp -> side_r : 0.7
+l -> demo.out.left
+r -> demo.out.right

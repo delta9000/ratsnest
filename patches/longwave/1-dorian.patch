@@ -357,8 +357,10 @@ kick_env -> master_mix.lvl4 : -0.16
 # between "the kick has arrived" and "everything is here", and this movement
 # is built out of exactly that difference.
 mast = sub { file: "../lib/master-chain.sub", low_gain: 0.6, mid1_gain: -1.4,
-             high_gain: 0.4, comp_thr: -13, comp_ratio: 1.9, comp_makeup: 2.0,
-             clip_drive: 3.2, width: 1.1 }
+             high_gain: 0.4, comp_thr: -13, comp_ratio: 1.9,
+             clip_drive: 3.2 }
+1.1 -> mast.width
+2.0 -> mast.makeup
 master_mix.out_l -> mast.in_l
 master_mix.out_r -> mast.in_r
 kck -> mast.side_l : 0.7
