@@ -62,3 +62,23 @@ add_test(NAME cli_describe COMMAND ratsnest describe additive)
 set_tests_properties(cli_describe PROPERTIES PASS_REGULAR_EXPRESSION "number_array")
 add_test(NAME cli_describe_unknown COMMAND ratsnest describe nonexistent)
 set_tests_properties(cli_describe_unknown PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli_describe_suggests COMMAND ratsnest describe vcoo)
+set_tests_properties(cli_describe_suggests PROPERTIES PASS_REGULAR_EXPRESSION "did you mean 'vco'")
+
+# Durations: 500ms is half a second (not 500 s), 2m is minutes, junk is an error.
+add_test(NAME cli_render_ms
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+          -d 500ms -o ${CMAKE_CURRENT_BINARY_DIR}/first-ms.wav)
+set_tests_properties(cli_render_ms PROPERTIES PASS_REGULAR_EXPRESSION "rendered 0\\.5s")
+add_test(NAME cli_render_bad_duration
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+          -d 5sec -o ${CMAKE_CURRENT_BINARY_DIR}/first-bad.wav)
+set_tests_properties(cli_render_bad_duration PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli_render_unknown_option
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch --duration 5)
+set_tests_properties(cli_render_unknown_option PROPERTIES
+  PASS_REGULAR_EXPRESSION "unknown option '--duration'")
+add_test(NAME cli_check_warns_silent
+  COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/silent.patch)
+set_tests_properties(cli_check_warns_silent PROPERTIES
+  PASS_REGULAR_EXPRESSION "warning: nothing is cabled into 'out'")
