@@ -69,7 +69,7 @@ construction:
 lift = math { op: add, b: 1 }        # +1 octave
 root -> lift.a
 
-mel = switch { mode: seq, n: 8 }
+mel = switch { mode: seq, n: 8, fade: 0 }   # pitch: cut, don't slew
 lift -> mel.in1
 third -> mel.in2
 fifth -> mel.in3

@@ -216,7 +216,7 @@ bass_lvl -> sub_amp.cv : 0.7
 arp_lift = math { op: add }
 ch_fifth.cv -> arp_lift.a
 1 -> arp_lift.b
-arp_switch = switch { mode: seq, n: 8 }
+arp_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> arp_switch.clock
 ch_root.cv  -> arp_switch.in1
 ch_third.cv -> arp_switch.in2
@@ -263,7 +263,7 @@ lead_lift_f = math { op: add }
 ch_fifth.cv -> lead_lift_f.a
 1           -> lead_lift_f.b
 
-lead_switch = switch { mode: seq, n: 8 }
+lead_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> lead_switch.clock
 ch_third.cv  -> lead_switch.in1
 lead_lift_r  -> lead_switch.in2

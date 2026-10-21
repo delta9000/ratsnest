@@ -283,8 +283,10 @@ onto their config bases. This is the module's best feature and the reason an
   note does not re-scale until the next gate. Deliberate.
 - `out` is a straight sum of carriers, unnormalised. Six carriers at level
   0.8 clip hard. Stage at the cable or with a `vca`.
-- `sync: on` (the default) resets all phases on every gate — that's why
-  repeated notes are identical. `sync: off` is looser on sustained parts.
+- `sync: on` (the default) resets all phases on a gate that starts from
+  silence (carriers below −60 dB) — that's why repeated notes are
+  identical. A retrigger while the voice still rings keeps its phases, so
+  it does not click. `sync: off` is looser on sustained parts.
 
 ## Where it shows up
 

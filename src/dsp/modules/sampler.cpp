@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -18,6 +19,8 @@ constexpr ConfigInfo kCfg[] = {
     {"file", nullptr, ConfigKind::Text},   // arbitrary path string (quoted in the patch)
     {"loop", kLoop},
 };
+// Retrigger crossfade and loop-seam / end-of-file slew, seconds.
+constexpr float kFade = 0.005f;
 constexpr OutputInfo kOuts[] = {
     {"out"},
     {"eos"},
@@ -29,6 +32,7 @@ class Sampler final : public Module {
     engine_rate_ = static_cast<float>(rate);
     loop_ = (cfg_str(cfg, "loop", "off") == "on");
     buf_.clear();
+    len_ = 0;
     file_rate_ = engine_rate_;
 
     const std::string file = cfg_str(cfg, "file", "");
@@ -43,12 +47,21 @@ class Sampler final : public Module {
           for (size_t c = 0; c < ch; ++c) acc += w.samples[fr * ch + c];
           buf_[fr] = acc / static_cast<float>(w.channels);
         }
+        len_ = buf_.size();
+        // Guard frame: interpolation past the last frame wraps to the first
+        // when looping and holds the last otherwise.
+        buf_.push_back(loop_ ? buf_.front() : buf_.back());
         file_rate_ = static_cast<float>(w.sample_rate);
       }
     }
     pos_ = 0.0;
-    playing_ = !buf_.empty();  // play once at load; trig can restart
+    playing_ = len_ > 0;  // play once at load; trig can restart
     trig_edge_ = RisingEdge{};
+    fade_ = kFade * engine_rate_;
+    old_left_ = 0.0f;
+    seam_ = false;
+    last_ = 0.0f;
+    seam_dc_ = Declick{};
   }
 
   void process(const float* ins, float* outs) override {
@@ -57,38 +70,40 @@ class Sampler final : public Module {
     // pos_ non-finite, and casting that to an index is undefined.
     const float pitch = sanitize_clamp(ins[1], -24.0f, 24.0f);
     const float level = ins[2];
+    const double step = static_cast<double>(file_rate_ / engine_rate_) *
+                        std::pow(2.0, static_cast<double>(pitch));
 
-    // Rising edge on trig restarts playback from the beginning.
+    // Rising edge on trig restarts playback from the beginning at full
+    // level; a voice still playing moves to the fade head and dies out.
     if (trig_edge_(trig)) {
+      if (playing_) { old_pos_ = pos_; old_left_ = fade_; }
+      seam_ = false;  // the fade head carries the old voice instead
       pos_ = 0.0;
-      playing_ = !buf_.empty();
+      playing_ = len_ > 0;
     }
 
     float out = 0.0f;
     float eos = 0.0f;
-
-    if (playing_ && !buf_.empty()) {
-      const size_t len = buf_.size();
-      const size_t i0 = static_cast<size_t>(pos_);
-      const float frac = static_cast<float>(pos_ - static_cast<double>(i0));
-      const float a = buf_[i0];
-      const float b = (i0 + 1 < len) ? buf_[i0 + 1] : (loop_ ? buf_[0] : buf_[i0]);
-      out = (a + (b - a) * frac) * level;
-
-      const double step = static_cast<double>(file_rate_ / engine_rate_) *
-                          std::pow(2.0, static_cast<double>(pitch));
+    const double before = pos_;
+    if (playing_) {
+      out = read(pos_);
       pos_ += step;
-      if (pos_ >= static_cast<double>(len)) {
-        if (loop_) {
-          pos_ = std::fmod(pos_, static_cast<double>(len));
-        } else {
-          playing_ = false;
-          eos = 1.0f;
-        }
-      }
+      playing_ = loop_ || pos_ < static_cast<double>(len_);  // one-shot ends
+      eos = static_cast<float>(!playing_);
+      pos_ = std::fmod(pos_, static_cast<double>(len_));
+    }
+    // A loop wrap or the end of the file is a seam: slew its step out.
+    if (seam_) seam_dc_.jump(last_, out, fade_);
+    seam_ = pos_ < before;
+    last_ = out;
+    out = seam_dc_(out);
+    if (old_left_ > 0.0f) {  // fade head; holds the last frame at the end
+      out += read(old_pos_) * (old_left_ / fade_);
+      old_left_ -= 1.0f;
+      old_pos_ = std::min(old_pos_ + step, static_cast<double>(len_ - 1));
     }
 
-    outs[0] = out;
+    outs[0] = out * level;
     outs[1] = eos;
   }
 
@@ -97,21 +112,41 @@ class Sampler final : public Module {
     pos_ = o.pos_;
     playing_ = o.playing_;
     trig_edge_ = o.trig_edge_;
-    // A reload may have loaded a shorter buffer; keep the read position valid.
-    if (pos_ >= static_cast<double>(buf_.size())) {
+    old_pos_ = std::min(o.old_pos_, static_cast<double>(len_) - 1.0);
+    old_left_ = o.old_left_;
+    seam_ = o.seam_;
+    last_ = o.last_;
+    seam_dc_ = o.seam_dc_;
+    // A reload may have loaded a shorter buffer; keep the read positions valid.
+    if (pos_ >= static_cast<double>(len_)) {
       pos_ = 0.0;
       playing_ = false;
+      old_left_ = 0.0f;
     }
   }
 
  private:
+  // Linear interpolation at pos in [0, len_), reading the guard frame last.
+  float read(double pos) const {
+    const size_t i0 = static_cast<size_t>(pos);
+    const float frac = static_cast<float>(pos - static_cast<double>(i0));
+    return buf_[i0] + (buf_[i0 + 1] - buf_[i0]) * frac;
+  }
+
   float engine_rate_ = 48000.0f;
   float file_rate_ = 48000.0f;
   bool loop_ = false;
-  std::vector<float> buf_;
+  std::vector<float> buf_;  // len_ frames plus one guard frame
+  size_t len_ = 0;
   double pos_ = 0.0;
   bool playing_ = false;
   RisingEdge trig_edge_;
+  float fade_ = 0.0f;      // kFade in samples
+  double old_pos_ = 0.0;   // fade head: the retriggered voice dying out
+  float old_left_ = 0.0f;  // fade-head samples left
+  bool seam_ = false;      // the main head wrapped or stopped last sample
+  float last_ = 0.0f;      // main head's last raw output
+  Declick seam_dc_;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Sampler>(); }

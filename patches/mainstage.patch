@@ -226,7 +226,7 @@ ch_fifth.cv -> lf1.a
 lf2 = math { op: add }
 ch_fifth.cv -> lf2.a
 2 -> lf2.b
-arp_switch = switch { mode: seq, n: 8 }
+arp_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> arp_switch.clock
 lr1 -> arp_switch.in1
 lf1 -> arp_switch.in2

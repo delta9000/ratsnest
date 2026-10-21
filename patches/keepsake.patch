@@ -8,11 +8,11 @@ form = scene { bars: [4, 8, 4] }
 time.bar -> form.clock
 
 # Named controls bind every scene change to the same address; no parallel counters.
-harmony = switch { mode: addr, n: 3, in1: 0, in2: 5, in3: 7 }
-remember = switch { mode: addr, n: 3, in1: 0, in2: 1, in3: 1 }
-rotation = switch { mode: addr, n: 3, in1: 0, in2: 0, in3: 4 }
-melody_level = switch { mode: addr, n: 3, in1: -19, in2: -16, in3: -22 }
-hat_density = switch { mode: addr, n: 3, in1: 0.3, in2: 0.8, in3: 0.2 }
+harmony = switch { mode: addr, n: 3, in1: 0, in2: 5, in3: 7, fade: 0 }
+remember = switch { mode: addr, n: 3, in1: 0, in2: 1, in3: 1, fade: 0 }
+rotation = switch { mode: addr, n: 3, in1: 0, in2: 0, in3: 4, fade: 0 }
+melody_level = switch { mode: addr, n: 3, in1: -19, in2: -16, in3: -22, fade: 0 }
+hat_density = switch { mode: addr, n: 3, in1: 0.3, in2: 0.8, in3: 0.2, fade: 0 }
 form.index -> harmony.addr
 form.index -> remember.addr
 form.index -> rotation.addr
