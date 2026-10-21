@@ -1,0 +1,230 @@
+# dorian-sidestep.trk -- "Dorian Sidestep", written with lanes, len, ^N, @R,
+# sections, bar:row labels and ramps. One row per (swung) sixteenth.
+# Lane digits: hit at vel d/9 (9 = 1.0, 8 = .89, 5 = .56, 3 = .33, 2 = .22).
+
+track kick  note vel
+track snare note vel
+track hat   note vel        # closed (chokes the open hat)
+track ohat  note vel
+track tom   note vel        # pitched toms
+track bass  note vel
+track lead  note vel cva    # cva = brightness
+track keys  note vel cva cvb len 1   # voicing note/cva/cvb; vel = filter
+
+# =================== DRUMS ===================
+pattern hats 16 hat ohat
+lane hat  7.5. 7.5. 7... 7.5.
+lane ohat .... .... ..5. ....
+
+pattern groove_a 16 kick snare hat ohat
+lane kick  9..5 .... 8.7. ....
+lane snare .... 9..2 .2.. 92.3
+lane hat   8363 8363 83.3 8364
+lane ohat  .... .... ..7. ....
+
+# fill bar over groove_a: zeros silence the groove hits underneath
+pattern fill_a 16 kick snare hat ohat tom
+lane kick  9..0 .... 8.0. ...6
+lane snare ..23 9..3 .0.. 5789
+lane hat   8000 8000 0000 0000
+lane ohat  .... .... ..0. ...9
+06 | . | . | . | . | A2 .9
+08 | . | . | . | . | E2 1
+10 | . | . | . | . | A2 .7
+11 | . | . | . | . | A2 .5
+12 | . | . | . | . | D3 .8
+13 | . | . | . | . | B2 .85
+14 | . | . | . | . | A2 .9
+
+pattern fill1 16 kick snare hat ohat tom
+lane kick  9... .... 8... ...7
+lane snare ..45 9... ...4 6789
+lane hat   8... 8... .... ....
+lane ohat  .... .... .... ...9
+06 | . | . | . | . | D3 .8
+07 | . | . | . | . | D3 .5
+08 | . | . | . | . | B2 .9
+10 | . | . | . | . | A2 .8
+12 | . | . | . | . | E2 1
+
+pattern breakkit 16 hat ohat tom
+lane hat  5..2 ..4. 5... 5.3.
+lane ohat .... .... ..4. ....
+12 | . | . | E3 .35
+
+# build: snare roll quarters -> eighths -> sixteenths, vel ramped
+pattern build 4x16 kick snare hat
+lane kick  7...7...7...7... 8...8...8...8... 8...8...8...8... 9...9...9......0
+lane snare ....x...x...x... ..x.x.x.x.x.x.x. .xxxxxxxxxxxxxxx .xxxxxxxxxx.xxx0
+lane hat   ................ ................ 5.5.5.5.5.5.5.5. 6.6.6.6.6.6....0
+1:00 | . | x .3>
+2:00 | . | x .45>
+3:00 | . | x .6>
+4:00 | . | x .9>
+4:11 | . | x 1
+
+pattern groove_b 16 kick snare hat ohat
+lane kick  9...9...9...9..5
+lane snare ...2 9..2 ...2 9.32
+lane hat   73.3 73.3 73.3 73.4
+lane ohat  ..6. ..6. ..7. ..6.
+
+pattern fill_b 16 kick snare hat ohat tom
+lane kick  9...9...9...9..0
+lane snare ...0 9..0 4556 7889
+lane hat   7000 0000 0000 0000
+lane ohat  ..0. ..0. ..0. ..0.
+02 | . | . | . | . | E3 .8
+03 | . | . | . | . | D3 .7
+06 | . | . | . | . | B2 .9
+07 | . | . | . | . | A2 .8
+10 | . | . | . | . | E2 1
+
+pattern final 2x16 kick snare ohat tom bass lead keys
+00 | x 1 | x 1 | x 1 | E2 1 | E1:6 1 | E5:6 1 .9 | G3:6 1 B3 E4
+
+# =================== BASS ===================
+pattern bass_e 2x16 bass        # Em7 riff; bass_e^5 is the A7 riff
+1:00 | E2:2 1
+1:03 | E2:2 .55
+1:06 | E3:1 .9
+1:10 | D2:2 .8
+1:13 | E2   .6
+1:14 | G2:1 .85
+2:00 | E2:2 1
+2:03 | E2:2 .55
+2:06 | B2:1 .9
+2:10 | A2   .8
+2:12 | G2   .7
+2:14 | Fs2:1 .8
+
+pattern bass_break 4x16 bass
+1:00 | E2:24 .7
+2:12 | D2   .6
+2:14 | E2:18 .7
+4:08 | B1:6 .6
+
+pattern bass_c_d 2x16 bass
+1:00 | C2:3 1
+1:04 | C3:1 .6
+1:06 | C2   .8
+1:08 | G2:2 .7
+1:11 | C2   .6
+1:12 | B1:2 .8
+2:00 | D2:3 1
+2:04 | D3:1 .6
+2:06 | D2   .8
+2:08 | A2:2 .7
+2:11 | D2   .6
+2:12 | Cs2:2 .8
+
+pattern bass_e_b 2x16 bass
+1:00 | E2:3 1
+1:04 | E3:1 .6
+1:06 | E2   .8
+1:08 | B2:2 .7
+1:11 | E2   .6
+1:12 | D2:2 .8
+2:00 | B1:3 1
+2:04 | B2:1 .6
+2:06 | B1   .8
+2:08 | Fs2:2 .7
+2:11 | A2   .6
+2:12 | As2:2 .8
+
+# =================== KEYS ===================
+# offbeat stab rhythm, written once; voicings are overlays @0
+pattern stab 2x16 keys
+lane keys ..x. ..x. ..x. .x.. ..x. ..x. ..x. .x..
+
+pattern ch_em 2x16 keys
+1:02 | G3 .3 B3 D4
+pattern ch_a7 2x16 keys
+1:02 | G3 .3 Cs4 E4
+pattern ch_cd 2x16 keys
+1:02 | G3 .6 B3 E4
+2:02 | Fs3 .6 A3 D4
+pattern ch_eb 2x16 keys
+1:02 | G3 .6 B3 D4
+2:02 | Fs3 .6 A3 Ds4
+
+pattern keys_break 4x16 keys
+1:00 | G3:32 .1 B3 D4
+2:00 | .  .2
+3:00 | G3:30 .3 Cs4 E4
+4:00 | .  .45
+
+pattern keys_build 4x16 keys
+lane keys .... .... .... .... .... .... .... .... ..x. x.x. ..x. x.x. ..x. x.x. ..x. x.x.
+1:00 | G3:2 .3 B3 D4
+1:04 | x:2
+1:08 | x:2
+1:12 | x:2
+2:00 | x:2 .4
+2:04 | x:2
+2:08 | x:2
+2:12 | x:2
+3:00 | Fs3 .55 A3 D4
+3:08 | x .7
+4:00 | Fs3 .85 A3 Ds4
+4:08 | x 1
+
+# =================== LEAD ===================
+pattern lead_m 2x16 lead        # the motif
+1:00 | E4:2 .9 .4
+1:03 | G4:2 .7
+1:06 | A4:2 .9
+1:10 | B4   1  .7
+1:13 | ~A4:2
+2:02 | G4:1 .7 .4
+2:04 | E4   .8
+2:06 | D4   .7
+2:08 | E4:4 .9 .5
+
+pattern lead_ans 2x16 lead
+1:04 | Cs5 .8 .5
+1:06 | B4  .7
+1:08 | A4:2 .9
+1:12 | G4  .7
+1:14 | A4:4 .9 .6
+2:06 | E4:1 .6 .4
+2:08 | G4:6 .9 .5
+
+pattern lead_frag 4x16 lead
+1:00 | E4:2 .6 .2
+1:03 | G4:2 .5
+1:06 | A4:2 .6
+3:00 | B4  .6 .3
+3:03 | ~A4:2
+3:06 | G4:2 .5
+
+pattern lead_ans_hi 2x16 lead
+1:04 | D5  .8 .7
+1:06 | E5  .9
+1:08 | G5:2 1
+1:12 | Fs5 .8
+1:14 | E5:4 .9 .8
+2:04 | Ds5 .8
+2:06 | Fs5 .9
+2:08 | B4:6 1 .9
+
+# =================== FORM ===================
+section a_m    bass_e+stab+lead_m+groove_a+ch_em@0
+section a_ans  bass_e^5+stab+lead_ans+groove_a+ch_a7@0
+section a_m4   bass_e^5+stab+lead_m^5+groove_a+ch_a7@0
+section a_late bass_e+stab+groove_a+lead_m@2+ch_em@0
+section brk    bass_break+keys_break+lead_frag+breakkit
+section bld    build+bass_break+keys_build
+section p_cd   bass_c_d+stab+lead_m^12+groove_b+ch_cd@0
+section p_eb   bass_e_b+stab+lead_ans_hi+groove_b+ch_eb@0
+section o_e    bass_e+stab+groove_a+ch_em@0
+section o_a    bass_e^5+stab+groove_a+ch_a7@0
+
+order hats*2 groove_a fill1                          # 1-4   intro
+order a_m a_ans a_m a_m4+fill_a@16                   # 5-12  A1
+order a_late a_m4 a_late a_ans+fill_a@16             # 13-20 A2
+order brk*2                                          # 21-28 breakdown
+order bld                                            # 29-32 build
+order p_cd p_eb p_cd p_eb+fill_b@16                  # 33-40 peak
+order p_cd p_eb p_cd p_eb+fill_b@16                  # 41-48
+order o_e o_a o_e final                              # 49-56 outro

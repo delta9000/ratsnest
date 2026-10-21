@@ -1,0 +1,17 @@
+# lantern-counter.trk -- a 7-note phrase, one row per bar-quintuplet (5 rows/bar).
+# Seven rows against five per bar: it realigns every 7 bars. Values are scale
+# DEGREES (quant.degree), stepped through the current chord's mask, so the
+# phrase re-harmonizes itself under every chord.
+
+track ctr note cva          # 1: strike | degree
+
+pattern ctr 7
+0 | x 0
+1 | x 2
+2 | .
+3 | x 1
+4 | x 3
+5 | .
+6 | x -1
+
+order |: ctr

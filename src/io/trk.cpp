@@ -286,7 +286,7 @@ class Parser {
     for (size_t k = from; k < end && out_.errors.empty(); ++k) {
       const int f = tr.fields[k - from];
       if (is_empty(t[k].s)) continue;
-      if (written(e, f)) return err(t[k], "track '" + tr.name + "' on this row is already written by a lane");
+      if (written(e, f)) return err(t[k], "track '" + tr.name + "' on this row is already written by a lane (put '.' in the lane at this row to write it here)");
       if (f == kNote) note(t[k], tr, e);
       else value(t[k], tr, f, e);
     }
@@ -345,7 +345,7 @@ class Parser {
     e.kind = Kind::None;
     if (t.s.find('#') != std::string_view::npos)
       return err(t, "'" + std::string(t.s) + "' is not a note (Cs4 for sharp, Bb3 for flat)");
-    err(t, "'" + std::string(t.s) + "' is not a note (uppercase: C4, Cs4, Bb3), number, x, ~note, off or .");
+    err(t, "'" + std::string(t.s) + "' is not a note (uppercase: C4, Cs4, Bb3), number, x, ~note, t1..t3 (with 'from'), off or .");
   }
 
   // `:L` at `colon` in a note token: the note sounds L rows.

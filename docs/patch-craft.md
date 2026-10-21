@@ -284,7 +284,12 @@ Learned building `patches/symphony/` (four movements, fifteen mono parts):
 For anything with a form, write the score as `.trk` files and keep the patch
 about sound (`docs/modules.md` `tracker`; worked port:
 `patches/mainstage-trk.patch`, which nulls against `mainstage.patch` to
-about −80 dB per block):
+about −80 dB per block). Three songs in `patches/tracker/` show the composing
+features: `whole-step` (chord tones from one harmony track, `chorus^2` for the
+key change, sections), `dorian-sidestep` (lanes with ghost notes, overlay
+fills, `^N` and `@R` motif variation, swing from `transport`) and `lantern`
+(extended chords, `>` ramps for the form, a counter-line in chord degrees
+through `quant`):
 
 - **Two trackers, two clocks.** One for notes at the finest grid the song
   needs (`clock { bpm: 4 × tempo }` = sixteenths), one for the form clocked

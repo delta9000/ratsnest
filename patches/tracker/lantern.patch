@@ -1,0 +1,222 @@
+# lantern -- slow, harmonically rich, 64 BPM, 48 bars = 180 s.
+#   lantern.trk     pad (4 voices over 2 tracks), bass, melody, plus the
+#                current chord's quant mask and root for the generative parts
+#   lantern-counter.trk  a 7-step phrase of chord DEGREES at 5 rows per bar
+#   lantern-form.trk     eight level/filter columns, one row per bar
+# Generative sparkle: euclid -> turing -> quant (chord mask) -> mallet.
+#
+# Clock tree: 1280 BPM master = 80 ticks/bar (LCM of 16ths and 5-per-bar).
+
+master  = clock { bpm: 1280 }
+six     = div { by: 5 }       # sixteenths
+quin    = div { by: 16 }      # five per bar
+bar     = div { by: 80 }
+master -> six.in
+master -> quin.in
+master -> bar.in
+
+song = tracker { file: "lantern.trk" }
+ctr  = tracker { file: "lantern-counter.trk" }
+form = tracker { file: "lantern-form.trk" }
+six  -> song.clock
+quin -> ctr.clock
+bar  -> form.clock
+
+# ---- form lanes, slewed ----
+pad_lvl  = func { rise: 3, fall: 3 }
+cut_lvl  = func { rise: 4, fall: 4 }
+bass_lvl = func { rise: 3, fall: 3 }
+mel_lvl  = func { rise: 2, fall: 3 }
+ctr_lvl  = func { rise: 3, fall: 3 }
+spk_lvl  = func { rise: 3, fall: 3 }
+verb_lvl = func { rise: 4, fall: 4 }
+main_lvl = func { rise: 3, fall: 3.5 }
+form.cva1 -> pad_lvl.in
+form.cva2 -> cut_lvl.in
+form.cva3 -> bass_lvl.in
+form.cva4 -> mel_lvl.in
+form.cva5 -> ctr_lvl.in
+form.cva6 -> spk_lvl.in
+form.cva7 -> verb_lvl.in
+form.cva8 -> main_lvl.in
+
+# ---- pad: four voices, each two detuned saws, glided for voice leading ----
+gl1 = func { rise: 0.6, fall: 0.6 }
+gl2 = func { rise: 0.6, fall: 0.6 }
+gl3 = func { rise: 0.6, fall: 0.6 }
+gl4 = func { rise: 0.6, fall: 0.6 }
+song.voct1 -> gl1.in
+song.cva1  -> gl2.in
+song.cvb1  -> gl3.in
+song.voct2 -> gl4.in
+p1a = vco { wave: saw }
+p1b = vco { wave: saw }
+p2a = vco { wave: saw }
+p2b = vco { wave: saw }
+p3a = vco { wave: saw }
+p3b = vco { wave: saw }
+p4a = vco { wave: saw }
+p4b = vco { wave: saw }
+gl1 -> p1a.v_oct
+gl1 -> p1b.v_oct
+gl2 -> p2a.v_oct
+gl2 -> p2b.v_oct
+gl3 -> p3a.v_oct
+gl3 -> p3b.v_oct
+gl4 -> p4a.v_oct
+gl4 -> p4b.v_oct
+0.005  -> p1b.v_oct
+-0.006 -> p2b.v_oct
+0.007  -> p3b.v_oct
+-0.004 -> p4b.v_oct
+pad_sum = mix { levels: [1,1,1,1,1,1,1,1], pans: [-.6,-.2,.2,.6,-.5,-.1,.1,.5] }
+p1a -> pad_sum.in1 : 0.12
+p2a -> pad_sum.in2 : 0.12
+p3a -> pad_sum.in3 : 0.12
+p4a -> pad_sum.in4 : 0.12
+p1b -> pad_sum.in5 : 0.12
+p2b -> pad_sum.in6 : 0.12
+p3b -> pad_sum.in7 : 0.12
+p4b -> pad_sum.in8 : 0.12
+pad_breath = lfo { freq: 0.07hz, wave: sine }
+pad_fl = svf { cutoff: 250, res: 0.2 }
+pad_fr = svf { cutoff: 250, res: 0.2 }
+pad_sum.out_l -> pad_fl.in
+pad_sum.out_r -> pad_fr.in
+cut_lvl -> pad_fl.cutoff : 2600
+cut_lvl -> pad_fr.cutoff : 2600
+pad_breath -> pad_fl.cutoff : 120
+pad_breath -> pad_fr.cutoff : -120
+pad_env = adsr { attack: 2.5, decay: 1, sustain: 1, release: 6 }
+song.gate1 -> pad_env.gate
+pad_vl = vca { gain: 0 }
+pad_vr = vca { gain: 0 }
+pad_fl.lp -> pad_vl.in
+pad_fr.lp -> pad_vr.in
+pad_amp = math { op: mult }
+pad_env -> pad_amp.a
+pad_lvl -> pad_amp.b
+pad_amp -> pad_vl.cv
+pad_amp -> pad_vr.cv
+
+# ---- bass: sine + soft triangle, slow attack, pedal-friendly ----
+b_env = adsr { attack: 0.8, decay: 1.5, sustain: 0.85, release: 4 }
+song.gate3 -> b_env.gate
+b_sin = vco { wave: sine }
+b_tri = vco { wave: tri }
+song.voct3 -> b_sin.v_oct
+song.voct3 -> b_tri.v_oct
+b_f = svf { cutoff: 300, res: 0.1 }
+b_sin -> b_f.in : 0.7
+b_tri -> b_f.in : 0.3
+b_v = vca { gain: 0 }
+b_f.lp -> b_v.in
+b_lc = math { op: mult }
+b_env -> b_lc.a
+bass_lvl -> b_lc.b
+b_lv = math { op: mult }
+b_lc -> b_lv.a
+song.vel3 -> b_lv.b
+b_lv -> b_v.cv
+
+# ---- melody: soft triangle + quiet saw, a breath of vibrato ----
+m_env = adsr { attack: 0.15, decay: 1.2, sustain: 0.6, release: 2.5 }
+song.gate4 -> m_env.gate
+vib = lfo { freq: 4.8hz, wave: sine }
+m_tri = vco { wave: tri }
+m_saw = vco { wave: saw }
+song.voct4 -> m_tri.v_oct
+song.voct4 -> m_saw.v_oct
+vib -> m_tri.v_oct : 0.003
+vib -> m_saw.v_oct : 0.003
+m_f = svf { cutoff: 1400, res: 0.15 }
+m_tri -> m_f.in : 0.6
+m_saw -> m_f.in : 0.15
+m_env -> m_f.cutoff : 900
+m_v = vca { gain: 0 }
+m_f.lp -> m_v.in
+m_a = math { op: mult }
+m_env -> m_a.a
+mel_lvl -> m_a.b
+m_b = math { op: mult }
+m_a -> m_b.a
+song.vel4 -> m_b.b
+m_b -> m_v.cv
+
+# ---- counter: chord DEGREES through the current chord's mask ----
+cq = quant { scale: [], mode: clock }
+A4v -> cq.in
+song.cvb2 -> cq.root
+song.cva2 -> cq.mask
+-4095 -> cq.mask                 # mask input base is 4095 and cables sum onto it
+ctr.cva1 -> cq.degree
+ctr.gate1 -> cq.clock
+ctr_v = sub { file: "../lib/mallet.sub", tune: A3, decay: 2.2s }
+ctr.gate1 -> ctr_v.trig
+cq.out -> ctr_v.cv
+c_amp = vca { gain: 0 }
+ctr_v.main -> c_amp.in
+ctr_lvl -> c_amp.cv : 0.45
+
+# ---- sparkle: euclid sixteenths -> turing -> quant (same chord mask) ----
+spk_pat = euclid { steps: 16, hits: 1, rot: 3 }
+six -> spk_pat.clock
+spk_lvl -> spk_pat.hits : 5
+tm = turing { len: 11, prob: 0.12, seed: 4 }
+spk_pat.trig -> tm.clock
+sq = quant { scale: [], mode: clock }
+tm.out -> sq.in : 1.5
+A4v -> sq.in
+song.cvb2 -> sq.root
+song.cva2 -> sq.mask
+-4095 -> sq.mask
+spk_pat.trig -> sq.clock
+spk_v = sub { file: "../lib/mallet.sub", tune: A3, decay: 0.9s }
+spk_pat.trig -> spk_v.trig
+sq.out -> spk_v.cv
+1 -> spk_v.cv
+s_amp = vca { gain: 0 }
+spk_v.main -> s_amp.in
+spk_lvl -> s_amp.cv : 0.3
+
+# ---- space ----
+dly = delay { time: 0ms, feedback: 0.45, tone: 2500, mix: 1, slew: 0.3 }
+dt = tempo { bpm: 64, beats: 0.75 }
+dt.seconds -> dly.time
+m_v   -> dly.in : 0.35
+c_amp -> dly.in : 0.3
+s_amp -> dly.in : 0.5
+
+verb = reverb { decay: 0.88, damp: 0.35, mix: 1, predelay: 0.04, mod_rate: 0.4, mod_depth: 30 }
+pad_vl -> verb.in_l : 0.4
+pad_vr -> verb.in_r : 0.4
+m_v    -> verb.in_l : 0.5
+m_v    -> verb.in_r : 0.5
+c_amp  -> verb.in_l : 0.5
+s_amp  -> verb.in_r : 0.6
+dly    -> verb.in_l : 0.4
+dly    -> verb.in_r : 0.4
+
+band = mix { levels: [0.7, 0.7, 0.6, 0.6, 0.6, 0.6, 0, 0], pans: [-1, 1, 0, 0.1, -0.35, 0.4, -1, 1] }
+pad_vl -> band.in1
+pad_vr -> band.in2
+b_v    -> band.in3
+m_v    -> band.in4
+c_amp  -> band.in5
+dly    -> band.in5 : 0.35
+s_amp  -> band.in6
+verb.out_l -> band.in7
+verb.out_r -> band.in8
+verb_lvl -> band.lvl7
+verb_lvl -> band.lvl8
+
+dc = dcblock { cutoff: 15hz }
+band.out_l -> dc.in_l
+band.out_r -> dc.in_r
+lim = limiter { threshold: -1, release: 0.2 }
+dc.out_l -> lim.in_l
+dc.out_r -> lim.in_r
+lim.out_l -> out.left
+lim.out_r -> out.right
+-1 -> out.level
+main_lvl -> out.level

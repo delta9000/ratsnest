@@ -1,0 +1,98 @@
+# lantern.trk -- "Lantern" notes. 64 BPM, 16 rows per bar.
+# intro 4 bars | A 16 | B (D pedal, climax) 16 | A' 8 | end 4 = 48 bars.
+
+track pad   note cva cvb    # 1: pad voices 1, 2, 3 (low to high)
+track pad4  note cva cvb    # 2: pad voice 4 | quant mask | root (semitones from A)
+track bass  note vel        # 3
+track mel   note vel        # 4
+
+# masks: bit k = semitone k above the root
+#   maj9 2197  m9 1165  sus2add11 165  m7add11 1193  maj7#11 2261
+#   Cmaj7#11 2257  A/D (as D) 645
+
+pattern intro 4x16 pad pad4 bass
+1:00 | Fs3 A3 Cs4    | E4  2197 5   | D2 .7    # Dmaj9
+3:00 | ~Fs3 A3 Cs4   | ~D4 1165 2   | .        # Bm9 over the D pedal
+
+pattern achords 16x16 pad pad4 bass
+1:00  | ~Fs3 A3 Cs4  | ~E4 2197 5   | D2 .8    # Dmaj9
+3:00  | ~Fs3 A3 Cs4  | ~D4 1165 2   | B1 .75   # Bm9
+5:00  | ~Fs3 A3 B3   | ~D4 2197 -2  | G1 .8    # Gmaj9
+7:00  | ~E3 A3 B3    | ~D4 165 0    | A1 .75   # Asus2add11
+9:00  | ~E3 A3 B3    | ~Cs4 1193 -3 | Fs1 .75  # F#m7add11
+11:00 | ~D3 Fs3 G3   | ~B3 1165 -5  | E2 .7    # Em9
+13:00 | ~D3 Fs3 B3   | ~Cs4 2261 -2 | G1 .8    # Gmaj7#11
+15:00 | ~D3 E3 A3    | ~B3 165 0    | A1 .75   # Asus2add11
+
+pattern bchords 8x16 pad pad4 bass
+1:00 | ~Fs3 A3 B3    | ~D4 2197 -2  | D2 .9    # Gmaj9/D (pedal)
+3:00 | ~Fs3 G3 B3    | ~D4 1165 -5  | .        # Em9/D
+5:00 | ~E3 G3 B3     | ~C4 2257 3   | .        # Cmaj7#11/D
+7:00 | ~E3 A3 B3     | ~D4 645 5    | .        # Asus2/D
+
+pattern end 4x16 pad pad4 bass
+1:00 | ~Fs3 A3 Cs4   | ~E4 2197 5   | D2 .6    # Dmaj9, let it ring
+3:08 | off           | off          | off
+
+# melodies: colour tones; the last note of each phrase carries its length
+pattern mel_a 16x16 mel
+1:08  | E5 .55        # 9 of D
+2:04  | Cs5:10 .5     # maj7
+3:08  | D5 .5
+4:00  | Cs5:12 .6     # 9 of Bm
+5:08  | Fs5 .6        # maj7 of G
+6:00  | E5 .55
+6:08  | A4:6 .5       # 9 of G
+7:08  | B4 .5         # 9 of A
+8:00  | D5:12 .55     # 11 of A
+9:08  | B4 .55        # 11 of F#m
+10:00 | Cs5 .55
+10:08 | E5:6 .6
+11:08 | Fs5 .6        # 9 of Em
+12:04 | D5:10 .55
+13:08 | Cs5 .65       # #11 of G
+14:08 | B4:6 .55
+15:08 | E5 .5
+16:00 | D5:12 .45
+
+pattern mel_b 16x16 mel
+1:00  | A5 .8         # 9 of G
+1:12  | Fs5 .75
+2:00  | G5 .75
+2:08  | E5:6 .7
+3:00  | B5 .85
+3:08  | A5 .8
+3:12  | Fs5 .75       # 9 of Em
+4:00  | D5 .7
+4:08  | E5:6 .7
+5:00  | Fs5 .9        # #11 of C
+5:08  | E5 .8
+5:12  | D5 .75
+6:04  | B4:10 .7
+7:00  | E5 .8
+7:08  | B4 .75
+8:00  | A4:12 .7
+9:00  | A5 .9
+9:08  | B5 .9
+10:00 | D6:12 1       # the peak
+11:00 | B5 .9
+11:08 | A5 .85
+12:00 | Fs5:12 .85
+13:00 | Fs5 .95       # #11 of C, held
+13:08 | G5 .9
+13:12 | Fs5 .85
+14:00 | E5:14 .8
+15:00 | E5 .7
+16:00 | Fs5:12 .6
+
+pattern mel_out 8x16 mel
+2:00 | E5:12 .4
+4:00 | Cs5:14 .4
+6:00 | A4:14 .35
+8:00 | B4:12 .35
+
+section a      achords+mel_a
+section b      mel_b+bchords       # 256-row melody first: chords loop twice
+section aprime mel_out+achords     # 128-row melody first: first half of A only
+
+order intro a b aprime end

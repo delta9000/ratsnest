@@ -82,7 +82,7 @@ Iterate on numbers, not vibes. Two or three passes converges.
 - **Songs with a form: write a `.trk`.** Notes, sections and the arrangement
   go in a plain-text tracker file; the patch stays about sound.
   `docs/modules.md` `tracker` has the format, `docs/patch-craft.md` "Writing a
-  song with tracker" the craft, `patches/mainstage-trk.patch` a worked song.
+  song with tracker" the craft, `patches/tracker/` three worked songs (chords, groove, ambient).
 - **Arrangement grid.** (Pre-tracker; still right for a lane of levels.) Bar-clocked `stepseq` lanes of 0..1 levels → `func`
   (nothing on `trig`, so it slews) → `vca.cv`. One lane per element. Asymmetric
   rise/fall is the trick: risers rise for seconds and fall in 0.4 s.
