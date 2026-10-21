@@ -289,6 +289,18 @@ TEST_CASE("tracker loader: .trk errors carry the .trk's file:line:col") {
   CHECK(missing.compiled.errors[0].msg.find("cannot read tracker file") != std::string::npos);
 }
 
+TEST_CASE("tracker loader: a cable from an undeclared track is an error") {
+  TempDir d;
+  d.write("songs/a.trk", ramp(0.0f));
+  const std::string src = std::string(kPatch) + "song.gate2 -> out.right\n";
+  const std::string patch = d.write("p.patch", src);
+  auto b = graph::build_patch(src, patch, 48000.0);
+  REQUIRE(b.compiled.errors.size() == 1);
+  CHECK(b.compiled.errors[0].line == 5);
+  CHECK(b.compiled.errors[0].msg.find("reads track 2, but 'songs/a.trk' declares 1") !=
+        std::string::npos);
+}
+
 TEST_CASE("tracker loader: a .trk edit reloads the topology and keeps position") {
   TempDir d;
   d.write("songs/a.trk", ramp(0.0f));

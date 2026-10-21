@@ -16,8 +16,37 @@ void set_text(dsl::ModuleDecl& m, const dsl::ParamDecl& at, std::string text) {
   else *it = std::move(p);
 }
 
-void embed(dsl::ModuleDecl& m, const dsl::ParamDecl& pf, const std::string& patch_dir,
-           const FileReader& read, std::vector<std::string>& files, Diags& errors) {
+// The track number of a per-track output (`cva6` -> 6), or 0 for the rest.
+int track_of(const std::string& port) {
+  for (const char* col : {"voct", "gate", "vel", "cva", "cvb"}) {
+    const std::string c = col;
+    if (port.size() == c.size() + 1 && port.compare(0, c.size(), c) == 0 &&
+        port.back() >= '1' && port.back() <= '8')
+      return port.back() - '0';
+  }
+  return 0;
+}
+
+// A cable from a track the song never declares would read a silent 0.
+void check_tracks(const dsl::PatchAst& ast, const dsl::ModuleDecl& m, int tracks,
+                  const std::string& path, Diags& errors) {
+  const std::string prefix = m.name + ".";
+  for (const auto& c : ast.cables) {
+    // The lexer keeps `song.cva6` as one name until compile splits it.
+    const std::string& e = c.src.module;
+    if (c.src.is_literal || e.compare(0, prefix.size(), prefix) != 0) continue;
+    const int t = track_of(e.substr(prefix.size()));
+    if (t <= tracks) continue;
+    errors.push_back({c.src.line, c.src.col,
+                      "'" + e + "' reads track " + std::to_string(t) + ", but '" + path +
+                          "' declares " + std::to_string(tracks),
+                      c.file});
+  }
+}
+
+void embed(const dsl::PatchAst& ast, dsl::ModuleDecl& m, const dsl::ParamDecl& pf,
+           const std::string& patch_dir, const FileReader& read,
+           std::vector<std::string>& files, Diags& errors) {
   const std::filesystem::path dir =
       m.file.empty() ? std::filesystem::path(patch_dir)
                      : std::filesystem::path(m.file).parent_path();
@@ -33,7 +62,9 @@ void embed(dsl::ModuleDecl& m, const dsl::ParamDecl& pf, const std::string& patc
     d.file = path;
     errors.push_back(std::move(d));
   }
-  if (song.ok()) set_text(m, pf, std::move(text));
+  if (!song.ok()) return;
+  check_tracks(ast, m, song.song.tracks, pf.value.str, errors);
+  set_text(m, pf, std::move(text));
 }
 
 }  // namespace
@@ -47,7 +78,7 @@ void embed_tracker_files(dsl::PatchAst& ast, const std::string& patch_dir,
                            [](const dsl::ParamDecl& p) { return p.name == "file"; });
     if (pf == m.params.end() || pf->value.str.empty()) continue;
     const dsl::ParamDecl file = *pf;  // set_text may grow params
-    embed(m, file, patch_dir, read, files, errors);
+    embed(ast, m, file, patch_dir, read, files, errors);
   }
 }
 
