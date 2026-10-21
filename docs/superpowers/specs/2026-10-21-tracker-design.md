@@ -120,7 +120,7 @@ arrangement can be written one section per line with a comment. Entries:
 - `name` — play pattern `name` for its length.
 - `a+b+c` — play the patterns **together** (layers). The step lasts as long
   as the **first** pattern; each other layer loops within the step (its row
-  is `step_row mod its length`). Layers must cover disjoint tracks. Tracks no
+  is `step_row mod its length`). Layers must cover disjoint tracks (`@` overlays excepted, §8.4). Tracks no
   layer covers are empty for the step (their values and notes hold). This is
   how a four-bar chord pattern, a one-bar drum loop and a two-bar hook stack
   without being copied into every section.
@@ -399,3 +399,25 @@ when the file is parsed. A ramp with no later value in its pattern (or one
 whose target is a chord tone) is an error at the ramp. The filled values are
 pitches only when both ends are, so `^N` moves a pitch glide and leaves a
 level fade alone. Values stay stepped per row (§4.3); `func` still smooths.
+
+### 8.9 Example
+
+Every composing feature in one song (a test parses it):
+
+```text
+track harm note cva cvb
+track arp  note vel cva from harm len 1     # chord tones, one-row notes
+track kick note vel len 1
+pattern prog 2x16 harm                      # two bars of sixteen
+1:00 | D3  F4 A3
+2:00 | Bb2 D4 F3
+pattern arp 8 arp                           # loops under every chord
+| t1+12 .3> t3                              # vel ramps to .7 at row 4
+4 | ~t2+12:3 .7 t1-12
+pattern beat 16 kick
+lane kick 9..5 x..5 9..5 x.0.
+pattern fill 4 kick
+lane kick 9999
+section verse prog+arp+beat
+order verse*2 |: verse^5+fill@2:12 verse^-2
+```

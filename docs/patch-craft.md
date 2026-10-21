@@ -291,7 +291,15 @@ about −80 dB per block):
   by a four-bar divider (`div { by: 64 }` off the same clock). The form file
   is a table: one row per block, one `cva` column per section level, read
   down like a mix sheet. Slew each column through `func` exactly as the old
-  arrangement lanes did; the tracker's values are stepped and held.
+  arrangement lanes did; the tracker's values are stepped and held. When
+  every order step of the notes is one block, `song.step_trig -> form.clock`
+  ties the form to the order list instead of a divider: one form row per
+  step, whatever each step's length.
+- **Swing is the clock's.** The tracker has no groove; drive it from
+  `transport { bpm: 128, division: 4, swing: s }` and `t.clock -> song.clock`.
+  Drum-machine swing P% (the first sixteenth of a pair takes P% of it: 50 %
+  straight, 66 % triplet) is `s = 2P − 1`: 54 % → .08, 58 % → .16,
+  66 % → .32, 75 % → .5 (the cap .75 is 87.5 %).
 - **Layer, don't copy.** `order chords+chop+hook+beat` stacks a four-bar
   chord pattern with one-bar and two-bar loops: the step lasts as long as
   the first pattern and the rest wrap inside it. Put the longest pattern
@@ -303,6 +311,14 @@ about −80 dB per block):
   lane. Write `off` where the old gate fell if you care about gate length.
 - **Chords are one track.** `track harm note cva cvb` carries root, third
   and fifth as note names; every voice reads `voct5`/`cva5`/`cvb5`.
+- **Write a riff once.** `track arp note vel from harm` and cells like
+  `t1+12`, `~t3`, `t2-12:2` follow harm's chord on every row, so one bar of
+  arp or bass loops under the whole progression; `verse^5` or a section's
+  `^N` moves a whole key change. `len 1` on a drum or pluck track and
+  `lane hat x.x. 9x5x` write rhythm without an `off` row per hit; a trailing
+  `>` ramps a level across a build. `pattern verse 4x16` lets labels read
+  `3:06`. The full list is `docs/modules.md` `tracker`, "Composing".
+
 - **No wrap hazard.** Without `|:` the song ends after its last row (gates
   fall, `end` goes high), so the guard-step arithmetic of the arrangement
   grid section is unnecessary. Add `|:` only for an endless loop.

@@ -2,81 +2,52 @@
 # 128 BPM, one row per sixteenth (the patch clocks it from a 512 BPM clock).
 # The arrangement levels live in mainstage-form.trk, one row per four bars.
 
-track kick  note            # 1: four on the floor
-track clap  note            # 2: beats 2 and 4
+track kick  note len 2      # 1: four on the floor, an eighth long
+track clap  note len 2      # 2: beats 2 and 4
 track chop  note            # 3: the trance-gate rhythm that chops the pad
-track hook  note            # 4: supersaw hook (its level lane gates it)
+track hook  note len 2      # 4: supersaw hook (its level lane gates it)
 track harm  note cva cvb    # 5: chord root, third, fifth (absolute v/oct)
-track fx    note            # 6: crash + sub impact on a drop downbeat
+track fx    note len 1      # 6: crash + sub impact on a drop downbeat
 
 # One chord per bar. Every voice -- bass, pad, arp -- reads these three.
-pattern chords 64 harm
-#    root third fifth
-00 | D3   F4    A3
-16 | Bb2  D4    F3
-32 | F3   A4    C4
-48 | C3   E4    G3
+pattern chords 4x16 harm
+#      root third fifth
+1:00 | D3   F4    A3
+2:00 | Bb2  D4    F3
+3:00 | F3   A4    C4
+4:00 | C3   E4    G3
 
-# The pad's sixteenth gate: 1011 0101 1010 1101, one bar, looped.
+# The pad's sixteenth gate: 1011 0101 1010 1101, one bar, looped (0 = off).
 pattern chop 16 chop
-00 | x
-01 | off
-02 | x
-03 | x
-04 | off
-05 | x
-06 | off
-07 | x
-08 | x
-09 | off
-10 | x
-11 | off
-12 | x
-13 | x
-14 | off
-15 | x
+lane chop x0xx 0x0x x0x0 xx0x
 
 # Two-bar D-minor-pentatonic hook in straight quarters: A C D C | A G A--.
 pattern hook 32 hook
 00 | A4
-02 | off
 04 | C5
-06 | off
 08 | D5
-10 | off
 12 | C5
-14 | off
 16 | A4
-18 | off
 20 | G4
-22 | off
 24 | A4
-26 | off
 
-# Kick on every quarter (gate an eighth long), clap on 2 and 4.
+# Kick on every quarter, clap on 2 and 4.
 pattern beat 16 kick clap
-#    kick  clap
-00 | x
-02 | off
-04 | x   | x
-06 | off | off
-08 | x
-10 | off
-12 | x   | x
-14 | off | off
+lane kick x... x... x... x...
+lane clap .... x... .... x...
 
-# A drop downbeat: one crash + impact. Sixty-four rows so it does not loop.
-pattern hit 64 fx
-00 | x
-01 | off
+# A drop downbeat: one crash + impact, laid over the step once (hit@0).
+pattern hit 1 fx
+| x
 
 # 32 four-bar blocks; levels per block are in mainstage-form.trk.
-order chords+chop+hook*6             # 0-5   intro, arp in, grow: no drums
-order chords+chop+hook+beat          # 6     build: kick in
-order chords+chop+hook               # 7     the lift: kick out
-order chords+chop+hook+beat+hit      # 8     DROP 1
-order chords+chop+hook+beat*3        # 9-11
-order chords+chop+hook*5             # 12-16 breathe, break, build 2
-order chords+chop+hook+beat+hit      # 17    DROP 2
-order chords+chop+hook+beat*7        # 18-24 the peak, then the groove
-order chords+chop+hook*7             # 25-31 peel, fade, silence
+section main chords+chop+hook
+order main*6                 # 0-5   intro, arp in, grow: no drums
+order main+beat              # 6     build: kick in
+order main                   # 7     the lift: kick out
+order main+beat+hit@0        # 8     DROP 1
+order main+beat*3            # 9-11
+order main*5                 # 12-16 breathe, break, build 2
+order main+beat+hit@0        # 17    DROP 2
+order main+beat*7            # 18-24 the peak, then the groove
+order main*7                 # 25-31 peel, fade, silence
