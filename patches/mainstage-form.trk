@@ -1,0 +1,51 @@
+# mainstage-form.trk -- the arrangement of mainstage-trk.patch: one row per
+# four-bar block (7.5 s at 128 BPM), one column per section level. The patch
+# slews every column through a func, so each step becomes a crossfade.
+# Values hold until changed; this sheet writes every cell so it reads as a
+# table. The song ends after row 31 (no loop point).
+
+track bass  cva     # 1: reese + sub level, reese filter
+track hats  cva     # 2: hat level, density and decay
+track arp   cva     # 3: arp level and strike density
+track pad   cva     # 4: gate-pad level and filter bloom
+track lead  cva     # 5: hook level and brightness
+track perc  cva     # 6: open hats
+track rise  cva     # 7: noise riser and snare roll
+track main  cva     # 8: master fader
+
+pattern form 32
+#    bass | hats | arp | pad | lead | perc | rise | main
+00 | 0    | 0    | 0   | .5  | 0    | 0    | 0    | 1     # intro: gate pad alone, dark
+01 | 0    | 0    | 0   | .5  | 0    | 0    | 0    | 1
+02 | .2   | .15  | .2  | .45 | 0    | 0    | 0    | 1     # arp in: arp + hats fade up
+03 | .25  | .25  | .3  | .45 | 0    | 0    | 0    | 1
+04 | .45  | .45  | .45 | .5  | 0    | 0    | 0    | 1     # grow: reese firms, pad opens
+05 | .5   | .55  | .55 | .55 | 0    | 0    | 0    | 1
+06 | .65  | .6   | .6  | .6  | 0    | .3   | .55  | 1     # build: kick, roll, riser
+07 | .75  | .5   | .65 | .65 | 0    | .4   | 1    | 1     # the lift: kick out
+08 | .9   | .75  | .7  | .6  | 0    | .7   | 0    | 1     # DROP 1
+09 | .9   | .75  | .7  | .6  | 0    | .7   | 0    | 1
+10 | .9   | .75  | .7  | .6  | 0    | .7   | 0    | 1
+11 | .9   | .75  | .7  | .6  | 0    | .7   | 0    | 1
+12 | .55  | .3   | .5  | .75 | 0    | 0    | 0    | 1     # breathe: drums out
+13 | .35  | 0    | .3  | .9  | .2   | 0    | 0    | 1     # break: pad blooms, hook teases
+14 | .4   | .15  | .35 | .95 | .35  | 0    | 0    | 1
+15 | .55  | .3   | .45 | .8  | .5   | .1   | .55  | 1     # build 2
+16 | .7   | .5   | .55 | .7  | .7   | .2   | 1    | 1
+17 | 1    | .85  | .85 | .65 | 1    | .8   | 0    | 1     # DROP 2: everything + hook
+18 | 1    | .85  | .85 | .65 | 1    | .8   | 0    | 1
+19 | 1    | .85  | .85 | .65 | 1    | .8   | 0    | 1
+20 | 1    | .85  | .85 | .65 | 1    | .8   | 0    | 1
+21 | 1    | .85  | .85 | .65 | 1    | .8   | 0    | 1
+22 | 1    | .85  | .85 | .65 | 1    | .8   | 0    | 1
+23 | .9   | .75  | .7  | .6  | 0    | .7   | 0    | 1     # groove: hook out
+24 | .85  | .65  | .6  | .55 | 0    | .55  | 0    | 1
+25 | .3   | .35  | .25 | .5  | 0    | 0    | 0    | 1     # peel: drums pull away
+26 | .2   | .2   | .12 | .45 | 0    | 0    | 0    | 1
+27 | .1   | .1   | .05 | .35 | 0    | 0    | 0    | .45   # fade
+28 | 0    | 0    | 0   | .15 | 0    | 0    | 0    | .12
+29 | 0    | 0    | 0   | 0   | 0    | 0    | 0    | 0     # silence
+30 | 0    | 0    | 0   | 0   | 0    | 0    | 0    | 0
+31 | 0    | 0    | 0   | 0   | 0    | 0    | 0    | 0
+
+order form

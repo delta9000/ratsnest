@@ -1,0 +1,82 @@
+# mainstage.trk -- the notes of mainstage-trk.patch: Dm | Bb | F | C at
+# 128 BPM, one row per sixteenth (the patch clocks it from a 512 BPM clock).
+# The arrangement levels live in mainstage-form.trk, one row per four bars.
+
+track kick  note            # 1: four on the floor
+track clap  note            # 2: beats 2 and 4
+track chop  note            # 3: the trance-gate rhythm that chops the pad
+track hook  note            # 4: supersaw hook (its level lane gates it)
+track harm  note cva cvb    # 5: chord root, third, fifth (absolute v/oct)
+track fx    note            # 6: crash + sub impact on a drop downbeat
+
+# One chord per bar. Every voice -- bass, pad, arp -- reads these three.
+pattern chords 64 harm
+#    root third fifth
+00 | D3   F4    A3
+16 | Bb2  D4    F3
+32 | F3   A4    C4
+48 | C3   E4    G3
+
+# The pad's sixteenth gate: 1011 0101 1010 1101, one bar, looped.
+pattern chop 16 chop
+00 | x
+01 | off
+02 | x
+03 | x
+04 | off
+05 | x
+06 | off
+07 | x
+08 | x
+09 | off
+10 | x
+11 | off
+12 | x
+13 | x
+14 | off
+15 | x
+
+# Two-bar D-minor-pentatonic hook in straight quarters: A C D C | A G A--.
+pattern hook 32 hook
+00 | A4
+02 | off
+04 | C5
+06 | off
+08 | D5
+10 | off
+12 | C5
+14 | off
+16 | A4
+18 | off
+20 | G4
+22 | off
+24 | A4
+26 | off
+
+# Kick on every quarter (gate an eighth long), clap on 2 and 4.
+pattern beat 16 kick clap
+#    kick  clap
+00 | x
+02 | off
+04 | x   | x
+06 | off | off
+08 | x
+10 | off
+12 | x   | x
+14 | off | off
+
+# A drop downbeat: one crash + impact. Sixty-four rows so it does not loop.
+pattern hit 64 fx
+00 | x
+01 | off
+
+# 32 four-bar blocks; levels per block are in mainstage-form.trk.
+order chords+chop+hook*6             # 0-5   intro, arp in, grow: no drums
+order chords+chop+hook+beat          # 6     build: kick in
+order chords+chop+hook               # 7     the lift: kick out
+order chords+chop+hook+beat+hit      # 8     DROP 1
+order chords+chop+hook+beat*3        # 9-11
+order chords+chop+hook*5             # 12-16 breathe, break, build 2
+order chords+chop+hook+beat+hit      # 17    DROP 2
+order chords+chop+hook+beat*7        # 18-24 the peak, then the groove
+order chords+chop+hook*7             # 25-31 peel, fade, silence
