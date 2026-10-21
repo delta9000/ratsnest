@@ -1,0 +1,323 @@
+# glasshouse.trk -- "Glasshouse", synth-pop, 108 BPM, 16 rows per bar.
+# intro 4 | verse 8 | pre 4 | chorus 8 | verse2 8 | pre 4 | chorus2 8 | bridge 8 | chorus x2 16 (2nd ^2) | outro 4 = 72 bars
+# Verse Am7 Fmaj7 C G | Pre Dm7 Em7 Fmaj7 G | Chorus Fmaj7 G Em7 Am7 Fmaj7 G Cadd9 C | Bridge Dm7 Am7 Fmaj7 Gsus4/G
+
+track kick  note              # 1
+track snare note vel          # 2  snare+clap
+track hat   note vel          # 3
+track chord note cva cvb      # 4  root 3rd 5th (pad voices 1-3)
+track ext   note              # 5  7th / 9th (pad voice 4)
+track bass  note vel from chord   # 6
+track lead  note vel          # 7
+track pluck note vel from chord   # 8  intro hook, arp, chorus-2 counter
+
+# ---------------- harmony ----------------
+pattern h_verse 4x16 chord ext
+1:00 | A3 C4 E4  | G4      # Am7
+2:00 | F3 A3 C4  | E4      # Fmaj7
+3:00 | C4 E4 G4  | D5      # Cadd9
+4:00 | G3 B3 D4  | A4      # Gadd9
+
+pattern h_pre 4x16 chord ext
+1:00 | D4 F4 A4  | C5      # Dm7
+2:00 | E4 G4 B4  | D5      # Em7
+3:00 | F3 A3 C4  | E4      # Fmaj7
+4:00 | G3 C4 D4  | F4      # G7sus4
+4:08 | G3 B3 D4  | F4      # G7
+
+pattern h_chorus 8x16 chord ext
+1:00 | F3 A3 C4  | E4      # Fmaj7
+2:00 | G3 B3 D4  | A4      # Gadd9
+3:00 | E3 G3 B3  | D4      # Em7
+4:00 | A3 C4 E4  | G4      # Am7
+5:00 | F3 A3 C4  | E4      # Fmaj7
+6:00 | G3 B3 D4  | F4      # G7
+7:00 | C4 E4 G4  | D5      # Cadd9
+8:00 | C4 E4 G4  | B4      # Cmaj7
+
+pattern h_bridge 4x16 chord ext
+1:00 | D4 F4 A4  | C5      # Dm7
+2:00 | A3 C4 E4  | G4      # Am7
+3:00 | F3 A3 C4  | E4      # Fmaj7
+4:00 | G3 C4 D4  | F4      # G7sus4
+4:08 | G3 B3 D4  | F4      # G7
+
+pattern h_outro 4x16 chord ext
+1:00 | F3 A3 C4  | E4      # Fmaj7
+3:00 | C4 E4 G4  | D5      # Cadd9
+4:12 | off       | off
+
+# ---------------- bass riffs (follow the chord) ----------------
+pattern b_eighth 16 bass
+00 | t1-24 .9
+02 | x .6
+04 | t1-12 .8
+06 | t1-24 .6
+08 | x .9
+10 | x .6
+12 | t1-12 .8
+14 | t1-24 .6
+
+pattern b_verse 16 bass
+00 | t1-24:6 .9
+06 | x:2 .6
+08 | x:4 .8
+14 | t1-12:2 .7
+
+pattern b_break 16 bass
+00 | t1-24:14 .7
+
+# ---------------- lead ----------------
+pattern l_verse1 8x16 lead
+1:04 | E4 .7
+1:06 | E4 .6
+1:08 | G4 .8
+1:10 | A4:10 .85      # ties over the bar line
+2:04 | G4 .6
+2:06 | E4 .6
+2:08 | C4:6 .75
+2:14 | D4 .6          # pickup
+3:00 | E4:6 .8
+3:06 | D4 .6
+3:08 | C4 .6
+3:10 | D4:4 .7
+3:14 | E4 .6
+4:00 | D4:12 .75
+5:04 | E4 .7
+5:06 | E4 .6
+5:08 | G4 .8
+5:10 | C5:10 .9       # call reaches higher
+6:04 | B4 .65
+6:06 | A4 .6
+6:08 | F4:6 .75
+6:14 | E4 .6
+7:00 | G4:6 .8
+7:06 | E4 .6
+7:08 | D4 .6
+7:10 | C4:4 .7
+7:14 | A3 .6
+8:00 | B3:10 .75
+
+pattern l_verse2 8x16 lead
+1:02 | C4 .55         # extra pickup this time
+1:04 | E4 .7
+1:06 | E4 .6
+1:08 | G4 .8
+1:10 | A4:10 .85
+2:04 | G4 .6
+2:06 | E4 .6
+2:08 | C4:6 .75
+2:14 | D4 .6
+3:00 | E4:6 .8
+3:06 | G4 .7
+3:08 | E4 .6
+3:10 | D4:4 .7
+3:14 | E4 .6
+4:00 | D4:12 .75
+5:04 | E4 .7
+5:06 | G4 .7
+5:08 | A4 .8
+5:10 | E5:10 .95      # variation: leaps to the 5th
+6:04 | D5 .7
+6:06 | C5 .65
+6:08 | A4:6 .8
+6:14 | G4 .6
+7:00 | E4:6 .8
+7:06 | G4 .6
+7:08 | E4 .6
+7:10 | D4:4 .7
+7:14 | C4 .6
+8:00 | D4:10 .75
+
+pattern l_pre 4x16 lead
+1:00 | F4 .65
+1:02 | F4 .55
+1:04 | F4 .65
+1:06 | E4 .55
+1:08 | D4 .65
+1:10 | F4:6 .75
+2:00 | G4 .7
+2:02 | G4 .6
+2:04 | G4 .7
+2:06 | F4 .6
+2:08 | E4 .7
+2:10 | G4:6 .8
+3:00 | A4 .75
+3:02 | A4 .65
+3:04 | A4 .75
+3:06 | G4 .65
+3:08 | A4 .8
+3:10 | C5:6 .9
+4:00 | B4:8 .9
+4:08 | off
+4:12 | G4 .75         # pickup into the hook
+4:14 | A4 .8
+
+pattern l_chorus 8x16 lead
+1:00 | C5:6 1
+1:06 | C5 .8
+1:08 | D5 .9
+1:10 | C5:6 .9
+2:00 | B4:4 .8
+2:04 | G4:4 .7
+2:08 | D5:8 .95
+3:00 | E5:6 1
+3:06 | D5 .8
+3:08 | B4 .8
+3:10 | C5:10 .85      # tied over into the Am bar
+4:04 | A4:8 .8
+4:12 | G4 .75
+4:14 | A4 .8
+5:00 | C5:6 1
+5:06 | C5 .8
+5:08 | D5 .9
+5:10 | C5:6 .9
+6:00 | B4:4 .8
+6:04 | G4:4 .7
+6:08 | D5 .9
+6:10 | E5 .9
+6:12 | F5:4 1
+7:00 | E5:8 1
+7:08 | D5 .85
+7:10 | C5:18 .9       # held through the last bar
+8:12 | G4 .7
+8:14 | A4 .75
+
+pattern l_br1 4x16 lead
+1:00 | F4:8 .6
+1:08 | E4 .5
+1:10 | D4:6 .6
+2:00 | C4:8 .6
+2:08 | E4 .5
+2:10 | A4:6 .6
+3:00 | A4:8 .6
+3:08 | G4 .5
+3:10 | F4 .6
+3:12 | E4:4 .6
+4:00 | D4:16 .6
+pattern l_br2 4x16 lead
+1:00 | A4:8 .7
+1:08 | G4 .65
+1:10 | F4:6 .7
+2:00 | E4:8 .7
+2:08 | G4 .7
+2:10 | C5:6 .8
+3:00 | C5:8 .8
+3:08 | D5 .8
+3:10 | E5:6 .9
+4:00 | D5:8 .9
+4:08 | off
+4:12 | G4 .75
+4:14 | A4 .8
+
+pattern l_outro 4x16 lead
+1:00 | C5:6 .8
+1:06 | C5 .7
+1:08 | D5 .8
+1:10 | C5:6 .75
+2:00 | B4:4 .7
+2:04 | G4:4 .6
+3:00 | E5:8 .7          # hook answered, resolves to the 9th
+3:08 | D5:24 .6
+
+# ---------------- pluck ----------------
+pattern p_intro 4x16 pluck      # the hook, foreshadowed
+1:00 | C5:3 .7
+1:06 | C5 .55
+1:08 | D5 .65
+1:10 | C5:3 .6
+2:00 | B4:3 .6
+2:04 | G4:3 .5
+2:08 | D5:4 .7
+3:00 | C5:3 .7
+3:06 | C5 .55
+3:08 | D5 .65
+3:10 | C5:3 .6
+4:00 | B4:3 .6
+4:04 | G4:3 .5
+4:08 | D5:4 .7
+4:12 | E5 .6
+4:14 | D5 .5
+
+pattern p_arp 16 pluck
+00 | t1+12:1 .55
+03 | t3+12:1 .45
+06 | t1+24:1 .5
+08 | t2+12:1 .45
+11 | t3+12:1 .45
+14 | t2+24:1 .4
+
+pattern p_counter 8x16 pluck    # chorus 2: answers in the gaps of the hook
+1:12 | A5:2 .6
+1:14 | G5:2 .5
+2:12 | G5:4 .55
+3:12 | B5:2 .5
+3:14 | G5:2 .5
+4:08 | E5:2 .5
+4:10 | A5:4 .6
+5:12 | A5:2 .6
+5:14 | G5:2 .5
+6:00 | B5:6 .55
+7:04 | G5:2 .6
+7:06 | A5:2 .5
+7:12 | G5:2 .6
+7:14 | E5:2 .5
+8:00 | G5:8 .55
+8:08 | E5:4 .5
+
+# ---------------- drums ----------------
+pattern d_intro 16 kick
+lane kick  x... .... x... ....
+
+pattern d_verse 16 kick snare hat
+lane kick  x... .... x.x. ....
+lane snare .... 7... .... 7...
+lane hat   6.3. 5.3. 6.3. 5.3.
+
+pattern d_verse2 16 kick snare hat
+lane kick  x... ...x x.x. ....
+lane snare .... 7... .... 7..2
+lane hat   6343 5343 6343 5343
+
+pattern d_pre 16 kick snare hat
+lane kick  x... x... x... x...
+lane snare .... 7... .... 7...
+lane hat   ..5. ..5. ..5. ..5.
+
+pattern d_chorus 16 kick snare hat
+lane kick  x... ..x. x... .x..
+lane snare .... 9... .... 9...
+lane hat   7454 6454 7454 6454
+
+pattern d_bridge_a 16 hat
+lane hat   4... .... 3... ....
+
+pattern d_bridge_b 16 kick hat
+lane kick  x... x... x... x...
+lane hat   ..4. ..4. ..4. ..4.
+
+pattern fill 16 kick snare hat      # last bar before every chorus
+lane kick  x... .... x... ....
+lane snare 3.3. 4.4. 5656 7899
+lane hat   0... .... .... ....
+
+pattern d_outro 16 kick hat
+lane kick  x... .... .... ....
+lane hat   5... .... .... ....
+
+# ---------------- form ----------------
+section intro    h_verse+p_intro+d_intro
+section verse    l_verse1+h_verse+b_verse+d_verse
+section verse2   l_verse2+h_verse+b_eighth+d_verse2+p_arp
+section pre      h_pre+l_pre+b_eighth+d_pre+fill@4:00
+section chorus   l_chorus+h_chorus+b_eighth+d_chorus
+section chorus2  l_chorus+h_chorus+b_eighth+d_chorus+p_counter
+section bridge_a h_bridge+l_br1+b_break+d_bridge_a
+section bridge_b h_bridge+l_br2+b_verse+d_bridge_b+fill@4:00
+section outro    h_outro+l_outro+b_break+d_outro
+
+order intro verse pre chorus
+order verse2 pre chorus2
+order bridge_a bridge_b
+order chorus2 chorus2^2
+order outro

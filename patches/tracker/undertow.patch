@@ -1,0 +1,192 @@
+# undertow -- melodic techno, 126 BPM, A minor, 128 bars (~4:04).
+# Notes/sections in undertow.trk, automation (one row per bar) in undertow-form.trk.
+#   1-16 intro drums | 17-32 bass, riff 25 | 33-48 build, riff opens over 32 bars
+#   49-64 main | 65-80 break (pad, riser 73-80) | 81-96 drop (riff +8va)
+#   97-112 ride | 113-128 outro drums
+# Pump: kick gate -> duck env -> bass/pad/riff/returns lvl, plus bus comp sidechain.
+
+clk  = clock { bpm: 504 }        # sixteenths at 126
+bar  = div { by: 16 }
+clk -> bar.in
+
+song = tracker { file: "undertow.trk" }
+form = tracker { file: "undertow-form.trk" }
+clk -> song.clock
+bar -> form.clock
+
+# ---- slewed lanes ----
+bass_lvl  = func { rise: 0.05, fall: 0.05 }
+riff_lvl  = func { rise: 1, fall: 1 }
+riff_cut  = func { rise: 1.9, fall: 0.5 }
+pad_lvl   = func { rise: 3, fall: 0.4 }
+riser_lvl = func { rise: 1.9, fall: 0.05 }
+verb_lvl  = func { rise: 2, fall: 2 }
+width_lvl = func { rise: 1, fall: 0.2 }
+form.cva1 -> bass_lvl.in
+form.cvb1 -> riff_lvl.in
+form.cva2 -> riff_cut.in
+form.cvb2 -> pad_lvl.in
+form.cva3 -> riser_lvl.in
+form.cvb3 -> verb_lvl.in
+form.cva4 -> width_lvl.in
+
+# ---- duck envelope off the kick gate (silent when the kick section is out)
+duck = func { rise: 0.003, fall: 1.2, curve: exp }
+song.gate1 -> duck.trig
+
+# ---- drums ----
+kick  = sub { file: "../lib/kick.sub", tune: 49hz, decay: 0.17s, click: 0.4 }
+song.gate1 -> kick.trig
+kdrv  = drive { amount: 0.45, mode: soft }
+kick -> kdrv.in : 0.8
+chat  = sub { file: "../lib/kit/hat_model.sub", decay: 0.05 }
+ohat  = sub { file: "../lib/kit/hat_model.sub", decay: 0.32 }
+song.gate2 -> chat.trig
+song.vel2  -> chat.accent
+song.gate3 -> ohat.trig
+song.vel3  -> ohat.accent
+song.gate2 -> ohat.choke
+clap  = sub { file: "../lib/kit/clap.sub", decay: 0.18 }
+song.gate4 -> clap.trig
+song.vel4  -> clap.accent
+rim   = sub { file: "../lib/kit/rim.sub", tune: 620hz }
+song.gate5 -> rim.trig
+song.vel5  -> rim.accent
+
+# ---- rolling bass: saw + sine sub, short pluck ----
+b_saw = vco { wave: saw }
+b_sin = vco { wave: sine }
+song.voct7 -> b_saw.v_oct
+song.voct7 -> b_sin.v_oct
+b_env = func { rise: 0.002, fall: 0.3, curve: exp }
+song.gate7 -> b_env.trig
+b_filt = ladder { cutoff: 160, res: 0.3, drive: 0.5 }
+b_saw -> b_filt.in : 0.6
+b_env -> b_filt.cutoff : 900
+b_vel = math { op: mult }
+b_env -> b_vel.a
+song.vel7 -> b_vel.b
+b_amp = vca { gain: 0 }
+b_filt -> b_amp.in : 0.8
+b_sin  -> b_amp.in : 0.7
+b_vel -> b_amp.cv
+
+# ---- riff: two detuned saws, lane-driven cutoff + pluck env ----
+r_a = vco { wave: saw }
+r_b = vco { wave: saw }
+song.voct8 -> r_a.v_oct
+song.voct8 -> r_b.v_oct
+0.006 -> r_b.v_oct
+r_env = func { rise: 0.002, fall: 0.6, curve: exp }
+song.gate8 -> r_env.trig
+r_filt = ladder { cutoff: 250, res: 0.45, drive: 0.3 }
+r_a -> r_filt.in : 0.5
+r_b -> r_filt.in : 0.5
+riff_cut -> r_filt.cutoff : 3500
+r_env -> r_filt.cutoff : 1200
+r_vel = math { op: mult }
+r_env -> r_vel.a
+song.vel8 -> r_vel.b
+r_amp = vca { gain: 0 }
+r_filt -> r_amp.in
+r_vel -> r_amp.cv
+r_hp = svf { cutoff: 180 }
+r_amp -> r_hp.in
+
+# ---- pad: three saws on harm, adsr per bar ----
+p1 = vco { wave: saw }
+p2 = vco { wave: saw }
+p3 = vco { wave: saw }
+song.voct6 -> p1.v_oct
+song.cva6  -> p2.v_oct
+song.cvb6  -> p3.v_oct
+0.005  -> p2.v_oct
+-0.005 -> p3.v_oct
+p_env = adsr { attack: 0.6, decay: 1, sustain: 0.8, release: 1.5 }
+song.gate6 -> p_env.gate
+p_filt = svf { cutoff: 600, res: 0.2 }
+p1 -> p_filt.in : 0.3
+p2 -> p_filt.in : 0.3
+p3 -> p_filt.in : 0.3
+riser_lvl -> p_filt.cutoff : 2500
+p_amp = vca { gain: 0 }
+p_filt.lp -> p_amp.in
+p_env -> p_amp.cv
+p_hp = svf { cutoff: 220 }
+p_amp -> p_hp.in
+p_cho = chorus { voices: 3, depth: 0.6, mix: 0.5 }
+p_fade = vca { gain: 0 }            # post-fader: sends tap after this
+p_hp.hp -> p_fade.in
+pad_lvl -> p_fade.cv : 1.2
+duck -> p_fade.cv : -0.35
+p_fade -> p_cho.in_l
+p_fade -> p_cho.in_r
+
+# ---- riser: noise through a rising band-pass, 8 bars ----
+rs_n = noise { color: white, seed: 11 }
+rs_f = svf { cutoff: 300, res: 0.6 }
+rs_n -> rs_f.in
+riser_lvl -> rs_f.cutoff : 7000
+rs_amp = vca { gain: 0 }
+rs_f.bp -> rs_amp.in
+riser_lvl -> rs_amp.cv : 0.25
+
+# ---- space: dotted-eighth echo on the riff, plate on riff/pad/clap/riser ----
+de = tempo { bpm: 126, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.4, tone: 2500, mix: 1 }
+de.seconds -> echo.time
+r_hp.hp -> echo.in : 0.35
+room = reverb { decay: 0.82, damp: 0.4, mix: 1, predelay: 0.02 }
+r_hp.hp -> room.in_l : 0.2
+r_hp.hp -> room.in_r : 0.2
+p_cho.out_l -> room.in_l : 0.25
+p_cho.out_r -> room.in_r : 0.25
+clap -> room.in_l : 0.15
+clap -> room.in_r : 0.15
+rs_amp -> room.in_l : 0.25
+rs_amp -> room.in_r : 0.25
+echo -> room.in_l : 0.2
+echo -> room.in_r : 0.2
+
+# ---- mix: level lanes + duck sum on lvlN ----
+#        kick  chat  ohat  clap  rim   bass  riff  pad
+band = mix { levels: [0.7, 0.5, 0.35, 0.5, 0.3, 0, 0, 0],
+             pans:   [0, 0.25, -0.3, 0, -0.35, 0, 0, 0] }
+kdrv   -> band.in1
+chat   -> band.in2
+ohat   -> band.in3
+clap   -> band.in4
+rim    -> band.in5
+b_amp  -> band.in6
+r_hp.hp -> band.in7
+bass_lvl -> band.lvl6 : 1.5
+riff_lvl -> band.lvl7 : 1.4
+duck -> band.lvl6 : -0.9
+duck -> band.lvl7 : -0.4
+
+#        pad L pad R echo  verbL verbR riser
+fx = mix { levels: [1, 1, 0.4, 0, 0, 0.6], pans: [-1, 1, 0.3, -1, 1, 0] }
+p_cho.out_l -> fx.in1
+p_cho.out_r -> fx.in2
+echo        -> fx.in3
+room.out_l  -> fx.in4
+room.out_r  -> fx.in5
+rs_amp      -> fx.in6
+verb_lvl -> fx.lvl4
+verb_lvl -> fx.lvl5
+duck -> fx.lvl3 : -0.2
+duck -> fx.lvl4 : -0.2
+duck -> fx.lvl5 : -0.2
+
+mast = sub { file: "../lib/master-chain.sub", width: 0,
+             comp_makeup: 8, clip_drive: 10.5, clip_blend: 1,
+             comp_thr: -18, ceiling: -2.5 }
+band.out_l -> mast.in_l
+band.out_r -> mast.in_r
+fx.out_l -> mast.in_l
+fx.out_r -> mast.in_r
+kdrv -> mast.side_l : 0.7
+kdrv -> mast.side_r : 0.7
+width_lvl -> mast.field.width
+mast.l -> out.left
+mast.r -> out.right

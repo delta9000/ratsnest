@@ -1,0 +1,111 @@
+# undertow.trk -- "Undertow", melodic techno, 126 BPM, A minor, 128 bars.
+# Chords one per bar: Am | F | G | Em  (i - VI - VII - v)
+#
+#   bars   1-16  intro     drums only (DJ mix-in): kick+hat, +16th hats at 9
+#   bars  17-32  groove    + rolling bass, clap at 17; riff A enters 25 (dark), rim at 25
+#   bars  33-48  build     riff B (notes added) at 41, open hats at 33
+#   bars  49-64  main      riff B, full kit
+#   bars  65-80  break     kick/bass out, pad, riff exposed, riser 73-80
+#   bars  81-96  drop      riff B +12 (octave jump), pad, full kit
+#   bars  97-112 ride      riff A, pad out, perc thins at 105
+#   bars 113-128 outro     drums only (DJ mix-out), 16th hats out at 121
+
+track kick  note             # 1
+track hat   note vel len 1   # 2 closed
+track ohat  note vel len 1   # 3 open
+track clap  note vel len 1   # 4
+track rim   note vel len 1   # 5
+track harm  note cva cvb     # 6: pad root/third/fifth, one chord per bar
+track bass  note vel len 1 from harm   # 7
+track riff  note vel len 1 from harm   # 8
+
+# ---- harmony (also the 4-bar carrier every section's step length comes from)
+pattern harm 4x16 harm
+1:00 | A3 C4 E4
+2:00 | F3 A3 C4
+3:00 | G3 B3 D4
+4:00 | E3 G3 B3
+
+# ---- drums, one bar each ----
+pattern kick 16 kick
+lane kick  x... x... x... x...
+
+pattern hat8 16 hat
+lane hat   ..7. ..7. ..7. ..8.
+
+pattern hat16 16 hat
+lane hat   3373 3483 3373 3484
+
+pattern ohat 16 ohat
+lane ohat  ..6. ..6. ..6. ..7.
+
+pattern clap 16 clap
+lane clap  .... 8... .... 8..3
+
+pattern rim 16 rim
+lane rim   ...6 ..5. .6.. 5..7
+
+pattern rim2 2x16 rim
+lane rim   ...6 ..5. .6.. 5..7 ...6 ..5. 6.6. 5.77
+
+# ---- rolling bass: three sixteenths after every kick, root two octaves down
+pattern bass 16 bass
+00 | .
+01 | t1-24 .55
+02 | x     .9
+03 | x     .7
+05 | x     .55
+06 | x     .9
+07 | x     .7
+09 | x     .55
+10 | x     .9
+11 | x     .7
+13 | x     .55
+14 | x     .9
+15 | t1-12 .6
+
+# ---- riff: A is the hook, B adds the in-between notes
+pattern riff_a 16 riff
+00 | t1+12 .9
+03 | t3    .7
+06 | t2+12 .8
+08 | t1+12 .6
+10 | t3    .8
+13 | t2+12 .7
+
+pattern riff_b 16 riff
+00 | t1+12 .9
+02 | t3+12 .5
+03 | t3    .7
+05 | t1+12 .5
+06 | t2+12 .8
+08 | t1+12 .6
+10 | t3    .8
+11 | t1+24 .5
+13 | t2+12 .7
+14 | t3+12 .5
+
+# ---- sections (one step = 4 bars) ----
+section in1    harm+kick+hat8
+section in2    harm+kick+hat16
+section groove harm+kick+hat16+clap+bass
+section grv_r  harm+kick+hat16+clap+bass+rim+riff_a
+section build  harm+kick+hat16+clap+bass+rim+riff_a+ohat
+section bld_b  harm+kick+hat16+clap+bass+rim2+riff_b+ohat
+section main   harm+kick+hat16+clap+bass+rim2+riff_b+ohat
+section brk    harm+riff_a
+section brk2   harm+riff_b+hat8
+section drop   harm+kick+hat16+clap+bass+rim2+riff_b^12+ohat
+section ride   harm+kick+hat16+clap+bass+rim+riff_a+ohat
+section ride2  harm+kick+hat16+clap+bass+riff_a
+section out1   harm+kick+hat16+clap
+section out2   harm+kick+hat8
+
+order in1*2 in2*2
+order groove*2 grv_r*2
+order build*2 bld_b*2
+order main*4
+order brk*2 brk2*2
+order drop*4
+order ride*2 ride2*2
+order out1*2 out2*2
