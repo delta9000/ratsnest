@@ -109,14 +109,31 @@ Iterate on numbers, not vibes. Two or three passes converges.
   `strum:` staggers the gates; a slur moves pitches with no retrigger. Any
   other tone: `ch = chord {}`, `pad = voice { notes: ch }`, `pad.v = sub
   {...}` (docs/patch-craft.md "Chord pads").
-- **Clock tree, not clocks.** One `clock` at 4× the tempo, then a chain of
-  `div { by: 2 }`. Every rhythm in the patch is phase-locked for free, and
-  "offbeat" is `logic{and}` of eighth with `logic{not}` of quarter.
+- **One `transport` clocks the song.** It holds the tempo and the swing in
+  one place, and every output is phase-locked to it:
+
+  ```text
+  t    = transport { bpm: 124, division: 4, swing: 0.16 }   # swung sixteenths
+  song = tracker { file: "song.trk" }
+  form = tracker { file: "song-form.trk" }
+  t.clock -> song.clock       # one row per sixteenth
+  t.bar   -> form.clock       # one form row per bar
+  ```
+
+  `t.beat` pulses quarters, `t.phrase` every `bars:` bars, `t.gate` is a
+  50%-duty gate per subdivision (the pulses are one sample long), and
+  `t.phrase_phase` into an `lfo { freq: 0 }`'s `phase` locks a slow sweep
+  to the form. Polymeter is
+  a free-running `name~` layer in the `.trk`, not a second clock. Keep
+  `clock → div` chains for tricks off a shared master: polyrhythm
+  (`div { by: 3 }` against `by: 4`), ratchets and bursts faster than the
+  grid, and offbeat logic (`logic{and}` of eighth with `logic{not}` of
+  quarter).
 - **Songs with a form: write a `.trk`.** Notes, sections and the arrangement
   go in a plain-text tracker file; the patch stays about sound.
   `docs/modules.md` `tracker` has the format, `docs/patch-craft.md` "Writing a
   song with tracker" the craft, `patches/tracker/` three worked songs (chords, groove, ambient).
-- **Arrangement grid.** (Pre-tracker; still right for a lane of levels.) Bar-clocked `stepseq` lanes of 0..1 levels → `func`
+- **Arrangement grid.** (Pre-tracker; still right for a lane of levels.) `stepseq` lanes on `t.bar`, of 0..1 levels → `func`
   (nothing on `trig`, so it slews) → `vca.cv`. One lane per element. Asymmetric
   rise/fall is the trick: risers rise for seconds and fall in 0.4 s.
 - **Chord lanes.** Three bar-clocked `stepseq`s carrying root/third/fifth as

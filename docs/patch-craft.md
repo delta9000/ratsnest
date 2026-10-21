@@ -366,20 +366,32 @@ fills, `^N` and `@R` motif variation, swing from `transport`) and `lantern`
 (extended chords, `>` ramps for the form, a free-running `ctr~`
 counter-line in chord degrees through `quant`):
 
-- **Two trackers, two clocks.** One for notes at the finest grid the song
-  needs (`clock { bpm: 4 × tempo }` = sixteenths), one for the form clocked
-  by a four-bar divider (`div { by: 64 }` off the same clock). The form file
-  is a table: one row per block, one `cva` column per section level, read
-  down like a mix sheet. Slew each column through `func` exactly as the old
-  arrangement lanes did; the tracker's values are stepped and held. When
-  every order step of the notes is one block, `song.step_trig -> form.clock`
-  ties the form to the order list instead of a divider: one form row per
-  step, whatever each step's length.
-- **Swing is the clock's.** The tracker has no groove; drive it from
-  `transport { bpm: 128, division: 4, swing: s }` and `t.clock -> song.clock`.
-  Drum-machine swing P% (the first sixteenth of a pair takes P% of it: 50 %
-  straight, 66 % triplet) is `s = 2P − 1`: 54 % → .08, 58 % → .16,
-  66 % → .32, 75 % → .5 (the cap .75 is 87.5 %).
+- **One transport, two trackers.** The song clock is a `transport`, not a
+  `clock` at 4× tempo and a chain of `div`s: `t = transport { bpm: 128,
+  division: 4, swing: s }`, then `t.clock -> song.clock` (one row per
+  sixteenth, at the finest grid the song needs) and `t.bar -> form.clock`
+  (one form row per bar; `div { by: 4 }` off `t.bar` for four-bar blocks).
+  Tempo and swing live in one module and every rhythm, `euclid` and
+  `stepseq` clocked off `t.clock` or `t.beat` stays phase-locked to the
+  notes. The form file is a table: one row per bar or block, one `cva`
+  column per section level, read down like a mix sheet. Slew each column
+  through `func` exactly as the old arrangement lanes did; the tracker's
+  values are stepped and held. When every order step of the notes is one
+  block, `song.step_trig -> form.clock` ties the form to the order list
+  instead: one form row per step, whatever each step's length.
+  `patches/tracker/lantern.patch` is the whole tree: one transport, two
+  trackers.
+- **Swing is the transport's.** The tracker has no groove; `swing` on the
+  transport delays every second sixteenth while downbeats and bars stay
+  put. Drum-machine swing P% (the first sixteenth of a pair takes P% of it:
+  50 % straight, 66 % triplet) is `s = 2P − 1`: 54 % → .08, 58 % → .16,
+  66 % → .32, 75 % → .5 (the cap .75 is 87.5 %). A `clock`/`div` tree cannot
+  swing at all.
+- **Div chains are for tricks.** Keep `clock → div` for what a transport
+  does not do: polyrhythm off one master (`div { by: 3 }` against
+  `by: 4`), ratchets and bursts faster than the grid, offbeat logic. A
+  phrase in another meter is a free-running `~` layer in the `.trk`, not a
+  second tracker on a least-common-multiple clock.
 - **Layer, don't copy.** `order chords+chop+hook+beat` stacks a four-bar
   chord pattern with one-bar and two-bar loops: the step lasts as long as
   the first pattern and the rest wrap inside it. Put the longest pattern
