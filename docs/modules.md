@@ -707,6 +707,10 @@ Composing (all resolved when the file loads; the ports never change):
   (not looping), and its non-empty events replace the earlier layers' on
   the same tracks: `order verse+beat+fill@48`. Only overlays may share
   tracks; the first layer cannot be one.
+- **Drum lanes:** inside a pattern, `lane kick x... x... x..x x.0.` writes
+  one row per character from row 0 (spaces ignored): `.` empty, `x` hit,
+  `1`–`9` hit at vel n/9 (if the track has `vel`), `0` off. Lanes and row
+  lines mix; writing the same cell twice is an error.
 
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
 before it gates are low). A re-articulated note drops its gate for the edge

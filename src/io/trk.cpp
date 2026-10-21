@@ -156,15 +156,18 @@ class Parser {
 
   void statement(const std::vector<Tok>& t) {
     if (t.empty()) return;
+    using Directive = void (Parser::*)(const std::vector<Tok>&);
+    static constexpr std::pair<std::string_view, Directive> kDirectives[] = {
+        {"track", &Parser::track}, {"pattern", &Parser::pattern}, {"lane", &Parser::lane},
+        {"order", &Parser::order}};
     const std::string_view w = t[0].s;
-    if (w == "track") return track(t);
-    if (w == "pattern") return pattern(t);
-    if (w == "order") return order(t);
+    for (const auto& [name, fn] : kDirectives)
+      if (w == name) return (this->*fn)(t);
     int n = 0;
     if (w == "|" || to_int(w, 0, 1 << 30, n)) return row(t);
     err(t[0], "unknown directive '" + std::string(w) +
-              "' (directives: track, pattern, order; rows start with '|')" +
-              dsl::did_you_mean(w, {"track", "pattern", "order"}));
+              "' (directives: track, pattern, lane, order; rows start with '|')" +
+              dsl::did_you_mean(w, {"track", "pattern", "lane", "order"}));
   }
 
   // track <name> <field>... [len <rows>] [from <track>]
@@ -278,10 +281,51 @@ class Parser {
     for (size_t k = from; k < end && out_.errors.empty(); ++k) {
       const int f = tr.fields[k - from];
       if (is_empty(t[k].s)) continue;
+      if (written(e, f)) return err(t[k], "track '" + tr.name + "' on this row is already written by a lane");
       if (f == kNote) note(t[k], tr, e);
       else value(t[k], tr, f, e);
     }
   }
+
+  static bool written(const Event& e, int f) { return f == kNote ? e.kind != Kind::None : (e.set >> f) & 1u; }
+
+  // lane <track> <steps>: one character per row from row 0, spaces ignored.
+  void lane(const std::vector<Tok>& t) {
+    if (pats_.empty()) return err(t[0], "lane outside a pattern (start one with 'pattern <name> <rows>')");
+    if (t.size() < 3) return err(t[0], "lane needs a track and its steps ('lane kick x...x...')");
+    Pattern& p = pats_.back();
+    const int id = find_named(tracks_, t[1].s);
+    const auto col = std::find(p.tracks.begin(), p.tracks.end(), id);
+    if (col == p.tracks.end())
+      return err(t[1], "track '" + std::string(t[1].s) + "' is not in pattern '" + p.name + "'" +
+                           hint(tracks_, t[1].s));
+    int r = 0;
+    for (size_t i = 2; i < t.size(); ++i)
+      for (size_t k = 0; k < t[i].s.size() && out_.errors.empty(); ++k)
+        step({t[i].s.substr(k, 1), t[i].col + static_cast<int>(k)}, r++, p,
+             static_cast<size_t>(col - p.tracks.begin()));
+  }
+
+  // One lane character: `.` rest, `x` hit, `1`-`9` hit at vel n/9, `0` off.
+  void step(const Tok& c, int r, Pattern& p, size_t col) {
+    if (r >= p.rows)
+      return err(c, "lane is longer than pattern '" + p.name + "' (" + std::to_string(p.rows) + " rows)");
+    const size_t kind = std::string_view(".0x123456789").find(c.s[0]);
+    if (kind == std::string_view::npos)
+      return err(c, "'" + std::string(c.s) + "' is not a lane step (. rest, x hit, 1-9 hit at vel n/9, 0 off)");
+    const Track& tr = tracks_[static_cast<size_t>(p.tracks[col])];
+    Event& e = p.ev[static_cast<size_t>(r) * p.tracks.size() + col];
+    const bool vel = kind > 2 && has(tr, kVel);
+    if (kind == 0) return;
+    if (written(e, kNote) || (vel && written(e, kVel)))
+      return err(c, "row " + std::to_string(r) + " of track '" + tr.name + "' is already written");
+    e.kind = kind == 1 ? Kind::Off : Kind::Hit;
+    e.len = static_cast<std::int16_t>(tr.len);
+    if (!vel) return;
+    e.v[kVel] = static_cast<float>(kind - 2) / 9.0f;
+    e.set = static_cast<std::uint8_t>(e.set | (1u << kVel));
+  }
+
 
   void note(const Tok& t, const Track& tr, Event& e) {
     std::string_view s = t.s.substr(0, t.s.find(':'));

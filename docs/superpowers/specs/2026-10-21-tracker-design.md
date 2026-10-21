@@ -351,3 +351,14 @@ through), so `order verse+beat+fill@48` puts a fill over the groove's last
 bar and `chords+chop+hit@0` a drop hit, without full-length copies. Only
 overlays may share tracks with other layers; the first layer sets the step
 length and cannot be one; R past the step's last row is an error.
+
+### 8.5 Drum lanes: `lane <track> <steps>`
+
+Inside a pattern, `lane kick x... x... x..x x.0.` writes one row per
+character from row 0; whitespace is ignored, so bars can be spaced out. `.`
+is empty, `x` a hit at the held vel, `1`–`9` a hit with vel n/9 (on a track
+without `vel`, just a hit), `0` a note off. A lane longer than the pattern,
+or naming a track the pattern does not cover, is an error. Lanes and row
+lines mix freely in one pattern: a lane fills cells a row line left empty and
+vice versa, and writing the same field of the same cell twice is an error.
+A lane is the drum-machine view of what is otherwise one sparse row per hit.

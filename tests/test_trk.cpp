@@ -362,6 +362,47 @@ TEST_CASE("trk: overlay diagnostics") {
   fails(h + "order p+q\n", 4, 9, "only an '@' overlay may share tracks");
 }
 
+TEST_CASE("trk: drum lanes write one row per character") {
+  auto s = ok("track kick note\ntrack hat note vel len 1\ntrack bass note\n"
+              "pattern beat 8\n"
+              "lane kick x... x.0.\n"
+              "lane hat  .9.x 3...\n"
+              "| . | . | C2\n"
+              "04 | . | . | D2\n"
+              "order beat\n");
+  const bool kick[] = {1, 1, 1, 1, 1, 1, 0, 0};
+  for (int r = 0; r < 8; ++r) {
+    CAPTURE(r);
+    CHECK(at(s, r, 0).on == kick[r]);
+    CHECK(at(s, r, 0).retrig == (r == 0 || r == 4));
+  }
+  CHECK(at(s, 1, 1).retrig);
+  CHECK(at(s, 1, 1).vel == doctest::Approx(1.0f));
+  CHECK_FALSE(at(s, 2, 1).on);  // len 1
+  CHECK(at(s, 3, 1).vel == doctest::Approx(1.0f));  // x keeps the vel
+  CHECK(at(s, 4, 1).vel == doctest::Approx(3.0f / 9));
+  CHECK(at(s, 4, 2).voct == doctest::Approx(-19.0f / 12));  // rows and lanes mix
+  // A digit on a track without vel is a plain hit; a lane cell fills an
+  // empty row cell and vice versa.
+  s = ok("track k note\ntrack v cva\npattern p 2\n| . | 3\nlane k 5\norder p\n");
+  CHECK(at(s, 0, 0).retrig);
+  CHECK(at(s, 0, 1).cva == 3.0f);
+}
+
+TEST_CASE("trk: lane diagnostics") {
+  const std::string h = "track k note vel\ntrack b note\npattern p 4 k\n";
+  fails("track k note\nlane k x\n", 2, 1, "lane outside a pattern");
+  fails(h + "lane k\n", 4, 1, "lane needs a track and its steps");
+  fails(h + "lane b x\n", 4, 6, "track 'b' is not in pattern 'p'");
+  fails(h + "lane kk x\n", 4, 6, "did you mean 'k'");
+  fails(h + "lane k x... x\n", 4, 13, "lane is longer than pattern 'p' (4 rows)");
+  fails(h + "lane k x.o.\n", 4, 10, "'o' is not a lane step");
+  fails(h + "| C4\nlane k x\n", 5, 8, "row 0 of track 'k' is already written");
+  fails(h + "| . .5\nlane k 5\n", 5, 8, "already written");
+  fails(h + "lane k 5\n| . .5\n", 5, 5, "already written by a lane");
+  fails(h + "lane k x\n| C4\n", 5, 3, "already written by a lane");
+}
+
 TEST_CASE("trk: the longest song fits exactly") {
   auto s = ok("track a cva\npattern p 1024\norder p*64\n");
   CHECK(s.length() == 65536);
