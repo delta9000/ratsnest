@@ -123,7 +123,7 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `out` |
+| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `out`, `rec`, `extin` |
 
 ## `vca`
 
@@ -145,6 +145,9 @@ Only the live audio-device boundary clips to ±1. Internal sums are not normaliz
 linear `fm`, `pw`, `pwm`, rising-edge `sync`, phase offset in cycles; output `out`. Waves: `sine`,
 `tri`, `saw`, `pulse`. Effective Hz = `freq * 2^v_oct + fm * freq`, clamped
 to `0..0.45*rate` (negative frequencies stop the phase). `+1` v/oct doubles pitch.
+Linear FM depth scales with the `freq` base, not the tracked pitch, so a fixed
+`fm` cable gives a brighter index on low notes than high ones. Pulse width is
+`pw + pwm` clamped to `0.05..0.95` (non-finite reads 0.5).
 Sine is analytic. Free-running triangle, saw, and pulse morph between shared
 Fourier-series tables whose highest partial stays below Nyquist; hard sync,
 fast FM, PWM, and phase modulation still create discontinuities and can alias.
@@ -186,6 +189,8 @@ phase follows array position; new positions start at zero. A stopped bank
 `lfo { freq: 1hz, wave: sine, phase: 0 }` — inputs `freq`, rising-edge `reset`,
 phase offset in cycles; bipolar output `out`. Double-precision accumulation
 keeps minute-long periods accurate. Waves: `sine`, `tri`, `saw`, `square`.
+Negative `freq` clamps to 0 (stopped; it never runs backward). The waves are
+naive (not band-limited): at audio rates `saw` and `square` alias — use `vco`.
 Example: `slow -> filter.cutoff : 300`.
 
 **Starting value at `phase: 0`** (measured) — this matters whenever an LFO is
@@ -206,7 +211,8 @@ same rate ramps the wrong way first.
 
 `clock { bpm: 120, run: 1 }` — inputs `bpm`, `run`, rising-edge `reset`;
 outputs 50%-duty `out` and normalized `run`. Stop forces clock low but holds
-phase. Use BPM 240 for eighth-note gates at a musical 120 BPM.
+phase. Negative BPM clamps to 0 (holds). Use BPM 240 for eighth-note gates at
+a musical 120 BPM.
 
 ## `transport`
 
@@ -285,8 +291,10 @@ and input edge counts as step zero.
 ## `func`
 
 `func { rise: 0.01, fall: 0.1, curve: lin, cycle: off }` — inputs rising-edge
-`trig`, slew `in`, rise/fall seconds; outputs unipolar `out`, `eor` gate, and
-one-sample `eoc`. Curves: `lin`, `exp`, `log`; cycle: `off`/`on`. With nothing
+`trig`, slew `in`, rise/fall seconds; outputs unipolar `out` and two
+one-sample pulses: `eor` when the rise reaches 1, `eoc` when the fall reaches 0.
+Curves (as in `adsr`): `lin`, `exp`, `log`; cycle: `off`/`on`. A trigger
+mid-cycle rises again from the current level. With nothing
 patched to `trig`, `out` slews toward `in` at the rise/fall rates — this is
 the intended way to smooth stepped CV (section fades, portamento).
 
@@ -294,8 +302,12 @@ the intended way to smooth stepped CV (section fades, portamento).
 
 `svf { cutoff: 1000, res: 0, v_oct: 0 }` — inputs `in`, cutoff Hz,
 resonance `0..1`, octave tracking `v_oct`; outputs `lp`, `bp`, `hp`.
-Effective cutoff = `cutoff * 2^v_oct`, clamped to `5..0.45 * sample_rate`.
-Patch note pitch into `v_oct` for musical tracking. Modulate `cutoff` for additive
+Effective cutoff = `cutoff * 2^v_oct`, clamped to `5..0.45 * sample_rate`
+(`v_oct` clamps to ±24). Linear and unconditionally stable; it does not
+self-oscillate. `res` maps to Q 0.5..50 (measured: −6 dB at the cutoff at
+`res: 0`, unity at 0.5, +13 dB at 0.9, **+34 dB at 1**), with no output
+compensation or saturation — a resonant sweep across a bright source gets
+very loud. Patch note pitch into `v_oct` for musical tracking. Modulate `cutoff` for additive
 Hz movement, or `v_oct` for proportional movement; both remain audio-rate.
 
 ## `noise`
@@ -382,20 +394,31 @@ while low.
 
 Inputs `in` 0, `cutoff` 1000 Hz, `res` 0 (`0..1`), `drive` 0 (`0..4`),
 `v_oct` 0; four-pole low-pass output `out`. Effective cutoff = `cutoff * 2^v_oct`,
-clamped to `5..0.45*rate`. Example: `env -> filter.cutoff : 1800` adds Hz;
+clamped to `5..0.45*rate` (`v_oct` clamps to ±24). The ladder is linear: `drive`
+saturates the input only (0 is an exact bypass), never the feedback loop. As
+on the hardware, the passband drops as `res` rises (measured at 100 Hz:
+−9 dB at 0.5, −14 dB at 1), with no compensation. `res: 1` is exactly the
+self-oscillation edge: the ring never decays, and an input at the cutoff is
+not bounded (a 0.8 sine peaked near 900) — stay below about 0.95 or put a
+limiter/`drive` downstream. Example: `env -> filter.cutoff : 1800` adds Hz;
 `notes.cv -> filter.v_oct` tracks pitch by octaves without a negative cutoff.
 
 ## `lpg`
 
 Inputs `in`, continuous `cv`, rising-edge `strike`, `damp` 0.5, `decay` 0.25 s;
 output `out`. Strike excites a vactrol-like amplitude/brightness decay; CV can
-hold it open.
+hold it open. `cv` clamps to `0..1` and opens with a fixed ~2 ms rise; a strike
+opens the gate instantly (a deliberate "bonk": on a bass-heavy source it is an
+audible click). `decay` is the one-pole time constant (≥ 1 ms; about −60 dB
+after 7× it). The two-pole, non-resonant lowpass sweeps from 30 Hz closed to
+`30 * 2^(9 − 6*damp)` Hz open: `damp: 0` reaches ~15 kHz, `1` only ~240 Hz.
 
 ## `random`
 
 `random { rate: 1hz, smooth: 1, seed: 1 }` — internally clocked bipolar
 generator. Outputs cosine-interpolated `out` and raw `stepped`; smooth clamps
-to `0..1`.
+to `0..1`; negative `rate` clamps to 0 (holds). It has no clock input — for
+clocked random values use `noise -> sh` or `turing`.
 
 ## `quant`
 
@@ -419,7 +442,11 @@ notes; `changed` deliberately does not retrigger them.
 
 Eight inputs `in1..in8` and additive level CVs `lvl1..lvl8`; configs `levels`
 (missing = 1) and `pans` (`-1` left, `0` center, `1` right; missing = center).
-Outputs `out_l`, `out_r`. Negative level CV is useful for sidechain ducking.
+Outputs `out_l`, `out_r`. Each gain is `clamp(level + lvl, 0, 8)`. Pans are
+equal-power, so a centered input reaches each side at −3 dB (0.707). Negative
+level CV is useful for sidechain ducking. `levels`/`pans` are configs: a live
+edit jumps (no glide), and pans cannot be modulated — cross two `vca`s for an
+auto-pan.
 
 ## `channel`
 
@@ -443,23 +470,35 @@ for watch and future TUI tooling without altering the signal path.
 
 ## `delay`
 
-Inputs `in` 0, `time` 0.4 s (`0..10`), `pitch` 0 v/oct, `feedback` 0.35,
-equal-power `mix` 0.5, feedback `tone` 8000 Hz, `slew` 0.1 s; output `out`.
-Effective time is `time * 2^-pitch`. The dark, DC-blocked, saturated feedback
-can self-oscillate above 1. Example: `{ time: 375ms, feedback: .65, mix: 1 }`.
+Inputs `in` 0, `time` 0.4 s (`0..10`), `pitch` 0 v/oct, `feedback` 0.35
+(`0..1.2`), equal-power `mix` 0.5, feedback `tone` 8000 Hz (`20..0.45*rate`),
+`slew` 0.1 s (one-pole time constant of the time glide); output `out`.
+Effective time is `time * 2^-pitch` (at least 2 samples). The dark,
+DC-blocked, tanh-saturated feedback can self-oscillate above 1. `tone` sits in
+the feedback path only: the first echo is undarkened, later repeats darken. Example: `{ time: 375ms, feedback: .65, mix: 1 }`.
 
 ## `adsr`
 
-Inputs `gate`, `attack` .005 s, `decay` .15 s, `sustain` .7, `release` .3 s;
-unipolar `out`. Config curve: `lin`, `exp`, `log`. Retriggers and releases from
-the current level rather than jumping.
+Inputs `gate`, `attack` .005 s, `decay` .15 s, `sustain` .7 (`0..1`, live),
+`release` .3 s; unipolar `out`. Retriggers and releases from the current level
+rather than jumping. Segment times are durations, whatever the start level; 0
+is a one-sample jump.
+
+Config `curve` bends every segment by progress `x` through it: `lin` is
+linear, `exp` is `x²` (slow start: a soft attack, but decays and releases that
+hang near the top, then drop — measured 0.75 at half the decay time), `log` is
+`√x` (fast start: the snappy, percussive fall; 0.29 at half the decay). None
+is a true RC exponential; for plucks and drums use `log`.
 
 ## `reverb`
 
-Stereo Dattorro plate. Inputs `in_l`, `in_r`, `decay` .5, `damp` .25, `mix`
-.3, `freeze` gate; outputs `out_l`, `out_r`. Configs: `predelay` .02 s,
-`bandwidth` .9995, `mod_rate` 1 Hz, `mod_depth` 13 samples. Freeze smoothly
-mutes input and makes the tank lossless while held.
+Stereo Dattorro plate. Inputs `in_l`, `in_r`, `decay` .5 (`0..0.9995`, the
+tank loop gain), `damp` .25 (`0..1`, tank high-frequency loss), equal-power
+`mix` .3, `freeze` gate; outputs `out_l`, `out_r`. The tank input is the mono
+sum; the stereo image comes from the output taps. Configs: `predelay` .02 s
+(`0..0.25`), input `bandwidth` .9995 (`0..1`), `mod_rate` 1 Hz (`0..20`),
+`mod_depth` 13 samples (`0..100`). Freeze smoothly mutes input and makes the
+tank lossless while held.
 
 ## `euclid`
 
@@ -495,7 +534,9 @@ Eight signal inputs, plus `clock`, rising-edge `reset`, zero-based `addr`, and
 `n` 8 (`1..8`); output `out`. Config `mode`: `seq` (the **default**) advances
 on clock and ignores `addr`; `addr` reads the live address (rounded, clamped
 to `0..n-1`) and ignores the clock. A selector driven by a lane must say
-`switch { mode: addr }`, or it sits on `in1` forever, silently. Example:
+`switch { mode: addr }`, or it sits on `in1` forever, silently. Selection is a
+hard cut with no crossfade: fine for CV and gates, but switching between
+running audio clicks — use `xfade` for audio. Example:
 `switch { mode: seq, n: 4 }`.
 
 ## `turing`
@@ -680,8 +721,8 @@ Guarantees a true hard ceiling at the target threshold by looking ahead 2.0 ms (
 ## `follow`
 
 `follow { mode: peak }` — envelope follower / audio→CV bridge. Inputs `in` 0,
-`attack` 0.01 s, `release` 0.1 s, `thresh` 0.1; outputs unipolar `env` and
-`gate`. It rectifies `in` (peak: `|in|`; rms: `in²`), smooths it with an
+`attack` 0.01 s, `release` 0.1 s (both clamped `0.0001..10`), `thresh` 0.1
+(`0..8`); outputs unipolar `env` and `gate`. It rectifies `in` (peak: `|in|`; rms: `in²`), smooths it with an
 asymmetric one-pole attack/release detector, and emits the linear amplitude as
 `env` (`≥ 0`, `0..1` for input within ±1, unclamped above — a hot signal reads
 honestly). `gate` rises when `env` exceeds `thresh` and falls at `0.75 · thresh`
@@ -700,13 +741,15 @@ f.env -> m.lvl2 : -0.4
 ## `sampler`
 
 `sampler { file: "kick.wav", loop: off }` — WAV file playback. Inputs `trig` 0,
-`pitch` 0 (v/oct), `level` 1; outputs `out`, `eos`. Loads the file at graph
+`pitch` 0 (v/oct, clamped ±24), linear `level` 1; outputs `out`, `eos`. Loads the file at graph
 build (mixing any channel count to mono) and plays it back with linear
 interpolation. Playback rate is `(file_rate / engine_rate) * 2^pitch`, so a file
 recorded at any rate plays at correct pitch and `+1 v/oct` doubles it. A rising
-edge on `trig` restarts from the beginning; with nothing patched to `trig` it
-plays once at load. Config `loop`: `off` stops at the end and emits a one-sample
-`eos` pulse; `on` wraps seamlessly. A missing or unreadable file yields silence
+edge on `trig` restarts from the beginning — a hard cut with no declick, so
+retriggering a sample that is still sounding clicks; with nothing patched to
+`trig` it plays once at load. Config `loop`: `off` stops at the end and emits a one-sample
+`eos` pulse; `on` wraps without a crossfade (seamless only if the file is
+cut on a loop point). A missing or unreadable file yields silence
 (the session never dies). The `file:` string **must be quoted** and resolves
 against the process working directory (mise runs from the repo root); absolute
 paths always work. Reads PCM 16/24/32-bit and 32-bit float WAVs.
@@ -810,6 +853,9 @@ the 0.25 default. Entries clamp to at most 64; an empty list, a non-positive
 entry, or combining with `modes:` is a patch error. The drumkit voices in
 `patches/lib/kit/` are built on this (membrane and metal ratio sets; see
 docs/attribution.md). Bowed and blown textures come from `noise -> vca -> m.in` with slow `vca.cv`.
+Like Rings, it reads `freq`/`v_oct`/`structure`/`brightness`/`damping` every 32
+samples (`position` is ramped per sample; `strike` and `in` are sample-exact);
+the fundamental clamps to a quarter of the sample rate (12 kHz at 48 kHz).
 
 ## `string`
 
@@ -823,7 +869,10 @@ a curved-bridge nonlinearity — gongs, sitars; 0.24..0.26 pure string; above
 0.07 s..~18 s, exponential; ≥ 0.95 crossfades to infinite sustain — a drone),
 `position` 0.25 (pluck point and pickup comb). Outputs `out` (pickup-combed
 voice, Rings' mix) and `aux` (raw pickup tap; `out + aux` is the bare loop).
-Config `seed`: equal seeds repeat plucks exactly. Reaches ~5.9 Hz at 48 kHz.
+Config `seed`: equal seeds repeat plucks exactly. Reaches ~5.9 Hz at 48 kHz
+and clamps at a quarter of the sample rate. Like Rings, controls are read every
+32 samples and the loop delay, pickup position, dispersion and phase
+compensation are ramped per sample; `strike` and `in` are sample-exact.
 
 ## `overdrive`
 
@@ -873,7 +922,9 @@ Configs (all arrays are per-op, padded with the slot default; more than six
 entries is an error): `ratios` (all 1), `levels` (`[1,0,0,0,0,0]` — ops 2..6 stay off
 until asked), `fixed` (per-op Hz; >0 pins the op off `v_oct`/`ratio` for
 clicks and body resonances), `fb` (0..0.999; `fb[k] > 0` is itself the
-self-edge — never put self-edges in `route`), `vel_sens` (0..1; op level ×=
+self-edge — never put self-edges in `route`; the feedback is one sample and
+unaveraged at index 4π, so a carrier turns from saw-like to noisy above about
+0.15 — measured at 110 Hz — and the rest of the range is noise colours), `vel_sens` (0..1; op level ×=
 (1−sens)+sens·vel), `t1..t4` segment seconds (0 = one-sample jump),
 `l1..l3` segment levels, `curve` (`lin`/`exp`/`log`, default `lin` — `log`
 is the natural percussive fall), `sync` (`on`/`off`, default `on`).
@@ -912,10 +963,11 @@ short delay taps with decorrelated LFO phases (L and R a half-cycle apart)
 spread across the stereo field and summed with the dry signal, for widening
 and thickening. Feed a mono source to both inputs to fan it into stereo.
 
-Inputs: `in_l`, `in_r`, `rate` .5 Hz (LFO speed), `depth` .5 (0..1, delay
-swing), `mix` .5 (dry↔wet). Outputs: `out_l`, `out_r`. Configs: `voices`
-(1..4, default 3), `delay` (base delay ms, default 12), `swing` (max swing ms
-at depth 1, default 6), `shape` (`tri`/`sine`, default `tri`). No feedback
+Inputs: `in_l`, `in_r`, `rate` .5 Hz (LFO speed, `0..100`), `depth` .5
+(0..1, delay swing), `mix` .5 (linear dry↔wet; the wet sum is scaled by
+`1/voices`). Outputs: `out_l`, `out_r`. Configs: `voices` (1..4, default 3),
+`delay` (base delay ms, `1..40`, default 12), `swing` (max swing ms at depth 1,
+`0..20`, default 6), `shape` (`tri`/`sine`, default `tri`). No feedback
 (that is the flanger regime — see Recipes).
 
 ## `phaser`
@@ -924,9 +976,11 @@ at depth 1, default 6), `shape` (`tri`/`sine`, default `tri`). No feedback
 whose break frequency is swept by an internal LFO, summed with the dry signal
 so moving notches sweep the spectrum. Feedback sharpens the notches.
 
-Inputs: `in`, `rate` .3 Hz, `depth` .6 (0..1, sweep width), `feedback` .3
-(0..0.95, resonance), `mix` .5 (dry↔wet; 0.5 is the deepest notches). Output:
-`out`. Configs: `stages` (2..12, default 6 — more stages = more notches),
+Inputs: `in`, `rate` .3 Hz (`0..100`), `depth` .6 (0..1, sweep width),
+`feedback` .3 (0..0.95, resonance), `mix` .5 (linear dry↔wet; 0.5 is the
+deepest notches). Output: `out`. The sweep is fixed to 100 Hz..4 kHz
+(geometric centre ~630 Hz; `depth` narrows it around that centre); there is no
+centre-frequency or external sweep input. Configs: `stages` (2..12, default 6 — more stages = more notches),
 `spread` (0..1, default 0 — stage-frequency stagger: 0 keeps all stages
 coincident for tight Phase-90-style notches, higher fans them out around the
 swept centre for wider, more vocal notches), `shape` (`tri`/`sine`).

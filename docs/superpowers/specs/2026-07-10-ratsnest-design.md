@@ -141,8 +141,8 @@ essentials.
 
 | Module | Role | Key params | Key ports |
 |---|---|---|---|
-| `vco` | polyBLEP anti-aliased oscillator | `freq`, `wave` (sine\|tri\|saw\|pulse), `pw` | in: `v_oct` `fm` `pwm` `sync` · out: `out` |
-| `noise` | noise source | `color` (white\|pink), `seed` | out |
+| `vco` | band-limited oscillator (shared Fourier-series tables; analytic sine) | `freq`, `wave` (sine\|tri\|saw\|pulse), `pw` | in: `v_oct` `fm` `pwm` `sync` `phase` · out: `out` |
+| `noise` | noise source | `color` (white\|pink\|brown\|blue\|violet), `seed` | out |
 | `svf` | state-variable filter | `cutoff`, `res` | in · out: `lp` (default) `bp` `hp` |
 | `ladder` | 4-pole ZDF ladder LPF | `cutoff`, `res`, `drive` | in · out |
 | `vca` | amplifier | `gain`, `response` (lin\|exp) | `in` `cv` · out |
@@ -150,10 +150,10 @@ essentials.
 | `fold` | wavefolder | `fold`, `sym` | `in` `fold` · out |
 | `drive` | saturation | `amount`, `mode` (soft\|hard) | in · out |
 | `func` | Maths-style function generator | `rise`, `fall`, `curve`, `cycle` (bool) | in: `trig` `in`(slew) `rise` `fall` · out: `out` `eor` `eoc` |
-| `lfo` | multi-wave LFO | `freq`, `wave`, `phase` | in: `reset` `rate` · out |
+| `lfo` | multi-wave LFO | `freq`, `wave` (sine\|tri\|saw\|square), `phase` | in: `freq` `reset` `phase` · out |
 | `random` | smooth/stepped wandering voltage | `rate`, `smooth`, `seed` | out: `out` `stepped` |
 | `sh` | sample & hold / track & hold | `mode` (sample\|track) | `in` `trig` · out |
-| `quant` | quantizer | `scale` (array), `root`, `transpose` | `in` `transpose` · out: `out` `changed`(gate) |
+| `quant` | quantizer | `scale` (array), `mode` (continuous\|clock), `root`, `transpose` | `in` `root` `transpose` `clock` `mask` `degree` · out: `out` `changed`(one-sample trigger) |
 | `math` | signal math (= ring mod, rectifier, min/max, …) | `op` (add\|sub\|mult\|min\|max\|abs\|clip\|wrap\|exp2), `b` | `a` `b` · out |
 | `xfade` | linear crossfader, optional equal-power law | `mix`, `law` | `a` `b` `mix` · out |
 | `mix` | stereo mixer | `levels` (array), `pans` (array); defaults 1.0 / center | `in1..in8` `lvl1..lvl8` · out: `out_l` `out_r` |
@@ -182,7 +182,7 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 | `euclid` | Euclidean rhythm | ins `clock` `reset` `steps`(1..64) `hits`(0..steps) `rot`(wrapped); outs `trig`(one sample) `gate`(clock width). Live integer params round; reset makes the coincident/next edge step zero |
 | `stepseq` | step sequencer | cfg `steps`/`gates`/`lens`/`ties`/`vels` arrays, `dir` (forward\|reverse\|pingpong\|random), `seed`; ins `clock` `reset` `len` `transpose`; outs `cv` `trig` `gate` `eoc` `vel` |
 | `turing` | lockable shift register | ins `clock` `write` `clear` `len`(1..16) `prob`; cfg `seed`; outs `out` `pulse` `bit1..bit8`. Volts/Pulses expanders = cables |
-| `bern` | Bernoulli gate | ins `gate` `prob`; cfg `seed`; mutually exclusive gate-width outs `a` `b` |
+| `bern` | Bernoulli gate | ins `gate` `prob` `reset` `length` `reroll`; cfg `seed`; mutually exclusive gate-width outs `a` `b`, held draw `value` |
 | `logic` | gate logic + comparator | ins `a` `b` `threshold`; cfg `op` (and\|or\|xor\|not\|cmp); out |
 | `switch` | sequential/addressed switch | ins `in1..in8` `clock` `reset` `addr` `n`; cfg `mode` (seq\|addr); out |
 | `tempo` | musical time conversion | ins `bpm` `beats`; outs `seconds` `hz` |
