@@ -25,15 +25,25 @@ filter.lp -> amp.in : 0.5       # cable gain
 seq = stepseq { steps: [0, 0.25, 0.58333], gates: [1, 0, 1] }
 ```
 
-Suffixes include `hz`, `ms`, and `s`. Omitted output means the first output
+Unit suffixes are `hz`, `khz`, `ms`, `s` and `bpm`, lowercase, written
+directly after the number (`2khz`, `250ms`). They are plain scale factors —
+`khz` ×1000, `ms` ×0.001, the rest ×1 — and are **not** checked against the
+parameter: `lfo { freq: 500ms }` is 0.5 Hz and `delay { time: 2hz }` is two
+seconds. Pick the suffix that matches the input's unit (Hz for `freq`/`cutoff`/
+`rate`, seconds for times, BPM for `bpm`). Omitted output means the first output
 (a bare `stepseq` name reads its `cv`, a bare `svf` its `lp`). Validate with
-`ratsnest check patch.patch`; `ratsnest render ... --stats [Ns]` prints
-overall peak/RMS/DC plus a per-window level timeline for mix work.
+`ratsnest check patch.patch`; `ratsnest render ... --stats [dur]` prints
+overall peak/RMS/DC plus a per-window level timeline for mix work. CLI
+durations (`-d`, `--start`, `--stats`) take `90`, `90s`, `500ms` or `2m`;
+`ratsnest` with no arguments prints every option and its default.
 `ratsnest describe` lists the runtime modules as JSON; `ratsnest describe fm`
 returns one interface, including input bases, config types and enum choices,
 outputs, and the default output. It describes built-in modules; compile-time
 subpatch constructs are documented below. `check` validates the expanded patch
-and exits nonzero on errors. It does not establish musical balance or sound
+and exits nonzero on errors; a misspelled module, port, parameter, enum value
+or subpatch port is reported with its closest valid name. `check` and `render`
+also warn when nothing is cabled into `out` (the patch would be silent). A
+clean check does not establish musical balance or sound
 quality. A rejected hot reload leaves the previous graph playing.
 
 **Note names** are numeric literals, usable anywhere a number is (`freq: A4`,
@@ -123,7 +133,7 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
-| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `out` |
+| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `rec`, `extin`, `out` |
 
 ## `vca`
 

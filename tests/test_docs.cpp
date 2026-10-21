@@ -34,6 +34,14 @@ TEST_CASE("module reference covers every registered module") {
     CHECK(text.find("## `" + std::string(info->type) + "`") !=
           std::string::npos);
   }
+  // The quick palette is where a reader looks first: it names every module.
+  const auto palette_at = text.find("## Quick palette");
+  REQUIRE(palette_at != std::string::npos);
+  const std::string palette = text.substr(palette_at, text.find("\n## ", palette_at + 1) - palette_at);
+  for (const ModuleInfo* info : all_modules()) {
+    CAPTURE(info->type);
+    CHECK(palette.find("`" + std::string(info->type) + "`") != std::string::npos);
+  }
   for (const char* pseudo : {"sub", "subdef", "param", "input", "output"}) {
     CAPTURE(pseudo);
     CHECK(text.find("## `" + std::string(pseudo) + "`") != std::string::npos);
