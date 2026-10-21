@@ -631,9 +631,10 @@ mel = stepseq { steps: [D4v, F4v, E4v, 0, A4v], gates: [1, 1, 1, 0, 1],
 file: tracks, named patterns of rows, and an order list. Each rising `clock`
 edge plays one row (rows-per-beat is the clock's business). Inputs (all
 discrete) `clock`, rising-edge `reset`, and `start` (the order step `reset`
-rewinds to, 0-based, rounded and clamped). Outputs, per track n = 1..8:
-`voctn`, `gaten`, `veln`, `cvan`, `cvbn` (banks like `alloc`'s; undeclared
-tracks output 0); then `step` (order step), `pattern` (file index of the
+rewinds to, 0-based, rounded and clamped). Outputs, per track n = 1..16:
+`voctn`, `gaten`, `veln`, `cvan`, `cvbn`, `cvdn` (banks like `alloc`'s;
+grouped per track, track n's six ports first; undeclared tracks output 0, and
+a cable from one is an error at check time); then `step` (order step), `pattern` (file index of the
 step's first pattern), `row` (row within the step), one-sample `step_trig`
 and `row_trig`, and `end`. A bare `song` reads `voct1`.
 
@@ -667,8 +668,9 @@ order verse*2               # sections accumulate, one per line
 order |: verse+beat*3       # '|:' = loop point; without one the song ends
 ```
 
-- `track <name> <fields>` declares tracks 1..8 in order, with the fields its
-  cells hold (`note`, `vel`, `cva`, `cvb`), written in that order.
+- `track <name> <fields>` declares tracks 1..16 in order, with the fields its
+  cells hold (`note`, `vel`, `cva`, `cvb`, `cvd`), written in that order.
+  `note cva cvb cvd` carries a four-note chord on one track.
 - `pattern <name> <rows> [tracks]` (1..1024 rows) over the listed tracks
   (default all). Rows are `[n] | cell | cell`; a row number is optional
   (decimal, increasing) and rows never written are empty, so patterns can be
@@ -679,11 +681,13 @@ order |: verse+beat*3       # '|:' = loop point; without one the song ends
   slur (pitch change, no re-attack); `off`/`===` = note off; `.`/`...`/`-`/
   `---` = empty. Values fill the track's fields in declared order, so a
   `note vel` cell is `C4 .8`, never `.8 C4`. `vel` is a number in 0..1 (1
-  until first written); `cva`/`cvb` take numbers or note names (0 until
-  written). Note names are uppercase.
+  until first written); `cva`/`cvb`/`cvd` take numbers or note names (0
+  until written). Note names are uppercase.
   **Every value holds until changed.**
 - `order` entries: `name`, `a+b` (layers: the first sets the step length,
-  the others loop inside it, tracks must not overlap), `entry*N` repeats
+  the others loop inside it and may not be longer, which is an error rather
+  than a silent cut: list the longest layer first; tracks must not overlap),
+  `entry*N` repeats
   (`*N` binds to the whole layer group: `a+b*3` is `(a+b)` three times, and
   each repeat is its own `step`), and
   `|:` the loop point. Capped at 65536 rows.
@@ -691,17 +695,18 @@ order |: verse+beat*3       # '|:' = loop point; without one the song ends
 Composing (all resolved when the file loads; the ports never change):
 
 - **Transpose** a layer in the order list: `order verse verse^5 bass^-2+beat`
-  (semitones, ±48). It moves the note field and any `cva`/`cvb` value written
-  as a note name; numeric levels stay put.
+  (semitones, ±48). It moves the note field and any `cva`/`cvb`/`cvd` value
+  written as a note name; numeric levels stay put.
 - **Note length:** `track hat note len 1` (every note sounds one row), or per
   cell `C4:3`, `x:2`, `~D4:4`. The gate drops L rows later unless another
   note, slur or `off` on that track comes first; counted in song rows, so a
   looping layer's note can ring into the next step. No `len` holds.
 - **Chord tones:** `track arp note vel from harm` (an earlier track with
-  `note`, optionally `cva`/`cvb`). In `arp`'s cells `t1`, `t2`, `t3` are
-  harm's resolved note, cva, cvb on that song row (after harm's `^N`), with an
-  optional semitone offset and length: `| t1+12 .8`, `| ~t3-12:2`. They work
-  in the note field (a note; `~t2` slurs) and in `cva`/`cvb`. One 16-row riff
+  `note`, optionally `cva`/`cvb`/`cvd`). In `arp`'s cells `t1`, `t2`, `t3`,
+  `t4` are harm's resolved note, cva, cvb, cvd on that song row (after harm's
+  `^N`), with an optional semitone offset and length: `| t1+12 .8`,
+  `| ~t4-12:2`. They work in the note field (a note; `~t2` slurs) and in
+  `cva`/`cvb`/`cvd`. One 16-row riff
   then loops under every chord: `order chords+arp`.
 - **Overlays:** in a layer group, `name@R` plays once from row R of the step
   (not looping), and its non-empty events replace the earlier layers' on
@@ -720,7 +725,7 @@ Composing (all resolved when the file loads; the ports never change):
   follow their transposed source, so it skips them (a layer's own `^N`
   still applies). Sections share the pattern namespace and hold patterns,
   not other sections.
-- **Ramps:** a trailing `>` on a `vel`/`cva`/`cvb` value (`.2>`, `A3>`)
+- **Ramps:** a trailing `>` on a `vel`/`cva`/`cvb`/`cvd` value (`.2>`, `A3>`)
   glides linearly, one step per row, to the next value written in that field
   later in the same pattern (an error if none follows). Still stepped per
   row: slew with `func` for a smooth fade.
@@ -863,8 +868,9 @@ The dry branch is delay-aligned by exactly 1 sample to match the filter's peak l
 
 ## `limiter`
 
-`limiter` — inputs `in_l` 0, `in_r` 0, `threshold` -0.1, `release` 0.05; outputs `out_l`, `out_r`, `gain`, `gr`.
+`limiter { true_peak: off }` — inputs `in_l` 0, `in_r` 0, `threshold` -0.1, `release` 0.05; outputs `out_l`, `out_r`, `gain`, `gr`.
 A stereo-linked peak limiter with a fixed 2.0 ms lookahead.
+*   `true_peak`: Config, `off` (default) or `on`: detect inter-sample peaks (below).
 *   `threshold` (clamped `-24..0`, default -0.1): Target ceiling threshold in dBFS.
 *   `release` (clamped `0.001..2`, default 0.05): Release time in seconds.
 *   `gain`: Output. Current linear gain reduction factor.
@@ -876,8 +882,19 @@ sample needs is peak-held over the lookahead (or `min(release, 20 ms)` if
 longer, so bass does not ripple the gain), released with the `release` time
 constant, then box-filtered over the whole lookahead: the gain ramps down
 across the full 2 ms and arrives exactly as the peak does. A 50 Hz sine under
-6 dB of reduction stays below 0.01 % THD. Sample peaks only; inter-sample
-(true) peaks can still exceed the threshold slightly.
+6 dB of reduction stays below 0.01 % THD.
+
+With `true_peak: off` it limits sample peaks only, and the waveform a DAC
+reconstructs between samples can overshoot the threshold: by 1.6–2.3 dB on
+dense masters, by 3 dB on a sine at fs/4 whose samples straddle its crests.
+`true_peak: on` feeds the same detector a 4x-oversampled estimate (ITU-R
+BS.1770-4 Annex 2 style: a 12-tap-per-phase polyphase interpolator), holding
+the reconstructed peak under the threshold: steady tones up to about
+0.36 fs (17 kHz at 48 kHz) stay under it; a lone crest falling between the
+4x points can still pass by up to 0.2 dB, as in any 4x meter. It costs 6 more samples of latency
+(2.125 ms at 48 kHz) and three 12-tap dot products per channel per sample.
+Use it on the final limiter of a master; `off` keeps older renders
+bit-identical.
 
 ## `follow`
 

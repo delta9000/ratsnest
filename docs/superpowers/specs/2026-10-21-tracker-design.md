@@ -52,9 +52,10 @@ silently cut — see §2.4). Every directive and row is one line.
 
     track <name> <field>...
 
-Declares the next track (track 1, then 2, ... up to 8, in file order) and
+Declares the next track (track 1, then 2, ... up to 16, in file order) and
 the **fields its cells hold, in the order they are written**. Fields:
-`note`, `vel`, `cva`, `cvb`, each at most once. `<name>` is a lowercase
+`note`, `vel`, `cva`, `cvb`, `cvd`, each at most once. (`cvd` came later, so
+a four-note chord fits one track: `note cva cvb cvd`.) `<name>` is a lowercase
 identifier (`[a-z][a-z0-9_]*`) used by pattern headers and diagnostics; the
 port names stay positional (`voct1`, `gate1`, ...). All tracks are declared before the first
 pattern.
@@ -90,7 +91,7 @@ until the next directive:
 
 Field tokens:
 
-| token | in `note` | in `vel` / `cva` / `cvb` |
+| token | in `note` | in `vel` / `cva` / `cvb` / `cvd` |
 |---|---|---|
 | `.` / `...` / `-` / `---` (any run of one of them) | empty: nothing changes | empty: the value holds |
 | `C4`, `Cs4`, `Bb3`, `A3v` | new note at that pitch (v/oct, A3 = 0) | that pitch as v/oct |
@@ -108,7 +109,7 @@ values are any finite number within ±1000000.
 **Every value is held until changed**, across rows, patterns and steps: a
 note sounds until `off` or the next note (tracker convention); `vel`, `cva`
 and `cvb` hold their last written value. Before anything is written a track
-holds `voct` 0, `vel` 1, `cva`/`cvb` 0, gate off.
+holds `voct` 0, `vel` 1, `cva`/`cvb`/`cvd` 0, gate off.
 
 ### 2.3 The order list
 
@@ -120,7 +121,9 @@ arrangement can be written one section per line with a comment. Entries:
 - `name` — play pattern `name` for its length.
 - `a+b+c` — play the patterns **together** (layers). The step lasts as long
   as the **first** pattern; each other layer loops within the step (its row
-  is `step_row mod its length`). Layers must cover disjoint tracks (`@` overlays excepted, §8.4). Tracks no
+  is `step_row mod its length`), so none may be longer than the first: a
+  longer one would lose its tail unheard, and is an error (list the longest
+  layer first). Layers must cover disjoint tracks (`@` overlays excepted, §8.4). Tracks no
   layer covers are empty for the step (their values and notes hold). This is
   how a four-bar chord pattern, a one-bar drum loop and a two-bar hook stack
   without being copied into every section.
@@ -147,6 +150,7 @@ Every error carries `file:line:col` and the session keeps the last good graph
 - `row 16 is outside pattern 'beat' (16 rows: 0..15)` / `row labels must increase`
 - `unknown pattern 'drop' in order` (with did-you-mean)
 - `layers 'beat' and 'kit' both write track 'kick'`
+- `layer 'mel' (128 rows) is longer than the step (64 rows, set by 'harm'); list the longest layer first`
 - `no order list: nothing would play`
 - `song is longer than 65536 rows`
 
@@ -200,17 +204,23 @@ Inputs (all discrete: `glide: false`):
 | `reset` | 0 | rising edge: rewind; the next clock plays row 0 of step `start` |
 | `start` | 0 | order step (0-based, rounded, clamped) that `reset` rewinds to |
 
-Outputs: five banks of eight, named like `alloc`/`midi` banks: `voct1..8`,
-`gate1..8`, `vel1..8`, `cva1..8`, `cvb1..8` (track n is `voctn`, `gaten`, ...), then
+Outputs: six banks of sixteen, named like `alloc`/`midi` banks: `voct1..16`,
+`gate1..16`, `vel1..16`, `cva1..16`, `cvb1..16`, `cvd1..16` (track n is
+`voctn`, `gaten`, ...; grouped per track, so track n's ports are outputs
+6(n−1) .. 6(n−1)+5), then
 `step` (0-based order step), `pattern` (index, in file order, of the step's
 first pattern), `row` (row within the step), `step_trig` (one-sample pulse
 when a step starts), `row_trig` (one-sample pulse on every row), `end`.
 A bare `song` reads `voct1`. Tracks the file does not declare output 0.
 
-The bank is fixed at eight tracks because outputs must be declared up front
-(like `alloc`/`midi` banks); eight tracks × five columns plus six song
-outputs is 46 ports. Port names cannot contain dots (an endpoint splits at
-its last dot), hence `voct1`, not `t1.voct`. Patterns needing more voices use a second tracker.
+The bank is fixed at sixteen tracks because outputs must be declared up
+front (like `alloc`/`midi` banks); sixteen tracks × six columns plus six song
+outputs is 102 ports. (It was eight × five until songs ran out of tracks and
+had to split across two trackers whose order lists then had to agree step
+for step.) Patches cable by name, so growing the bank moves output indices
+but no patch. Port names cannot contain dots (an endpoint splits at its last
+dot), hence `voct1`, not `t1.voct`. A cable from a track the `.trk` never
+declares is an error at load (it would read a silent 0).
 
 ## 4. Timing semantics
 
@@ -312,7 +322,7 @@ are unchanged.
 
 Any layer of an order entry may carry `^N`, N in −48..48 semitones:
 `order verse verse^5`, `bass^-2+beat`, `a^2+b+c^2`. It adds N/12 v/oct to
-every note the layer writes (note-name or numeric) and to `cva`/`cvb` values
+every note the layer writes (note-name or numeric) and to `cva`/`cvb`/`cvd` values
 **written as note names**; the parser records per value whether it was a
 pitch, so numeric levels are never shifted. `x` keeps the held pitch.
 
@@ -327,15 +337,15 @@ until changed, as before. Lengths count song rows, so a note in a looping
 layer, or on a step's last row, rings across the wrap or the step boundary.
 This removes the `off` row after every short note (hats, plucks, hooks).
 
-### 8.3 Chord tones: `from <track>`, `t1`..`t3`
+### 8.3 Chord tones: `from <track>`, `t1`..`t4`
 
 `track arp note vel from harm` makes `arp` a dependent of `harm`, which must
-be declared earlier and hold `note` (and optionally `cva`, `cvb`). In a
-dependent track's cells the pitch tokens `t1`, `t2`, `t3` mean the source's
-**resolved** note, cva and cvb on that song row, after the source's own
+be declared earlier and hold `note` (and optionally `cva`, `cvb`, `cvd`). In
+a dependent track's cells the pitch tokens `t1`, `t2`, `t3`, `t4` mean the
+source's **resolved** note, cva, cvb and cvd on that song row, after the source's own
 `^N`, with an optional semitone offset (`t1-12`, `t3+12`, `t2+7`, ±48) and
 `:L` length. In the note field they act like a note (gate, retrigger; `~t2`
-slurs); in `cva`/`cvb` they set the value. They count as pitches, so the
+slurs); in `cva`/`cvb`/`cvd` they set the value. They count as pitches, so the
 dependent layer's own `^N` adds on top. Tracks resolve in declaration order
 on every row, which is why the source comes first. A token naming a field the
 source does not hold is an error. This is what lets one 16-row arp or bass

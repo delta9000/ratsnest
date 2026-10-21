@@ -61,6 +61,39 @@ class SlidingMax {
   unsigned head_ = 0, tail_ = 0, now_ = 0;
 };
 
+// Inter-sample peak estimate after ITU-R BS.1770-4 Annex 2: 4x polyphase
+// interpolation, 12 taps per phase. The coefficients are generated locally
+// (sinc times a Kaiser window, beta 5, each phase normalised to unity DC
+// gain), not the standard's table; at fs/4 they read about 0.015 dB high.
+// push(x[n]) returns the largest magnitude among x[n-6] and the three points
+// between it and x[n-5], so it lags the input by kLag samples. See
+// docs/attribution.md.
+class TruePeak4x {
+ public:
+  static constexpr int kLag = 6;
+  float push(float x) {
+    std::copy(h_ + 1, h_ + 12, h_);
+    h_[11] = x;
+    float m = std::abs(h_[5]);
+    for (const auto& ph : kPhases) {
+      float y = 0.0f;
+      for (int k = 0; k < 12; ++k) y += ph[k] * h_[k];
+      m = std::max(m, std::abs(y));
+    }
+    return m;
+  }
+
+ private:
+  static constexpr float kPhases[3][12] = {
+      {-0.004879555f, 0.014719555f, -0.034300832f, 0.072401957f, -0.163447096f, 0.897775454f,
+       0.290083687f, -0.106084276f, 0.050049278f, -0.022932814f, 0.008885806f, -0.002271165f},
+      {-0.004843870f, 0.016329487f, -0.039836273f, 0.085150470f, -0.184445326f, 0.627645512f,
+       0.627645512f, -0.184445326f, 0.085150470f, -0.039836273f, 0.016329487f, -0.004843870f},
+      {-0.002271165f, 0.008885806f, -0.022932814f, 0.050049278f, -0.106084276f, 0.290083687f,
+       0.897775454f, -0.163447096f, 0.072401957f, -0.034300832f, 0.014719555f, -0.004879555f}};
+  float h_[12] = {};
+};
+
 // Dynamics peak-hold length: bridges the troughs of |x| for fundamentals down
 // to 25 Hz (20 ms), so bass does not ripple the gain, but never outlasts the
 // release the patch asked for.

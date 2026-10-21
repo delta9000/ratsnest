@@ -1,7 +1,9 @@
 // The tracker's file loader: a non-RT build pass after subpatch expansion.
 // See docs/superpowers/specs/2026-10-21-tracker-design.md §5.
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
+#include <string_view>
 #include "graph/subs.h"
 #include "io/trk.h"
 
@@ -16,15 +18,15 @@ void set_text(dsl::ModuleDecl& m, const dsl::ParamDecl& at, std::string text) {
   else *it = std::move(p);
 }
 
-// The track number of a per-track output (`cva6` -> 6), or 0 for the rest.
+// The track number of a per-track output (`cva6` -> 6, `cvd12` -> 12), or 0
+// for the rest; names past the bank are not ports and compile reports them.
 int track_of(const std::string& port) {
-  for (const char* col : {"voct", "gate", "vel", "cva", "cvb"}) {
-    const std::string c = col;
-    if (port.size() == c.size() + 1 && port.compare(0, c.size(), c) == 0 &&
-        port.back() >= '1' && port.back() <= '8')
-      return port.back() - '0';
-  }
-  return 0;
+  constexpr std::string_view kCols[] = {"voct", "gate", "vel", "cva", "cvb", "cvd"};
+  const size_t d = std::min(port.find_first_of("123456789"), port.size());
+  const std::string num = port.substr(d);
+  const int n = std::atoi(num.c_str());
+  const bool col = std::find(std::begin(kCols), std::end(kCols), port.substr(0, d)) != std::end(kCols);
+  return col && n <= io::kTrkTracks && std::to_string(n) == num ? n : 0;
 }
 
 // A cable from a track the song never declares would read a silent 0.

@@ -308,14 +308,16 @@ through `quant`):
 - **Layer, don't copy.** `order chords+chop+hook+beat` stacks a four-bar
   chord pattern with one-bar and two-bar loops: the step lasts as long as
   the first pattern and the rest wrap inside it. Put the longest pattern
-  first. A one-shot (a drop hit, a fill) is an overlay, `hit@0` or
+  first (a longer later layer is an error, not a silent cut). A one-shot (a drop hit, a fill) is an overlay, `hit@0` or
   `fill@48`: it plays once and overrides the loop under it.
 - **The gate is the trigger.** Each note or `x` re-articulates with a
   one-sample gap, so `gateN` drives `func.trig`, `adsr.gate`, `lpg.strike`
   and `vco.sync` directly; no `stepseq.trig`, no `logic { op: and }` with a
   lane. Write `off` where the old gate fell if you care about gate length.
 - **Chords are one track.** `track harm note cva cvb` carries root, third
-  and fifth as note names; every voice reads `voct5`/`cva5`/`cvb5`.
+  and fifth as note names; every voice reads `voct5`/`cva5`/`cvb5`. A
+  seventh or ninth goes in `cvd` (`note cva cvb cvd`, read as `cvd5`, `t4`).
+  Sixteen tracks: one `.trk` holds notes and form levels together.
 - **Write a riff once.** `track arp note vel from harm` and cells like
   `t1+12`, `~t3`, `t2-12:2` follow harm's chord on every row, so one bar of
   arp or bass loops under the whole progression; `verse^5` or a section's

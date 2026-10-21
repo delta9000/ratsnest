@@ -7,7 +7,8 @@
 // Lookahead brickwall after Geraint Luff, "Designing a straightforward
 // limiter" (Signalsmith Audio, 2022): windowed peak-hold of the required gain
 // reduction, release smoothing, then a box filter as long as the lookahead.
-// See docs/attribution.md.
+// `true_peak: on` detects 4x-interpolated peaks (ITU-R BS.1770-4 Annex 2
+// style, dsp/mastering.h). See docs/attribution.md.
 
 namespace ms::dsp {
 namespace {
@@ -18,6 +19,8 @@ constexpr InputInfo kIns[] = {
     {"threshold", -0.1f}, // dBFS
     {"release", 0.05f}    // s
 };
+constexpr const char* kOnOff[] = {"off", "on", nullptr};
+constexpr ConfigInfo kCfg[] = {{"true_peak", kOnOff}};
 constexpr OutputInfo kOuts[] = {
     {"out_l"},
     {"out_r"},
@@ -30,11 +33,14 @@ constexpr int kRing = 512;  // audio + box-filter history; lookahead < kRing
 class Limiter final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
-    (void)cfg;
     rate_ = static_cast<float>(rate);
     // 2.0 ms lookahead; the box filter spans the lookahead plus the current
     // sample, so it has fully settled by the time a peak leaves the delay.
-    delay_ = std::clamp(static_cast<int>(std::round(rate_ * 0.002f)), 1, kRing - 2);
+    // The true-peak detector reports a peak kLag samples late, so the audio
+    // waits that much longer, and the hold covers both samples around it.
+    tp_ = cfg_enum(cfg, "true_peak", kOnOff) == 1;
+    look_ = std::clamp(static_cast<int>(std::round(rate_ * 0.002f)), 1, kRing - 2 - TruePeak4x::kLag);
+    delay_ = look_ + TruePeak4x::kLag * tp_;
     st_ = State{};
   }
 
@@ -44,16 +50,17 @@ class Limiter final : public Module {
     const float in_r = sanitize(ins[1], 0.0f);
     const float threshold = sanitize_clamp(ins[2], -24.0f, 0.0f, -0.1f);
     const float release = sanitize_clamp(ins[3], 0.001f, 2.0f, 0.05f);
-    const int box = delay_ + 1;
+    const int box = look_ + 1;
     const int w = s.write;
     s.buf_l[w] = in_l;
     s.buf_r[w] = in_r;
 
     // 1. Gain reduction (dB) each input sample needs, peak-held over the
     //    lookahead (or the bass-safe hold, if longer).
-    const float peak = std::max(std::abs(in_l), std::abs(in_r));
+    const float peak = tp_ ? std::max(s.tp_l.push(in_l), s.tp_r.push(in_r))
+                           : std::max(std::abs(in_l), std::abs(in_r));
     const float need = std::max(0.0f, linear_to_db(peak) - threshold);
-    const float held = s.hold.push(need, std::max(box, hold_samples(release, rate_)));
+    const float held = s.hold.push(need, std::max(box + tp_, hold_samples(release, rate_)));
 
     // 2. Instant attack, one-pole release.
     if (release_key_.changed({release})) alpha_r_ = 1.0f - std::exp(-1.0f / (release * rate_));
@@ -82,12 +89,14 @@ class Limiter final : public Module {
   struct State {
     float buf_l[kRing] = {}, buf_r[kRing] = {}, box[kRing] = {};
     SlidingMax<4096> hold;  // 20 ms up to 192 kHz
+    TruePeak4x tp_l, tp_r;
     float env = 0.0f;
     double sum = 0.0;       // running box sum; double keeps drift negligible
     int write = 0;
   };
   float rate_ = 48000.0f;
-  int delay_ = 96;
+  int look_ = 96, delay_ = 96;
+  bool tp_ = false;
   State st_;
   // Memoized libm results; see dsp/input_key.h.
   InputKey<1> release_key_, gain_key_;
@@ -98,6 +107,6 @@ std::unique_ptr<Module> make() { return std::make_unique<Limiter>(); }
 
 }  // namespace
 
-const ModuleInfo limiter_info{"limiter", kIns, {}, kOuts, &make};
+const ModuleInfo limiter_info{"limiter", kIns, kCfg, kOuts, &make};
 
 }  // namespace ms::dsp

@@ -12,15 +12,18 @@ constexpr InputInfo kIns[] = {
 // as `text`; init only parses text, so it does no I/O.
 constexpr ConfigInfo kCfg[] = {{"file", nullptr, ConfigKind::Text},
                                {"text", nullptr, ConfigKind::Text}};
-// Banks like alloc/midi (`voct1..8`, ...), grouped per track: track t's
-// columns are outputs 5t..5t+4.
-#define MS_TRACK(n) {"voct" #n}, {"gate" #n}, {"vel" #n}, {"cva" #n}, {"cvb" #n}
+// Banks like alloc/midi (`voct1..16`, ...), grouped per track: track t's
+// columns are outputs 6t..6t+5. Patches cable by name, so the order may grow.
+#define MS_TRACK(n) {"voct" #n}, {"gate" #n}, {"vel" #n}, {"cva" #n}, {"cvb" #n}, {"cvd" #n}
 constexpr OutputInfo kOuts[] = {
-    MS_TRACK(1), MS_TRACK(2), MS_TRACK(3), MS_TRACK(4),
-    MS_TRACK(5), MS_TRACK(6), MS_TRACK(7), MS_TRACK(8),
+    MS_TRACK(1),  MS_TRACK(2),  MS_TRACK(3),  MS_TRACK(4),
+    MS_TRACK(5),  MS_TRACK(6),  MS_TRACK(7),  MS_TRACK(8),
+    MS_TRACK(9),  MS_TRACK(10), MS_TRACK(11), MS_TRACK(12),
+    MS_TRACK(13), MS_TRACK(14), MS_TRACK(15), MS_TRACK(16),
     {"step"}, {"pattern"}, {"row"}, {"step_trig"}, {"row_trig"}, {"end"}};
 #undef MS_TRACK
-constexpr int kCols = 5;
+constexpr int kCols = 6;
+static_assert(std::size(kOuts) == io::kTrkTracks * kCols + 6);
 constexpr int kSongOut = io::kTrkTracks * kCols;
 
 // Plays a .trk song: one row per rising clock edge, everything precomputed.
@@ -107,6 +110,7 @@ class Tracker final : public Module {
       o[2] = r.vel;
       o[3] = r.cva;
       o[4] = r.cvb;
+      o[5] = r.cvd;
     }
   }
 
