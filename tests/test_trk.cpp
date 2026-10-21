@@ -1,5 +1,6 @@
 // The .trk song format: every syntax element, every diagnostic with
 // line:col, and mutation fuzzing (rule 6: report, never crash or hang).
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <doctest/doctest.h>
@@ -446,6 +447,12 @@ TEST_CASE("trk: sections name layer groups; ^N moves all their layers") {
   CHECK(at(s, 6, 2).cva == 0.0f);
   CHECK(at(s, 7, 2).cva == 7.0f);  // an overlay added to a section's group
   CHECK(at(s, 8, 0).voct == doctest::Approx(5.0f / 12));
+  // A section's ^N moves a dependent's written pitches, but its chord tones
+  // only once, through their source; the layer's own ^-12 still applies.
+  s = ok("track h note\ntrack d note cva from h\nsection v c+r^-12\n"
+         "pattern c 1 h\n| C4\npattern r 1 d\n| t1 E4\norder v^2\n");
+  CHECK(at(s, 0, 1).voct == doctest::Approx(0.25f + 2.0f / 12 - 1));
+  CHECK(at(s, 0, 1).cva == doctest::Approx(7.0f / 12 + 2.0f / 12 - 1));
 }
 
 TEST_CASE("trk: section diagnostics") {
@@ -497,6 +504,32 @@ TEST_CASE("trk: ramp diagnostics") {
         "none follows");
 }
 
+TEST_CASE("trk: the composing example from the design spec") {
+  auto s = ok("# every composing feature in one song\n"
+              "track harm note cva cvb\n"
+              "track arp  note vel cva from harm len 1\n"
+              "track kick note vel len 1\n"
+              "pattern prog 2x16 harm\n"
+              "1:00 | D3  F4 A3\n"
+              "2:00 | Bb2 D4 F3\n"
+              "pattern arp 8 arp\n"
+              "| t1+12 .3> t3\n"
+              "4 | ~t2+12:3 .7 t1-12\n"
+              "pattern beat 16 kick\n"
+              "lane kick 9..5 x..5 9..5 x.0.\n"
+              "pattern fill 4 kick\n"
+              "lane kick 9999\n"
+              "section verse prog+arp+beat\n"
+              "order verse*2 |: verse^5+fill@2:12 verse^-2\n");
+  CHECK(s.steps() == 4);
+  CHECK(s.loop == 2);
+  CHECK(at(s, 2, 1).vel == doctest::Approx(0.5f));
+  CHECK(at(s, 16, 1).voct == doctest::Approx(1.0f - 11.0f / 12));    // Bb2 + 12
+  CHECK(at(s, 64 + 16, 1).voct == doctest::Approx(1.0f - 6.0f / 12)); // ^5
+  CHECK(at(s, 64 + 29, 2).retrig);                                    // the fill
+  CHECK(at(s, 96, 0).voct == doctest::Approx(-9.0f / 12));            // D3 - 2
+}
+
 TEST_CASE("trk: the longest song fits exactly") {
   auto s = ok("track a cva\npattern p 1024\norder p*64\n");
   CHECK(s.length() == 65536);
@@ -506,13 +539,18 @@ TEST_CASE("trk: the longest song fits exactly") {
 // reports exactly one positioned error, and never crashes or hangs (the
 // sanitizer build turns any memory error into a failure).
 TEST_CASE("trk: mutation fuzz never crashes and always positions its error") {
-  const std::string song =
+  const std::string songs[] = {
       "# fuzz seed\ntrack kick note\ntrack bass note vel cva\ntrack harm note cva cvb\n"
       "pattern beat 4 kick\n00 | x\n02 | x\n"
       "pattern verse 8 bass harm\n00 | D2 .9 1 | D3 F4 A3\n| ~E2\n04 | off | Bb2 D4 F3\n"
-      "order verse*2 |: verse+beat*3\n";
-  REQUIRE(parse_trk(song).ok());
-  const char alphabet[] = "|#.-~x*+:0129 \nCsbvAoffpatternrackorder=";
+      "order verse*2 |: verse+beat*3\n",
+      "track harm note cva cvb\ntrack arp note vel cva from harm len 1\ntrack hat note vel\n"
+      "section main chords+arp^-12\n"
+      "pattern chords 2x4 harm\n1:00 | D3 F4 A3\n2:0 | Bb2 D4 F3\n"
+      "pattern arp 4 arp\n| t1+12:2 .2> t2\n2 | ~t3 .8 C4\n"
+      "pattern fill 2 hat\nlane hat 9x\n"
+      "order main^2+fill@1:2 |: main+fill@3*2\n"};
+  const char alphabet[] = "|#.-~x*+:0129 \nCsbvAoffpatternrackorder=^@>tlnesci";
   std::uint32_t rng = 0x2545F491u;
   auto next = [&] {
     rng ^= rng << 13;
@@ -520,26 +558,31 @@ TEST_CASE("trk: mutation fuzz never crashes and always positions its error") {
     rng ^= rng << 5;
     return rng;
   };
-  for (int i = 0; i < 4000; ++i) {
-    std::string m = song;
-    const int edits = 1 + static_cast<int>(next() % 4);
-    for (int e = 0; e < edits; ++e) {
-      const size_t pos = next() % (m.size() + 1);
-      const char c = alphabet[next() % (sizeof(alphabet) - 1)];
-      switch (next() % 3) {
-        case 0: if (pos < m.size()) m[pos] = c; break;
-        case 1: m.insert(pos, 1, c); break;
-        default: if (pos < m.size()) m.erase(pos, 1); break;
+  for (const std::string& song : songs) {
+    REQUIRE(parse_trk(song).ok());
+    for (int i = 0; i < 4000; ++i) {
+      std::string m = song;
+      const int edits = 1 + static_cast<int>(next() % 4);
+      for (int e = 0; e < edits; ++e) {
+        const size_t pos = next() % (m.size() + 1);
+        const char c = alphabet[next() % (sizeof(alphabet) - 1)];
+        switch (next() % 3) {
+          case 0: if (pos < m.size()) m[pos] = c; break;
+          case 1: m.insert(pos, 1, c); break;
+          default: if (pos < m.size()) m.erase(pos, 1); break;
+        }
       }
-    }
-    auto r = parse_trk(m);
-    if (r.ok()) {
-      CHECK(r.song.length() > 0);
-      CHECK(r.song.rows.size() == static_cast<size_t>(r.song.length() * r.song.tracks));
-    } else {
-      REQUIRE(r.errors.size() == 1);
-      CHECK(r.errors[0].line >= 1);
-      CHECK(r.errors[0].col >= 1);
+      auto r = parse_trk(m);
+      if (r.ok()) {
+        CHECK(r.song.length() > 0);
+        CHECK(r.song.rows.size() == static_cast<size_t>(r.song.length() * r.song.tracks));
+        for (const TrkRow& row : r.song.rows)
+          REQUIRE((std::isfinite(row.voct) && std::isfinite(row.cva) && std::isfinite(row.cvb)));
+      } else {
+        REQUIRE(r.errors.size() == 1);
+        CHECK(r.errors[0].line >= 1);
+        CHECK(r.errors[0].col >= 1);
+      }
     }
   }
 }

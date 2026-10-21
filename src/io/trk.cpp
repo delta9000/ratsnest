@@ -50,10 +50,11 @@ struct Pattern {
   int bar = 0;            // rows per bar (`4x16`); 0: no bars
 };
 // A layer as written in the order list (`name^N`), then resolved.
-// `at` is the `@R` text (col 0: none).
-struct Spec { Tok name; int shift = 0; Tok at{{}, 0}; };
+// `at` is the `@R` text (col 0: none). `outer` is a section's `^N`, which
+// moves written pitches but not chord tones: those follow their source.
+struct Spec { Tok name; int shift = 0; Tok at{{}, 0}; int outer = 0; };
 // `at`: the step row a one-shot overlay starts on; -1 loops.
-struct Layer { int pat = 0; int shift = 0; int at = -1; };
+struct Layer { int pat = 0; int shift = 0; int at = -1; int outer = 0; };
 struct Entry { std::vector<Spec> specs; int repeat = 1; std::vector<Layer> layers; };
 // `section <name> <layers>`: a named layer group for the order list.
 struct Section { std::string name; std::vector<Spec> specs; int line = 0; };
@@ -63,8 +64,8 @@ struct Ramp { size_t pat, cell; int f, line, col; };
 // A track's state while flattening: the row so far and the song row its
 // sounding note's length runs out (-1: none).
 struct Voice { TrkRow s; int off_at = -1; };
-// The event a track plays on one row, and its layer's transposition.
-struct Cue { const Event* e = nullptr; int shift = 0; };
+// The event a track plays on one row, and the layer it comes from.
+struct Cue { const Event* e = nullptr; const Layer* l = nullptr; };
 
 bool is_name(std::string_view s) {
   constexpr std::string_view kLower = "abcdefghijklmnopqrstuvwxyz";
@@ -330,7 +331,6 @@ class Parser {
     e.set = static_cast<std::uint8_t>(e.set | (1u << kVel));
   }
 
-
   void note(const Tok& t, const Track& tr, Event& e) {
     std::string_view s = t.s.substr(0, t.s.find(':'));
     if (s.size() < t.s.size() && !length(t, s.size(), e)) return;
@@ -393,7 +393,8 @@ class Parser {
     if (std::isupper(static_cast<unsigned char>(t.s[0]))) e.pitch = static_cast<std::uint8_t>(e.pitch | (1u << f));
   }
 
-  // order <entry>...  with entry = name[+name...][*N], or the loop mark '|:'.
+  // order <entry>...  with entry = layer[+layer...][*N], layer = name[^N][@R],
+  // or the loop mark '|:'.
   void order(const std::vector<Tok>& t) {
     for (size_t i = 1; i < t.size() && out_.errors.empty(); ++i) {
       if (t[i].s == "|:") {
@@ -517,7 +518,7 @@ class Parser {
       }
       if (sp.at.col) return err(sp.at.col - 1, "a section cannot be an '@' overlay (overlay a pattern)");
       for (Spec in : sections_[static_cast<size_t>(id)].specs) {
-        in.shift += sp.shift;
+        in.outer += sp.shift;
         in.name.col = sp.name.col;  // errors point at the section's use
         if (in.at.col) in.at.col = sp.name.col + 1;
         out.push_back(in);
@@ -532,7 +533,7 @@ class Parser {
       const Tok& n = sp.name;
       const int id = find_named(pats_, n.s);
       if (id < 0) return err(n, "unknown pattern '" + std::string(n.s) + "'" + unknown(n.s));
-      Layer l{id, sp.shift, -1};
+      Layer l{id, sp.shift, -1, sp.outer};
       if (sp.at.col ? !overlay(e, sp, l) : !own(owner, n, id)) return;
       e.layers.push_back(l);
     }
@@ -603,7 +604,6 @@ class Parser {
     return err(t, "row count must be an integer in 1..1024, or BARSxROWS (4x16) of at most 1024 rows"), false;
   }
 
-
   void flatten() {
     TrkSong& song = out_.song;
     song.tracks = static_cast<int>(tracks_.size());
@@ -652,7 +652,7 @@ class Parser {
     const size_t base = static_cast<size_t>(pr) * p.tracks.size();
     for (size_t c = 0; c < p.tracks.size(); ++c) {
       const Event& ev = p.ev[base + c];
-      if (l.at < 0 || ev.kind != Kind::None || ev.set) cue[p.tracks[c]] = {&ev, l.shift};
+      if (l.at < 0 || ev.kind != Kind::None || ev.set) cue[p.tracks[c]] = {&ev, &l};
     }
   }
 
@@ -665,16 +665,19 @@ class Parser {
     if (v.off_at == row) v.s.on = false;
     if (!c.e) return;
     const int src = tracks_[tr].src;
-    apply(*c.e, static_cast<float>(c.shift) / 12.0f, voice_[src < 0 ? tr : static_cast<size_t>(src)].s, v.s);
+    apply(*c.e, *c.l, voice_[src < 0 ? tr : static_cast<size_t>(src)].s, v.s);
     if (c.e->kind == Kind::None) return;
     v.off_at = c.e->kind != Kind::Off && c.e->len > 0 ? row + c.e->len : -1;
   }
 
-  // `up` (v/oct) shifts the note and the cv values written as pitches;
-  // chord tones add to the source track's resolved values on this row.
-  static void apply(const Event& e, float up, const TrkRow& src, TrkRow& s) {
+  // The layer's `^N` shifts the note and the cv values written as pitches;
+  // chord tones add to the source track's resolved values on this row, so
+  // an enclosing section's `^N` (already in the source) skips them.
+  static void apply(const Event& e, const Layer& l, const TrkRow& src, TrkRow& s) {
     const float tones[4] = {0.0f, src.voct, src.cva, src.cvb};
-    const auto val = [&](int f) { return tones[e.tone[f]] + e.v[f] + ((e.pitch >> f) & 1u ? up : 0.0f); };
+    const float own = static_cast<float>(l.shift) / 12.0f, all = own + static_cast<float>(l.outer) / 12.0f;
+    const auto up = [&](int f) { return (e.pitch >> f) & 1u ? (e.tone[f] ? own : all) : 0.0f; };
+    const auto val = [&](int f) { return tones[e.tone[f]] + e.v[f] + up(f); };
     if (e.kind == Kind::Note || e.kind == Kind::Slur) s.voct = val(kNote);
 
     if (e.kind == Kind::Note || e.kind == Kind::Hit) s.retrig = true;

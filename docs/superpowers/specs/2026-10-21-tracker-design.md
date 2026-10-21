@@ -377,8 +377,13 @@ is an error that says to declare `pattern <name> BARSxROWS`.
 `section verse mel_v+pad_v+bass+beat` names one layer group (layers may
 carry `^N` and `@R`); the order list then uses the name like a pattern:
 `order verse*2 chorus verse^2`. In an order entry a section is spliced into
-its layers, so `^N` on it adds to every layer's own transposition and more
-layers may follow it (`verse+fill@48`); a section cannot itself be an `@`
+its layers and more layers may follow it (`verse+fill@48`). `^N` on a
+section transposes the music in it **once**: it adds to every written pitch
+(notes, note-name cvs) but not to chord tones, which already move with their
+transposed source; a layer's own `^N` (`riff^-12` inside the section) still
+applies to its chord tones as in §8.3. Otherwise `verse^5` would move an arp
+that follows the chords by ten semitones (a dependent whose source is not in
+the section keeps following that source). A section cannot itself be an `@`
 overlay or contain another section. Sections share the pattern namespace
 (a clash is an error; a typo gets a did-you-mean over both) and may be
 declared before the patterns they name. Each section is checked at its own

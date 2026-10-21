@@ -716,8 +716,10 @@ Composing (all resolved when the file loads; the ports never change):
   from 1 and row from 0: `3:06` is row 38. Plain numbers still work.
 - **Sections:** `section verse mel+pad+bass+beat` names one layer group
   (with `^N` and `@R` as usual); then `order verse*2 chorus verse^2+fill@48`.
-  A section's `^N` adds to each of its layers. Sections share the pattern
-  namespace and hold patterns, not other sections.
+  A section's `^N` moves every written pitch in it once: chord tones already
+  follow their transposed source, so it skips them (a layer's own `^N`
+  still applies). Sections share the pattern namespace and hold patterns,
+  not other sections.
 - **Ramps:** a trailing `>` on a `vel`/`cva`/`cvb` value (`.2>`, `A3>`)
   glides linearly, one step per row, to the next value written in that field
   later in the same pattern (an error if none follows). Still stepped per
