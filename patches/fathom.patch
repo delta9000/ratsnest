@@ -58,14 +58,14 @@ kick_env -> kick_osc.v_oct : 1.6
 kick_amp = vca { gain: 0 }
 kick_osc -> kick_amp.in
 kick_env -> kick_amp.cv : 0.95
-kclk_env = func { rise: 0.0002, fall: 0.006, curve: exp }
+kclk_env = func { rise: 0.0002, fall: 0.018, curve: exp }
 quarter -> kclk_env.trig
 kclk_noise = noise { color: white, seed: 9 }
 kclk_hp = svf { cutoff: 2200, res: 0.2 }
 kclk_noise -> kclk_hp.in
 kclk_amp = vca { gain: 0 }
 kclk_hp.hp -> kclk_amp.in
-kclk_env -> kclk_amp.cv : 0.1
+kclk_env -> kclk_amp.cv : 0.14
 kick_mix = mix { levels: [1.0, 0.3] }
 kick_amp -> kick_mix.in1
 kclk_amp -> kick_mix.in2
@@ -104,7 +104,7 @@ stab_seq = stepseq { steps: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 eighth -> stab_seq.clock
 stab_coin = bern { prob: 0.85, seed: 61 }
 stab_seq.trig -> stab_coin.gate
-stab_fenv = func { rise: 0.002, fall: 0.28, curve: exp }
+stab_fenv = func { rise: 0.002, fall: 0.84, curve: exp }
 stab_coin.a -> stab_fenv.trig
 
 stab1 = fm { algo: dual, freq: 220hz,
@@ -184,25 +184,25 @@ perc_fm.out -> perc_amp.in
 hat_pattern = euclid { steps: 16, hits: 3, rot: 5 }
 master -> hat_pattern.clock
 tide -> hat_pattern.rot : 2
-hat_env = func { rise: 0.0006, fall: 0.04, curve: exp }
+hat_env = func { rise: 0.0006, fall: 0.12, curve: exp }
 hat_pattern.trig -> hat_env.trig
 hat_noise = noise { color: white, seed: 19 }
 hat_filter = svf { cutoff: 9500, res: 0.25 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.4
+hat_env -> hat_amp.cv : 0.56
 quarter -> hat_amp.cv : -0.12
 
 # ---- offbeat open hat ----
-oh_env = func { rise: 0.001, fall: 0.22, curve: exp }
+oh_env = func { rise: 0.001, fall: 0.66, curve: exp }
 offbeat -> oh_env.trig
 oh_noise = noise { color: white, seed: 37 }
 oh_filter = svf { cutoff: 6800, res: 0.3 }
 oh_noise -> oh_filter.in
 oh_amp = vca { gain: 0 }
 oh_filter.hp -> oh_amp.in
-oh_env -> oh_amp.cv : 0.3
+oh_env -> oh_amp.cv : 0.42
 
 # ---- hiss floor: pink noise through a dark lowpass, breathing ----
 hiss_noise = noise { color: pink, seed: 3 }

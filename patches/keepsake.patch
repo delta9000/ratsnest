@@ -40,11 +40,11 @@ answer = quant { mode: clock, scale: [0, 2, 3, 5, 7, 8, 10], degree: -2 }
 memory.tap1 -> answer.in
 harmony -> answer.root
 time.beat -> answer.clock
-lead_env = func { rise: 0.004, fall: 0.24, curve: exp }
+lead_env = func { rise: 0.004, fall: 0.72, curve: exp }
 material.a -> lead_env.trig
 lead = additive { levels: [0.7, 0.25, 0.14, 0.06], gain: 0, tilt: -4 }
 key -> lead.v_oct
-lead_env -> lead.gain
+lead_env -> lead.gain : 1.4
 # One slow sweep is tied to the phrase, so tempo edits retain its musical length.
 sweep = lfo { freq: 0, wave: sine }
 time.phrase_phase -> sweep.phase
@@ -54,11 +54,11 @@ lead -> lead_ch.in_l
 lead -> lead_ch.in_r
 melody_level -> lead_ch.level
 
-answer_env = func { rise: 0.012, fall: 0.8, curve: exp }
+answer_env = func { rise: 0.012, fall: 2.4, curve: exp }
 time.beat -> answer_env.trig
 bell = additive { levels: [0.7, 0.15, 0.05], ratios: [1, 2, 3.01], gain: 0 }
 answer -> bell.v_oct
-answer_env -> bell.gain
+answer_env -> bell.gain : 1.4
 bell_ch = channel { level: -23, balance: 0.35, send: -9 }
 bell -> bell_ch.in_l
 bell -> bell_ch.in_r
@@ -72,12 +72,12 @@ hats = bern { seed: 19, length: 16, prob: 0 }
 time.clock -> hats.gate
 time.phrase -> hats.reset
 hat_density -> hats.prob
-hat_env = func { rise: 0.0003, fall: 0.04, curve: exp }
+hat_env = func { rise: 0.0003, fall: 0.12, curve: exp }
 hats.a -> hat_env.trig
 hash = noise { color: blue, seed: 18 }
 hat = vca { gain: 0 }
 hash -> hat.in
-hat_env -> hat.cv
+hat_env -> hat.cv : 1.4
 hat_ch = channel { level: -23, balance: 0.2, send: -18 }
 hat -> hat_ch.in_l
 hat -> hat_ch.in_r

@@ -210,7 +210,7 @@ kck = sub { file: "../lib/kit/kick.sub", tune: 52hz, decay: 0.28 }
 kick_on -> kck.trig
 l_kick  -> kck.accent : 0.35
 0.55    -> kck.accent
-kick_env = func { rise: 0.001, fall: 0.16, curve: exp }
+kick_env = func { rise: 0.001, fall: 0.48, curve: exp }
 kick_on -> kick_env.trig
 
 snr_on = logic { op: and, threshold: 0.02 }
@@ -247,14 +247,14 @@ l_hats -> chat.accent : 0.3
 bass_pat = euclid { steps: 16, hits: 6 }
 master -> bass_pat.clock
 l_bass -> bass_pat.hits : 6
-bass_env = func { rise: 0.003, fall: 0.13, curve: exp }
+bass_env = func { rise: 0.003, fall: 0.39, curve: exp }
 bass_on = logic { op: and, threshold: 0.02 }
 bass_pat.gate -> bass_on.a
 arr_bass.cv   -> bass_on.b
 bass_on -> bass_env.trig
 bass = sub { file: "../lib/reese.sub", saw_cut: 280, sub_cut: 110, detune: 0.009 }
 ch_root.cv -> bass.voct
-bass_env   -> bass.level : 0.9
+bass_env   -> bass.level : 1.26
 l_brgt     -> bass.cut_mod : 380
 
 # === THE FLAT-2 STAB -- the phrygian signature, on the offbeat ===
@@ -278,11 +278,11 @@ stab_a -> stab_filt.in : 0.34
 stab_b -> stab_filt.in : 0.33
 stab_c -> stab_filt.in : 0.33
 l_brgt -> stab_filt.cutoff : 1600
-stab_env = func { rise: 0.002, fall: 0.11, curve: exp }
+stab_env = func { rise: 0.002, fall: 0.33, curve: exp }
 stab_on -> stab_env.trig
 stab_amp = vca { gain: 0 }
 stab_filt -> stab_amp.in
-stab_env  -> stab_amp.cv
+stab_env  -> stab_amp.cv : 1.4
 stab_out = vca { gain: 0 }
 stab_amp -> stab_out.in
 l_stab   -> stab_out.cv : 0.85
@@ -297,11 +297,11 @@ l_brgt -> lead_filt.cutoff : 3800
 lead_on = logic { op: and, threshold: 0.02 }
 mot_seq.gate -> lead_on.a
 arr_lead.cv  -> lead_on.b
-lead_env = func { rise: 0.002, fall: 0.09, curve: exp }
+lead_env = func { rise: 0.002, fall: 0.27, curve: exp }
 lead_on -> lead_env.trig
 lead_amp = vca { gain: 0 }
 lead_filt.lp -> lead_amp.in
-lead_env -> lead_amp.cv
+lead_env -> lead_amp.cv : 1.4
 lead_out = vca { gain: 0 }
 lead_amp -> lead_out.in
 l_lead   -> lead_out.cv : 0.8

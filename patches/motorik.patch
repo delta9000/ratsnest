@@ -88,27 +88,27 @@ quarter -> clap_pat.clock
 clap_gate = logic { op: and }
 clap_pat.trig -> clap_gate.a
 arr_kick.cv -> clap_gate.b
-clap_env = func { rise: 0.001s, fall: 0.16s, curve: exp }
+clap_env = func { rise: 0.001s, fall: 0.48s, curve: exp }
 clap_gate -> clap_env.trig
 clap_n = noise { color: white, seed: 5 }
 clap_filt = svf { cutoff: 1500, res: 0.4 }
 clap_n -> clap_filt.in
 clap_amp = vca { gain: 0 }
 clap_filt.bp -> clap_amp.in
-clap_env -> clap_amp.cv : 0.6
+clap_env -> clap_amp.cv : 0.84
 
 # ---- hats ----
 hat_pat = euclid { steps: 16, hits: 2, rot: 3 }
 master -> hat_pat.clock
 hats_lvl -> hat_pat.hits : 5
-hat_env = func { rise: 0.0005s, fall: 0.035s, curve: exp }
+hat_env = func { rise: 0.0005s, fall: 0.11s, curve: exp }
 hat_pat.trig -> hat_env.trig
 hat_n = noise { color: white, seed: 19 }
 hat_filt = svf { cutoff: 8500, res: 0.2 }
 hat_n -> hat_filt.in
 hat_amp = vca { gain: 0 }
 hat_filt.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.4
+hat_env -> hat_amp.cv : 0.56
 quarter -> hat_amp.cv : -0.1
 
 # ---- bass ----
@@ -206,12 +206,12 @@ gtr_lfo = lfo { freq: 0.06hz, wave: tri }
 gtr_lfo -> gtr_filt.cutoff : 400
 gtr_lvl -> gtr_filt.cutoff : 800
 
-gtr_env = func { rise: 0.008s, fall: 0.35s, curve: exp }
+gtr_env = func { rise: 0.008s, fall: 1.05s, curve: exp }
 gtr_euclid.trig -> gtr_env.trig
 
 gtr_amp = vca { gain: 0 }
 gtr_filt.lp -> gtr_amp.in
-gtr_env -> gtr_amp.cv : 0.55
+gtr_env -> gtr_amp.cv : 0.77
 gtr_lvl -> gtr_amp.cv : 0.6
 
 # ---- granular freeze: records drone+overdrive bed, locks when freeze=1 ----

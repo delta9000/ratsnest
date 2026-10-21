@@ -1,7 +1,8 @@
 # pluck -- Karplus-Strong strings in a tempo-synced echo groove, 180 BPM.
 #
-# The string is a 12 ms noise burst ringing a tuned feedback delay; the
-# quantized melody drives the delay's v_oct pitch input so it stays in tune.
+# The string is a ~12 ms noise burst (exp fall, 36 ms to -60 dB) ringing a
+# tuned feedback delay; the quantized melody drives the delay's v_oct pitch
+# input so it stays in tune.
 # Two echo delays are hand-tuned to the tempo (no clock-sync module yet):
 #   250 ms = a dotted eighth at 180 BPM -- gallops against the quarter plucks
 #   1 s    = three beats -- a slow polyrhythmic wash that laps the bar line
@@ -28,12 +29,12 @@ probe = scope { label: melody }
 scale -> probe.in
 
 # ---- the string: burst exciter into a tuned 9.09 ms loop (~110 Hz) ----
-burst = func { rise: 0.001, fall: 0.012, curve: exp }
+burst = func { rise: 0.001, fall: 0.036, curve: exp }
 quarter -> burst.trig
 hiss = noise { color: white, seed: 4 }
 exciter = vca { gain: 0 }
 hiss -> exciter.in
-burst -> exciter.cv
+burst -> exciter.cv : 1.2
 string = delay { time: 9.09ms, pitch: 0, feedback: 0.96, tone: 3500, mix: 1, slew: 0 }
 exciter -> string.in
 scale -> string.pitch
@@ -50,14 +51,14 @@ scale -> roots.in
 bar -> roots.trig
 bass_osc = vco { freq: 73.42hz, wave: saw }
 roots -> bass_osc.v_oct
-bass_env = func { rise: 0.008, fall: 0.4, curve: exp }
+bass_env = func { rise: 0.008, fall: 2, curve: exp }
 half -> bass_env.trig
 bass_vcf = ladder { cutoff: 100, res: 0.3, drive: 0.5 }
 bass_osc -> bass_vcf.in
 bass_env -> bass_vcf.cutoff : 800
 bass_amp = vca { gain: 0, response: exp }
 bass_vcf -> bass_amp.in
-bass_env -> bass_amp.cv : 0.85
+bass_env -> bass_amp.cv : 1.02
 
 # ---- drums: soft kick on quarters, hats on eighths (offbeats louder) ----
 kick_env = func { rise: 0.001, fall: 0.2, curve: log }
@@ -71,14 +72,14 @@ kick_env -> kick_amp.cv
 kick_drv = drive { amount: 0.25, mode: soft }
 kick_amp -> kick_drv.in
 
-hat_env = func { rise: 0.001, fall: 0.045, curve: exp }
+hat_env = func { rise: 0.001, fall: 0.14, curve: exp }
 master -> hat_env.trig
 hat_noise = noise { color: white, seed: 11 }
 hat_hp = svf { cutoff: 9000, res: 0.75 }
 hat_noise -> hat_hp.in
 hat_amp = vca { gain: 0 }
 hat_hp.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.6
+hat_env -> hat_amp.cv : 0.84
 quarter -> hat_amp.cv : -0.2
 
 # ---- mix: string center-left, gallop right, wash left; kick ducks echoes ----

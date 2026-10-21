@@ -117,14 +117,14 @@ quarter -> clap_seq.clock
 clap_gate = logic { op: and }
 clap_seq.trig -> clap_gate.a
 arr_kick.cv -> clap_gate.b
-clap_env = func { rise: 0.001, fall: 0.14, curve: exp }
+clap_env = func { rise: 0.001, fall: 0.42, curve: exp }
 clap_gate -> clap_env.trig
 clap_noise = noise { color: white, seed: 5 }
 clap_filter = svf { cutoff: 1500, res: 0.55 }
 clap_noise -> clap_filter.in
 clap_amp = vca { gain: 0 }
 clap_filter.bp -> clap_amp.in
-clap_env -> clap_amp.cv : 0.8
+clap_env -> clap_amp.cv : 1.12
 
 # ---- bass: rolling offbeat eighths on the chord root ----
 # Offbeat = eighth AND NOT quarter; both gates come from the same div chain,
@@ -134,7 +134,7 @@ quarter -> beat_not.a
 offbeat = logic { op: and }
 eighth -> offbeat.a
 beat_not -> offbeat.b
-bass_env = func { rise: 0.0015, fall: 0.14, curve: exp }
+bass_env = func { rise: 0.0015, fall: 0.42, curve: exp }
 offbeat -> bass_env.trig
 bass_osc = vco { freq: 110hz, wave: saw }
 ch_root.cv -> bass_osc.v_oct
@@ -144,21 +144,21 @@ bass_env -> bass_filter.cutoff : 1050
 bass_lvl -> bass_filter.cutoff : 250
 bass_amp = vca { gain: 0 }
 bass_filter -> bass_amp.in
-bass_env -> bass_amp.cv : 0.9
+bass_env -> bass_amp.cv : 1.26
 
 # ---- hats: euclid sixteenths whose density rides the arrangement ----
 hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
 master -> hat_pattern.clock
 hats_lvl -> hat_pattern.hits : 6
-hat_env = func { rise: 0.0006, fall: 0.04, curve: exp }
+hat_env = func { rise: 0.0006, fall: 0.12, curve: exp }
 hat_pattern.trig -> hat_env.trig
-hats_lvl -> hat_env.fall : 0.03
+hats_lvl -> hat_env.fall : 0.09
 hat_noise = noise { color: white, seed: 19 }
 hat_filter = svf { cutoff: 8800, res: 0.3 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.5
+hat_env -> hat_amp.cv : 0.7
 quarter -> hat_amp.cv : -0.13
 
 # ---- arp: 16-step turing loop, A minor pentatonic, density automated ----
@@ -188,7 +188,7 @@ arp_lvl -> arp_amp.cv : 0.85
 stab_seq = stepseq { steps: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
                      gates: [0,1,0,0, 1,0,0,1, 0,0,1,0, 0,1,0,0] }
 eighth -> stab_seq.clock
-stab_env = func { rise: 0.002, fall: 0.3, curve: exp }
+stab_env = func { rise: 0.002, fall: 1.5, curve: exp }
 stab_seq.trig -> stab_env.trig
 stab_osc1 = vco { freq: 220hz, wave: pulse, pw: 0.5 }
 stab_osc2 = vco { freq: 220hz, wave: pulse, pw: 0.5 }
@@ -207,7 +207,7 @@ stab_env -> stab_filter.cutoff : 2400
 stab_wander -> stab_filter.cutoff : 250
 stab_amp = vca { gain: 0, response: exp }
 stab_filter.lp -> stab_amp.in
-stab_env -> stab_amp.cv : 0.8
+stab_env -> stab_amp.cv : 0.96
 # Post-fader stage: the arrangement lane gates the stabs BEFORE the FX sends,
 # so muted stabs cannot bleed into the reverb and delay returns.
 stab_out = vca { gain: 0 }

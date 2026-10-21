@@ -100,7 +100,7 @@ hall.out_l -> m.in7
 hall.out_r -> m.in8
 ech -> m.in5 : 0.6      # echo submixed onto the rim channel; 8 slots, all spoken for
 
-duck = func { rise: 0.004, fall: 0.22, curve: exp }
+duck = func { rise: 0.004, fall: 0.66, curve: exp }
 quarter -> duck.trig
 duck -> m.lvl2 : -0.3
 duck -> m.lvl3 : -0.12

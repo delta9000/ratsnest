@@ -71,7 +71,7 @@ master -> note.clock
 wob = lfo { freq: 0hz, wave: tri }
 wrate.hz -> wob.freq
 note.trig -> wob.reset
-depth = func { rise: 0.42, fall: 0.12, curve: exp }
+depth = func { rise: 0.42, fall: 0.36, curve: exp }
 note.trig -> depth.trig
 wdepth = vca { gain: 0 }
 wob   -> wdepth.in

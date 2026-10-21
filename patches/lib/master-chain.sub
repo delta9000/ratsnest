@@ -78,7 +78,7 @@ brick.out_r -> r.in
 demo.clk  = clock { bpm: 120 }
 demo.beat = div { by: 2 }
 demo.clk -> demo.beat.in
-demo.kenv = func { rise: 0.001, fall: 0.16, curve: exp }
+demo.kenv = func { rise: 0.001, fall: 0.48, curve: exp }
 demo.beat -> demo.kenv.trig
 demo.kosc = vco { freq: 52hz, wave: sine }
 demo.kenv -> demo.kosc.fm : 40

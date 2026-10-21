@@ -194,14 +194,14 @@ renv -> ride.cv : 0.5
 crash_gate = logic { op: and }
 bar -> crash_gate.a
 arr_chorus.cv -> crash_gate.b
-crenv = func { rise: 0.001s, fall: 0.9s, curve: exp }
+crenv = func { rise: 0.001s, fall: 2.7s, curve: exp }
 crash_gate -> crenv.trig
 crz = noise { color: white, seed: 21 }
 crhp = svf { cutoff: 5500hz, res: 0.1 }
 crz -> crhp.in
 crash = vca { gain: 0 }
 crhp.hp -> crash.in
-crenv -> crash.cv : 0.6
+crenv -> crash.cv : 0.84
 
 cyms = mix { levels: [0.9, 0.5, 0.7] }
 hats -> cyms.in1
@@ -277,7 +277,7 @@ pad3 -> pad_tone.in3
 pad_fil = svf { cutoff: 700, res: 0.2 }
 pad_tone -> pad_fil.in
 pad_env = adsr { attack: 0.6, decay: 0.4, sustain: 0.8, release: 1.6,
-                curve: exp }
+                curve: quad }
 bar -> pad_env.gate
 pad_amp = vca { gain: 0, response: exp }
 pad_fil.lp -> pad_amp.in

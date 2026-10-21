@@ -169,6 +169,27 @@ bleeds into reverb/delay if the send is tapped pre-mute. Gate the voice
 from there. (`meridian.patch` demonstrates this; it's why its stabs vanish
 cleanly instead of leaving reverb ghosts.)
 
+## `curve: exp` times are −60 dB times
+
+`curve: exp` on `adsr`/`func`/`fm` is a true RC decay normalized to land on
+time, so its stage time is where the tail reaches −60 dB; it passes −20 dB at
+a third of the stage. (Before it became a true exponential, `exp` was `x²`,
+now `quad`, which holds near the top and passes −20 dB at 95% of the stage.)
+When converting a linear or `quad` decay, or a number from an older note:
+
+- **Time ×3** keeps the −20 dB point (the heard length) where it was.
+  A squared amp (`vca { response: exp }`) halves every dB, so it needs ×5;
+  so do `fm` segments, whose brightness follows the index nonlinearly.
+  A tail summed under a louder transient (the kit hats) needs more: measure.
+- **Amp depth ×1.4 (+3 dB)** roughly restores the level: a natural decay
+  carries ~4 dB less energy than a held one of the same heard length, at the
+  same peak (×1.2 on the cv of a squared amp). Measured across the 2026-10
+  rebalance: percussion bands back within ~2 dB (most within 1), mastered
+  tracks within ±0.5 dB RMS.
+- **Keep `quad`** where the hang is the point: bar-gated pads and subs that
+  "swell per bar" (the release bridges the gate's low half) and slow
+  arrangement arcs that should hold tension and then accelerate.
+
 ## Composition idioms that read as "composed"
 
 Learned by diffing the good patches (`meridian`/`halcyon`/`ion`) against

@@ -43,7 +43,7 @@ modu -> prin.fm : 0.22
 folder = fold { fold: 1.4, sym: 0 }
 prin -> folder.in
 
-timbre = func { rise: 8ms, fall: 0.5, curve: exp }
+timbre = func { rise: 8ms, fall: 1.5, curve: exp }
 clk -> timbre.trig
 timbre -> folder.fold : 2.6
 drift = lfo { freq: 0.043hz, wave: sine }
@@ -78,7 +78,7 @@ oscillator pitch modulation.
 body = vco { freq: 220hz, wave: sine }
 fld = fold { fold: 1.0 }
 body -> fld.in
-hit = func { rise: 0.001, fall: 0.09, curve: exp }
+hit = func { rise: 0.001, fall: 0.27, curve: exp }
 hit -> fld.fold : 2.4
 skin = lpg { damp: 0.55, decay: 0.09 }
 fld -> skin.in

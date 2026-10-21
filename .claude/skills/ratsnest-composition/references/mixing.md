@@ -57,7 +57,7 @@ kick_drive -> glue.side_l : 0.7
 kick_drive -> glue.side_r : 0.7
 ```
 
-The duck envelope is a `func { rise: 0.004, fall: 0.28, curve: exp }` on the
+The duck envelope is a `func { rise: 0.004, fall: 0.84, curve: exp }` on the
 quarter clock — not the kick audio. That gives you a clean, adjustable shape
 and no bleed. If the arrangement drops the kick, gate the duck envelope with
 the kick's arrangement lane or the breakdown will pump against nothing.

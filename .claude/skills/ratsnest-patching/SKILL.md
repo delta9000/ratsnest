@@ -98,6 +98,7 @@ Iterate on numbers, not vibes. Two or three passes converges.
 | Everything transposed by octaves | note names on a `freq:` base that isn't 220 Hz |
 | Note retunes during its own tail | no `sh` holding pitch after the switch/quantizer |
 | Reverb ghosts of a muted part | send tapped pre-mute; tap it from the post-fader `vca` |
+| `curve: exp` hit far shorter than its time | the time is the −60 dB point: write ~3x a linear time (patch-craft.md) |
 | Intro reappears at the end | the arrangement grid wrapped; render shorter than `steps × block` |
 | `quant` output missing | it's `quant.out`; only `stepseq` has `.cv` |
 | Voice muted for a whole section | `logic{and}` thresholds at 0.5 and your lane sits below it — compare against a floor with `logic{op:cmp}` instead |

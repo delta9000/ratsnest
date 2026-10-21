@@ -109,7 +109,7 @@ p_rim.gate   -> rim.trig
 0.35 -> rim.accent
 
 # Kick envelope for the three-depth duck (channel, FX return, bus glue).
-kduck = func { rise: 0.004, fall: 0.20, curve: exp }
+kduck = func { rise: 0.004, fall: 0.6, curve: exp }
 p_kick.trig -> kduck.trig
 
 # === SUB — sine only, mono, never modulated (card rule) ===
@@ -138,7 +138,7 @@ wsub.cv -> wrate.beats
 wob = lfo { freq: 0hz, wave: tri }          # freq base zeroed: cables SUM
 wrate.hz -> wob.freq
 note.trig -> wob.reset
-wdep = func { rise: 0.42, fall: 0.12, curve: exp }
+wdep = func { rise: 0.42, fall: 0.36, curve: exp }
 note.trig -> wdep.trig
 wdepth = vca { gain: 0 }
 wob  -> wdepth.in

@@ -25,7 +25,13 @@ d1 -> benv.trig
 d2 -> benv.trig
 
 # Tail starts at the last burst.
-tenv = func { rise: 0.001, fall: decay, curve: exp }
+# `decay` keeps its meaning (the length of the tail you hear). An `exp` stage
+# time is its -60 dB point, so the fall runs 4x decay: measured at the default
+# 0.15 s, -20 dB at 87 ms (x^2 curve: 129) and -40 dB at 264 ms (172) -- a
+# natural room tail in place of a gated one, energy -1.1 dB.
+tail = math { op: mult, a: decay, b: 4 }
+tenv = func { rise: 0.001, fall: 0, curve: exp }
+tail -> tenv.fall
 d2 -> tenv.trig
 
 cn = noise { color: white, seed: 29 }

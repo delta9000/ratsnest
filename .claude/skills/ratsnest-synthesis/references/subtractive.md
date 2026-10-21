@@ -105,7 +105,7 @@ sweeping the slave's pitch moves the formant, not the note.
 mas = vco { freq: 110hz, wave: pulse }
 slv = vco { freq: 110hz, wave: saw }
 mas -> slv.sync
-sweep = func { rise: 0.01, fall: 0.9, curve: exp }
+sweep = func { rise: 0.01, fall: 2.7, curve: exp }
 clk -> sweep.trig
 sweep -> slv.v_oct : 2.2
 ```
@@ -132,7 +132,7 @@ Expect DC (measured −0.028) and clean it up downstream.
 plus `drive` inside the filter.
 
 ```text
-env = func { rise: 0.002, fall: 0.16, curve: exp }
+env = func { rise: 0.002, fall: 0.48, curve: exp }
 acidf = ladder { cutoff: 90, res: 0.88, drive: 1.2 }
 env -> acidf.cutoff : 2600
 ```
