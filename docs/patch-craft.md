@@ -27,7 +27,9 @@ Use measurements to investigate a specific concern, then audition the result.
 Float renders preserve overs, so a peak above 0 dBFS is useful evidence of
 overload. Live output clips at the device boundary; an explicit limiter remains
 the way to control peaks. Compressor/clipper dry-wet blends and hot reload now
-use linear interpolation, so old equal-power gain boosts are gone. Rebalance
+use linear interpolation, so old equal-power gain boosts are gone. Compressor
+and limiter detectors peak-hold for `min(release, 20 ms)` (clean bass, but a
+slow-attack glue comp now reduces 2–3 dB more; raise its makeup). Rebalance
 older mastered patches by measurement rather than assuming old numbers still hold.
 Those EDM levels are calibration examples, not acceptance criteria for every
 style. Compare at similar playback loudness. Render a short, full-tempo clip

@@ -321,7 +321,7 @@ dc.out_l -> eq_m.in_l
 dc.out_r -> eq_m.in_r
 
 glue = compressor { sidechain: external, threshold: -14, ratio: 2.4, knee: 6,
-                    attack: 0.012, release: 0.14, makeup: 6.0, mix: 1 }
+                    attack: 0.012, release: 0.14, makeup: 6.5, mix: 1 }
 eq_m.out_l -> glue.in_l
 eq_m.out_r -> glue.in_r
 kick -> glue.side_l : 0.9                   # depth three: external-sidechain glue

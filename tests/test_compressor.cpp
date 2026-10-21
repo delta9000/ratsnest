@@ -1,7 +1,10 @@
 #include <doctest/doctest.h>
 #include <cmath>
+#include <numbers>
+#include <vector>
 #include "dsp/modules.h"
 #include "dsp/mastering.h"
+#include "thd.h"
 
 using namespace ms::dsp;
 
@@ -171,10 +174,37 @@ TEST_CASE("compressor: time constants and stereo linking") {
   CHECK(std::abs(outs[0] - db_to_linear(-10.0f)) < 0.002f);
   CHECK(outs[1] == 0.0f);
   
-  // 2. Check release phase
+  // 2. Check release phase: the detector holds the last peak for
+  //    min(release, 20 ms), then releases with the release time constant.
   ins[0] = 0.0f; // Silence input
-  m->process(ins, outs);
-  CHECK(outs[3] < 10.0f); // GR begins to drop
+  const float held = outs[3];
+  for (int i = 0; i < 959; ++i) m->process(ins, outs);
+  CHECK(outs[3] == doctest::Approx(held));
+  for (int i = 0; i < 9601; ++i) m->process(ins, outs);  // + 200 ms = one tau
+  CHECK(outs[3] == doctest::Approx(held * std::exp(-1.0f)).epsilon(0.01));
+}
+
+TEST_CASE("compressor: fast attack on 50 Hz bass stays clean") {
+  // 1 ms attack, 100 ms release, a -6 dBFS sine 12 dB over threshold: the
+  // detector holds across the waveform's troughs instead of tracking them.
+  for (float knee : {0.0f, 6.0f}) {
+    auto m = make_compressor();
+    std::vector<float> y;
+    float gr = 0.0f;
+    for (int i = 0; i < 96000; ++i) {
+      const float x = 0.5f * std::sin(2.0f * std::numbers::pi_v<float> * 50.0f * static_cast<float>(i) / 48000.0f);
+      float ins[11] = {x, x, 0, 0, -18, 4, knee, 0.001f, 0.1f, 0, 1};
+      float outs[4];
+      m->process(ins, outs);
+      if (i >= 48000) y.push_back(outs[0]);
+      gr = outs[3];
+    }
+    CAPTURE(knee);
+    CHECK(thd(y, 50.0, 48000.0) < 1e-3);  // < 0.1 % (was 1.2 %)
+    // Threshold and ratio keep their meaning: the held -6 dBFS peak is 12 dB
+    // over, 4:1 leaves 3 dB of it, so 9 dB of reduction.
+    CHECK(gr == doctest::Approx(9.0f).epsilon(0.01));
+  }
 }
 
 TEST_CASE("compressor: hostile values and silence") {

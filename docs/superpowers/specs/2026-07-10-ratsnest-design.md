@@ -211,10 +211,10 @@ bridge. See `docs/modules.md` for behavior.)
 |---|---|---|
 | `dcblock` | stereo DC blocker | first-order high-pass filter, parameter smoothing around 20 ms, denormal flushing |
 | `stereo` | stereo utility | normalized M/S width, equal-power balance, level-sensed mono/swap, 300 ms correlation meter |
-| `compressor` | stereo linked compressor | stereo-linked feed-forward log-domain soft-knee curve, attack/release smoothing, makeup and dry/wet |
+| `compressor` | stereo linked compressor | stereo-linked feed-forward log-domain soft-knee curve, peak-held detector, attack/release smoothing, makeup and dry/wet |
 | `eq` | stereo mastering EQ | five-band parametric EQ (HPF, low shelf, mid1 peaking, mid2 peaking, high shelf), shared coefficients, 20 ms parameter smoothing, zero-gain bypass |
 | `clipper` | oversampled stereo clipper | hard/soft (tanh) oversampled clipping, 4x polyphase allpass IIR half-band oversampling, dry-delay latency alignment |
-| `limiter` | lookahead peak limiter | fixed 2.0 ms lookahead, peak detection window, fast 0.1 ms attack, log-domain smoothing |
+| `limiter` | lookahead peak limiter | fixed 2.0 ms lookahead, peak-hold of required gain reduction, release, box-filter attack across the whole lookahead |
 
 ### Phase 6 — granular (+1)
 

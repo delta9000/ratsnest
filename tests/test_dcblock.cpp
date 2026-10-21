@@ -147,3 +147,21 @@ TEST_CASE("dcblock: hostile finite inputs/rates and silence") {
     CHECK(std::isfinite(outs[1]));
   }
 }
+
+TEST_CASE("dcblock: a static cutoff starts settled (no sweep from 10 Hz)") {
+  for (float cutoff : {1.0f, 30.0f}) {
+    auto fresh = make_dcblock();
+    auto warm = make_dcblock();
+    float ins[3] = {0, 0, cutoff}, outs[2], ref[2];
+    for (int i = 0; i < 48000; ++i) warm->process(ins, ref);
+    float worst = 0.0f;
+    for (int i = 0; i < 4800; ++i) {
+      ins[0] = ins[1] = 0.5f + 0.3f * std::sin(2.0f * std::numbers::pi_v<float> * 20.0f * static_cast<float>(i) / 48000.0f);
+      fresh->process(ins, outs);
+      warm->process(ins, ref);
+      worst = std::max({worst, std::abs(outs[0] - ref[0]), std::abs(outs[1] - ref[1])});
+    }
+    CAPTURE(cutoff);
+    CHECK(worst < 1e-5f);
+  }
+}
