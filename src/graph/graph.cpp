@@ -6,18 +6,27 @@
 #include <queue>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include "dsl/suggest.h"
 #include "graph/voices.h"
 
 namespace ms::graph {
 namespace {
 
-std::string join_names(auto&& items, auto&& name_of) {
-  std::string s;
-  for (auto&& it : items) {
-    if (!s.empty()) s += ", ";
-    s += name_of(it);
-  }
-  return s;
+template <class Items>
+std::vector<std::string> names_of(const Items& items) {
+  std::vector<std::string> v;
+  for (const auto& it : items) v.emplace_back(it.name);
+  return v;
+}
+
+// Why `port` is not one of `wanted`: it names the other direction, or it is
+// close to a real name.
+std::string port_hint(const std::string& port, const std::vector<std::string>& wanted,
+                      const std::vector<std::string>& other, const char* other_kind) {
+  if (std::find(other.begin(), other.end(), port) != other.end())
+    return " ('" + port + "' is " + other_kind + "; cables run source -> destination)";
+  return dsl::did_you_mean(port, wanted);
 }
 
 dsp::ConfigValue to_config_value(const dsl::Value& v) {
@@ -37,23 +46,18 @@ dsp::ConfigValue to_config_value(const dsl::Value& v) {
 }
 
 // An enum config (one name, or an array of names for ConfigKind::Enums).
+// A number never matches: its str is empty, and no enum value is.
 std::string enum_error(const dsp::ConfigInfo& ci, const dsl::Value& v) {
-  using K = dsl::Value::Kind;
+  std::vector<std::string> vals;
+  for (const char* const* e = ci.enum_vals; *e; ++e) vals.emplace_back(*e);
   auto valid = [&](const dsl::Value& item) {
-    if (item.kind != K::Ident && item.kind != K::Str) return false;
-    for (const char* const* e = ci.enum_vals; *e; ++e)
-      if (item.str == *e) return true;
-    return false;
+    return std::find(vals.begin(), vals.end(), item.str) != vals.end();
   };
   const bool array = ci.kind == dsp::ConfigKind::Enums;
-  if (array ? (v.kind == K::Array && std::all_of(v.items.begin(), v.items.end(), valid))
+  if (array ? (v.kind == dsl::Value::Kind::Array && std::all_of(v.items.begin(), v.items.end(), valid))
             : valid(v)) return {};
-  std::string opts;
-  for (const char* const* e = ci.enum_vals; *e; ++e) {
-    if (!opts.empty()) opts += ", ";
-    opts += *e;
-  }
-  return std::string(array ? "expects an array of: " : "expects one of: ") + opts;
+  return std::string(array ? "expects an array of: " : "expects one of: ") + dsl::join(vals) +
+         dsl::did_you_mean(v.str, vals);
 }
 
 bool finite_num(const dsl::Value& v) {
@@ -145,7 +149,12 @@ class Compiler {
   void declare(const dsl::ModuleDecl& m) {
     if (m.name == "out") return err(m.line, m.col, "'out' is a reserved built-in module name", m.file);
     const dsp::ModuleInfo* info = dsp::find_module(m.type);
-    if (!info) return err(m.line, m.col, "unknown module type '" + m.type + "'", m.file);
+    if (!info) {
+      failed_.insert(m.name);  // its cables would only repeat this error
+      return err(m.line, m.col, "unknown module type '" + m.type + "'" +
+                 dsl::did_you_mean(m.type, module_types(), " (run 'ratsnest describe' for the list)"),
+                 m.file);
+    }
     // The parser rejects duplicates as written; this catches a declared name
     // colliding with one a subpatch stamps (`t.osc` beside `t = sub {..}`).
     if (index_of_.count(m.name))
@@ -164,7 +173,10 @@ class Compiler {
     const int slot = info.input_index(p.name);
     if (slot >= 0) {
       if (!finite_num(p.value) || std::abs(p.value.num) > std::numeric_limits<float>::max())
-        return err(p.line, p.col, "parameter '" + p.name + "' expects a finite float number", m.file);
+        return err(p.line, p.col, "parameter '" + p.name + "' expects a finite float number" +
+                   // `a4` lexes as a name: notes are the uppercase spelling.
+                   (p.value.kind == dsl::Value::Kind::Ident ? " (note names are uppercase, e.g. A4)" : ""),
+                   m.file);
       n.input_base[static_cast<size_t>(slot)] = static_cast<float>(p.value.num);
       return;
     }
@@ -174,8 +186,10 @@ class Compiler {
       n.config.push_back({p.name, to_config_value(p.value)});
       return;
     }
-    err(p.line, p.col, "module type '" + m.type + "' has no parameter '" + p.name +
-        "' (inputs: " + join_names(info.inputs, [](auto& i) { return i.name; }) + ")", m.file);
+    std::vector<std::string> all = names_of(info.inputs);
+    for (const auto& c : names_of(info.configs)) all.push_back(c);
+    err(p.line, p.col, "module type '" + m.type + "' has no parameter '" + p.name + "'" +
+        dsl::did_you_mean(p.name, all) + " (parameters: " + dsl::join(all) + ")", m.file);
   }
 
   // Resolve a dotted chain to a node index + port via the shared split rule
@@ -193,19 +207,22 @@ class Compiler {
       return err(c.line, c.col, "unknown name '" + c.depth_ident +
                  "' for cable depth (params resolve only inside a subpatch)", c.file);
     const Resolved rd = resolve(c.dst.module);
-    if (rd.node < 0) return err(c.dst.line, c.dst.col, "unknown module '" + c.dst.module + "'", c.file);
+    if (rd.node < 0) return unknown_module(c.dst, c.file);
     Node& dn = g_->nodes[static_cast<size_t>(rd.node)];
     const std::string dport = rd.port.empty() ? "in" : rd.port;
     const int dslot = dn.info->input_index(dport);
-    if (dslot < 0)
-      return err(c.dst.line, c.dst.col, "module '" + dn.name + "' has no input '" + dport +
-                 "' (inputs: " + join_names(dn.info->inputs, [](auto& i) { return i.name; }) + ")", c.file);
+    if (dslot < 0) {
+      const auto inputs = names_of(dn.info->inputs);
+      return err(c.dst.line, c.dst.col, "module '" + dn.name + "' has no input '" + dport + "'" +
+                 port_hint(dport, inputs, names_of(dn.info->outputs), "an output") +
+                 " (inputs: " + dsl::join(inputs) + ")", c.file);
+    }
     if (c.src.is_literal) {
       dn.input_base[static_cast<size_t>(dslot)] += static_cast<float>(c.src.literal * c.depth);
       return;
     }
     const Resolved rs = resolve(c.src.module);
-    if (rs.node < 0) return err(c.src.line, c.src.col, "unknown module '" + c.src.module + "'", c.file);
+    if (rs.node < 0) return unknown_module(c.src, c.file);
     const Node& sn = g_->nodes[static_cast<size_t>(rs.node)];
     // A bare module name means its first output (spec §DSL; e.g. `seq -> ...`
     // reads stepseq's cv, not a port literally named "out").
@@ -213,10 +230,26 @@ class Compiler {
         ? (sn.info->outputs.empty() ? "" : sn.info->outputs[0].name)
         : rs.port;
     const int sslot = sn.info->output_index(sport);
-    if (sslot < 0)
-      return err(c.src.line, c.src.col, "module '" + sn.name + "' has no output '" + sport +
-                 "' (outputs: " + join_names(sn.info->outputs, [](auto& o) { return o.name; }) + ")", c.file);
+    if (sslot < 0) {
+      const auto outputs = names_of(sn.info->outputs);
+      return err(c.src.line, c.src.col, "module '" + sn.name + "' has no output '" + sport + "'" +
+                 port_hint(sport, outputs, names_of(sn.info->inputs), "an input") +
+                 " (outputs: " + dsl::join(outputs) + ")", c.file);
+    }
     cables.push_back({rs.node, sslot, rd.node, dslot, static_cast<float>(c.depth)});
+  }
+
+  // An endpoint naming no node: quiet when its declaration already failed,
+  // else a suggestion from the declared (not voice-stamped) names.
+  void unknown_module(const dsl::Endpoint& e, const std::string& file) {
+    if (split_endpoint([&](const std::string& n) { return failed_.count(n) > 0; }, e.module).ok)
+      return;
+    std::vector<std::string> names;
+    for (const auto& [name, idx] : index_of_)
+      if (name.find('#') == std::string::npos) names.push_back(name);
+    std::sort(names.begin(), names.end());
+    const std::string head = e.module.substr(0, e.module.find('.'));
+    err(e.line, e.col, "unknown module '" + e.module + "'" + dsl::did_you_mean(head, names), file);
   }
 
   // Reorder nodes into processing order and bucket cables by destination.
@@ -242,9 +275,16 @@ class Compiler {
   CompileResult& r_;
   std::unique_ptr<Graph> g_;
   std::unordered_map<std::string, int> index_of_;
+  std::unordered_set<std::string> failed_;  // declared with an unknown type
 };
 
 }  // namespace
+
+std::vector<std::string> module_types() {
+  std::vector<std::string> v;
+  for (const auto* m : dsp::all_modules()) v.emplace_back(m->type);
+  return v;
+}
 
 CompileResult compile(const dsl::PatchAst& ast_in, double sample_rate) {
   CompileResult r;

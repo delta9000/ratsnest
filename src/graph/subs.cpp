@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "dsl/parser.h"
+#include "dsl/suggest.h"
 
 namespace ms::graph {
 
@@ -199,6 +200,7 @@ class Splice {
 
   void run(dsl::PatchAst& parent, dsl::PatchAst& body) {
     if (!lift_ports(body)) return;
+    for (const auto& m : body.modules) members_.insert(m.name.substr(0, m.name.find('.')));
     for (const auto& c : parent.cables)
       if (!route(c)) return;
     drive_defaults();
@@ -244,10 +246,30 @@ class Splice {
     return !ctx_.failed();
   }
 
+  // `inst.x`, where x is neither a port nor a body member, is a misspelled
+  // port: name the interface instead of leaving compile to report an
+  // unknown module 'inst.x'.
+  // (A literal's empty name, and every name at top level where inst_ is
+  // empty, are never chain_under it.)
+  bool known_port(const dsl::Endpoint& e, const std::string& pfile) {
+    if (!chain_under(e.module, inst_)) return true;
+    const std::string x = e.module.substr(inst_.size() + 1);
+    if (x.find('.') != std::string::npos || members_.count(x)) return true;
+    std::vector<std::string> ins;
+    for (const auto& i : f_.inputs) ins.push_back(i.first);
+    std::vector<std::string> ports = ins;
+    ports.insert(ports.end(), f_.outputs.begin(), f_.outputs.end());
+    ctx_.err(pfile, e.line, e.col,
+             "sub '" + inst_ + "' has no port '" + x + "'" + dsl::did_you_mean(x, ports) +
+                 " (inputs: " + dsl::join(ins) + "; outputs: " + dsl::join(f_.outputs) + ")");
+    return false;
+  }
+
   bool route(const dsl::CableDecl& c) {
     // Errors here are about this parent-side cable: attribute them to the
     // file it was written in (empty = the parent itself), not the body.
     const std::string& pfile = c.file.empty() ? parent_file_ : c.file;
+    if (!known_port(c.src, pfile) || !known_port(c.dst, pfile)) return false;
     std::vector<dsl::CableDecl> stage{c};
     if (!c.src.is_literal && !read_outputs(c, pfile, stage)) return false;
     for (const auto& sc : stage)
@@ -365,6 +387,7 @@ class Splice {
   const Interface& f_;
   std::unordered_map<std::string, std::vector<dsl::CableDecl>> in_targets_, out_sources_;
   std::unordered_set<std::string> fed_inputs_;
+  std::unordered_set<std::string> members_;  // body names' first segments, ports included
   std::vector<dsl::CableDecl> out_;
 };
 
@@ -416,8 +439,14 @@ ParamMap bind_params(Ctx& ctx, const dsl::ModuleDecl& decl, const std::string& p
   for (const auto& o : decl.params) {
     if (o.name == "file" || o.name == "def") continue;
     auto it = params.find(o.name);
-    if (it == params.end())
-      ctx.err(parent_file, o.line, o.col, "sub '" + decl.name + "' has no param '" + o.name + "'");
+    if (it == params.end()) {
+      std::vector<std::string> names;
+      for (const auto& [n, v] : params) names.push_back(n);
+      std::sort(names.begin(), names.end());
+      ctx.err(parent_file, o.line, o.col, "sub '" + decl.name + "' has no param '" + o.name + "'" +
+                                              dsl::did_you_mean(o.name, names) +
+                                              " (params: " + dsl::join(names) + ")");
+    }
     else
       it->second = o.value;
   }
@@ -479,7 +508,7 @@ struct Source {
   std::string dir, file, key;
 };
 
-Source def_source(Ctx& ctx, const dsl::ModuleDecl& decl, const dsl::ParamDecl& pd,
+Source def_source(Ctx& ctx, const dsl::ParamDecl& pd,
                   const TemplateMap& templates, const std::string& dir, const std::string& file) {
   if (pd.value.kind != dsl::Value::Kind::Ident) {
     ctx.err(file, pd.line, pd.col, "sub 'def:' expects a template name");
@@ -488,10 +517,6 @@ Source def_source(Ctx& ctx, const dsl::ModuleDecl& decl, const dsl::ParamDecl& p
   auto it = templates.find(pd.value.str);
   if (it == templates.end()) {
     ctx.err(file, pd.line, pd.col, "unknown subdef '" + pd.value.str + "'");
-    return {};
-  }
-  if (ctx.stack.size() >= kMaxDepth) {
-    ctx.err(file, decl.line, decl.col, "subpatch nesting deeper than 16");
     return {};
   }
   return {&it->second, dir, file, "def:" + pd.value.str + "@" + file};
@@ -529,10 +554,6 @@ Source file_source(Ctx& ctx, const dsl::ModuleDecl& decl, const dsl::ParamDecl& 
     ctx.err(file, decl.line, decl.col, "subpatch include cycle at '" + path + "'");
     return {};
   }
-  if (ctx.stack.size() >= kMaxDepth) {
-    ctx.err(file, decl.line, decl.col, "subpatch nesting deeper than 16");
-    return {};
-  }
   return {load_file(ctx, path, pf, file), p.parent_path().string(), path, key};
 }
 
@@ -544,7 +565,9 @@ void instantiate(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const TemplateMap&
   if ((pf != nullptr) == (pd != nullptr))
     return ctx.err(file, decl.line, decl.col,
                    "sub '" + decl.name + "' requires exactly one of 'file:' or 'def:'");
-  const Source src = pd ? def_source(ctx, decl, *pd, templates, dir, file)
+  if (ctx.stack.size() >= kMaxDepth)
+    return ctx.err(file, decl.line, decl.col, "subpatch nesting deeper than 16");
+  const Source src = pd ? def_source(ctx, *pd, templates, dir, file)
                         : file_source(ctx, decl, *pf, dir, file);
   if (!src.ast) return;
   ctx.stack.insert(src.key);
@@ -681,6 +704,20 @@ SubExpansion expand_subs(dsl::PatchAst& ast, const std::string& patch_dir,
     out.files = std::move(ctx.files);
   }
   return out;
+}
+
+PatchBuild build_patch(std::string_view src, const std::string& patch_path, double rate) {
+  PatchBuild b;
+  auto p = dsl::parse(src);
+  b.compiled.errors = std::move(p.errors);
+  if (!b.compiled.ok()) return b;
+  const std::filesystem::path parent = std::filesystem::path(patch_path).parent_path();
+  b.files = expand_subs(p.ast, parent.empty() ? "." : parent.string(), read_text_file,
+                        b.compiled.errors).files;
+  if (!b.compiled.ok()) return b;
+  b.ast = std::move(p.ast);
+  b.compiled = compile(b.ast, rate);
+  return b;
 }
 
 }  // namespace ms::graph

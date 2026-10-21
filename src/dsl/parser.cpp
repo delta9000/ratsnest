@@ -65,16 +65,7 @@ class Parser {
     ModuleDecl m;
     const Token& name = next();
     m.name = name.text; m.line = name.line; m.col = name.col;
-    while (at(Tok::Dot)) {
-      next();
-      if (!at(Tok::Ident)) {
-        err(cur().line, cur().col, "expected name after '.'");
-        sync();
-        return nullptr;
-      }
-      m.name += '.';
-      m.name += next().text;
-    }
+    if (!dotted(m.name)) return nullptr;
     const Token& eq = next();  // '='
     if (!at(Tok::Ident)) {
       err(eq.line, eq.col, "expected module type after '='");
@@ -83,7 +74,8 @@ class Parser {
     }
     m.type = next().text;
     if (at(Tok::LBrace)) {
-      next();
+      const Token& open = next();
+      const std::string where = std::to_string(open.line) + ":" + std::to_string(open.col);
       while (!at(Tok::RBrace) && !at(Tok::End)) {
         ParamDecl p;
         const Token& pn = cur();
@@ -95,7 +87,8 @@ class Parser {
         if (at(Tok::Comma)) next();
         else break;
       }
-      if (!expect(Tok::RBrace, "'}' to close parameter block")) return nullptr;
+      const std::string want = "',' between parameters, or '}' to close the block opened at " + where;
+      if (!expect(Tok::RBrace, want.c_str())) return nullptr;
     }
     r_.ast.modules.push_back(std::move(m));
     return &r_.ast.modules.back();
@@ -106,7 +99,7 @@ class Parser {
     if (at(Tok::Ident)) {
       v.kind = Value::Kind::Ident;
       v.str = next().text;
-      while (at(Tok::Dot) && i_ + 1 < toks_.size() && toks_[i_ + 1].kind == Tok::Ident) {
+      while (at(Tok::Dot) && peek(1).kind == Tok::Ident) {
         next();
         v.str += '.';
         v.str += next().text;
@@ -170,6 +163,11 @@ class Parser {
   bool endpoint(Endpoint& e) {
     const Token& m = next();
     e.module = m.text; e.line = m.line; e.col = m.col;
+    return dotted(e.module);  // e.port stays empty; graph resolves module vs port
+  }
+
+  // Appends any `.ident` segments to `name`; false (reported) on a bare '.'.
+  bool dotted(std::string& name) {
     while (at(Tok::Dot)) {
       next();
       if (!at(Tok::Ident)) {
@@ -177,10 +175,10 @@ class Parser {
         sync();
         return false;
       }
-      e.module += '.';
-      e.module += next().text;
+      name += '.';
+      name += next().text;
     }
-    return true;  // e.port stays empty; graph resolves module vs port
+    return true;
   }
 
   std::vector<Token> toks_;

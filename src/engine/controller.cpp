@@ -1,6 +1,4 @@
 #include "engine/controller.h"
-#include <filesystem>
-#include "dsl/parser.h"
 #include "graph/reload.h"
 #include "graph/subs.h"
 #include "graph/voices.h"
@@ -15,19 +13,9 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
   drain_retired();
   pending_ = false;  // this edit is newer than anything held back
 
-  auto p = dsl::parse(src);
-  if (!p.ok()) {
-    res.errors = std::move(p.errors);
-    return res;
-  }
-
-  const std::filesystem::path parent = std::filesystem::path(patch_path).parent_path();
-  const std::string dir = parent.empty() ? "." : parent.string();
-  auto sx = graph::expand_subs(p.ast, dir, graph::read_text_file, res.errors);
-  if (!res.errors.empty()) return res;
-  res.files = std::move(sx.files);
-
-  auto c = graph::compile(p.ast, rate_);
+  auto b = graph::build_patch(src, patch_path, rate_);
+  auto& c = b.compiled;
+  res.files = std::move(b.files);
   if (!c.ok()) {
     res.errors = std::move(c.errors);
     return res;
@@ -65,7 +53,7 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
   }
 
   // The RT engine and the shadow must be distinct objects: compile again.
-  auto c2 = graph::compile(p.ast, rate_);
+  auto c2 = graph::compile(b.ast, rate_);
   Command cmd;
   cmd.kind = Command::Kind::Swap;
   cmd.engine = new Engine(std::move(c.graph));

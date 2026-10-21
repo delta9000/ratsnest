@@ -14,6 +14,9 @@ bool is_digit(char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0;
 bool is_space(char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; }
 bool ident_start(char c) { return std::islower(static_cast<unsigned char>(c)) || c == '_'; }
 bool ident_char(char c) { return ident_start(c) || is_digit(c); }
+// Wider than an identifier: lets a diagnostic quote a whole mistyped word
+// (`Hz`, `Osc`) instead of stopping at its first uppercase letter.
+bool word_char(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }
 
 // A note-name literal: uppercase letter A-G, optional accidental (s = sharp,
 // b = flat — '#' is unavailable, it starts a comment), one octave digit 0-9,
@@ -49,6 +52,12 @@ std::string printable(char c) {
   char buf[8];
   std::snprintf(buf, sizeof buf, "\\x%02x", u);
   return buf;
+}
+
+std::string lower(std::string s) {
+  std::transform(s.begin(), s.end(), s.begin(),
+                 [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+  return s;
 }
 
 bool unit_factor(std::string_view u, double& factor) {
@@ -93,6 +102,11 @@ class Lexer {
       if (src_[i_] == '\n') { ++line_; col_ = 1; } else { ++col_; }
     }
   }
+  // A digit, or '.' then a digit, k bytes ahead.
+  bool number_at(size_t k) const {
+    return is_digit(at(k)) || (at(k) == '.' && is_digit(at(k + 1)));
+  }
+
   template <class Pred>
   std::string_view take_while(Pred pred) {
     const size_t start = i_;
@@ -104,16 +118,16 @@ class Lexer {
     if (skip_trivia()) return;
     const int tl = line_, tc = col_;
     if (at() == '-' && at(1) == '>') { push(Tok::Arrow, "->", 0, tl, tc); advance(2); return; }
-    // A '-' directly before a digit or '.' negates the number that follows.
-    const bool neg = at() == '-' && (is_digit(at(1)) || at(1) == '.');
+    // A '-' directly before a number negates it.
+    const bool neg = at() == '-' && number_at(1);
     if (neg) advance(1);
     const char c = at();
-    if (is_digit(c) || (c == '.' && is_digit(at(1)))) return number(neg, tl, tc);
+    if (number_at(0)) return number(neg, tl, tc);
     if (ident_start(c)) {
       push(Tok::Ident, std::string(take_while(ident_char)), 0, tl, tc);
       return;
     }
-    if (c >= 'A' && c <= 'G') return note(tl, tc);
+    if (c >= 'A' && c <= 'Z') return note(tl, tc);
     if (c == '"') return quoted(tl, tc);
     punct(c, tl, tc);
   }
@@ -137,27 +151,31 @@ class Lexer {
   void number(bool neg, int tl, int tc) {
     const std::string_view digits = take_while([](char ch) { return is_digit(ch) || ch == '.'; });
     const double v = std::strtod(std::string(digits).c_str(), nullptr);
-    const std::string_view unit = take_while(ident_char);
+    const std::string unit(take_while(word_char));
     double factor = 1.0;
     if (!unit.empty() && !unit_factor(unit, factor))
-      err(tl, tc, "unknown unit '" + std::string(unit) + "' (hz, khz, ms, s, bpm)");
+      err(tl, tc, "unknown unit '" + unit + "'" +
+                      (unit_factor(lower(unit), factor) ? " (units are lowercase: " + lower(unit) + ")"
+                                                         : " (hz, khz, ms, s, bpm)"));
     push(Tok::Number, "", (neg ? -v : v) * factor, tl, tc);
   }
 
-  // Note-name literal (A4, Cs4, Bb2). Uppercase A-G is otherwise unused, so
-  // consume the run and validate it as a note -> a Number token in Hz.
+  // Note-name literal (A4, Cs4, Bb2). Uppercase letters are otherwise unused,
+  // so consume the run and validate it as a note -> a Number token in Hz.
+  // `C#4` is consumed whole: '#' would otherwise comment out the line's rest.
   void note(int tl, int tc) {
     const size_t start = i_;
     advance(1);
-    take_while(ident_char);
+    const bool hash = at() == '#';
+    advance(hash);
+    take_while(word_char);
     const std::string_view tok = src_.substr(start, i_ - start);
     double val = 0.0;
-    if (note_num(tok, val)) {
-      push(Tok::Number, "", val, tl, tc);
-    } else {
-      err(tl, tc, "invalid note name '" + std::string(tok) +
-                      "' (use e.g. A4, Cs4 for sharp, Bb2 for flat, A4v for v/oct)");
-    }
+    if (!hash && note_num(tok, val)) return push(Tok::Number, "", val, tl, tc);
+    err(tl, tc, "'" + std::string(tok) + "' is not a note name (A4; Cs4 for sharp -- '#' starts"
+                " a comment; Bb2 for flat; A4v for v/oct) nor a name (names are lowercase)");
+    // Recover as the name it probably meant, so one typo reports once.
+    push(Tok::Ident, std::string(tok), 0, tl, tc);
   }
 
   void quoted(int tl, int tc) {
@@ -172,10 +190,17 @@ class Lexer {
   }
 
   void punct(char c, int tl, int tc) {
+    if (c == '=' && at(1) == '>') {  // read as the arrow it was meant to be
+      err(tl, tc, "'=>' is not an arrow; cables use '->'");
+      push(Tok::Arrow, "->", 0, tl, tc);
+      advance(2);
+      return;
+    }
     const auto* p = std::find_if(std::begin(kPunct), std::end(kPunct),
                                  [c](const Punct& q) { return q.c == c; });
     if (p == std::end(kPunct)) {
-      err(tl, tc, "unexpected character '" + printable(c) + "'");
+      err(tl, tc, "unexpected character '" + printable(c) + "'" +
+                      (c == '-' ? " (cables use '->'; names use '_', not '-')" : ""));
     } else {
       depth_ = std::max(0, depth_ + p->nest);
       push(p->kind, std::string(1, c), 0, tl, tc);
