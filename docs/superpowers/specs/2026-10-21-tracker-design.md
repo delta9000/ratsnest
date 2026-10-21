@@ -315,3 +315,14 @@ Any layer of an order entry may carry `^N`, N in −48..48 semitones:
 every note the layer writes (note-name or numeric) and to `cva`/`cvb` values
 **written as note names**; the parser records per value whether it was a
 pitch, so numeric levels are never shifted. `x` keeps the held pitch.
+
+### 8.2 Note length: `len N`, `C4:L`
+
+`track hat note len 1` gives every note (and `x`, and slur) on the track a
+length in rows; a note token may override it with `:L` (`C4:3`, `x:2`,
+`~D4:4`), L in 1..4096. A note of length L at song row R sounds rows R..R+L−1
+and its gate drops on row R+L, unless another note, slur or `off` on that
+track comes first (it replaces the pending drop). Without `len` a note holds
+until changed, as before. Lengths count song rows, so a note in a looping
+layer, or on a step's last row, rings across the wrap or the step boundary.
+This removes the `off` row after every short note (hats, plucks, hooks).

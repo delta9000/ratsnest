@@ -693,6 +693,10 @@ Composing (all resolved when the file loads; the ports never change):
 - **Transpose** a layer in the order list: `order verse verse^5 bass^-2+beat`
   (semitones, ±48). It moves the note field and any `cva`/`cvb` value written
   as a note name; numeric levels stay put.
+- **Note length:** `track hat note len 1` (every note sounds one row), or per
+  cell `C4:3`, `x:2`, `~D4:4`. The gate drops L rows later unless another
+  note, slur or `off` on that track comes first; counted in song rows, so a
+  looping layer's note can ring into the next step. No `len` holds.
 
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
 before it gates are low). A re-articulated note drops its gate for the edge

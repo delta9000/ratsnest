@@ -240,6 +240,53 @@ TEST_CASE("trk: ^N in the order list transposes notes and note-name cvs") {
   fails("track a note\npattern p 1\norder q^2\n", 3, 7, "unknown pattern 'q'");
 }
 
+TEST_CASE("trk: note length from the track default or the cell") {
+  auto s = ok("track a note vel len 1\ntrack b note\n"
+              "pattern p 8\n"
+              "| C4 .5 | x:3\n"   // 0 a: one row; b: three rows
+              "| .     | .\n"     // 1 a off by length
+              "| ~D4:4 | C4:2\n"  // 2 a slur sounds 4 rows; b's next note cuts its length
+              "| .\n"             // 3
+              "| x:2\n"           // 4 a re-articulates before its length runs out
+              "|\n|\n|\n"
+              "order p\n");
+  CHECK(at(s, 0, 0).on);
+  CHECK_FALSE(at(s, 1, 0).on);
+  CHECK(at(s, 1, 0).vel == doctest::Approx(0.5f));
+  CHECK(at(s, 2, 0).on);
+  CHECK_FALSE(at(s, 2, 0).retrig);
+  CHECK(at(s, 3, 0).on);
+  CHECK(at(s, 4, 0).retrig);
+  CHECK(at(s, 5, 0).on);
+  CHECK_FALSE(at(s, 6, 0).on);  // x:2 from row 4
+  CHECK(at(s, 1, 1).on);
+  CHECK(at(s, 2, 1).retrig);    // b: C4:2 at row 2 replaces x:3 (which ran to 3)
+  CHECK(at(s, 3, 1).on);
+  CHECK_FALSE(at(s, 4, 1).on);
+  CHECK_FALSE(at(s, 7, 1).on);
+}
+
+TEST_CASE("trk: a looping layer's note length counts song rows") {
+  // A 3-row loop under 4-row steps whose hit falls on layer row 2: the one
+  // on step row 2 rings into the next step's first row.
+  auto s = ok("track k note\ntrack h cva\n"
+              "pattern long 4 h\n| 1\npattern hit 3 k\n02 | x:2\norder long+hit*2\n");
+  const bool on[] = {0, 0, 1, 1, 0, 0, 1, 1};
+  for (int r = 0; r < 8; ++r) {
+    CAPTURE(r);
+    CHECK(at(s, r, 0).on == on[r]);
+  }
+}
+
+TEST_CASE("trk: note length diagnostics") {
+  fails("track a note len\n", 1, 14, "'len' needs a row count");
+  fails("track a note len 0\n", 1, 18, "row count in 1..4096");
+  fails("track a len 2\n", 1, 1, "needs a name and fields");
+  fails("track a note\npattern p 2\n| C4:0\n", 3, 5, "':L' with L in 1..4096");
+  fails("track a note\npattern p 2\n| C4:\n", 3, 5, "':L'");
+  fails("track a note\npattern p 2\n| :3\n", 3, 3, "is not a note");
+}
+
 TEST_CASE("trk: the longest song fits exactly") {
   auto s = ok("track a cva\npattern p 1024\norder p*64\n");
   CHECK(s.length() == 65536);
