@@ -40,6 +40,25 @@ struct RisingEdge {
   }
 };
 
+// Slews out a step in a signal (switch selection, sampler loop seam). After
+// jump(last_out, new_value, n) the output is the new signal plus an offset
+// that starts at their difference and falls linearly to zero over n samples,
+// so the output stays continuous. n < 1 is an instant cut; a non-finite
+// step is dropped. Two floats of state; no allocation.
+struct Declick {
+  float offset = 0.0f, step = 0.0f;
+  void jump(float from, float to, float samples) {
+    const float d = from - to;
+    offset = std::isfinite(d) ? d * static_cast<float>(samples >= 1.0f) : 0.0f;
+    step = offset / std::max(samples, 1.0f);
+  }
+  float operator()(float x) {
+    const float y = x + offset;
+    offset -= std::copysign(std::fmin(std::fabs(step), std::fabs(offset)), offset);
+    return y;
+  }
+};
+
 // Envelope segment curve over progress x in [0, 1], indexed like the
 // lin/exp/log `curve` configs.
 inline double env_curve(int curve, double x) {

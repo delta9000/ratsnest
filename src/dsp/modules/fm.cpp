@@ -206,7 +206,8 @@ class Fm final : public Module {
     rate_ = rate;
     algo_ = cfg_enum(cfg, "algo", kAlgos);
     curve_ = cfg_enum(cfg, "curve", kCurves);
-    sync_ = cfg_str(cfg, "sync", "on") != "off";
+    // Key sync resets phases when the voice is quieter than this; off: never.
+    sync_floor_ = 1e-3 * static_cast<double>(cfg_str(cfg, "sync", "on") != "off");
 
     fill(cfg, "ratios", ratios_, 1.0, 0.0, 1e9);
     fill(cfg, "levels", levels_, 0.0, 0.0, 1.0);
@@ -277,12 +278,22 @@ class Fm final : public Module {
   // Latch keyboard scaling from v_oct for the whole note (DX-style): a
   // mid-note pitch glide bends pitch without warping level or envelope.
   void note_on(float v_oct) {
-    if (sync_) phase_.fill(0.0);
+    if (loudness() < sync_floor_) phase_.fill(0.0);
     const double d = static_cast<double>(clamp_nan(v_oct, -24.f, 24.f)) - key_break_;
     for (size_t k = 0; k < kOps; ++k) {
       level_scale_[k] = clamp_nan(std::exp2(key_level_[k] * d), 0.0, 16.0);
       time_scale_[k] = clamp_nan(std::exp2(-key_rate_[k] * d), 1e-3, 1e3);
     }
+  }
+
+  // Key sync resets phases only from silence (every carrier's envelope times
+  // its configured level below -60 dB): resetting a still-ringing voice steps
+  // its output, a click.
+  double loudness() const {
+    double loud = 0.0;
+    for (size_t k = 0; k < kOps; ++k)
+      loud = std::max(loud, carrier_[k] * envs_[k].level * levels_[k] * level_scale_[k]);
+    return loud;
   }
 
   // Operator k's output this sample. `post` holds this sample's outputs of
@@ -390,7 +401,7 @@ class Fm final : public Module {
   double base_ = 0.0;
   int algo_ = 0;
   int curve_ = 0;
-  bool sync_ = true;
+  double sync_floor_ = 1e-3;
   std::array<double, kOps> ratios_{}, levels_{}, fixed_{}, fb_{}, vel_sens_{};
   std::array<int, kOps> waves_{};
   double key_break_ = 0.0;

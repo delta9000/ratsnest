@@ -184,7 +184,7 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 | `turing` | lockable shift register | ins `clock` `write` `clear` `len`(1..16) `prob`; cfg `seed`; outs `out` `pulse` `bit1..bit8`. Volts/Pulses expanders = cables |
 | `bern` | Bernoulli gate | ins `gate` `prob` `reset` `length` `reroll`; cfg `seed`; mutually exclusive gate-width outs `a` `b`, held draw `value` |
 | `logic` | gate logic + comparator | ins `a` `b` `threshold`; cfg `op` (and\|or\|xor\|not\|cmp); out |
-| `switch` | sequential/addressed switch | ins `in1..in8` `clock` `reset` `addr` `n`; cfg `mode` (seq\|addr); out |
+| `switch` | sequential/addressed switch | ins `in1..in8` `clock` `reset` `addr` `n`; cfg `mode` (seq\|addr), `fade` (s, default 0.005; 0 = instant cut for CV/gates); out |
 | `tempo` | musical time conversion | ins `bpm` `beats`; outs `seconds` `hz` |
 
 Transposition (Berlin school) needs no module: pitch CVs sum on `v_oct`.

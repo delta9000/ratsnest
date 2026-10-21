@@ -103,7 +103,7 @@ gallop = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 1] }
 clk -> gallop.clock
 half = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 0] }
 beat -> half.clock
-strike_src = switch { mode: addr, n: 2 }
+strike_src = switch { mode: addr, n: 2, fade: 0 }
 gallop.trig -> strike_src.in1
 half.trig   -> strike_src.in2
 arr_halftime.cv -> strike_src.addr     # 0 = gallop, 1 = half-time

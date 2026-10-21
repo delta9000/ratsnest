@@ -88,3 +88,39 @@ TEST_CASE("lpg damp darkens the output") {
   }
   CHECK(sd < sb * 0.25);
 }
+
+TEST_CASE("lpg strike ramps open over 2 ms instead of stepping") {
+  // A 55 Hz bass tone through a closed gate: the 30 Hz floor filter still
+  // tracks it, so an instant strike stepped the output by ~0.2.
+  LpgRig lpg;
+  lpg.ins[4] = 0.3f;
+  float prev = 0.0f, event = 0.0f, steady = 0.0f, peak = 0.0f;
+  for (int i = 0; i < 9600; ++i) {
+    lpg.ins[0] = std::sin(static_cast<float>(2.0 * 3.14159265358979 * 55.0 * i / 48000.0));
+    lpg.ins[2] = i >= 4800 ? 1.0f : 0.0f;
+    const float o = lpg.tick();
+    const float step = std::abs(o - prev);
+    if (i >= 4800 && i < 4800 + 480) event = std::max(event, step);
+    if (i >= 4800 + 480) steady = std::max(steady, step);
+    if (i >= 4800) peak = std::max(peak, std::abs(o));
+    prev = o;
+  }
+  CHECK(peak > 0.5f);                 // still a full-strength pluck
+  // An instant strike stepped by ~0.22 (31x the tone's slope); the ramp
+  // leaves only the filter catching up as it opens, ~3x.
+  CHECK(steady == doctest::Approx(0.0072f).epsilon(0.05));  // 2*pi*55/48000
+  CHECK(event < 4.0f * steady);
+}
+
+TEST_CASE("lpg strike reaches fully open in 2 ms") {
+  LpgRig lpg;
+  lpg.ins[4] = 1.0f;
+  lpg.ins[0] = 1.0f;  // DC in: the output is the filter state times the gate
+  for (int i = 0; i < 48000; ++i) lpg.tick();  // closed filter settles to 1
+  lpg.ins[2] = 1.0f;
+  float o = 0.0f;
+  for (int i = 0; i < 95; ++i) o = lpg.tick();
+  CHECK(o < 0.999f);
+  for (int i = 0; i < 2; ++i) o = lpg.tick();
+  CHECK(o == doctest::Approx(1.0f).epsilon(1e-3));
+}

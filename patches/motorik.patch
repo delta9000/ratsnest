@@ -173,7 +173,7 @@ gtr_lift_t = math { op: add }
 ch_third.cv -> gtr_lift_t.a
 1 -> gtr_lift_t.b
 
-gtr_switch = switch { mode: seq, n: 8 }
+gtr_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> gtr_switch.clock
 ch_root.cv  -> gtr_switch.in1
 ch_third.cv -> gtr_switch.in2

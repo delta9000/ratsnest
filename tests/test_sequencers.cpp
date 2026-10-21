@@ -75,7 +75,7 @@ TEST_CASE("switch selects sequential and addressed inputs") {
   float ins[12] = {10, 20, 30, 40, 50, 60, 70, 80,
                    0, 0, 0, 3};  // clock reset addr n
   float out[1] = {};
-  auto seq = make("switch", {{"mode", text("seq")}});
+  auto seq = make("switch", {{"mode", text("seq")}, {"fade", number(0)}});
   ins[8] = 1.0f;
   seq->process(ins, out);
   CHECK(out[0] == doctest::Approx(10.0f));
@@ -85,10 +85,53 @@ TEST_CASE("switch selects sequential and addressed inputs") {
   seq->process(ins, out);
   CHECK(out[0] == doctest::Approx(20.0f));
 
-  auto addr = make("switch", {{"mode", text("addr")}});
+  auto addr = make("switch", {{"mode", text("addr")}, {"fade", number(0)}});
   ins[10] = 2.0f;
   addr->process(ins, out);
   CHECK(out[0] == doctest::Approx(30.0f));
+}
+
+TEST_CASE("switch slews a selection change over its fade; fade 0 cuts") {
+  // in1 and in2 are 220 Hz sines in antiphase: the selection change at a
+  // crest is a step of 2 under a hard cut.
+  auto run = [](Config cfg, float* max_event_step, float* max_steady_step) {
+    auto m = make("switch", cfg);
+    float ins[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2};
+    float out[1] = {}, prev = 0.0f;
+    *max_event_step = *max_steady_step = 0.0f;
+    for (int i = 0; i < 4800; ++i) {
+      const float s = std::sin(2.0f * 3.14159265f * 220.0f * static_cast<float>(i) / 48000.0f);
+      ins[0] = s;
+      ins[1] = -s;
+      ins[10] = i >= 2400 + 55 ? 1.0f : 0.0f;  // switch near a crest
+      m->process(ins, out);
+      const float step = std::abs(out[0] - prev);
+      if (i > 0) {
+        if (i >= 2455 && i < 2455 + 240) *max_event_step = std::max(*max_event_step, step);
+        else *max_steady_step = std::max(*max_steady_step, step);
+      }
+      if (i < 2455) CHECK(out[0] == s);  // bit-exact until the change
+      if (i >= 2455 + 240) CHECK(out[0] == doctest::Approx(-s).epsilon(1e-5));
+      prev = out[0];
+    }
+  };
+  float ev = 0.0f, st = 0.0f;
+  run({{"mode", text("addr")}}, &ev, &st);
+  CHECK(st == doctest::Approx(0.0288f).epsilon(0.02));  // 2*pi*220/48000
+  CHECK(ev < 1.5f * st);  // default 5 ms: no step beyond the waveform's own slope
+  run({{"mode", text("addr")}, {"fade", number(0)}}, &ev, &st);
+  CHECK(ev > 1.9f);  // instant: the full antiphase step
+}
+
+TEST_CASE("switch with fade 0 keeps gates and stepped CV sharp") {
+  auto m = make("switch", {{"mode", text("addr")}, {"fade", number(0)}});
+  float ins[12] = {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2};
+  float out[1] = {};
+  m->process(ins, out);
+  CHECK(out[0] == 0.0f);
+  ins[10] = 1.0f;
+  m->process(ins, out);
+  CHECK(out[0] == 1.0f);
 }
 
 TEST_CASE("turing write and clear control the shift register") {

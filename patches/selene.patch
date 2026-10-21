@@ -202,7 +202,7 @@ bell_lvl -> bell_amp.cv : 0.7
 str_lift = math { op: add }
 ch_root.cv -> str_lift.a
 1 -> str_lift.b
-str_switch = switch { mode: seq, n: 8 }
+str_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> str_switch.clock
 ch_root.cv -> str_switch.in1
 ch_v3.cv   -> str_switch.in2

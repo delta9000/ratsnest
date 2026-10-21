@@ -149,7 +149,8 @@ g = lpg { damp: 0.7, decay: 1.2 }
 open -> g.cv : 0.35
 ```
 
-`strike` and `cv` coexist: the strike sets the envelope to 1 and it decays
+`strike` and `cv` coexist: the strike ramps the envelope to 1 (over 2 ms,
+fast enough to pluck, slow enough not to click) and it decays
 back down toward whatever `cv` holds. That floor is how you get plucks
 sitting on top of a drone through one gate.
 

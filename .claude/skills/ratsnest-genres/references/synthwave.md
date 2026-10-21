@@ -31,7 +31,7 @@ quarter -> bar.in
 |---|---|---|
 | gated snare | `lib/kit/snare.sub` + `reverb` + `func` + `logic{cmp}` + `vca` | `decay: 0.72`, gate window ~180 ms |
 | kick | `lib/kit/kick.sub` | `tune: 48hz`, straight quarters |
-| bass arp | `switch { mode: seq, n: 8 }` + `vco{saw}` + `ladder` | cutoff 320 Hz base, env +900 |
+| bass arp | `switch { mode: seq, n: 8, fade: 0 }` + `vco{saw}` + `ladder` | cutoff 320 Hz base, env +900 |
 | lead | `vco { wave: pulse }` + `lfo -> pwm` | `pwm : 0.34` at 0.45 Hz, vib 5.2 Hz |
 | pad | 3–5 detuned `vco{saw}` + `ladder` + `adsr` | attack 0.6–1.0 s |
 | space | `reverb` | `decay: 0.72, damp: 0.15, mix: 1` (wet-only return) |
@@ -94,7 +94,7 @@ bar -> root.clock
 bar -> third.clock
 bar -> fifth.clock
 
-arp = switch { mode: seq, n: 8 }
+arp = switch { mode: seq, n: 8, fade: 0 }   # pitch: cut, don't slew
 master -> arp.clock
 root  -> arp.in1
 fifth -> arp.in2

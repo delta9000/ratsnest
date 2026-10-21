@@ -651,6 +651,24 @@ TEST_CASE("fm: sync off free-runs phases") {
   CHECK(differ);
 }
 
+TEST_CASE("fm: sync on does not reset a ringing voice on retrigger") {
+  Config cfg;
+  cfg.push_back({"t4", arr({1.0})});  // long release: still ringing at retrigger
+  FmRig rig(48000.0, cfg);
+  rig.ins[1] = 220.0f;
+  float prev = 0.0f, steady = 0.0f, event = 0.0f;
+  for (int i = 0; i < 9600; ++i) {
+    // gate high, a 60-sample gap (release barely starts), then retrigger
+    rig.tick(i < 4800 || i >= 4860 ? 1.0f : 0.0f);
+    const float step = std::abs(rig.outs[0] - prev);
+    if (i >= 2400 && i < 4800) steady = std::max(steady, step);
+    if (i >= 4860 && i < 4870) event = std::max(event, step);
+    prev = rig.outs[0];
+  }
+  CHECK(steady > 0.01f);
+  CHECK(event < 1.5f * steady);  // phase carried through: no step
+}
+
 TEST_CASE("fm: state migration continues identically") {
   Config cfg;
   cfg.push_back({"algo", str("dual")});

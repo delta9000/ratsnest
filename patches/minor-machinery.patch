@@ -144,11 +144,11 @@ eighth -> b_motif.clock
 two_bar -> a_motif.reset
 two_bar -> b_motif.reset
 
-motif_pitch = switch { mode: addr, n: 2 }
+motif_pitch = switch { mode: addr, n: 2, fade: 0 }
 a_motif.cv -> motif_pitch.in1
 b_motif.cv -> motif_pitch.in2
 arr_b.cv -> motif_pitch.addr
-motif_gate = switch { mode: addr, n: 2 }
+motif_gate = switch { mode: addr, n: 2, fade: 0 }
 a_motif.trig -> motif_gate.in1
 b_motif.trig -> motif_gate.in2
 arr_b.cv -> motif_gate.addr

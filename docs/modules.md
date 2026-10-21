@@ -418,8 +418,9 @@ limiter/`drive` downstream. Example: `env -> filter.cutoff : 1800` adds Hz;
 Inputs `in`, continuous `cv`, rising-edge `strike`, `damp` 0.5, `decay` 0.25 s;
 output `out`. Strike excites a vactrol-like amplitude/brightness decay; CV can
 hold it open. `cv` clamps to `0..1` and opens with a fixed ~2 ms rise; a strike
-opens the gate instantly (a deliberate "bonk": on a bass-heavy source it is an
-audible click). `decay` is the one-pole time constant (≥ 1 ms; about −60 dB
+ramps the gate fully open over a fixed 2 ms (linear), then decays: still a
+percussive "bonk", without the click an instant opening made on bass-heavy
+sources. `decay` is the one-pole time constant (≥ 1 ms; about −60 dB
 after 7× it). The two-pole, non-resonant lowpass sweeps from 30 Hz closed to
 `30 * 2^(9 − 6*damp)` Hz open: `damp: 0` reaches ~15 kHz, `1` only ~240 Hz.
 
@@ -544,10 +545,15 @@ Eight signal inputs, plus `clock`, rising-edge `reset`, zero-based `addr`, and
 `n` 8 (`1..8`); output `out`. Config `mode`: `seq` (the **default**) advances
 on clock and ignores `addr`; `addr` reads the live address (rounded, clamped
 to `0..n-1`) and ignores the clock. A selector driven by a lane must say
-`switch { mode: addr }`, or it sits on `in1` forever, silently. Selection is a
-hard cut with no crossfade: fine for CV and gates, but switching between
-running audio clicks — use `xfade` for audio. Example:
-`switch { mode: seq, n: 4 }`.
+`switch { mode: addr }`, or it sits on `in1` forever, silently. Config `fade`
+(seconds, default `0.005`, clamped `0..1`): a selection change slews the
+step between the old and new input out linearly over `fade`, so switching
+running audio does not click. **Routing pitch CV or gates, set `fade: 0`**
+— the instant cut: a slewed pitch glides through wrong notes (an `sh`
+sampling on the same clock edge catches it mid-slew) and a slewed gate
+crosses 0.5 late. Without a selection change the output is the selected
+input exactly. Examples: `switch { mode: seq, n: 4 }` (audio),
+`switch { mode: seq, n: 8, fade: 0 }` (an arp's pitch).
 
 ## `turing`
 
@@ -755,11 +761,14 @@ f.env -> m.lvl2 : -0.4
 build (mixing any channel count to mono) and plays it back with linear
 interpolation. Playback rate is `(file_rate / engine_rate) * 2^pitch`, so a file
 recorded at any rate plays at correct pitch and `+1 v/oct` doubles it. A rising
-edge on `trig` restarts from the beginning — a hard cut with no declick, so
-retriggering a sample that is still sounding clicks; with nothing patched to
-`trig` it plays once at load. Config `loop`: `off` stops at the end and emits a one-sample
-`eos` pulse; `on` wraps without a crossfade (seamless only if the file is
-cut on a loop point). A missing or unreadable file yields silence
+edge on `trig` restarts from the beginning at full level while a voice still
+sounding fades out over a fixed 5 ms (a second read head, no allocation), so a
+retrigger does not click; with nothing patched to `trig` it plays once at load.
+Config `loop`: `off` stops at the end and emits a one-sample `eos` pulse; `on`
+wraps. Both seams — the loop wrap and the end of a one-shot — slew out their
+step over 5 ms instead of cutting (the output stays continuous; timing and
+`eos` are unchanged), so a file not cut on a loop point bumps rather than
+clicks. A missing or unreadable file yields silence
 (the session never dies). The `file:` string **must be quoted** and resolves
 against the process working directory (mise runs from the repo root); absolute
 paths always work. Reads PCM 16/24/32-bit and 32-bit float WAVs.
@@ -913,7 +922,7 @@ time/level envelopes; routing from a named algorithm set or a custom edge
 list. Mono; polyphony via `voice` groups.
 
 Inputs: `gate` 0 (rising fires all envelopes and, with `sync: on`, resets
-phases; unpatched gate = silence), `freq` 220 Hz, `v_oct`, `vel` 1, per-op
+phases if the voice is silent; unpatched gate = silence), `freq` 220 Hz, `v_oct`, `vel` 1, per-op
 `lvl1..lvl6` 0, `ratio1..ratio6` 0, `fbmod` 0 (adds to every op's `fb`, sum clamped 0..1;
 named apart from the `fb` config array so the DSL can tell them apart).
 Outputs: `out` (straight sum of the carriers — gain-stage at the cable) and
@@ -940,7 +949,11 @@ before its level, so `fb` means the same timbre on any op whatever its
 only past ~0.9 does it turn to noise), `vel_sens` (0..1; op level ×=
 (1−sens)+sens·vel), `t1..t4` segment seconds (0 = one-sample jump),
 `l1..l3` segment levels, `curve` (`lin`/`exp`/`log`, default `lin` — `log`
-is the natural percussive fall), `sync` (`on`/`off`, default `on`).
+is the natural percussive fall), `sync` (`on`/`off`, default `on`: a gate
+rise resets every operator phase only when each carrier's envelope × level
+is below −60 dB, so notes from silence start identically while a retrigger
+of a still-ringing voice carries its phases on rather than stepping — a
+click; `off` never resets).
 Envelope: gate rise runs 0→l1 over t1 → l2 over t2 → l3 over t3 and holds
 l3; gate fall runs to 0 over t4, always from the current level. A level-1
 modulator at envelope peak drives ±4π radians (index ≈ 12.6). `fm {}` bare

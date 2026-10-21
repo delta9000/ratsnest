@@ -192,6 +192,9 @@ the flat ones:
   lanes makes an arp/riff that is consonant over every chord. `math { op:
   add }` with `b: 1` is the octave lift. An `sh` after the switch holds
   pitch through each note's decay so ringing notes never retune mid-tail.
+  Give that switch `fade: 0`: its default 5 ms declick slew would glide
+  the pitch, and the `sh` sampling on the same eighth would catch it
+  mid-slew. The same goes for any `switch` carrying gates or stepped CV.
 - **Fixed phrases are fine if they're pentatonic.** A minor-pentatonic hook
   has no avoid notes over an i–VI–III–VII cadence ("big, dumb, correct" —
   `ion.patch`). If the phrase isn't pentatonic, use the chord-tracking
@@ -241,7 +244,8 @@ Learned building `patches/symphony/` (four movements, fifteen mono parts):
 - **`switch` defaults to `mode: seq` and ignores `addr`.** A selector fed
   by a lane without `mode: addr` sits on `in1` for the whole render -- and
   since `in1` is conventionally silence, the symptom is an almost silent
-  render, not an error. (`check` cannot catch it: the patch is valid.)
+  render, not an error. (`check` cannot catch it: the patch is valid.) A
+  selector routing lanes or gates also wants `fade: 0`, the instant cut.
 - **`quant` ties snap down**, so a minor-to-major "re-reading" through a
   major quantizer turns F into E, not F#. Nudge the input up a quarter-tone
   (`0.04167 -> q.in`) and every off-scale note snaps up while in-scale
