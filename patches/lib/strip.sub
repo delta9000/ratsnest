@@ -1,0 +1,90 @@
+# strip.sub -- a mixer channel strip: fader x duck, equal-power pan, and a
+# post-fader, post-duck effects send. Strips sum straight into a bus (a
+# sub input or `out` takes any number of cables), so a song needs no `mix`
+# and its eight-slot limit: a stereo source is one strip, not two slots.
+#
+#   pad = sub { file: "lib/strip.sub", gain: 0.8, pos: -0.2, send_gain: 0.4 }
+#   voice -> pad.in                  # mono; or chorus.out_l/_r -> in_l/in_r
+#   pad_lvl -> pad.level             # form lane; unpatched = 1
+#   duck -> pad.duck                 # duck.sub gain; unpatched = 1
+#   pad.l -> master.in_l
+#   pad.r -> master.in_r
+#   pad.fx -> room.in_l              # follows the fader: no ghost sends
+#
+# Inputs: `in` (mono), `in_l`/`in_r` (stereo; use one form or the other),
+# `level` (default 1), `duck` (a gain, default 1: duck.sub's `gain`, or any
+# 0..1 envelope), `pan` (-1..1, sums onto `pos`), `send` (default 1, scales
+# `send_gain`). Outputs `l`, `r`, and `fx` (mono).
+#
+# Gain staging: the fader is `level x gain x duck`. A mono `in` at centre
+# reaches each side at 0.707 (-3 dB, the `mix` law); hard left it is 1.0 on
+# the left. A stereo pair at centre passes at unity; `pan` on it is a
+# balance (equal-power, so the near side rises +3 dB at the extreme), and
+# `width` (0 mono .. 2) sets its image. `fx` = the post-fader signal x
+# `send x send_gain`: a mono `in` sends at its own post-fader level, a
+# stereo pair sends its sum at 0.707 each.
+#
+# Because the send is tapped after the fader and the duck, a strip whose
+# level lane is at zero sends nothing -- the reverb cannot ghost a part into
+# a section it is muted in -- and a ducked part ducks its echo too.
+#
+# Measured: unity in, unity out (no colour, no limiting). A centred mono
+# sine at peak 1.0 gives -3.0 dBFS per side.
+
+gain      = param { default: 1 }    # fader trim, multiplies `level`
+pos       = param { default: 0 }    # static pan/balance, -1 left .. 1 right
+width     = param { default: 1 }    # stereo width of a stereo input
+send_gain = param { default: 0 }    # fx send amount at `send` = 1
+
+in    = input {}
+in_l  = input {}
+in_r  = input {}
+level = input { default: 1 }
+duck  = input { default: 1 }
+pan   = input {}
+send  = input { default: 1 }
+l  = output {}
+r  = output {}
+fx = output {}
+
+# Fader: level x gain x duck.
+fader = vca { gain: 0 }
+level -> fader.in : gain
+duck -> fader.cv
+
+ch_l = vca { gain: 0 }
+ch_r = vca { gain: 0 }
+in -> ch_l.in
+in -> ch_r.in
+in_l -> ch_l.in : 1.41421356
+in_r -> ch_r.in : 1.41421356
+fader -> ch_l.cv
+fader -> ch_r.cv
+
+field = stereo { balance: pos, width: width }
+ch_l -> field.in_l
+ch_r -> field.in_r
+pan -> field.balance
+field.out_l -> l.in
+field.out_r -> r.in
+
+send_vca = vca { gain: 0 }
+ch_l -> send_vca.in : 0.5
+ch_r -> send_vca.in : 0.5
+send -> send_vca.cv : send_gain
+send_vca -> fx.in
+
+# Audition: `mise run play -- patches/lib/strip.sub` -- a pulsing tone
+# auto-panned left to right, ducked on every beat.
+demo.osc = vco { freq: 220hz, wave: tri }
+demo.osc -> in : 0.5
+demo.pan = lfo { freq: 0.25hz }
+demo.pan -> pan
+demo.clk = clock { bpm: 120 }
+demo.env = func { rise: 0.003, fall: 0.3 }
+demo.clk -> demo.env.trig
+demo.inv = math { op: sub, a: 1 }
+demo.env -> demo.inv.b : 0.8
+demo.inv -> duck
+l -> demo.out.left
+r -> demo.out.right

@@ -105,9 +105,43 @@ These settings are starting points, not neutral defaults:
   makeup +6.5..8.5 dB at mix ~0.85 (blends are linear now; the old +1.5..3 leaned on the equal-power boost), clipper drive 1..6.5 dB, in dB (parallel mix ~0.3), limiter
   −0.4 dBFS. Kick channel level ~0.85 with the kick saturated to ~±1 sets
   the track's peak anchor; everything else stages under it.
-- The pump is three layers deep, not one: per-channel `kick_env -> mix.lvlN
-  : -0.2`, the same on the FX returns, plus the external-sidechain glue comp
-  on the master bus. One layer alone sounds like a demo.
+- The pump is three layers deep, not one: per-channel ducking, the same on
+  the FX returns, plus the external-sidechain glue comp on the master bus.
+  One layer alone sounds like a demo. Duck with `lib/duck.sub` into each
+  strip's `duck` (below): `kick_env -> mix.lvlN : -0.2` subtracts a fixed
+  amount, so its depth in dB depends on the lane level (and a quiet section
+  ducks to silence).
+- **The lib chains** (`lib/master-chain.sub`, `lib/club-master.sub`):
+  `width`/`makeup` are inputs for lanes. Their kick-keyed compressor does
+  nothing in a kick-less section but still applies makeup (a breakdown came
+  back 1 dB under its chorus); the default parallel clipper overshoots its
+  threshold by 2.4–3.4 dB; the limiter is sample-peak unless `true_peak: on`
+  (+1.6–2.3 dB between samples otherwise). Numbers and fixes:
+  `ratsnest-composition/references/mastering.md`.
+
+## A song's voices and mix: synth-voice, strip, duck
+
+Two finished songs hand-built every pitched voice as osc → filter → env →
+`math` velocity multiply → vca → level vca (about nine nodes and twenty
+lines each), and mixed through `mix`, which cost them three bugs: eight
+mono slots (a stereo pad takes two, plus VCAs), a reverb send tapped before
+the level lane (a pad ghosted into the drums-only intro), and ducking by a
+negative cable onto `lvlN`. The default now:
+
+- **Voice:** `lib/synth-voice.sub` — `voct`, `gate`, `vel`, `level`, `cut`
+  in; mono audio out already × env × vel × level. Lead by default; pluck,
+  pad and bass by params (`lib-voices.md`). Watch `track` (key tracking,
+  default 0.5) when porting an untracked hand-built filter.
+- **Channel:** `lib/strip.sub` — fader `level × gain × duck`, equal-power
+  pan, `fx` send tapped post-fader and post-duck. Cable `l`/`r` straight
+  into the master's `in_l`/`in_r`: sub inputs sum any number of cables, so
+  there is no slot limit. Keep `mix` for a static mono kit.
+- **Pump:** `lib/duck.sub` per depth, `gain` into the strips' `duck`.
+- **Sends:** a `reverb`'s tank reads the *mean* of `in_l`/`in_r`, so a mono
+  send into one side needs depth 2 to match feeding both.
+
+Rebuilt that way, `patches/tracker/glasshouse.patch` and `undertow.patch`
+match their hand-built originals to 0.1 and 0.4 dB per section.
 
 ## Input bases sum — zero them first
 
@@ -169,7 +203,8 @@ The stereo version of the same bug: a voice muted by a mixer lane still
 bleeds into reverb/delay if the send is tapped pre-mute. Gate the voice
 *before* its sends (a post-fader VCA, e.g. `stab_out`), then tap the sends
 from there. (`meridian.patch` demonstrates this; it's why its stabs vanish
-cleanly instead of leaving reverb ghosts.)
+cleanly instead of leaving reverb ghosts.) `lib/strip.sub`'s `fx` output is
+tapped there by construction.
 
 ## `curve: exp` times are −60 dB times
 

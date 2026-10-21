@@ -1327,11 +1327,12 @@ Several classic pedals need no new module — they compose from what's here:
 
 ### Physical drumkit (`lib/kit/*.sub`)
 
-Eight kit voices (six physically modeled, one noise clap, one ring-modulated
-hat) sharing one contract: `trig` fires, `accent`
+Nine kit voices (six physically modeled, one noise clap, one ring-modulated
+hat, one crash cymbal) sharing one contract: `trig` fires, `accent`
 (0..1, latched per hit) drives level and strike brightness, `tune`/`decay`
 shape the body (`decay` is 0..1 ring on the modal voices, seconds on the
-clap and the ring-mod hat). Two hat flavours: `hat.sub` (darker, acoustic-
+clap, the ring-mod hat and the crash). `crash.sub` (with `choke`) is the
+driven-hash construction of `hat.sub` tuned low with a long wash. Two hat flavours: `hat.sub` (darker, acoustic-
 leaning, driven modal bank) and `hat_model.sub` (brighter, TR-808/electronic,
 ring-modulated square pairs under a noise wash). Closed/open hats are two
 instances of one file, choke-coupled:
@@ -1393,3 +1394,38 @@ input so delay times track a tempo ramp. `reese.sub` keeps the split-bass
 discipline: the sine sub is untouched by every modulation the saws receive,
 and `sub_out`/`saw_out` come out separately so they can be ducked at
 different depths.
+
+`master-chain.sub` takes `width` (default 1.15) and `makeup` (dB, default
+3.0) as **inputs**, so a form lane can ride them (`lane -> mast.width : 1.3`;
+a fixed value is a constant cable, `1.1 -> mast.width`); `key_bus` mixes the
+bus itself into the compressor key and `true_peak: on` sets the limiter's
+detector. `club-master.sub` is its loud preset (serial clipper, bus-assisted
+key, true-peak limiter at −1 dBTP: about −8.5 LUFS on a techno mix).
+
+### Building a song's voices and mix (`lib/synth-voice.sub`, `lib/strip.sub`, `lib/duck.sub`)
+
+`synth-voice.sub` is a whole subtractive voice — two oscillators and a sine
+sub, svf/ladder low-pass with envelope and tracking, ADSR, velocity and
+level — so a part is one instance and its `voct`/`gate`/`vel` cables.
+`strip.sub` is a channel: `in` (or `in_l`/`in_r`), `level` × `gain` ×
+`duck`, equal-power `pan`/`pos`, and a post-fader, post-duck `fx` send;
+strips sum straight into the master's inputs, so `mix`'s eight slots no
+longer bound a song. `duck.sub` turns a kick gate into a relative gain
+(`depth_db` at the dip) for a strip's `duck`:
+
+```text
+pump = sub { file: "lib/duck.sub", depth_db: -9, release: 0.3 }
+song.gate1 -> pump.trig
+bass = sub { file: "lib/synth-voice.sub", blend: 0, sublvl: 0.6, sub_oct: 0, cutoff: 200 }
+song.voct2 -> bass.voct
+song.gate2 -> bass.gate
+bass_s = sub { file: "lib/strip.sub", gain: 0.8 }
+bass -> bass_s.in
+pump -> bass_s.duck
+bass_s.l -> mast.in_l
+bass_s.r -> mast.in_r
+```
+
+Interfaces and measured levels: `.claude/skills/ratsnest-synthesis/
+references/lib-voices.md`; worked songs: `patches/tracker/glasshouse.patch`,
+`undertow.patch`.

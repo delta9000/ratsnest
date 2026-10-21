@@ -76,6 +76,18 @@ Iterate on numbers, not vibes. Two or three passes converges.
 
 ## Shapes to reach for
 
+- **A song's parts: voice → strip → master.** Every pitched part is one
+  `lib/synth-voice.sub` (osc, filter, env, velocity and level in one
+  instance: lead by default, pluck/pad/bass by params) cabled from the
+  tracker's `voctN`/`gateN`/`velN`; every channel is a `lib/strip.sub`
+  (`level` lane × `gain` × `duck`, equal-power pan, a post-fader `fx` send)
+  whose `l`/`r` cable straight into the master's inputs — no `mix` slots to
+  run out of, no ghost sends; the pump is a `lib/duck.sub` per depth on the
+  strips' `duck` (relative dB, not an absolute dip). Master with
+  `lib/master-chain.sub` (`club-master.sub` for −8.5 LUFS). Hand-build a
+  voice only for what synth-voice cannot do. Interfaces:
+  `ratsnest-synthesis/references/lib-voices.md`; worked:
+  `patches/tracker/glasshouse.patch`, `undertow.patch`.
 - **Clock tree, not clocks.** One `clock` at 4× the tempo, then a chain of
   `div { by: 2 }`. Every rhythm in the patch is phase-locked for free, and
   "offbeat" is `logic{and}` of eighth with `logic{not}` of quarter.
@@ -102,7 +114,9 @@ Iterate on numbers, not vibes. Two or three passes converges.
 | Delay time is wrong | forgot to zero the `time:` base before the `tempo` cable |
 | Everything transposed by octaves | note names on a `freq:` base that isn't 220 Hz |
 | Note retunes during its own tail | no `sh` holding pitch after the switch/quantizer |
-| Reverb ghosts of a muted part | send tapped pre-mute; tap it from the post-fader `vca` |
+| Reverb ghosts of a muted part | send tapped pre-mute; use `strip.sub`'s `fx` (post-fader, post-duck) |
+| Pump mutes a quiet section, barely touches a loud one | negative envelope on `mix.lvlN` is absolute; use `duck.sub` into a strip's `duck` |
+| Breakdown comes back as loud as the chorus | kick-keyed master comp: no kick, no compression, full makeup (mastering.md) |
 | `curve: exp` hit far shorter than its time | the time is the −60 dB point: write ~3x a linear time (patch-craft.md) |
 | Intro reappears at the end | the arrangement grid wrapped; render shorter than `steps × block` |
 | `quant` output missing | it's `quant.out`; only `stepseq` has `.cv` |
