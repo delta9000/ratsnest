@@ -197,7 +197,7 @@ gtr_str = string { seed: 3, damping: 0.72, position: 0.22 }
 gtr_note -> gtr_str.v_oct
 gtr_euclid.trig -> gtr_str.strike
 
-gtr_od = overdrive { model: klon, drive: 2.2, tone: 0.6, level: 0.5, mix: 0.65 }
+gtr_od = overdrive { model: klon, drive: 1, tone: 0.6, level: 0.5, mix: 0.65 }
 gtr_str.out -> gtr_od.in : 0.6
 
 gtr_filt = svf { cutoff: 2200, res: 0.25 }
@@ -337,7 +337,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -18, ratio: 2.4,
                            knee: 6, attack: 0.01, release: 0.18,
-                           makeup: 1.2, mix: 0.8 }
+                           makeup: 7.0, mix: 0.8 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.65
@@ -358,4 +358,4 @@ master_clip.out_r -> master_limit.in_r
 master_limit.out_l -> out.left
 master_limit.out_r -> out.right
 -1 -> out.level
-main_out -> out.level : 0.85
+main_out -> out.level : 1.0

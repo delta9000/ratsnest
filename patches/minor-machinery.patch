@@ -260,7 +260,7 @@ motif_alloc.spread -> motif.osc.v_oct : .006
 motif.fold = fold { fold: 1.7, sym: 0 }
 motif.osc -> motif.fold.in
 motif_color = lfo { freq: .037hz, wave: sine }
-motif.color = xfade { mix: .28 }
+motif.color = xfade { mix: .28, law: equal_power }
 motif.osc -> motif.color.a
 motif.fold -> motif.color.b
 arr_b.cv -> motif.color.mix : .38
@@ -310,7 +310,7 @@ pad_osc1 -> pad_tone.in1
 pad_osc2 -> pad_tone.in2
 pad_osc3 -> pad_tone.in3
 pad_air = noise { color: pink, seed: 37 }
-pad_blend = xfade { mix: .12 }
+pad_blend = xfade { mix: .12, law: equal_power }
 pad_tone.out_l -> pad_blend.a
 pad_air -> pad_blend.b : .4
 arr_b.cv -> pad_blend.mix : .12
@@ -441,7 +441,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -17, ratio: 2.2,
                            knee: 5, attack: .012, release: .15,
-                           makeup: 1.2, mix: .82 }
+                           makeup: 8.5, mix: .82 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : .72
