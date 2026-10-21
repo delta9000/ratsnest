@@ -35,10 +35,10 @@ g6 -> str_d2.strike
 str_d2.out -> str_a2.in : 0.05
 str_d2.out -> str_d3.in : 0.05
 
-# Subtle LFO drift on v_oct for chorus-y detuning.
-l2 -> str_d2.v_oct : 0.05
-l3 -> str_a2.v_oct : 0.05
-l4 -> str_d3.v_oct : 0.05
+# Subtle LFO drift on v_oct for chorus-y detuning (0.005 oct = +-6 cents).
+l2 -> str_d2.v_oct : 0.005
+l3 -> str_a2.v_oct : 0.005
+l4 -> str_d3.v_oct : 0.005
 
 # === BOWED PINK-NOISE PAD ===
 # Pink noise into a slow VCA (LFO A swells it) into a warm ladder LP.

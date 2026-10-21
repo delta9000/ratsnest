@@ -105,6 +105,7 @@ m.out_l -> dc.in_l
 m.out_r -> dc.in_r
 dc.out_l -> out.left
 dc.out_r -> out.right
+-0.2 -> out.level                 # band-limited saw/string peaks overshoot; trim 2 dB
 
 # Try next:
 #   * seed 12 -> 29 and hear a different piece with identical architecture

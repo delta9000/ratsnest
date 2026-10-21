@@ -86,7 +86,7 @@ roots -> pad_osc.v_oct
 pad_pwm = lfo { wave: sine, freq: 0.23hz }
 pad_pwm -> pad_osc.pwm : 0.25
 air = noise { color: pink, seed: 9 }
-pad_mix = xfade { mix: 0.3 }
+pad_mix = xfade { mix: 0.3, law: equal_power }
 pad_osc -> pad_mix.a
 air -> pad_mix.b : 0.7
 morph = lfo { wave: tri, freq: 0.033hz }

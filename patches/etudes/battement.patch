@@ -37,7 +37,7 @@ hair = lfo { wave: sine, freq: 0.0007hz }
 hair -> r2.v_oct : 0.0008
 
 # ---- one gentle filter, opening across nine minutes ----
-bed = svf { cutoff: 240, res: 0.08 }
+bed = svf { cutoff: 330, res: 0.08 }
 o1 -> bed.in : 0.22
 o2 -> bed.in : 0.22
 r1 -> bed.in : 0.15
@@ -45,8 +45,8 @@ r2 -> bed.in : 0.15
 f1 -> bed.in : 0.09
 f2 -> bed.in : 0.09
 
-dawn = lfo { wave: tri, freq: 0.0018hz }
-dawn -> bed.cutoff : 620
+dawn = lfo { wave: tri, freq: 0.00093hz }     # half-period ~9 min, starts dark
+dawn -> bed.v_oct : -1.25                       # 139 Hz .. 785 Hz, never closes
 
 # ---- a room, not an effect ----
 hall = reverb { decay: 0.9, damp: 0.28, mix: 1, predelay: 0.04,

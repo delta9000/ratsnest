@@ -13,7 +13,7 @@ fm = fm { algo: dual, freq: pitch,
 filt = ladder { cutoff: 1800hz, res: 0.3 }
 
 # Tubescreamer-style saturation: mid-focused drive
-od = overdrive { drive: 2.0, tone: 0.4, level: 0.6, mix: 0.8 }
+od = overdrive { drive: 1, tone: 0.4, level: 0.6, mix: 0.8 }
 
 # Stretch any trigger into a decay-length gate so the operator envelopes
 # see a real note: one-sample trigs and clock-width gates both work.

@@ -100,7 +100,7 @@ These settings are starting points, not neutral defaults:
   drive fixes it without crushing. Use `out.level : 1.0` and let the limiter
   own the ceiling.
 - **Working backwards from loudness**: premaster peak ≈ −3 dBFS, glue comp
-  makeup +1.5..3 dB, clipper drive 1..6.5 dB, in dB (parallel mix ~0.3), limiter
+  makeup +6.5..8.5 dB at mix ~0.85 (blends are linear now; the old +1.5..3 leaned on the equal-power boost), clipper drive 1..6.5 dB, in dB (parallel mix ~0.3), limiter
   −0.4 dBFS. Kick channel level ~0.85 with the kick saturated to ~±1 sets
   the track's peak anchor; everything else stages under it.
 - The pump is three layers deep, not one: per-channel `kick_env -> mix.lvlN

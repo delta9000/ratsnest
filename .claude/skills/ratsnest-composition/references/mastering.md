@@ -16,7 +16,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.4,
                            knee: 5, attack: 0.012, release: 0.14,
-                           makeup: 1.5, mix: 0.85 }
+                           makeup: 7.0, mix: 0.85 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.7
@@ -52,7 +52,7 @@ Working backwards from a loudness target:
 | Stage | Target |
 |---|---|
 | premaster peak | ≈ −3 dBFS |
-| glue comp makeup | +1.5 .. +3 dB |
+| glue comp makeup | +6.5 .. +8.5 dB at `mix` 0.75–0.85 (linear blend; measured on mainstage/ion/polaris/halcyon) |
 | clipper drive | 1 .. 6.5 dB (it is **dB**), parallel `mix` ~0.3 |
 | limiter threshold | −0.4 .. −0.5 dBFS |
 | drop-window RMS (club) | ≈ −12 dBFS, peaks −0.4 → crest ~11 dB |

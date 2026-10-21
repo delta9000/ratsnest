@@ -429,7 +429,7 @@ kick_vca.out  -> sub_comp.side_r
 
 # ----------------- 11. Master Stereo Sum -----------------
 master_mix = mix {
-  levels: [0.8, 1.0, 1.0],
+  levels: [1.12, 1.4, 1.4],
   pans: [0.0, -1.0, 1.0]
 }
 kick_vca.out   -> master_mix.in1

@@ -453,7 +453,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.2,
                            knee: 5, attack: 0.012, release: 0.15,
-                           makeup: 1.4, mix: 0.85 }
+                           makeup: 6.5, mix: 0.85 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.7
@@ -472,9 +472,9 @@ master_clip.out_l -> master_limit.in_l
 master_clip.out_r -> master_limit.in_r
 
 # ---- output: the arrangement's main lane fades the whole track out through
-# out.level. -1 cancels the default base of 1, leaving 0.7 * main_out, which
-# ranges 0.7 at full play to 0 in the silent tail. ----
+# out.level. -1 cancels the default base of 1, leaving main_out, which
+# ranges 1.0 at full play (the limiter owns the ceiling) to 0 in the tail. ----
 master_limit.out_l -> out.left
 master_limit.out_r -> out.right
 -1 -> out.level
-main_out -> out.level : 0.7
+main_out -> out.level : 1.0

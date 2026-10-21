@@ -3,7 +3,7 @@
 
 drone = vco { freq: 55hz, wave: saw }
 sub   = vco { freq: 110hz, wave: sine }
-bed   = mix { levels: [.5, .4] }
+bed   = mix { levels: [.4, .32] }
 drone -> bed.in1
 sub -> bed.in2
 

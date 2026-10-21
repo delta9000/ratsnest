@@ -207,10 +207,10 @@ str_d3 = string { seed: 13, freq: 146.83hz, structure: 0.25,
 eu_str.trig -> str_d2.strike
 str_d2.out -> str_a2.in : 0.05
 str_d2.out -> str_d3.in : 0.05
-# Subtle chorus drift (fractions of an octave, not quantized pitch).
-l2 -> str_d2.v_oct : 0.04
-l3 -> str_a2.v_oct : 0.04
-l4 -> str_d3.v_oct : 0.04
+# Subtle chorus drift: 0.004 oct = +-5 cents (0.04 detuned the strings +-48 c).
+l2 -> str_d2.v_oct : 0.004
+l3 -> str_a2.v_oct : 0.004
+l4 -> str_d3.v_oct : 0.004
 
 # === PAD (ember): bowed pink noise through a driven ladder ===
 pn = noise { color: pink, seed: 5 }

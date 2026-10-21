@@ -281,7 +281,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -18, ratio: 1.8,
                            knee: 6, attack: 0.02, release: 0.2,
-                           makeup: 1.2, mix: 0.8 }
+                           makeup: 7.0, mix: 0.8 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.6
@@ -302,4 +302,4 @@ master_clip.out_r -> master_limit.in_r
 master_limit.out_l -> out.left
 master_limit.out_r -> out.right
 -1 -> out.level
-main_out -> out.level : 0.95
+main_out -> out.level : 1.0
