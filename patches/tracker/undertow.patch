@@ -163,7 +163,7 @@ duck_ret -> room_s.duck
 
 # ---- master: everything sums into it ----
 mast = sub { file: "../lib/master-chain.sub", clip_drive: 10.5, clip_blend: 1,
-             comp_thr: -18, ceiling: -2.5 }
+             comp_thr: -18, ceiling: -2.5, true_peak: on }
 8 -> mast.makeup
 width_lvl -> mast.width
 kit.out_l   -> mast.in_l

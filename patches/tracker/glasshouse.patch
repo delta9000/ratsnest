@@ -174,7 +174,7 @@ room.out_r -> room_s.in_r
 verb_lvl -> room_s.level
 
 # ---- master: strips sum into it ----
-master = sub { file: "../lib/master-chain.sub", clip_drive: 4, ceiling: -1.5,
+master = sub { file: "../lib/master-chain.sub", clip_drive: 4, ceiling: -1.5, true_peak: on,
                 mid1_gain: -2.5, high_gain: 2.5, mid2_gain: 1.5 }
 7.5 -> master.makeup
 drums.l   -> master.in_l
