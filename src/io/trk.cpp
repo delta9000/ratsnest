@@ -57,6 +57,9 @@ struct Layer { int pat = 0; int shift = 0; int at = -1; };
 struct Entry { std::vector<Spec> specs; int repeat = 1; std::vector<Layer> layers; };
 // `section <name> <layers>`: a named layer group for the order list.
 struct Section { std::string name; std::vector<Spec> specs; int line = 0; };
+// A `.2>` ramp: field `f` of cell `cell` (row * width + column) in pattern
+// `pat` glides to the field's next value; line/col locate the token.
+struct Ramp { size_t pat, cell; int f, line, col; };
 // A track's state while flattening: the row so far and the song row its
 // sounding note's length runs out (-1: none).
 struct Voice { TrkRow s; int off_at = -1; };
@@ -377,8 +380,11 @@ class Parser {
   void value(const Tok& t, const Track& tr, int f, Event& e) {
     if (f != kVel && is_tone(t.s)) return tone(t, t.s, tr, f, e);
     float v = 0.0f;
-    if (!to_value(t.s, v))
+    const bool ramp = t.s.size() > 1 && t.s.back() == '>';
+    if (!to_value(t.s.substr(0, t.s.size() - ramp), v))
       return err(t, "'" + std::string(t.s) + "' is not a number or note name for " + kFields[f]);
+    const Pattern& p = pats_.back();
+    if (ramp) ramps_.push_back({pats_.size() - 1, static_cast<size_t>(&e - p.ev.data()), f, line_, t.col});
     // A note name in a vel slot is almost always fields written out of order.
     if (f == kVel && (std::isupper(static_cast<unsigned char>(t.s[0])) || !(v >= 0.0f && v <= 1.0f)))
       return err(t, "vel must be a number in 0..1 (a cell's values follow the track's field order)");
@@ -457,6 +463,8 @@ class Parser {
 
   // Resolve the order list, then flatten it into song rows.
   void finish() {
+    for (size_t i = 0; i < ramps_.size() && out_.errors.empty(); ++i) ramp(ramps_[i]);
+    if (!out_.errors.empty()) return;
     if (entries_.empty()) {
       line_ = 1;
       return err(1, "no order list: nothing would play (add 'order <pattern>...')");
@@ -476,6 +484,26 @@ class Parser {
       resolve(entries_[i]);
     }
     if (out_.errors.empty()) flatten();
+  }
+
+  // Fills the rows between a ramp and the field's next value in its pattern.
+  void ramp(const Ramp& rp) {
+    Pattern& p = pats_[rp.pat];
+    const size_t w = p.tracks.size(), bit = 1u << rp.f;
+    size_t end = rp.cell + w;
+    while (end < p.ev.size() && !written(p.ev[end], rp.f)) end += w;
+    line_ = rp.line;
+    if (end >= p.ev.size() || p.ev[end].tone[rp.f])
+      return err(rp.col, std::string("a ramp '>' glides to the next number or note written in its ") +
+                             kFields[rp.f] + " field later in pattern '" + p.name + "'; none follows");
+    const Event &a = p.ev[rp.cell], &b = p.ev[end];
+    const float n = static_cast<float>((end - rp.cell) / w);
+    for (size_t at = rp.cell + w; at < end; at += w) {
+      Event& e = p.ev[at];
+      e.v[rp.f] = a.v[rp.f] + (b.v[rp.f] - a.v[rp.f]) * static_cast<float>((at - rp.cell) / w) / n;
+      e.set = static_cast<std::uint8_t>(e.set | bit);
+      e.pitch = static_cast<std::uint8_t>(e.pitch | (a.pitch & b.pitch & bit));
+    }
   }
 
   // Splices each section into its layers; `verse^2` adds 2 to every one.
@@ -671,6 +699,8 @@ class Parser {
   std::vector<Entry> entries_;
   std::vector<int> entry_lines_;
   std::vector<Section> sections_;
+  std::vector<Ramp> ramps_;
+
 
 };
 

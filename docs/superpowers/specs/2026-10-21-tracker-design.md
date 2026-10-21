@@ -384,3 +384,13 @@ overlay or contain another section. Sections share the pattern namespace
 declared before the patterns they name. Each section is checked at its own
 line; errors that arise only from how an order entry combines it are
 reported at the entry.
+
+### 8.8 Ramps: a trailing `>`
+
+A `vel`, `cva` or `cvb` value with a trailing `>` (`.2>`, `A3>`) glides
+linearly, one step per row, to the next value written in the same field of
+the same track later in the same pattern: the rows between are filled in
+when the file is parsed. A ramp with no later value in its pattern (or one
+whose target is a chord tone) is an error at the ramp. The filled values are
+pitches only when both ends are, so `^N` moves a pitch glide and leaves a
+level fade alone. Values stay stepped per row (§4.3); `func` still smooths.

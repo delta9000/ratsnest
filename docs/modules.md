@@ -718,6 +718,10 @@ Composing (all resolved when the file loads; the ports never change):
   (with `^N` and `@R` as usual); then `order verse*2 chorus verse^2+fill@48`.
   A section's `^N` adds to each of its layers. Sections share the pattern
   namespace and hold patterns, not other sections.
+- **Ramps:** a trailing `>` on a `vel`/`cva`/`cvb` value (`.2>`, `A3>`)
+  glides linearly, one step per row, to the next value written in that field
+  later in the same pattern (an error if none follows). Still stepped per
+  row: slew with `func` for a smooth fade.
 
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
 before it gates are low). A re-articulated note drops its gate for the edge

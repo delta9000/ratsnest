@@ -465,6 +465,38 @@ TEST_CASE("trk: section diagnostics") {
   fails(h + "pattern r 8 a\nsection v r+p@6\norder q+v\n", 7, 10, "past the step's end ('q' has 4 rows");
 }
 
+TEST_CASE("trk: a trailing '>' ramps a value to the next one in its field") {
+  auto s = ok("track a note vel cva\ntrack b cvb\n"
+              "pattern p 8\n"
+              "| C4 .2> A3> | 1>\n"
+              "02 | . . . | 3\n"
+              "04 | . .6 A4 | 0\n"
+              "| . . 2> \n"
+              "07 | . . 4\n"
+              "order p p^12\n");
+  const float vel[] = {.2f, .3f, .4f, .5f, .6f, .6f, .6f, .6f};
+  for (int r = 0; r < 8; ++r) {
+    CAPTURE(r);
+    CHECK(at(s, r, 0).vel == doctest::Approx(vel[r]));
+  }
+  CHECK(at(s, 2, 0).cva == doctest::Approx(0.5f));  // A3 to A4 over four rows
+  CHECK(at(s, 1, 1).cvb == doctest::Approx(2.0f));
+  CHECK(at(s, 3, 1).cvb == doctest::Approx(3.0f));  // the ramp ended at row 2
+  CHECK(at(s, 6, 0).cva == doctest::Approx(3.0f));  // 2 to 4 over rows 5..7
+  CHECK(at(s, 10, 0).cva == doctest::Approx(1.5f));  // a pitch ramp transposes
+  CHECK(at(s, 14, 0).cva == doctest::Approx(3.0f));  // a level ramp does not
+}
+
+TEST_CASE("trk: ramp diagnostics") {
+  fails("track a cva\npattern p 4\n| 1>\n| 2\npattern q 4\n| 1\n03 | 5>\norder p\n", 7, 6,
+        "a ramp '>' glides to the next number or note written in its cva field later in pattern 'q'");
+  fails("track a note vel\npattern p 4\n| C4 .5>\n| D4\norder p\n", 3, 6, "in its vel field");
+  fails("track a note\npattern p 4\n| C4>\n", 3, 3, "is not a note");
+  fails("track a cva\npattern p 4\n| >\n", 3, 3, "not a number or note name for cva");
+  fails("track a note\ntrack b note cva from a\npattern p 4 b\n| . 1>\n| . t1\norder p\n", 4, 5,
+        "none follows");
+}
+
 TEST_CASE("trk: the longest song fits exactly") {
   auto s = ok("track a cva\npattern p 1024\norder p*64\n");
   CHECK(s.length() == 65536);
