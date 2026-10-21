@@ -201,6 +201,8 @@ TEST_CASE("trk: diagnostics carry line and column") {
   fails(h + "pattern p 4\n| H4\n", 3, 3, "is not a note");
   fails(h + "pattern p 4\n| ~\n", 3, 3, "is not a note");
   fails(h + "pattern p 4\n| C4 1.5\n", 3, 6, "vel must be a number in 0..1");
+  fails(h + "pattern p 4\n| .6 C4\n", 3, 6, "follow the track's field order");
+  fails(h + "pattern p 4\n| e4\n", 3, 3, "uppercase");
   fails(h + "pattern p 4\n| C4 loud\n", 3, 6, "not a number or note name for vel");
   fails(h + "pattern p 4\n| C4 1 1\n", 3, 8, "cell has 3 values; track 'a' holds 2 (note, vel)");
   fails(h + "pattern p 4\n| C4 | D4\n", 3, 6, "more cells than pattern 'p' has tracks");

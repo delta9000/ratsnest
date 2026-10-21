@@ -143,7 +143,9 @@ Typical use: `env -> amp.cv` with base gain zero.
 
 ## `out`
 
-Inputs `in` 0 (both channels), `left` 0, `right` 0, `level` 1; engine outputs
+`out` is built in: cable to it by that name and never declare it (a declared
+`o = out {}` is just another node, and `check` warns that nothing reaches the
+output). Inputs `in` 0 (both channels), `left` 0, `right` 0, `level` 1; engine outputs
 `l`, `r`. It sums mono into each side and applies level. Example:
 `mix.out_l -> out.left`, `mix.out_r -> out.right`. Graph output and float WAVs
 preserve finite values beyond ±1; use an explicit limiter for peak control.
@@ -675,10 +677,15 @@ order |: verse+beat*3       # '|:' = loop point; without one the song ends
 - Note tokens: `C4`, `Cs4`, `Bb3` (the DSL's spelling, always v/oct with
   A3 = 0) or a number = new note; `x` = new note at the held pitch; `~D4` =
   slur (pitch change, no re-attack); `off`/`===` = note off; `.`/`...`/`-`/
-  `---` = empty. `vel` is 0..1; `cva`/`cvb` take numbers or note names.
+  `---` = empty. Values fill the track's fields in declared order, so a
+  `note vel` cell is `C4 .8`, never `.8 C4`. `vel` is a number in 0..1 (1
+  until first written); `cva`/`cvb` take numbers or note names (0 until
+  written). Note names are uppercase.
   **Every value holds until changed.**
 - `order` entries: `name`, `a+b` (layers: the first sets the step length,
-  the others loop inside it, tracks must not overlap), `entry*N` repeats, and
+  the others loop inside it, tracks must not overlap), `entry*N` repeats
+  (`*N` binds to the whole layer group: `a+b*3` is `(a+b)` three times, and
+  each repeat is its own `step`), and
   `|:` the loop point. Capped at 65536 rows.
 
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;

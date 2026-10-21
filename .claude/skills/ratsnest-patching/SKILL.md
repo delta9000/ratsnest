@@ -21,6 +21,7 @@ Then load the skill that matches the job:
 | a timbre, voice, drum, texture, effect chain | `ratsnest-synthesis` |
 | a self-playing / evolving / never-repeating patch | `ratsnest-generative` |
 | a named genre, a track "like X", a groove | `ratsnest-genres` |
+| a song with sections, a melody, a written-out score | a `.trk` file played by `tracker` (below) |
 | structure, harmony, arrangement, mixing, mastering | `ratsnest-composition` |
 | "surprise me", a starting point, a way out of a rut | `ratsnest-inspiration` |
 | MIDI, polyphony, chords, live play, capture, writing a `.sub` | `ratsnest-instrument` |
@@ -78,7 +79,11 @@ Iterate on numbers, not vibes. Two or three passes converges.
 - **Clock tree, not clocks.** One `clock` at 4× the tempo, then a chain of
   `div { by: 2 }`. Every rhythm in the patch is phase-locked for free, and
   "offbeat" is `logic{and}` of eighth with `logic{not}` of quarter.
-- **Arrangement grid.** Bar-clocked `stepseq` lanes of 0..1 levels → `func`
+- **Songs with a form: write a `.trk`.** Notes, sections and the arrangement
+  go in a plain-text tracker file; the patch stays about sound.
+  `docs/modules.md` `tracker` has the format, `docs/patch-craft.md` "Writing a
+  song with tracker" the craft, `patches/mainstage-trk.patch` a worked song.
+- **Arrangement grid.** (Pre-tracker; still right for a lane of levels.) Bar-clocked `stepseq` lanes of 0..1 levels → `func`
   (nothing on `trig`, so it slews) → `vca.cv`. One lane per element. Asymmetric
   rise/fall is the trick: risers rise for seconds and fall in 0.4 s.
 - **Chord lanes.** Three bar-clocked `stepseq`s carrying root/third/fifth as

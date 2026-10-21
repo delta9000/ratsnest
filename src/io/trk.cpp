@@ -4,6 +4,7 @@
 // clipboard with dotted empty fields, `---`/`===` (tracker folklore, source
 // unresolved), and the order list with a restart position.
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -241,14 +242,16 @@ class Parser {
     if (to_value(s, e.v[kNote])) { e.kind = slur ? Kind::Slur : Kind::Note; return; }
     if (t.s.find('#') != std::string_view::npos)
       return err(t, "'" + std::string(t.s) + "' is not a note (Cs4 for sharp, Bb3 for flat)");
-    err(t, "'" + std::string(t.s) + "' is not a note (C4, Cs4, Bb3), number, x, ~note, off or .");
+    err(t, "'" + std::string(t.s) + "' is not a note (uppercase: C4, Cs4, Bb3), number, x, ~note, off or .");
   }
 
   void value(const Tok& t, int f, Event& e) {
     float v = 0.0f;
     if (!to_value(t.s, v))
       return err(t, "'" + std::string(t.s) + "' is not a number or note name for " + kFields[f]);
-    if (f == kVel && !(v >= 0.0f && v <= 1.0f)) return err(t, "vel must be a number in 0..1");
+    // A note name in a vel slot is almost always fields written out of order.
+    if (f == kVel && (std::isupper(static_cast<unsigned char>(t.s[0])) || !(v >= 0.0f && v <= 1.0f)))
+      return err(t, "vel must be a number in 0..1 (a cell's values follow the track's field order)");
     e.v[f] = v;
     e.set = static_cast<std::uint8_t>(e.set | (1u << f));
   }
