@@ -256,6 +256,36 @@ Learned building `patches/symphony/` (four movements, fifteen mono parts):
   shelve the master below 90 Hz. Check band-energy fractions (an FFT per 8 s window),
   not just the RMS timeline.
 
+## Writing a song with tracker
+
+For anything with a form, write the score as `.trk` files and keep the patch
+about sound (`docs/modules.md` `tracker`; worked port:
+`patches/mainstage-trk.patch`, which nulls against `mainstage.patch` to
+about −80 dB per block):
+
+- **Two trackers, two clocks.** One for notes at the finest grid the song
+  needs (`clock { bpm: 4 × tempo }` = sixteenths), one for the form clocked
+  by a four-bar divider (`div { by: 64 }` off the same clock). The form file
+  is a table: one row per block, one `cva` column per section level, read
+  down like a mix sheet. Slew each column through `func` exactly as the old
+  arrangement lanes did; the tracker's values are stepped and held.
+- **Layer, don't copy.** `order chords+chop+hook+beat` stacks a four-bar
+  chord pattern with one-bar and two-bar loops: the step lasts as long as
+  the first pattern and the rest wrap inside it. Put the longest pattern
+  first. A one-shot (a drop hit) needs a full-length pattern, or it loops.
+- **The gate is the trigger.** Each note or `x` re-articulates with a
+  one-sample gap, so `gateN` drives `func.trig`, `adsr.gate`, `lpg.strike`
+  and `vco.sync` directly; no `stepseq.trig`, no `logic { op: and }` with a
+  lane. Write `off` where the old gate fell if you care about gate length.
+- **Chords are one track.** `track harm note cva cvb` carries root, third
+  and fifth as note names; every voice reads `voct5`/`cva5`/`cvb5`.
+- **No wrap hazard.** Without `|:` the song ends after its last row (gates
+  fall, `end` goes high), so the guard-step arithmetic of the arrangement
+  grid section is unnecessary. Add `|:` only for an endless loop.
+- **Edit while it plays.** `play` watches the `.trk` files; a save keeps the
+  current order step and row. A typo reports `song.trk:line:col` and the last
+  good version keeps playing.
+
 ## Small gotchas
 
 - `quant`'s pitch output is `out`, not `cv` (stepseq has `cv`; quant does

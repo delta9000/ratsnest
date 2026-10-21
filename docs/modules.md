@@ -132,7 +132,7 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 | Sources | `vco`, `additive`, `lfo`, `noise`, `dust`, `random`, `sampler`, `modal`, `string`, `fm` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
-| Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tempo`, `alloc`, `midi` |
+| Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tracker`, `tempo`, `alloc`, `midi` |
 | Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `rec`, `extin`, `out` |
 
 ## `vca`
@@ -603,6 +603,75 @@ mel = stepseq { steps: [D4v, F4v, E4v, 0, A4v], gates: [1, 1, 1, 0, 1],
                 lens: [8, 4, 2, 1, 1], ties: [0, 0, 1, 0, 0],
                 vels: [.8, .7, .7, 0, 1] }
 ```
+
+## `tracker`
+
+`tracker { file: "song.trk" }` plays a song written as a plain-text pattern
+file: tracks, named patterns of rows, and an order list. Each rising `clock`
+edge plays one row (rows-per-beat is the clock's business). Inputs (all
+discrete) `clock`, rising-edge `reset`, and `start` (the order step `reset`
+rewinds to, 0-based, rounded and clamped). Outputs, per track n = 1..8:
+`voctn`, `gaten`, `veln`, `cvan`, `cvbn` (banks like `alloc`'s; undeclared
+tracks output 0); then `step` (order step), `pattern` (file index of the
+step's first pattern), `row` (row within the step), one-sample `step_trig`
+and `row_trig`, and `end`. A bare `song` reads `voct1`.
+
+The `file:` path is quoted and resolves against the directory of the file
+that declares the module (like a `sub`, unlike `sampler`). The loader reads
+it at build time, reports `.trk` mistakes as `song.trk:line:col`, embeds the
+song as config `text`, and `play` **watches it**: saving the `.trk`
+hot-reloads, keeping the order step and row (clamped to the edited song).
+
+```text
+# song.trk -- one row per sixteenth
+track kick  note            # 1: gate1
+track bass  note vel        # 2: voct2 gate2 vel2
+track harm  note cva cvb    # 3: root, third, fifth as v/oct
+
+pattern beat 16 kick        # one bar, loops under longer patterns
+00 | x
+04 | x
+08 | x
+12 | x
+
+pattern verse 64 bass harm  # four bars; step length comes from here
+00 | D2  .9     | D3  F4  A3
+08 | off        | .
+16 | Bb1        | Bb2 D4  F3
+32 | F2         | F3  A4  C4
+48 | C2         | C3  E4  G3
+62 | ~D2                         # slur: new pitch, no re-attack
+
+order verse*2               # sections accumulate, one per line
+order |: verse+beat*3       # '|:' = loop point; without one the song ends
+```
+
+- `track <name> <fields>` declares tracks 1..8 in order, with the fields its
+  cells hold (`note`, `vel`, `cva`, `cvb`), written in that order.
+- `pattern <name> <rows> [tracks]` (1..1024 rows) over the listed tracks
+  (default all). Rows are `[n] | cell | cell`; a row number is optional
+  (decimal, increasing) and rows never written are empty, so patterns can be
+  sparse. Cells hold whitespace-separated field tokens; trailing ones may be
+  omitted; `#` after a space starts a comment.
+- Note tokens: `C4`, `Cs4`, `Bb3` (the DSL's spelling, always v/oct with
+  A3 = 0) or a number = new note; `x` = new note at the held pitch; `~D4` =
+  slur (pitch change, no re-attack); `off`/`===` = note off; `.`/`...`/`-`/
+  `---` = empty. `vel` is 0..1; `cva`/`cvb` take numbers or note names.
+  **Every value holds until changed.**
+- `order` entries: `name`, `a+b` (layers: the first sets the step length,
+  the others loop inside it, tracks must not overlap), `entry*N` repeats, and
+  `|:` the loop point. Capped at 65536 rows.
+
+Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
+before it gates are low). A re-articulated note drops its gate for the edge
+sample only, so gates work with any clock duty, one-sample pulses included;
+slurs keep the gate high; `off` drops it on its row. Without `|:` the edge
+after the last row ends the song: gates fall, values hold, `end` stays high
+until `reset`; with it the song wraps (`end` pulses). A coincident reset and
+clock edge plays row 0 of step `start`. No effect column, tempo or polyphony
+per track: patch modules to the CVs. Full design:
+`docs/superpowers/specs/2026-10-21-tracker-design.md`; a worked port:
+`patches/mainstage-trk.patch`.
 
 ## `tempo`
 

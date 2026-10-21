@@ -7,7 +7,7 @@ const ModuleInfo* const kRegistry[] = {
     &svf_info, &noise_info, &math_info, &xfade_info, &drive_info, &fold_info,
     &sh_info, &ladder_info, &lpg_info, &random_info, &quant_info, &mix_info,
     &scope_info, &delay_info, &adsr_info, &reverb_info, &euclid_info,
-    &bern_info, &logic_info, &switch_info, &turing_info, &stepseq_info,
+    &bern_info, &logic_info, &switch_info, &turing_info, &stepseq_info, &tracker_info,
     &tempo_info, &alloc_info, &midi_info, &dcblock_info, &stereo_info, &compressor_info, &eq_info, &clipper_info, &limiter_info, &follow_info, &sampler_info, &rec_info, &extin_info, &grains_info, &modal_info, &string_info, &overdrive_info, &fm_info, &chorus_info, &phaser_info};
 }
 

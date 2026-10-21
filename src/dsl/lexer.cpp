@@ -18,6 +18,8 @@ bool ident_char(char c) { return ident_start(c) || is_digit(c); }
 // (`Hz`, `Osc`) instead of stopping at its first uppercase letter.
 bool word_char(char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }
 
+}  // namespace
+
 // A note-name literal: uppercase letter A-G, optional accidental (s = sharp,
 // b = flat — '#' is unavailable, it starts a comment), one octave digit 0-9,
 // and an optional trailing 'v'. Scientific pitch notation (C4 = middle C,
@@ -43,6 +45,8 @@ bool note_num(std::string_view s, double& out) {
              : 440.0 * std::exp2(static_cast<double>(midi - 69) / 12.0);
   return true;
 }
+
+namespace {
 
 // A stray byte, made safe to print inside a one-line diagnostic: control
 // bytes and lone high bytes (a fragment of UTF-8) become \xNN.
