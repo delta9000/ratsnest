@@ -326,3 +326,17 @@ track comes first (it replaces the pending drop). Without `len` a note holds
 until changed, as before. Lengths count song rows, so a note in a looping
 layer, or on a step's last row, rings across the wrap or the step boundary.
 This removes the `off` row after every short note (hats, plucks, hooks).
+
+### 8.3 Chord tones: `from <track>`, `t1`..`t3`
+
+`track arp note vel from harm` makes `arp` a dependent of `harm`, which must
+be declared earlier and hold `note` (and optionally `cva`, `cvb`). In a
+dependent track's cells the pitch tokens `t1`, `t2`, `t3` mean the source's
+**resolved** note, cva and cvb on that song row, after the source's own
+`^N`, with an optional semitone offset (`t1-12`, `t3+12`, `t2+7`, ±48) and
+`:L` length. In the note field they act like a note (gate, retrigger; `~t2`
+slurs); in `cva`/`cvb` they set the value. They count as pitches, so the
+dependent layer's own `^N` adds on top. Tracks resolve in declaration order
+on every row, which is why the source comes first. A token naming a field the
+source does not hold is an error. This is what lets one 16-row arp or bass
+riff loop under every chord of the song instead of being rewritten per chord.

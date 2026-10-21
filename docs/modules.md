@@ -697,6 +697,12 @@ Composing (all resolved when the file loads; the ports never change):
   cell `C4:3`, `x:2`, `~D4:4`. The gate drops L rows later unless another
   note, slur or `off` on that track comes first; counted in song rows, so a
   looping layer's note can ring into the next step. No `len` holds.
+- **Chord tones:** `track arp note vel from harm` (an earlier track with
+  `note`, optionally `cva`/`cvb`). In `arp`'s cells `t1`, `t2`, `t3` are
+  harm's resolved note, cva, cvb on that song row (after harm's `^N`), with an
+  optional semitone offset and length: `| t1+12 .8`, `| ~t3-12:2`. They work
+  in the note field (a note; `~t2` slurs) and in `cva`/`cvb`. One 16-row riff
+  then loops under every chord: `order chords+arp`.
 
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
 before it gates are low). A re-articulated note drops its gate for the edge

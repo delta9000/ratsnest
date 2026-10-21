@@ -279,12 +279,52 @@ TEST_CASE("trk: a looping layer's note length counts song rows") {
 }
 
 TEST_CASE("trk: note length diagnostics") {
-  fails("track a note len\n", 1, 14, "'len' needs a row count");
+  fails("track a note len\n", 1, 14, "'len' needs a value");
   fails("track a note len 0\n", 1, 18, "row count in 1..4096");
   fails("track a len 2\n", 1, 1, "needs a name and fields");
   fails("track a note\npattern p 2\n| C4:0\n", 3, 5, "':L' with L in 1..4096");
   fails("track a note\npattern p 2\n| C4:\n", 3, 5, "':L'");
   fails("track a note\npattern p 2\n| :3\n", 3, 3, "is not a note");
+}
+
+TEST_CASE("trk: chord tones from a source track follow its chords") {
+  const std::string h =
+      "track pad note cva cvb\ntrack arp note vel from pad\ntrack lvl cva cvb from pad\n"
+      "pattern chords 4 pad\n| D3 F4 A3\n02 | Bb2 D4 F3\n"
+      "pattern arp 2 arp lvl\n| t1+12 .8 | t3-12 .5\n| ~t2:1 | .25 t2\n";
+  const float d3 = -7.0f / 12, f4 = 8.0f / 12, a3 = 0.0f, bb2 = -11.0f / 12, d4 = 5.0f / 12;
+  auto s = ok(h + "order chords+arp chords^2+arp^-12\n");
+  CHECK(at(s, 0, 1).voct == doctest::Approx(d3 + 1));
+  CHECK(at(s, 0, 1).retrig);
+  CHECK(at(s, 0, 1).vel == doctest::Approx(0.8f));
+  CHECK(at(s, 0, 2).cva == doctest::Approx(a3 - 1));  // cva reads t3, an octave down
+  CHECK(at(s, 0, 2).cvb == doctest::Approx(0.5f));
+  CHECK(at(s, 1, 1).voct == doctest::Approx(f4));     // ~t2: slur to the third
+  CHECK_FALSE(at(s, 1, 1).retrig);
+  CHECK(at(s, 1, 2).cva == doctest::Approx(0.25f));   // a plain level
+  CHECK(at(s, 1, 2).cvb == doctest::Approx(f4));
+  CHECK(at(s, 2, 1).voct == doctest::Approx(bb2 + 1));  // the riff loops under the next chord
+  CHECK(at(s, 2, 1).on);  // ~t2:1 ended on row 2, the new note starts there
+  CHECK(at(s, 3, 1).voct == doctest::Approx(d4));
+  // Step 2: the source moves up 2, the arp's own ^-12 adds on top.
+  CHECK(at(s, 4, 1).voct == doctest::Approx(d3 + 2.0f / 12 + 1 - 1));
+  CHECK(at(s, 4, 2).cva == doctest::Approx(a3 + 2.0f / 12 - 1 - 1));
+  CHECK(at(s, 5, 2).cva == doctest::Approx(0.25f));  // levels never move
+}
+
+TEST_CASE("trk: chord tone diagnostics") {
+  const std::string h = "track pad note cva\n";
+  fails(h + "track arp note from\n", 2, 16, "'from' needs a value");
+  fails(h + "track arp note from pads\n", 2, 21, "did you mean 'pad'");
+  fails(h + "track arp note from arp\n", 2, 21, "a source track is declared earlier");
+  fails(h + "track lvl cva\ntrack arp note from lvl\n", 3, 21, "no note field");
+  fails(h + "track arp note\npattern p 1 arp\n| t1\n", 4, 3, "has no source");
+  fails(h + "track arp note from pad\npattern p 1 arp\n| t3\n", 4, 3, "reads cvb, which track 'pad'");
+  fails(h + "track arp note from pad\npattern p 1 arp\n| t1+x\n", 4, 3, "t1-12, t3+7");
+  fails(h + "track arp note from pad\npattern p 1 arp\n| t1+\n", 4, 3, "is not a chord tone");
+  fails(h + "track arp note from pad\npattern p 1 arp\n| t1+49\n", 4, 3, "is not a chord tone");
+  fails(h + "track arp note from pad\npattern p 1 arp\n| t4\n", 4, 3, "is not a note");
+  fails(h + "track arp note vel from pad\npattern p 1 arp\n| t1 t2\n", 4, 6, "for vel");
 }
 
 TEST_CASE("trk: the longest song fits exactly") {

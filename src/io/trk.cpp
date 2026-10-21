@@ -23,15 +23,23 @@ enum class Kind : std::uint8_t { None, Note, Slur, Off, Hit };
 struct Tok { std::string_view s; int col; };
 constexpr int kMaxLen = 4096;  // note length in rows
 // `len`: rows a note sounds before its gate drops; 0 holds until changed.
-struct Track { std::string name; std::vector<int> fields; int len = 0; };
+// `src`: the earlier track whose note, cva and cvb `t1`..`t3` read; -1 none.
+struct Track { std::string name; std::vector<int> fields; int len = 0, src = -1; };
+
+bool has(const Track& t, int f) { return std::count(t.fields.begin(), t.fields.end(), f) > 0; }
+
+// `t1`..`t3`, optionally offset: a chord tone of the source track.
+bool is_tone(std::string_view s) { return s.size() >= 2 && s[0] == 't' && s[1] >= '1' && s[1] <= '3'; }
 // One cell as written: a note event plus the value fields it sets (bit f of
 // `set` for v[f]); bit f of `pitch` marks a cv value written as a note name,
 // which an order-list `^N` transposes along with the note. `len` is the
-// note's length in rows (`C4:3`, else the track's); 0 holds.
+// note's length in rows (`C4:3`, else the track's); 0 holds. `tone[f]` 1..3
+// makes v[f] an offset from the source track's note, cva or cvb.
 struct Event {
   Kind kind = Kind::None;
   std::uint8_t set = 0, pitch = 0;
   std::int16_t len = 0;
+  std::uint8_t tone[4] = {};
   float v[4] = {};
 };
 struct Pattern {
@@ -157,7 +165,7 @@ class Parser {
               dsl::did_you_mean(w, {"track", "pattern", "order"}));
   }
 
-  // track <name> <field>... [len <rows>]
+  // track <name> <field>... [len <rows>] [from <track>]
   void track(const std::vector<Tok>& t) {
     if (!pats_.empty()) return err(t[0], "tracks are declared before the first pattern");
     if (tracks_.size() == kTrkTracks) return err(t[0], "at most 8 tracks");
@@ -166,7 +174,7 @@ class Parser {
     if (find_named(tracks_, t[1].s) >= 0) return err(t[1], "duplicate track '" + std::string(t[1].s) + "'");
     Track tr{std::string(t[1].s), {}};
     for (size_t i = 2; i < t.size() && out_.errors.empty(); ++i) {
-      if (t[i].s == "len") {
+      if (t[i].s == "len" || t[i].s == "from") {
         option(t, i++, tr);
         continue;
       }
@@ -174,7 +182,7 @@ class Parser {
       if (f == std::end(kFields))
         return err(t[i], "unknown field '" + std::string(t[i].s) + "' (fields: note, vel, cva, cvb)");
       const int id = static_cast<int>(f - std::begin(kFields));
-      if (std::count(tr.fields.begin(), tr.fields.end(), id))
+      if (has(tr, id))
         return err(t[i], "field '" + std::string(t[i].s) + "' listed twice");
       tr.fields.push_back(id);
     }
@@ -182,10 +190,21 @@ class Parser {
     tracks_.push_back(std::move(tr));
   }
 
-  // `len <rows>` after a track's fields.
+  // `len <rows>` or `from <track>` among a track's fields.
   void option(const std::vector<Tok>& t, size_t i, Track& tr) {
-    if (i + 1 == t.size()) return err(t[i], "'len' needs a row count ('len 1')");
-    if (!to_int(t[i + 1].s, 1, kMaxLen, tr.len)) err(t[i + 1], "len must be a row count in 1..4096");
+    if (i + 1 == t.size())
+      return err(t[i], "'" + std::string(t[i].s) + "' needs a value ('len 1' rows, 'from <track>')");
+    const Tok& v = t[i + 1];
+    if (t[i].s == "len") {
+      if (!to_int(v.s, 1, kMaxLen, tr.len)) err(v, "len must be a row count in 1..4096");
+      return;
+    }
+    tr.src = find_named(tracks_, v.s);
+    if (tr.src < 0)
+      return err(v, "unknown track '" + std::string(v.s) + "' (a source track is declared earlier)" +
+                        hint(tracks_, v.s));
+    if (!has(tracks_[static_cast<size_t>(tr.src)], kNote))
+      err(v, "track '" + std::string(v.s) + "' has no note field to read chord tones from");
   }
 
   // pattern <name> <rows> [<track>...]
@@ -257,19 +276,23 @@ class Parser {
     for (size_t k = from; k < end && out_.errors.empty(); ++k) {
       const int f = tr.fields[k - from];
       if (is_empty(t[k].s)) continue;
-      if (f == kNote) note(t[k], e);
-      else value(t[k], f, e);
+      if (f == kNote) note(t[k], tr, e);
+      else value(t[k], tr, f, e);
     }
   }
 
-  void note(const Tok& t, Event& e) {
+  void note(const Tok& t, const Track& tr, Event& e) {
     std::string_view s = t.s.substr(0, t.s.find(':'));
     if (s.size() < t.s.size() && !length(t, s.size(), e)) return;
     if (s == "off" || s == "===") { e.kind = Kind::Off; return; }
     if (s == "x") { e.kind = Kind::Hit; return; }
     const bool slur = !s.empty() && s[0] == '~';
     if (slur) s.remove_prefix(1);
-    if (to_value(s, e.v[kNote])) { e.kind = slur ? Kind::Slur : Kind::Note; return; }
+    e.kind = slur ? Kind::Slur : Kind::Note;
+    e.pitch = static_cast<std::uint8_t>(e.pitch | (1u << kNote));
+    if (is_tone(s)) return tone(t, s, tr, kNote, e);
+    if (to_value(s, e.v[kNote])) return;
+    e.kind = Kind::None;
     if (t.s.find('#') != std::string_view::npos)
       return err(t, "'" + std::string(t.s) + "' is not a note (Cs4 for sharp, Bb3 for flat)");
     err(t, "'" + std::string(t.s) + "' is not a note (uppercase: C4, Cs4, Bb3), number, x, ~note, off or .");
@@ -283,7 +306,29 @@ class Parser {
     return false;
   }
 
-  void value(const Tok& t, int f, Event& e) {
+  // `t2+7` in field `f`: source tone 2 (its cva) up 7 semitones.
+  void tone(const Tok& t, std::string_view s, const Track& tr, int f, Event& e) {
+    const std::string name(s.substr(0, 2));
+    if (tr.src < 0)
+      return err(t, "'" + name + "' is a chord tone, but track '" + tr.name +
+                        "' has no source (declare 'track " + tr.name + " ... from <track>')");
+    const Track& src = tracks_[static_cast<size_t>(tr.src)];
+    const int k = s[1] - '0', sf = k == 1 ? kNote : k;  // t1 note, t2 cva, t3 cvb
+    if (!has(src, sf))
+      return err(t, "'" + name + "' reads " + kFields[sf] + ", which track '" + src.name + "' does not hold");
+    std::string_view off = s.substr(2);
+    if (!off.empty() && off[0] == '+') off.remove_prefix(1);
+    int n = 0;
+    if (s.size() > 2 && !to_int(off, -48, 48, n))
+      return err(t, "'" + std::string(s) + "' is not a chord tone (t1, t2, t3 with an optional semitone offset: t1-12, t3+7)");
+    e.tone[f] = static_cast<std::uint8_t>(k);
+    e.v[f] = static_cast<float>(n) / 12.0f;
+    e.set = static_cast<std::uint8_t>(e.set | (1u << f));
+    e.pitch = static_cast<std::uint8_t>(e.pitch | (1u << f));
+  }
+
+  void value(const Tok& t, const Track& tr, int f, Event& e) {
+    if (f != kVel && is_tone(t.s)) return tone(t, t.s, tr, f, e);
     float v = 0.0f;
     if (!to_value(t.s, v))
       return err(t, "'" + std::string(t.s) + "' is not a number or note name for " + kFields[f]);
@@ -423,15 +468,19 @@ class Parser {
     v.s.retrig = false;
     if (v.off_at == row) v.s.on = false;
     if (!c.e) return;
-    apply(*c.e, static_cast<float>(c.shift) / 12.0f, v.s);
+    const int src = tracks_[tr].src;
+    apply(*c.e, static_cast<float>(c.shift) / 12.0f, voice_[src < 0 ? tr : static_cast<size_t>(src)].s, v.s);
     if (c.e->kind == Kind::None) return;
     v.off_at = c.e->kind != Kind::Off && c.e->len > 0 ? row + c.e->len : -1;
   }
 
-  // `up` (v/oct) shifts the note and the cv values written as note names.
-  static void apply(const Event& e, float up, TrkRow& s) {
-    const auto val = [&](int f) { return e.v[f] + ((e.pitch >> f) & 1u ? up : 0.0f); };
-    if (e.kind == Kind::Note || e.kind == Kind::Slur) s.voct = e.v[kNote] + up;
+  // `up` (v/oct) shifts the note and the cv values written as pitches;
+  // chord tones add to the source track's resolved values on this row.
+  static void apply(const Event& e, float up, const TrkRow& src, TrkRow& s) {
+    const float tones[4] = {0.0f, src.voct, src.cva, src.cvb};
+    const auto val = [&](int f) { return tones[e.tone[f]] + e.v[f] + ((e.pitch >> f) & 1u ? up : 0.0f); };
+    if (e.kind == Kind::Note || e.kind == Kind::Slur) s.voct = val(kNote);
+
     if (e.kind == Kind::Note || e.kind == Kind::Hit) s.retrig = true;
     if (e.kind != Kind::None) s.on = e.kind != Kind::Off;
     if (e.set & (1u << kVel)) s.vel = e.v[kVel];
