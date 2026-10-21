@@ -914,7 +914,7 @@ list. Mono; polyphony via `voice` groups.
 
 Inputs: `gate` 0 (rising fires all envelopes and, with `sync: on`, resets
 phases; unpatched gate = silence), `freq` 220 Hz, `v_oct`, `vel` 1, per-op
-`lvl1..lvl6` 0, `ratio1..ratio6` 0, `fbmod` 0 (adds to every op's feedback;
+`lvl1..lvl6` 0, `ratio1..ratio6` 0, `fbmod` 0 (adds to every op's `fb`, sum clamped 0..1;
 named apart from the `fb` config array so the DSL can tell them apart).
 Outputs: `out` (straight sum of the carriers — gain-stage at the cable) and
 post-envelope per-op taps `op1..op6` (pan/process carriers separately, or
@@ -931,10 +931,13 @@ malformed route fails `check`; hot reload keeps the last good graph.
 Configs (all arrays are per-op, padded with the slot default; more than six
 entries is an error): `ratios` (all 1), `levels` (`[1,0,0,0,0,0]` — ops 2..6 stay off
 until asked), `fixed` (per-op Hz; >0 pins the op off `v_oct`/`ratio` for
-clicks and body resonances), `fb` (0..0.999; `fb[k] > 0` is itself the
-self-edge — never put self-edges in `route`; the feedback is one sample and
-unaveraged at index 4π, so a carrier turns from saw-like to noisy above about
-0.15 — measured at 110 Hz — and the rest of the range is noise colours), `vel_sens` (0..1; op level ×=
+clicks and body resonances), `fb` (0..1; `fb[k] > 0` is itself the
+self-edge — never put self-edges in `route`. The op's phase is pushed by
+2.5·fb rad times the average of its last two enveloped outputs, taken
+before its level, so `fb` means the same timbre on any op whatever its
+`levels`/`lvl`/`vel`. Measured on a held carrier: 0 is a sine, ~0.6 a saw-like
+1/n spectrum, 0.8 the brightest clean saw (inharmonic floor below −40 dB), and
+only past ~0.9 does it turn to noise), `vel_sens` (0..1; op level ×=
 (1−sens)+sens·vel), `t1..t4` segment seconds (0 = one-sample jump),
 `l1..l3` segment levels, `curve` (`lin`/`exp`/`log`, default `lin` — `log`
 is the natural percussive fall), `sync` (`on`/`off`, default `on`).
@@ -960,7 +963,7 @@ All default 0 (no scaling).
 ```text
 ep = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
           t2: [.5, .07, .06, .45, .06, .09], l2: [.55, .25, .2, .5, .2, .25],
-          l3: [.18, 0, 0, .15, 0, 0], fb: [0, 0, 0, 0, .45, 0], curve: log }
+          l3: [.18, 0, 0, .15, 0, 0], fb: [0, 0, 0, 0, .23, 0], curve: log }
 mid = midi { voices: 4 }
 keys = voice { notes: mid }
 keys.ep = fm { ...same configs... }

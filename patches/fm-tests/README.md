@@ -33,6 +33,6 @@ hot-reload; the header comment in each file says what it exercises.
 - **Algorithm:** swap `algo:` between `free`/`triad`/`dual`/`cascade`/`crown`/`weave`.
 - **Brightness:** raise a modulator's `levels[]` entry (drives the FM index up).
 - **Inharmonicity:** nudge `ratios[]` off integers (e.g. `1.41`, `3.14`).
-- **Feedback:** raise a `fb[]` entry (0..0.999) — small changes matter near the top.
+- **Feedback:** raise a `fb[]` entry (0..1) — sine → saw by ~0.6–0.8; only past ~0.9 does it turn to noise.
 - **Decay:** lengthen `t3`/`t4`; use `curve: log` for a natural percussive fall.
 - **14/15:** flip `sync: off`→`on` (14) or fix the `route` (15) to hear the contrast.

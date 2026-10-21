@@ -166,7 +166,7 @@ kduck -> wob_out.cv : -0.18
 growl = fm { algo: dual, freq: 220hz,
              ratios: [1, 1, 3.5, 1, 7, 2],
              levels: [0.9, 0.35, 0.2, 0.6, 0.15, 0.25],
-             fb: [0, 0.3, 0, 0, 0.45, 0], curve: log,
+             fb: [0, 0.55, 0, 0, 0.35, 0], curve: log,
              t4: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05] }
 note.gate -> growl.gate
 note.cv   -> growl.v_oct

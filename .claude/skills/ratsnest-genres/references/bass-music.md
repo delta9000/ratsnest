@@ -120,7 +120,7 @@ operator gives the growl its long arc.
 ```text
 growl = fm { algo: dual, ratios: [1, 1, 3.5, 1, 7, 2],
              levels: [0.9, 0.35, 0.2, 0.6, 0.15, 0.25],
-             fb: [0, 0.3, 0, 0, 0.45, 0], curve: log,
+             fb: [0, 0.55, 0, 0, 0.35, 0], curve: log,
              t4: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05] }
 note.gate -> growl.gate
 note.cv   -> growl.v_oct
@@ -131,8 +131,8 @@ idx2 -> growl.lvl5 : 0.12
 ```
 
 Non-integer ratios (3.5, 7, 2) put the sidebands off the harmonic series,
-which is what separates a growl from a bell. `fb` on ops 2 and 5 adds the
-noise floor that reads as grit. Detune `idx.freq` a few Hz per section and the
+which is what separates a growl from a bell. `fb` on ops 2 and 5 turns those
+modulators saw-like, and the dense sidebands read as grit. Detune `idx.freq` a few Hz per section and the
 "vowel" changes.
 
 ### 4. Formant morphing from parallel bandpasses

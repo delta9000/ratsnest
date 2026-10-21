@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numbers>
 #include <string>
 #include <vector>
 #include "dsl/parser.h"
@@ -342,7 +343,7 @@ TEST_CASE("fm: feedback brightens a lone carrier") {
 
 TEST_CASE("fm: feedback stays bounded at maximum") {
   Config cfg;
-  cfg.push_back({"fb", arr({.999})});
+  cfg.push_back({"fb", arr({1.0})});
   FmRig rig(48000.0, cfg);
   rig.ins[1] = 480.0f;
   float peak = 0.0f;
@@ -352,6 +353,114 @@ TEST_CASE("fm: feedback stays bounded at maximum") {
     peak = std::max(peak, std::abs(rig.outs[0]));
   }
   CHECK(peak <= 1.0001f);
+}
+
+namespace {
+// Lone 220 Hz carrier held at full level with self-feedback fb; returns n
+// samples after a 0.1 s settle. 2400 samples = 11 periods = one cycle of the
+// sample-grid/phase pattern, so the window is coherent on a 20 Hz bin grid.
+std::vector<float> fb_carrier(float fb, float fbmod = 0.0f, int n = 2400) {
+  Config cfg;
+  cfg.push_back({"fb", arr({fb})});
+  cfg.push_back({"t1", arr({0.0})});
+  cfg.push_back({"t2", arr({0.0})});
+  cfg.push_back({"t3", arr({0.0})});
+  cfg.push_back({"l2", arr({1.0})});
+  cfg.push_back({"l3", arr({1.0})});
+  FmRig rig(48000.0, cfg);
+  rig.ins[1] = 220.0f;
+  rig.ins[16] = fbmod;
+  for (int i = 0; i < 4800; ++i) rig.tick(1.0f);
+  std::vector<float> x(static_cast<size_t>(n));
+  for (auto& v : x) {
+    rig.tick(1.0f);
+    v = rig.outs[0];
+  }
+  return x;
+}
+// Energy off the harmonic series (every 20 Hz bin that is not a multiple of
+// 220 Hz, up to Nyquist) relative to the energy on it, in dB.
+double inharmonic_db(const std::vector<float>& x) {
+  double on = 0.0, off = 0.0;
+  for (int m = 1; m < 1200; ++m) {
+    const double p = std::pow(dft_mag(x, 20.0 * m, 48000.0), 2.0);
+    (m % 11 == 0 ? on : off) += p;
+  }
+  return 10.0 * std::log10(off / on + 1e-30);
+}
+}  // namespace
+
+TEST_CASE("fm: moderate feedback is a harmonic, saw-like spectrum") {
+  CHECK(inharmonic_db(fb_carrier(0.3f)) < -60.0);  // β .75
+  CHECK(inharmonic_db(fb_carrier(0.6f)) < -60.0);  // β 1.5
+  CHECK(inharmonic_db(fb_carrier(0.8f)) < -35.0);  // β 2: brightest clean saw
+  // fb .6 (β = 1.5, Tomisawa's saw region): harmonics fall roughly as 1/n.
+  const auto x = fb_carrier(0.6f);
+  const double h1 = dft_mag(x, 220.0, 48000.0);
+  CHECK(dft_mag(x, 440.0, 48000.0) / h1 > 0.3);
+  CHECK(dft_mag(x, 660.0, 48000.0) / h1 > 0.18);
+  CHECK(dft_mag(x, 1100.0, 48000.0) / h1 > 0.08);
+}
+
+TEST_CASE("fm: feedback timbre is independent of the op's level") {
+  auto run = [](double level) {
+    Config cfg;
+    cfg.push_back({"fb", arr({0.6})});
+    cfg.push_back({"levels", arr({level})});
+    FmRig rig(48000.0, cfg);
+    rig.ins[1] = 220.0f;
+    std::vector<float> x(4800);
+    for (auto& v : x) {
+      rig.tick(1.0f);
+      v = rig.outs[0];
+    }
+    return x;
+  };
+  const auto loud = run(1.0), quiet = run(0.1);
+  for (size_t i = 0; i < loud.size(); ++i)
+    REQUIRE(quiet[i] == doctest::Approx(0.1 * loud[i]).epsilon(1e-4).scale(1e-6));
+}
+
+TEST_CASE("fm: only the top of the fb range breaks into noise") {
+  CHECK(inharmonic_db(fb_carrier(1.0f)) > -15.0);
+}
+
+TEST_CASE("fm: feedback is bounded and finite under hostile fbmod") {
+  const float inf = std::numeric_limits<float>::infinity();
+  for (float cv : {0.0f, 1e30f, inf, -inf, std::numeric_limits<float>::quiet_NaN()}) {
+    CAPTURE(cv);
+    const auto x = fb_carrier(1.0f, cv);
+    for (float v : x) {
+      REQUIRE(std::isfinite(v));
+      CHECK(std::abs(v) <= 1.0001f);
+    }
+  }
+}
+
+TEST_CASE("fm: fb 0 is bit-identical to plain phase modulation") {
+  // Reference: the pre-feedback-change arithmetic, spelled out.
+  auto cfg = two_op_cfg();
+  cfg.push_back({"fb", arr({0, 0})});
+  FmRig rig(48000.0, cfg);
+  rig.ins[1] = 4800.0f;
+  rig.ins[16] = -0.5f;  // negative fbmod clamps to 0: still no feedback
+  const float two_pi = 2.0f * std::numbers::pi_v<float>;
+  const float index = 4.0f * std::numbers::pi_v<float>;
+  double ph1 = 0.0, ph2 = 0.0;
+  const double f2 = 4800.0 * static_cast<double>(static_cast<float>(0.1));
+  for (int i = 0; i < 4000; ++i) {
+    rig.tick(1.0f);
+    ph2 += f2 / 48000.0;
+    ph2 -= std::floor(ph2);
+    ph1 += 4800.0 / 48000.0;
+    ph1 -= std::floor(ph1);
+    const double lvl2 = static_cast<double>(static_cast<float>(0.25));
+    const double post2 = lvl2 * static_cast<double>(std::sin(two_pi * static_cast<float>(ph2)));
+    const float A = two_pi * static_cast<float>(ph1) + index * static_cast<float>(post2);
+    const auto out = static_cast<float>(static_cast<double>(std::sin(A)));
+    REQUIRE(rig.outs[2] == static_cast<float>(post2));
+    REQUIRE(rig.outs[0] == out);
+  }
 }
 
 TEST_CASE("fm: fb array slot selects the feedback op") {

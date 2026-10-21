@@ -25,6 +25,15 @@ constexpr float kTwoPi = 2.0f * std::numbers::pi_v<float>;
 // Phase deviation carried by a level-1 modulator at envelope peak: ±4π rad
 // (modulation index ≈ 12.6), the classic instruments' ballpark maximum.
 constexpr float kIndex = 4.0f * std::numbers::pi_v<float>;
+// Self-feedback: phase deviation β = kFbIndex * fb * (y[n-1] + y[n-2]) / 2,
+// y = the op's enveloped waveform (before its level, so fb means the same
+// timbre on a quiet modulator as on a loud carrier). Averaging the last two
+// outputs is Tomisawa's anti-hunting fix (US 4,249,447; docs/attribution.md):
+// one previous sample alone flips sign every sample once β passes ~1.2 and
+// collapses to noise. Averaged, the spectrum stays harmonic (sine -> saw,
+// ~1/n) to β ≈ 2; past ~2.25 it turns to noise, so fb 0..1 spends only its
+// top ~10% there.
+constexpr double kFbIndex = 2.5;
 
 constexpr InputInfo kIns[] = {
     {"gate", 0.f},   {"freq", 220.f}, {"v_oct", 0.f},  {"vel", 1.f},
@@ -203,7 +212,7 @@ class Fm final : public Module {
     fill(cfg, "levels", levels_, 0.0, 0.0, 1.0);
     if (cfg_arr(cfg, "levels").empty()) levels_[0] = 1.0;  // a lone carrier
     fill(cfg, "fixed", fixed_, 0.0, 0.0, 1e9);
-    fill(cfg, "fb", fb_, 0.0, 0.0, 0.999);
+    fill(cfg, "fb", fb_, 0.0, 0.0, 1.0);
     fill(cfg, "vel_sens", vel_sens_, 0.0, 0.0, 1.0);
     load_envelopes(cfg);
     const auto& wv = cfg_str_arr(cfg, "waves");
@@ -221,7 +230,8 @@ class Fm final : public Module {
 
     for (auto& e : envs_) e = OpEnv{};
     phase_.fill(0.0);
-    prev_post_.fill(0.0f);
+    fb1_.fill(0.0f);
+    fb2_.fill(0.0f);
     prev_gate_ = 0.0f;
   }
 
@@ -246,7 +256,8 @@ class Fm final : public Module {
     float out = 0.0f;
     for (size_t k = 0; k < kOps; ++k) {
       if (carrier_[k]) out += static_cast<float>(post[k]);
-      prev_post_[k] = static_cast<float>(post[k]);
+      fb2_[k] = fb1_[k];
+      fb1_[k] = tap_[k];
     }
     outs[0] = out;
   }
@@ -255,7 +266,8 @@ class Fm final : public Module {
     const auto& o = static_cast<const Fm&>(other);
     envs_ = o.envs_;
     phase_ = o.phase_;
-    prev_post_ = o.prev_post_;
+    fb1_ = o.fb1_;
+    fb2_ = o.fb2_;
     prev_gate_ = o.prev_gate_;
     level_scale_ = o.level_scale_;
     time_scale_ = o.time_scale_;
@@ -291,11 +303,16 @@ class Fm final : public Module {
         (1.0 - vel_sens_[k] + vel_sens_[k] * static_cast<double>(vel)) * level_scale_[k];
     env_tick(envs_[k], env_cfg_[k], curve_, rate_, time_scale_[k]);
     const double fb_amt = static_cast<double>(
-        clamp_nan(static_cast<float>(fb_[k]) + ins[16], 0.0f, 0.999f));
-    double mod = fb_amt > 0.0 ? fb_amt * static_cast<double>(prev_post_[k]) : 0.0;
+        clamp_nan(static_cast<float>(fb_[k]) + ins[16], 0.0f, 1.0f));
+    double mod = 0.0;
     for (int p : preds_[k]) mod += post[static_cast<size_t>(p)];
-    const float A = kTwoPi * static_cast<float>(phase_[k]) + kIndex * static_cast<float>(mod);
-    return envs_[k].level * lvl * static_cast<double>(wave_sample(waves_[k], A));
+    float A = kTwoPi * static_cast<float>(phase_[k]) + kIndex * static_cast<float>(mod);
+    if (fb_amt > 0.0)  // fb 0 skips the term entirely: bit-identical to no feedback
+      A += static_cast<float>(kFbIndex * fb_amt * 0.5 *
+                              static_cast<double>(fb1_[k] + fb2_[k]));
+    const auto w = static_cast<double>(wave_sample(waves_[k], A));
+    tap_[k] = static_cast<float>(envs_[k].level * w);
+    return envs_[k].level * lvl * w;
   }
 
  private:
@@ -387,7 +404,8 @@ class Fm final : public Module {
   // runtime state (migrated on hot reload)
   std::array<OpEnv, kOps> envs_{};
   std::array<double, kOps> phase_{};
-  std::array<float, kOps> prev_post_{};
+  std::array<float, kOps> tap_{};            // this sample's feedback tap (scratch)
+  std::array<float, kOps> fb1_{}, fb2_{};    // feedback taps y[n-1], y[n-2]
   float prev_gate_ = 0.0f;
 };
 

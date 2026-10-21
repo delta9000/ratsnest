@@ -35,7 +35,7 @@ Relationships are classified as:
 | `src/rt/spsc.h` | **Implementation-influenced**, BSD-2-Clause and MIT | Cameron Desrochers' [readerwriterqueue](https://github.com/cameron314/readerwriterqueue) cached peer indices and PipeWire's acquire/release ring-buffer protocol | Combines independently written fixed-capacity SPSC storage with cached peer-index and memory-ordering patterns; this is not a verbatim port. Conservative software notices are retained in `THIRD_PARTY_NOTICES.md`. |
 | `src/dsp/modules/bern.cpp` | **Concept-inspired** | Mutable Instruments [Branches](https://github.com/pichenettes/eurorack/tree/master/branches) Bernoulli gate routing | Adopts the probability-routed gate concept in the ratsnest module model. No Branches firmware code was copied. |
 | `src/dsp/modules/turing.cpp` | **Concept-inspired** | Tom Whitwell's [Music Thing Modular Turing Machine](https://www.musicthing.co.uk/Turing-Machine/) | Adopts the looping, probabilistically mutated shift-register sequencer concept. No Turing Machine firmware code was copied. |
-| `src/dsp/modules/fm.cpp` | **Concept-inspired** | John M. Chowning, "The Synthesis of Complex Audio Spectra by Means of Frequency Modulation," *JASA* 54(2), 1973, [DOI 10.1121/1.1912800](https://doi.org/10.1121/1.1912800) (technique patent US 4,018,121, granted Apr 1977, expired 1995 — see Patent status below) | Locally implements the published phase-modulation formula with an original operator-routing model, algorithm set, and envelope design. Operator waveforms (rectified/windowed/folded sine) implement the TX81Z/DX11/FS1R operator-waveform concept locally from the mathematics; keyboard level/rate scaling is a standard technique in an original octave-exponent form. No Yamaha/DX data, layouts, or code, no GPL/emulator code (e.g. Dexed/MSFA), and no trademarks; written locally from the published formula. |
+| `src/dsp/modules/fm.cpp` | **Concept-inspired** | John M. Chowning, "The Synthesis of Complex Audio Spectra by Means of Frequency Modulation," *JASA* 54(2), 1973, [DOI 10.1121/1.1912800](https://doi.org/10.1121/1.1912800) (technique patent US 4,018,121, granted Apr 1977, expired 1995 — see Patent status below) | Locally implements the published phase-modulation formula with an original operator-routing model, algorithm set, and envelope design. Operator self-feedback averages the operator's last two outputs, after the anti-hunting "averaging device" (adjacent samples summed and halved) in Norio Tomisawa, "Tone production method for an electronic musical instrument," US 4,249,447 (filed 1979-06-27, granted 1981-02-10; [Google Patents](https://patents.google.com/patent/US4249447A/en)) — implemented from the patent text; the 2.5 rad full scale and the pre-level tap are ratsnest's own, measured locally. Operator waveforms (rectified/windowed/folded sine) implement the TX81Z/DX11/FS1R operator-waveform concept locally from the mathematics; keyboard level/rate scaling is a standard technique in an original octave-exponent form. No Yamaha/DX data, layouts, or code, no GPL/emulator code (e.g. Dexed/MSFA), and no trademarks; written locally from the published formula. |
 | `src/dsp/modules/chorus.cpp` | **Concept-generic** | Standard multi-voice modulated-delay chorus (textbook DSP) | Written locally from first principles: interpolated short delay taps with decorrelated LFO phases summed with the dry signal. No third-party code; a decades-old effect with no live patent (factual note, not legal advice); no trademarks. |
 | `src/dsp/modules/phaser.cpp` | **Concept-generic** | Standard swept first-order-allpass phaser; allpass coefficient from the project's existing bilinear/TPT filter lineage (see the Zavalishin / Bristow-Johnson rows above) | Written locally: a swept, optionally staggered allpass cascade with feedback and a dry/wet sum. No third-party code; a decades-old effect with no live patent (factual note, not legal advice); no trademarks. |
 | Build and `src/engine/pipewire_out.cpp` | **External dependency**, MIT | [PipeWire](https://docs.pipewire.org/) `libpipewire-0.3` | The installed version is discovered through pkg-config and linked as `PkgConfig::PIPEWIRE`; PipeWire is not vendored. |
@@ -74,6 +74,10 @@ not an exhaustive live-patent database search across jurisdictions.
   digital FM/PM synthesis; its expiry is why FM became freely implementable in
   software. Phase modulation and Chowning's FM are mathematically equivalent, so
   the module's exact method falls under this now-expired patent.
+- **Operator self-feedback with two-sample averaging** — Tomisawa
+  US 4,249,447, filed June 1979, granted February 1981; under the GATT
+  transition its term was the longer of 17 years from grant or 20 from filing,
+  so it **expired by mid-1999** at the latest.
 - **Operator waveforms** (rectified/windowed/folded sine) — the multi-waveform
   operator debuts with the Yamaha TX81Z (1987); any corresponding Yamaha patent
   is a mid-1980s filing and **expired ~2004–2005** under the pre-1995 17-years-
@@ -87,6 +91,7 @@ these decades-old techniques can be validly claimed by such a patent. No live
 patent covering the implemented techniques was found. Caveat: this is not an
 FTO clearance — obtain patent counsel before any commercial distribution.
 Sources: [FM synthesis (Wikipedia)](https://en.wikipedia.org/wiki/Frequency_modulation_synthesis),
+[US 4,249,447 (Google Patents)](https://patents.google.com/patent/US4249447A/en),
 [Yamaha TX81Z (Wikipedia)](https://en.wikipedia.org/wiki/Yamaha_TX81Z).
 
 ## Unresolved provenance
