@@ -3,7 +3,9 @@
 #   1-16 intro drums | 17-32 bass, riff 25 | 33-48 build, riff opens over 32 bars
 #   49-64 main | 65-80 break (pad, riser 73-80) | 81-96 drop (riff +8va)
 #   97-112 ride | 113-128 outro drums
-# Pump: kick gate -> duck env -> bass/pad/riff/returns lvl, plus bus comp sidechain.
+# Pump: kick gate -> one duck.sub per depth -> each strip's duck (relative:
+# the depth holds whatever the lane sets), plus the bus comp's kick key.
+# Voices are synth-voice.sub, channels strip.sub (post-fader sends).
 
 clk  = clock { bpm: 504 }        # sixteenths at 126
 bar  = div { by: 16 }
@@ -30,11 +32,17 @@ form.cva3 -> riser_lvl.in
 form.cvb3 -> verb_lvl.in
 form.cva4 -> width_lvl.in
 
-# ---- duck envelope off the kick gate (silent when the kick section is out)
-duck = func { rise: 0.003, fall: 1.2, curve: exp }
-song.gate1 -> duck.trig
+# ---- the pump, off the kick gate (gain 1 when the kick section is out) ----
+duck_bass = sub { file: "../lib/duck.sub", depth_db: -12, release: 0.8, curve: exp }
+duck_riff = sub { file: "../lib/duck.sub", depth_db: -3.8, release: 0.8, curve: exp }
+duck_pad  = sub { file: "../lib/duck.sub", depth_db: -6.5, release: 0.8, curve: exp }
+duck_ret  = sub { file: "../lib/duck.sub", depth_db: -6, release: 0.8, curve: exp }
+song.gate1 -> duck_bass.trig
+song.gate1 -> duck_riff.trig
+song.gate1 -> duck_pad.trig
+song.gate1 -> duck_ret.trig
 
-# ---- drums ----
+# ---- drums: a mono kit `mix` (static pans, no lane) straight to the master ----
 kick  = sub { file: "../lib/kick.sub", tune: 49hz, decay: 0.17s, click: 0.4 }
 song.gate1 -> kick.trig
 kdrv  = drive { amount: 0.45, mode: soft }
@@ -52,75 +60,76 @@ song.vel4  -> clap.accent
 rim   = sub { file: "../lib/kit/rim.sub", tune: 620hz }
 song.gate5 -> rim.trig
 song.vel5  -> rim.accent
+#        kick  chat  ohat  clap  rim
+kit = mix { levels: [0.7, 0.5, 0.35, 0.5, 0.3], pans: [0, 0.25, -0.3, 0, -0.35] }
+kdrv -> kit.in1
+chat -> kit.in2
+ohat -> kit.in3
+clap -> kit.in4
+rim  -> kit.in5
 
-# ---- rolling bass: saw + sine sub, short pluck ----
-b_saw = vco { wave: saw }
-b_sin = vco { wave: sine }
-song.voct7 -> b_saw.v_oct
-song.voct7 -> b_sin.v_oct
-b_env = func { rise: 0.002, fall: 0.3, curve: exp }
-song.gate7 -> b_env.trig
-b_filt = ladder { cutoff: 160, res: 0.3, drive: 0.5 }
-b_saw -> b_filt.in : 0.6
-b_env -> b_filt.cutoff : 900
-b_vel = math { op: mult }
-b_env -> b_vel.a
-song.vel7 -> b_vel.b
-b_amp = vca { gain: 0 }
-b_filt -> b_amp.in : 0.8
-b_sin  -> b_amp.in : 0.7
-b_vel -> b_amp.cv
+# ---- rolling bass: saw + sine sub, short pluck; vel rides the level so
+# the filter envelope stays velocity-blind ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0, osc_lvl: 0.6, sublvl: 0.875,
+             sub_oct: 0, cutoff: 160, res: 0.3, drive: 0.5, track: 0, env_amt: 900,
+             attack: 0.002, decay: 0.3, sustain: 0, release: 0.3 }
+song.voct7 -> bass.voct
+song.gate7 -> bass.gate
+song.vel7  -> bass.level
+bass_s = sub { file: "../lib/strip.sub", gain: 1.2 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+duck_bass -> bass_s.duck
 
 # ---- riff: two detuned saws, lane-driven cutoff + pluck env ----
-r_a = vco { wave: saw }
-r_b = vco { wave: saw }
-song.voct8 -> r_a.v_oct
-song.voct8 -> r_b.v_oct
-0.006 -> r_b.v_oct
-r_env = func { rise: 0.002, fall: 0.6, curve: exp }
-song.gate8 -> r_env.trig
-r_filt = ladder { cutoff: 250, res: 0.45, drive: 0.3 }
-r_a -> r_filt.in : 0.5
-r_b -> r_filt.in : 0.5
-riff_cut -> r_filt.cutoff : 3500
-r_env -> r_filt.cutoff : 1200
-r_vel = math { op: mult }
-r_env -> r_vel.a
-song.vel8 -> r_vel.b
-r_amp = vca { gain: 0 }
-r_filt -> r_amp.in
-r_vel -> r_amp.cv
-r_hp = svf { cutoff: 180 }
-r_amp -> r_hp.in
+riff = sub { file: "../lib/synth-voice.sub", wave2: saw, blend: 0.5, detune: 0.006,
+             cutoff: 250, res: 0.45, drive: 0.3, track: 0, env_amt: 1200, hp: 180,
+             attack: 0.002, decay: 0.6, sustain: 0, release: 0.6 }
+song.voct8 -> riff.voct
+song.gate8 -> riff.gate
+song.vel8  -> riff.level
+riff_cut -> riff.cut : 3500
+riff_s = sub { file: "../lib/strip.sub", gain: 1.4, send_gain: 0.168 }
+riff -> riff_s.in
+riff_lvl -> riff_s.level
+duck_riff -> riff_s.duck
 
-# ---- pad: three saws on harm, adsr per bar ----
-p1 = vco { wave: saw }
-p2 = vco { wave: saw }
-p3 = vco { wave: saw }
-song.voct6 -> p1.v_oct
-song.cva6  -> p2.v_oct
-song.cvb6  -> p3.v_oct
-0.005  -> p2.v_oct
--0.005 -> p3.v_oct
-p_env = adsr { attack: 0.6, decay: 1, sustain: 0.8, release: 1.5 }
-song.gate6 -> p_env.gate
-p_filt = svf { cutoff: 600, res: 0.2 }
-p1 -> p_filt.in : 0.3
-p2 -> p_filt.in : 0.3
-p3 -> p_filt.in : 0.3
-riser_lvl -> p_filt.cutoff : 2500
-p_amp = vca { gain: 0 }
-p_filt.lp -> p_amp.in
-p_env -> p_amp.cv
-p_hp = svf { cutoff: 220 }
-p_amp -> p_hp.in
+# ---- pad: three saws on harm, adsr per bar, opened by the riser ----
+padv = subdef {}
+padv.voct = input {}
+padv.gate = input {}
+padv.cut  = input {}
+padv.main = output {}
+padv.v = sub { file: "../lib/synth-voice.sub", blend: 0, osc_lvl: 0.3, slope: 0,
+               track: 0, cutoff: 600, res: 0.2, env_amt: 0, curve: lin, hp: 220,
+               attack: 0.6, decay: 1, sustain: 0.8, release: 1.5 }
+padv.voct -> padv.v.voct
+padv.gate -> padv.v.gate
+padv.cut  -> padv.v.cut
+padv.v -> padv.main.in
+pad1 = sub { def: padv }
+pad2 = sub { def: padv }
+pad3 = sub { def: padv }
+song.voct6 -> pad1.voct
+song.cva6  -> pad2.voct
+song.cvb6  -> pad3.voct
+0.005  -> pad2.voct
+-0.005 -> pad3.voct
+song.gate6 -> pad1.gate
+song.gate6 -> pad2.gate
+song.gate6 -> pad3.gate
+riser_lvl -> pad1.cut : 2500
+riser_lvl -> pad2.cut : 2500
+riser_lvl -> pad3.cut : 2500
+pad_s = sub { file: "../lib/strip.sub", gain: 1.697, send_gain: 0.177 }
+pad1 -> pad_s.in
+pad2 -> pad_s.in
+pad3 -> pad_s.in
+pad_lvl -> pad_s.level
+duck_pad -> pad_s.duck
 p_cho = chorus { voices: 3, depth: 0.6, mix: 0.5 }
-p_fade = vca { gain: 0 }            # post-fader: sends tap after this
-p_hp.hp -> p_fade.in
-pad_lvl -> p_fade.cv : 1.2
-duck -> p_fade.cv : -0.35
-p_fade -> p_cho.in_l
-p_fade -> p_cho.in_r
+pad_s.l -> p_cho.in_l
+pad_s.r -> p_cho.in_r
 
 # ---- riser: noise through a rising band-pass, 8 bars ----
 rs_n = noise { color: white, seed: 11 }
@@ -131,63 +140,47 @@ rs_amp = vca { gain: 0 }
 rs_f.bp -> rs_amp.in
 riser_lvl -> rs_amp.cv : 0.25
 
-# ---- space: dotted-eighth echo on the riff, plate on riff/pad/clap/riser ----
+# ---- space: dotted-eighth echo on the riff, plate on riff/pad/clap/riser.
+# (The plate's input is the mean of in_l and in_r: one side at 2x.)
 de = tempo { bpm: 126, beats: 0.75 }
 echo = delay { time: 0ms, feedback: 0.4, tone: 2500, mix: 1 }
 de.seconds -> echo.time
-r_hp.hp -> echo.in : 0.35
+riff_s.fx -> echo.in : 1.75
 room = reverb { decay: 0.82, damp: 0.4, mix: 1, predelay: 0.02 }
-r_hp.hp -> room.in_l : 0.2
-r_hp.hp -> room.in_r : 0.2
-p_cho.out_l -> room.in_l : 0.25
-p_cho.out_r -> room.in_r : 0.25
-clap -> room.in_l : 0.15
-clap -> room.in_r : 0.15
-rs_amp -> room.in_l : 0.25
-rs_amp -> room.in_r : 0.25
-echo -> room.in_l : 0.2
-echo -> room.in_r : 0.2
+riff_s.fx -> room.in_l : 2
+pad_s.fx  -> room.in_l : 2
+clap      -> room.in_l : 0.3
+rs_amp    -> room.in_l : 0.5
+echo      -> room.in_l : 0.4
+echo_s = sub { file: "../lib/strip.sub", gain: 0.4, pos: 0.3 }
+echo -> echo_s.in
+duck_ret -> echo_s.duck
+room_s = sub { file: "../lib/strip.sub" }
+room.out_l -> room_s.in_l
+room.out_r -> room_s.in_r
+verb_lvl -> room_s.level
+duck_ret -> room_s.duck
 
-# ---- mix: level lanes + duck sum on lvlN ----
-#        kick  chat  ohat  clap  rim   bass  riff  pad
-band = mix { levels: [0.7, 0.5, 0.35, 0.5, 0.3, 0, 0, 0],
-             pans:   [0, 0.25, -0.3, 0, -0.35, 0, 0, 0] }
-kdrv   -> band.in1
-chat   -> band.in2
-ohat   -> band.in3
-clap   -> band.in4
-rim    -> band.in5
-b_amp  -> band.in6
-r_hp.hp -> band.in7
-bass_lvl -> band.lvl6 : 1.5
-riff_lvl -> band.lvl7 : 1.4
-duck -> band.lvl6 : -0.9
-duck -> band.lvl7 : -0.4
-
-#        pad L pad R echo  verbL verbR riser
-fx = mix { levels: [1, 1, 0.4, 0, 0, 0.6], pans: [-1, 1, 0.3, -1, 1, 0] }
-p_cho.out_l -> fx.in1
-p_cho.out_r -> fx.in2
-echo        -> fx.in3
-room.out_l  -> fx.in4
-room.out_r  -> fx.in5
-rs_amp      -> fx.in6
-verb_lvl -> fx.lvl4
-verb_lvl -> fx.lvl5
-duck -> fx.lvl3 : -0.2
-duck -> fx.lvl4 : -0.2
-duck -> fx.lvl5 : -0.2
-
-mast = sub { file: "../lib/master-chain.sub",
-             clip_drive: 10.5, clip_blend: 1,
+# ---- master: everything sums into it ----
+mast = sub { file: "../lib/master-chain.sub", clip_drive: 10.5, clip_blend: 1,
              comp_thr: -18, ceiling: -2.5 }
-band.out_l -> mast.in_l
-band.out_r -> mast.in_r
-fx.out_l -> mast.in_l
-fx.out_r -> mast.in_r
+8 -> mast.makeup
+width_lvl -> mast.width
+kit.out_l   -> mast.in_l
+kit.out_r   -> mast.in_r
+bass_s.l    -> mast.in_l
+bass_s.r    -> mast.in_r
+riff_s.l    -> mast.in_l
+riff_s.r    -> mast.in_r
+p_cho.out_l -> mast.in_l
+p_cho.out_r -> mast.in_r
+rs_amp      -> mast.in_l : 0.424
+rs_amp      -> mast.in_r : 0.424
+echo_s.l    -> mast.in_l
+echo_s.r    -> mast.in_r
+room_s.l    -> mast.in_l
+room_s.r    -> mast.in_r
 kdrv -> mast.side_l : 0.7
 kdrv -> mast.side_r : 0.7
-width_lvl -> mast.width
-8 -> mast.makeup
 mast.l -> out.left
 mast.r -> out.right

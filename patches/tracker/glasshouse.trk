@@ -10,6 +10,10 @@ track ext   note              # 5  7th / 9th (pad voice 4)
 track bass  note vel from chord   # 6
 track lead  note vel          # 7
 track pluck note vel from chord   # 8  intro hook, arp, chorus-2 counter
+track crash note vel          # 9
+track ohat  note vel          # 10
+track tomhi note vel          # 11
+track tomlo note vel          # 12
 
 # ---------------- harmony ----------------
 pattern h_verse 4x16 chord ext
@@ -305,16 +309,36 @@ pattern d_outro 16 kick hat
 lane kick  x... .... .... ....
 lane hat   5... .... .... ....
 
+# ---------------- crash, open hat, toms ----------------
+pattern pre_p 4x16 crash tomhi tomlo
+4:08 | . | x .6 | .
+4:10 | . | x .7 | .
+4:12 | . | .    | x .8
+4:14 | . | .    | x .9
+
+pattern ch_p 8x16 crash
+1:00 | x 1
+5:00 | x .7
+
+pattern oh 16 ohat
+lane ohat ..5. ..5. ..5. ..5.
+
+pattern verse_p 8x16 crash
+1:00 | x .6
+
+pattern out_p 4x16 crash
+1:00 | x .9
+
 # ---------------- form ----------------
 section intro    h_verse+p_intro+d_intro
-section verse    l_verse1+h_verse+b_verse+d_verse
-section verse2   l_verse2+h_verse+b_eighth+d_verse2+p_arp
-section pre      h_pre+l_pre+b_eighth+d_pre+fill@4:00
-section chorus   l_chorus+h_chorus+b_eighth+d_chorus
-section chorus2  l_chorus+h_chorus+b_eighth+d_chorus+p_counter
+section verse    l_verse1+h_verse+b_verse+d_verse+verse_p
+section verse2   l_verse2+h_verse+b_eighth+d_verse2+p_arp+verse_p
+section pre      h_pre+l_pre+b_eighth+d_pre+pre_p+fill@4:00
+section chorus   l_chorus+h_chorus+b_eighth+d_chorus+ch_p+oh
+section chorus2  l_chorus+h_chorus+b_eighth+d_chorus+p_counter+ch_p+oh
 section bridge_a h_bridge+l_br1+b_break+d_bridge_a
-section bridge_b h_bridge+l_br2+b_verse+d_bridge_b+fill@4:00
-section outro    h_outro+l_outro+b_break+d_outro
+section bridge_b h_bridge+l_br2+b_verse+d_bridge_b+pre_p+fill@4:00
+section outro    h_outro+l_outro+b_break+d_outro+out_p
 
 order intro verse pre chorus
 order verse2 pre chorus2
