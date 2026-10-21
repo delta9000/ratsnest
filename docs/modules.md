@@ -863,8 +863,9 @@ The dry branch is delay-aligned by exactly 1 sample to match the filter's peak l
 
 ## `limiter`
 
-`limiter` — inputs `in_l` 0, `in_r` 0, `threshold` -0.1, `release` 0.05; outputs `out_l`, `out_r`, `gain`, `gr`.
+`limiter { true_peak: off }` — inputs `in_l` 0, `in_r` 0, `threshold` -0.1, `release` 0.05; outputs `out_l`, `out_r`, `gain`, `gr`.
 A stereo-linked peak limiter with a fixed 2.0 ms lookahead.
+*   `true_peak`: Config, `off` (default) or `on`: detect inter-sample peaks (below).
 *   `threshold` (clamped `-24..0`, default -0.1): Target ceiling threshold in dBFS.
 *   `release` (clamped `0.001..2`, default 0.05): Release time in seconds.
 *   `gain`: Output. Current linear gain reduction factor.
@@ -876,8 +877,19 @@ sample needs is peak-held over the lookahead (or `min(release, 20 ms)` if
 longer, so bass does not ripple the gain), released with the `release` time
 constant, then box-filtered over the whole lookahead: the gain ramps down
 across the full 2 ms and arrives exactly as the peak does. A 50 Hz sine under
-6 dB of reduction stays below 0.01 % THD. Sample peaks only; inter-sample
-(true) peaks can still exceed the threshold slightly.
+6 dB of reduction stays below 0.01 % THD.
+
+With `true_peak: off` it limits sample peaks only, and the waveform a DAC
+reconstructs between samples can overshoot the threshold: by 1.6–2.3 dB on
+dense masters, by 3 dB on a sine at fs/4 whose samples straddle its crests.
+`true_peak: on` feeds the same detector a 4x-oversampled estimate (ITU-R
+BS.1770-4 Annex 2 style: a 12-tap-per-phase polyphase interpolator), holding
+the reconstructed peak under the threshold: steady tones up to about
+0.36 fs (17 kHz at 48 kHz) stay under it; a lone crest falling between the
+4x points can still pass by up to 0.2 dB, as in any 4x meter. It costs 6 more samples of latency
+(2.125 ms at 48 kHz) and three 12-tap dot products per channel per sample.
+Use it on the final limiter of a master; `off` keeps older renders
+bit-identical.
 
 ## `follow`
 

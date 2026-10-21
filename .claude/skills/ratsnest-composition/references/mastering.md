@@ -44,6 +44,9 @@ Order matters: DC first (so nothing downstream sees offset), EQ before dynamics
 (so the compressor isn't triggered by mud you were going to cut anyway), width
 after compression (so the compressor stays stereo-linked on the real signal),
 clipper before limiter (the clipper shaves peaks so the limiter barely works).
+For a release master add `true_peak: on` to the limiter: sample-peak limiting
+lets dense mixes overshoot by 1.6–2.3 dB between samples (see `limiter` in
+`docs/modules.md`).
 
 ## The calibration numbers
 
@@ -104,7 +107,7 @@ Check, in order:
 4. **Section RMS steps** land at the seconds your block table predicts.
 5. **No dead air** after the fade, and no return of the intro (grid wrap).
 
-For LUFS and true-peak, that's outside the patch — use `ffmpeg`:
+For LUFS, and to confirm the true peak, measure outside the patch with `ffmpeg`:
 
 ```bash
 ffmpeg -i take.wav -af ebur128=peak=true -f null -
