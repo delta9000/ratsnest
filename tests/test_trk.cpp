@@ -201,10 +201,10 @@ TEST_CASE("trk: diagnostics carry line and column") {
   fails("track a note note\n", 1, 14, "listed twice");
   fails("track a note\ntrack a vel\n", 2, 7, "duplicate track 'a'");
   fails("track a note\npattern p 1\ntrack b note\n", 3, 1, "before the first pattern");
-  fails(std::string() +
-            "track a cva\ntrack b cva\ntrack c cva\ntrack d cva\ntrack e cva\n"
-            "track f cva\ntrack g cva\ntrack h cva\ntrack i cva\n",
-        9, 1, "at most 8 tracks");
+  std::string seventeen;
+  for (char c = 'a'; c <= 'q'; ++c) seventeen += std::string("track ") + c + " cva\n";
+  fails(seventeen, 17, 1, "at most 16 tracks");
+  fails("track a note cvc\n", 1, 14, "(fields: note, vel, cva, cvb, cvd)");
   fails(h + "pattern p\n", 2, 1, "needs a name and a row count");
   fails(h + "pattern p 0\n", 2, 11, "1..1024");
   fails(h + "pattern p 2000\n", 2, 11, "1..1024");
@@ -326,6 +326,22 @@ TEST_CASE("trk: chord tones from a source track follow its chords") {
   CHECK(at(s, 5, 2).cva == doctest::Approx(0.25f));  // levels never move
 }
 
+TEST_CASE("trk: cvd is a fourth value field, and t4 reads it") {
+  // A four-note chord on one track: root, then cva, cvb, cvd as note names.
+  auto s = ok("track pad note cva cvb cvd\ntrack arp note cvd from pad\n"
+              "pattern c 1 pad\n| D3 F3 A3 C4\n"
+              "pattern a 1 arp\n| t4-12 t4+7\n"
+              "order c^2+a\n");
+  const float c4 = 0.25f;
+  CHECK(at(s, 0, 0).cvd == doctest::Approx(c4 + 2.0f / 12));  // ^2 moves a note-name cvd
+  CHECK(at(s, 0, 1).voct == doctest::Approx(c4 + 2.0f / 12 - 1));
+  CHECK(at(s, 0, 1).cvd == doctest::Approx(c4 + 9.0f / 12));
+  // A ramped cvd and a numeric one: `1>` needs a later value, so an error.
+  fails("track a cvd\npattern p 2\n| 1>\norder p\n", 3, 3, "a ramp '>' glides");
+  s = ok("track a cvd\npattern p 3\n| 1>\n| .\n| 3\norder p\n");
+  CHECK(at(s, 1, 0).cvd == doctest::Approx(2.0f));
+}
+
 TEST_CASE("trk: chord tone diagnostics") {
   const std::string h = "track pad note cva\n";
   fails(h + "track arp note from\n", 2, 16, "'from' needs a value");
@@ -337,7 +353,8 @@ TEST_CASE("trk: chord tone diagnostics") {
   fails(h + "track arp note from pad\npattern p 1 arp\n| t1+x\n", 4, 3, "t1-12, t3+7");
   fails(h + "track arp note from pad\npattern p 1 arp\n| t1+\n", 4, 3, "is not a chord tone");
   fails(h + "track arp note from pad\npattern p 1 arp\n| t1+49\n", 4, 3, "is not a chord tone");
-  fails(h + "track arp note from pad\npattern p 1 arp\n| t4\n", 4, 3, "is not a note");
+  fails(h + "track arp note from pad\npattern p 1 arp\n| t4\n", 4, 3, "reads cvd, which track 'pad'");
+  fails(h + "track arp note from pad\npattern p 1 arp\n| t5\n", 4, 3, "is not a note");
   fails(h + "track arp note vel from pad\npattern p 1 arp\n| t1 t2\n", 4, 6, "for vel");
 }
 
@@ -590,7 +607,7 @@ TEST_CASE("trk: mutation fuzz never crashes and always positions its error") {
         CHECK(r.song.length() > 0);
         CHECK(r.song.rows.size() == static_cast<size_t>(r.song.length() * r.song.tracks));
         for (const TrkRow& row : r.song.rows)
-          REQUIRE((std::isfinite(row.voct) && std::isfinite(row.cva) && std::isfinite(row.cvb)));
+          REQUIRE((std::isfinite(row.voct) && std::isfinite(row.cva) && std::isfinite(row.cvb) && std::isfinite(row.cvd)));
       } else {
         REQUIRE(r.errors.size() == 1);
         CHECK(r.errors[0].line >= 1);

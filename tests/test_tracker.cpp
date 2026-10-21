@@ -15,15 +15,16 @@
 using namespace ms;
 
 namespace {
-enum { kVoct, kGate, kVel, kCva, kCvb };
-constexpr int kStep = 40, kPattern = 41, kRow = 42, kStepTrig = 43, kRowTrig = 44, kEnd = 45;
+enum { kVoct, kGate, kVel, kCva, kCvb, kCvd, kCols };
+constexpr int kStep = 16 * kCols, kPattern = kStep + 1, kRow = kStep + 2, kStepTrig = kStep + 3,
+              kRowTrig = kStep + 4, kEnd = kStep + 5, kOuts = kStep + 6;
 
-int col(int track, int c) { return track * 5 + c; }
+int col(int track, int c) { return track * kCols + c; }
 
 struct Trk {
   std::unique_ptr<dsp::Module> m;
   std::array<float, 3> in{};  // clock, reset, start
-  std::array<float, 46> out{};
+  std::array<float, kOuts> out{};
   explicit Trk(const std::string& text) {
     const dsp::ModuleInfo* info = dsp::find_module("tracker");
     REQUIRE(info != nullptr);
@@ -40,7 +41,7 @@ struct Trk {
   }
   // One clock period: the edge sample, then `low` samples low. Returns the
   // outputs seen on the edge sample.
-  std::array<float, 46> tick(int high = 2, int low = 2) {
+  std::array<float, kOuts> tick(int high = 2, int low = 2) {
     run(1.0f);
     const auto edge = out;
     for (int i = 1; i < high; ++i) run(1.0f);
@@ -50,19 +51,23 @@ struct Trk {
   float o(int i) const { return out[static_cast<size_t>(i)]; }
 };
 
-float at(const std::array<float, 46>& o, int i) { return o[static_cast<size_t>(i)]; }
+float at(const std::array<float, kOuts>& o, int i) { return o[static_cast<size_t>(i)]; }
 
 const char* kScale =
     "track a note vel cva\n"
     "pattern p 4\n| C4 .5 1\n| D4 . 2\n| D4\n| ~E4\norder p\n";
 }  // namespace
 
-TEST_CASE("tracker registers with five banks of eight and six song outputs") {
+TEST_CASE("tracker registers with six banks of sixteen and six song outputs") {
   const dsp::ModuleInfo* info = dsp::find_module("tracker");
   REQUIRE(info);
   CHECK(info->output_index("voct1") == 0);
   CHECK(info->output_index("gate1") == 1);
-  CHECK(info->output_index("cvb8") == 39);
+  CHECK(info->output_index("cvb8") == col(7, kCvb));
+  CHECK(info->output_index("cvd1") == col(0, kCvd));
+  CHECK(info->output_index("voct16") == col(15, kVoct));
+  CHECK(info->output_index("cvd16") == col(15, kCvd));
+  CHECK(info->output_index("step") == kStep);
   CHECK(info->output_index("end") == kEnd);
   CHECK(info->config("file") != nullptr);
   CHECK(info->config("text") != nullptr);
@@ -299,6 +304,37 @@ TEST_CASE("tracker loader: a cable from an undeclared track is an error") {
   CHECK(b.compiled.errors[0].line == 5);
   CHECK(b.compiled.errors[0].msg.find("reads track 2, but 'songs/a.trk' declares 1") !=
         std::string::npos);
+}
+
+TEST_CASE("tracker loader: every bank's ports are checked against the declared tracks") {
+  TempDir d;
+  std::string trk;
+  for (int t = 1; t <= 12; ++t) trk += "track t" + std::to_string(t) + " cvd\n";
+  d.write("songs/a.trk", trk + "pattern p 1\n| 1\norder p\n");
+  const std::string ok = std::string(kPatch) + "song.cvd12 -> out.right\n";
+  CHECK(graph::build_patch(ok, d.write("p.patch", ok), 48000.0).compiled.ok());
+  for (const char* port : {"voct13", "gate16", "cvd13", "cvb14"}) {
+    CAPTURE(port);
+    const std::string src = std::string(kPatch) + "song." + port + " -> out.right\n";
+    auto b = graph::build_patch(src, d.write("p.patch", src), 48000.0);
+    REQUIRE(b.compiled.errors.size() == 1);
+    CHECK(b.compiled.errors[0].msg.find("declares 12") != std::string::npos);
+  }
+  const std::string past = std::string(kPatch) + "song.cvd17 -> out.right\n";  // not a port
+  auto b = graph::build_patch(past, d.write("p.patch", past), 48000.0);
+  REQUIRE(b.compiled.errors.size() == 1);
+  CHECK(b.compiled.errors[0].msg.find("declares") == std::string::npos);
+}
+
+TEST_CASE("tracker: track 16's cvd reaches its port") {
+  std::string trk;
+  for (int t = 1; t <= 16; ++t) trk += "track t" + std::to_string(t) + " note cvd\n";
+  trk += "pattern p 1 t16\n| C4 E4\norder p\n";
+  Trk t(trk);
+  t.tick();
+  CHECK(t.o(col(15, kVoct)) == doctest::Approx(0.25f));
+  CHECK(t.o(col(15, kCvd)) == doctest::Approx(7.0f / 12));
+  CHECK(t.o(col(15, kGate)) == 1.0f);
 }
 
 TEST_CASE("tracker loader: a .trk edit reloads the topology and keeps position") {

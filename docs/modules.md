@@ -631,9 +631,10 @@ mel = stepseq { steps: [D4v, F4v, E4v, 0, A4v], gates: [1, 1, 1, 0, 1],
 file: tracks, named patterns of rows, and an order list. Each rising `clock`
 edge plays one row (rows-per-beat is the clock's business). Inputs (all
 discrete) `clock`, rising-edge `reset`, and `start` (the order step `reset`
-rewinds to, 0-based, rounded and clamped). Outputs, per track n = 1..8:
-`voctn`, `gaten`, `veln`, `cvan`, `cvbn` (banks like `alloc`'s; undeclared
-tracks output 0); then `step` (order step), `pattern` (file index of the
+rewinds to, 0-based, rounded and clamped). Outputs, per track n = 1..16:
+`voctn`, `gaten`, `veln`, `cvan`, `cvbn`, `cvdn` (banks like `alloc`'s;
+grouped per track, track n's six ports first; undeclared tracks output 0, and
+a cable from one is an error at check time); then `step` (order step), `pattern` (file index of the
 step's first pattern), `row` (row within the step), one-sample `step_trig`
 and `row_trig`, and `end`. A bare `song` reads `voct1`.
 
@@ -667,8 +668,9 @@ order verse*2               # sections accumulate, one per line
 order |: verse+beat*3       # '|:' = loop point; without one the song ends
 ```
 
-- `track <name> <fields>` declares tracks 1..8 in order, with the fields its
-  cells hold (`note`, `vel`, `cva`, `cvb`), written in that order.
+- `track <name> <fields>` declares tracks 1..16 in order, with the fields its
+  cells hold (`note`, `vel`, `cva`, `cvb`, `cvd`), written in that order.
+  `note cva cvb cvd` carries a four-note chord on one track.
 - `pattern <name> <rows> [tracks]` (1..1024 rows) over the listed tracks
   (default all). Rows are `[n] | cell | cell`; a row number is optional
   (decimal, increasing) and rows never written are empty, so patterns can be
@@ -679,8 +681,8 @@ order |: verse+beat*3       # '|:' = loop point; without one the song ends
   slur (pitch change, no re-attack); `off`/`===` = note off; `.`/`...`/`-`/
   `---` = empty. Values fill the track's fields in declared order, so a
   `note vel` cell is `C4 .8`, never `.8 C4`. `vel` is a number in 0..1 (1
-  until first written); `cva`/`cvb` take numbers or note names (0 until
-  written). Note names are uppercase.
+  until first written); `cva`/`cvb`/`cvd` take numbers or note names (0
+  until written). Note names are uppercase.
   **Every value holds until changed.**
 - `order` entries: `name`, `a+b` (layers: the first sets the step length,
   the others loop inside it and may not be longer, which is an error rather
@@ -693,17 +695,18 @@ order |: verse+beat*3       # '|:' = loop point; without one the song ends
 Composing (all resolved when the file loads; the ports never change):
 
 - **Transpose** a layer in the order list: `order verse verse^5 bass^-2+beat`
-  (semitones, ±48). It moves the note field and any `cva`/`cvb` value written
-  as a note name; numeric levels stay put.
+  (semitones, ±48). It moves the note field and any `cva`/`cvb`/`cvd` value
+  written as a note name; numeric levels stay put.
 - **Note length:** `track hat note len 1` (every note sounds one row), or per
   cell `C4:3`, `x:2`, `~D4:4`. The gate drops L rows later unless another
   note, slur or `off` on that track comes first; counted in song rows, so a
   looping layer's note can ring into the next step. No `len` holds.
 - **Chord tones:** `track arp note vel from harm` (an earlier track with
-  `note`, optionally `cva`/`cvb`). In `arp`'s cells `t1`, `t2`, `t3` are
-  harm's resolved note, cva, cvb on that song row (after harm's `^N`), with an
-  optional semitone offset and length: `| t1+12 .8`, `| ~t3-12:2`. They work
-  in the note field (a note; `~t2` slurs) and in `cva`/`cvb`. One 16-row riff
+  `note`, optionally `cva`/`cvb`/`cvd`). In `arp`'s cells `t1`, `t2`, `t3`,
+  `t4` are harm's resolved note, cva, cvb, cvd on that song row (after harm's
+  `^N`), with an optional semitone offset and length: `| t1+12 .8`,
+  `| ~t4-12:2`. They work in the note field (a note; `~t2` slurs) and in
+  `cva`/`cvb`/`cvd`. One 16-row riff
   then loops under every chord: `order chords+arp`.
 - **Overlays:** in a layer group, `name@R` plays once from row R of the step
   (not looping), and its non-empty events replace the earlier layers' on
@@ -722,7 +725,7 @@ Composing (all resolved when the file loads; the ports never change):
   follow their transposed source, so it skips them (a layer's own `^N`
   still applies). Sections share the pattern namespace and hold patterns,
   not other sections.
-- **Ramps:** a trailing `>` on a `vel`/`cva`/`cvb` value (`.2>`, `A3>`)
+- **Ramps:** a trailing `>` on a `vel`/`cva`/`cvb`/`cvd` value (`.2>`, `A3>`)
   glides linearly, one step per row, to the next value written in that field
   later in the same pattern (an error if none follows). Still stepped per
   row: slew with `func` for a smooth fade.

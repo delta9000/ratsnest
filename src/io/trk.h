@@ -8,14 +8,14 @@
 
 namespace ms::io {
 
-constexpr int kTrkTracks = 8;         // output banks voct1..8, gate1..8, ...
+constexpr int kTrkTracks = 16;        // output banks voct1..16, gate1..16, ...
 constexpr int kTrkMaxRows = 65536;    // whole flattened song
 constexpr int kTrkMaxPatternRows = 1024;
 
 // One track's resolved state on one row: the held values, whether a note
 // sounds, and whether this row re-articulates it (new note or `x`).
 struct TrkRow {
-  float voct = 0.0f, vel = 1.0f, cva = 0.0f, cvb = 0.0f;
+  float voct = 0.0f, vel = 1.0f, cva = 0.0f, cvb = 0.0f, cvd = 0.0f;
   bool on = false, retrig = false;
 };
 

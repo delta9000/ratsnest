@@ -16,31 +16,31 @@
 namespace ms::io {
 namespace {
 
-enum Field { kNote, kVel, kCva, kCvb };
-constexpr const char* kFields[] = {"note", "vel", "cva", "cvb"};
+enum Field { kNote, kVel, kCva, kCvb, kCvd };
+constexpr const char* kFields[] = {"note", "vel", "cva", "cvb", "cvd"};
 enum class Kind : std::uint8_t { None, Note, Slur, Off, Hit };
 
 struct Tok { std::string_view s; int col; };
 constexpr int kMaxLen = 4096;  // note length in rows
 // `len`: rows a note sounds before its gate drops; 0 holds until changed.
-// `src`: the earlier track whose note, cva and cvb `t1`..`t3` read; -1 none.
+// `src`: the earlier track whose note, cva, cvb, cvd `t1`..`t4` read; -1 none.
 struct Track { std::string name; std::vector<int> fields; int len = 0, src = -1; };
 
 bool has(const Track& t, int f) { return std::count(t.fields.begin(), t.fields.end(), f) > 0; }
 
-// `t1`..`t3`, optionally offset: a chord tone of the source track.
-bool is_tone(std::string_view s) { return s.size() >= 2 && s[0] == 't' && s[1] >= '1' && s[1] <= '3'; }
+// `t1`..`t4`, optionally offset: a chord tone of the source track.
+bool is_tone(std::string_view s) { return s.size() >= 2 && s[0] == 't' && s[1] >= '1' && s[1] <= '4'; }
 // One cell as written: a note event plus the value fields it sets (bit f of
 // `set` for v[f]); bit f of `pitch` marks a cv value written as a note name,
 // which an order-list `^N` transposes along with the note. `len` is the
-// note's length in rows (`C4:3`, else the track's); 0 holds. `tone[f]` 1..3
-// makes v[f] an offset from the source track's note, cva or cvb.
+// note's length in rows (`C4:3`, else the track's); 0 holds. `tone[f]` 1..4
+// makes v[f] an offset from the source track's note, cva, cvb or cvd.
 struct Event {
   Kind kind = Kind::None;
   std::uint8_t set = 0, pitch = 0;
   std::int16_t len = 0;
-  std::uint8_t tone[4] = {};
-  float v[4] = {};
+  std::uint8_t tone[5] = {};
+  float v[5] = {};
 };
 struct Pattern {
   std::string name;
@@ -179,8 +179,8 @@ class Parser {
   // track <name> <field>... [len <rows>] [from <track>]
   void track(const std::vector<Tok>& t) {
     if (!pats_.empty()) return err(t[0], "tracks are declared before the first pattern");
-    if (tracks_.size() == kTrkTracks) return err(t[0], "at most 8 tracks");
-    if (t.size() < 3) return err(t[0], "track needs a name and fields (note, vel, cva, cvb)");
+    if (tracks_.size() == kTrkTracks) return err(t[0], "at most " + std::to_string(kTrkTracks) + " tracks");
+    if (t.size() < 3) return err(t[0], "track needs a name and fields (note, vel, cva, cvb, cvd)");
     if (!is_name(t[1].s)) return err(t[1], "track name must be lowercase (a-z, 0-9, _)");
     if (find_named(tracks_, t[1].s) >= 0) return err(t[1], "duplicate track '" + std::string(t[1].s) + "'");
     Track tr{std::string(t[1].s), {}};
@@ -191,13 +191,13 @@ class Parser {
       }
       const auto* f = std::find(std::begin(kFields), std::end(kFields), t[i].s);
       if (f == std::end(kFields))
-        return err(t[i], "unknown field '" + std::string(t[i].s) + "' (fields: note, vel, cva, cvb)");
+        return err(t[i], "unknown field '" + std::string(t[i].s) + "' (fields: note, vel, cva, cvb, cvd)");
       const int id = static_cast<int>(f - std::begin(kFields));
       if (has(tr, id))
         return err(t[i], "field '" + std::string(t[i].s) + "' listed twice");
       tr.fields.push_back(id);
     }
-    if (tr.fields.empty()) err(t[0], "track needs a name and fields (note, vel, cva, cvb)");
+    if (tr.fields.empty()) err(t[0], "track needs a name and fields (note, vel, cva, cvb, cvd)");
     tracks_.push_back(std::move(tr));
   }
 
@@ -345,7 +345,7 @@ class Parser {
     e.kind = Kind::None;
     if (t.s.find('#') != std::string_view::npos)
       return err(t, "'" + std::string(t.s) + "' is not a note (Cs4 for sharp, Bb3 for flat)");
-    err(t, "'" + std::string(t.s) + "' is not a note (uppercase: C4, Cs4, Bb3), number, x, ~note, t1..t3 (with 'from'), off or .");
+    err(t, "'" + std::string(t.s) + "' is not a note (uppercase: C4, Cs4, Bb3), number, x, ~note, t1..t4 (with 'from'), off or .");
   }
 
   // `:L` at `colon` in a note token: the note sounds L rows.
@@ -363,14 +363,14 @@ class Parser {
       return err(t, "'" + name + "' is a chord tone, but track '" + tr.name +
                         "' has no source (declare 'track " + tr.name + " ... from <track>')");
     const Track& src = tracks_[static_cast<size_t>(tr.src)];
-    const int k = s[1] - '0', sf = k == 1 ? kNote : k;  // t1 note, t2 cva, t3 cvb
+    const int k = s[1] - '0', sf = k == 1 ? kNote : k;  // t1 note, t2 cva, t3 cvb, t4 cvd
     if (!has(src, sf))
       return err(t, "'" + name + "' reads " + kFields[sf] + ", which track '" + src.name + "' does not hold");
     std::string_view off = s.substr(2);
     if (!off.empty() && off[0] == '+') off.remove_prefix(1);
     int n = 0;
     if (s.size() > 2 && !to_int(off, -48, 48, n))
-      return err(t, "'" + std::string(s) + "' is not a chord tone (t1, t2, t3 with an optional semitone offset: t1-12, t3+7)");
+      return err(t, "'" + std::string(s) + "' is not a chord tone (t1..t4 with an optional semitone offset: t1-12, t3+7)");
     e.tone[f] = static_cast<std::uint8_t>(k);
     e.v[f] = static_cast<float>(n) / 12.0f;
     e.set = static_cast<std::uint8_t>(e.set | (1u << f));
@@ -685,7 +685,7 @@ class Parser {
   // chord tones add to the source track's resolved values on this row, so
   // an enclosing section's `^N` (already in the source) skips them.
   static void apply(const Event& e, const Layer& l, const TrkRow& src, TrkRow& s) {
-    const float tones[4] = {0.0f, src.voct, src.cva, src.cvb};
+    const float tones[5] = {0.0f, src.voct, src.cva, src.cvb, src.cvd};
     const float own = static_cast<float>(l.shift) / 12.0f, all = own + static_cast<float>(l.outer) / 12.0f;
     const auto up = [&](int f) { return (e.pitch >> f) & 1u ? (e.tone[f] ? own : all) : 0.0f; };
     const auto val = [&](int f) { return tones[e.tone[f]] + e.v[f] + up(f); };
@@ -694,8 +694,9 @@ class Parser {
     if (e.kind == Kind::Note || e.kind == Kind::Hit) s.retrig = true;
     if (e.kind != Kind::None) s.on = e.kind != Kind::Off;
     if (e.set & (1u << kVel)) s.vel = e.v[kVel];
-    if (e.set & (1u << kCva)) s.cva = val(kCva);
-    if (e.set & (1u << kCvb)) s.cvb = val(kCvb);
+    float* const cv[] = {&s.cva, &s.cvb, &s.cvd};
+    for (int f = kCva; f <= kCvd; ++f)
+      if (e.set & (1u << f)) *cv[f - kCva] = val(f);
   }
 
   static std::string field_list(const Track& t) {
