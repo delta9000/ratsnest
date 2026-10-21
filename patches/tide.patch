@@ -106,7 +106,7 @@ eq_m = eq { hp_freq: 30, low_freq: 100, low_gain: -0.2,
             mid2_freq: 4000, mid2_gain: 0.4, mid2_q: 0.8,
             high_freq: 10000, high_gain: 0.3 }
 comp_m = compressor { threshold: -18, ratio: 2.0, knee: 8,
-                      attack: 0.05, release: 0.3, makeup: 1.0, mix: 1 }
+                      attack: 0.05, release: 0.3, makeup: 2.6, mix: 1 }
 field = stereo { width: 1.2, balance: 0 }
 clip = clipper { mode: soft, threshold: -3, drive: 0.5, mix: 0.5 }
 lim = limiter { threshold: -1.0, release: 0.15 }

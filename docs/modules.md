@@ -740,7 +740,8 @@ rule (`alloc`/`midi` expose only banks so `poly.voct` can resolve to
 
 `dcblock { cutoff: 10 }` — inputs `in_l` 0, `in_r` 0, `cutoff` 10; outputs `out_l`,
 `out_r`. A first-order high-pass filter that removes DC offsets below the
-cutoff frequency (clamped `1..40` Hz, smoothed around 20 ms). Protects speakers
+cutoff frequency (clamped `1..40` Hz; changes are smoothed around 20 ms, but
+the first sample starts at the patched cutoff, so there is no startup sweep). Protects speakers
 and downstream dynamics processors from sub-bass drift. Silence is exact, and
 all internal filter states migrate during hot reload.
 
@@ -769,7 +770,11 @@ feed-forward log-domain compressor.
 *   `threshold` (clamped `-120..0`, default -18): Target threshold in dBFS.
 *   `ratio` (clamped `1..1000`, default 4): Compression ratio.
 *   `knee` (clamped `0..40`, default 6): Soft-knee width in dB. `0` = hard knee.
-*   `attack` / `release` (clamped `0.0001..10`, default 0.01 / 0.1): Time constants in seconds.
+*   `attack` / `release` (clamped `0.0001..10`, default 0.01 / 0.1): Time constants in seconds
+    of the branching one-pole on gain reduction (dB). The detector target is
+    peak-held for `min(release, 20 ms)` before release starts, so the gain does
+    not ripple through the troughs of bass (a 50 Hz sine at 1 ms attack stays
+    under 0.1 % THD) and steady tones settle at the static curve of their peak.
 *   `makeup` (clamped `-40..40`, default 0): Output gain makeup in dB.
 *   `mix` (clamped `0..1`, default 1): Linear dry/wet interpolation (no gain boost for identical signals).
 *   `gain`: Output. Linear gain reduction factor (excluding makeup).
@@ -780,7 +785,8 @@ feed-forward log-domain compressor.
 `eq` — inputs `in_l` 0, `in_r` 0, `hp_freq` 0, `low_freq` 120, `low_gain` 0,
 `mid1_freq` 500, `mid1_gain` 0, `mid1_q` 0.707, `mid2_freq` 2500, `mid2_gain` 0,
 `mid2_q` 0.707, `high_freq` 10000, `high_gain` 0; outputs `out_l`, `out_r`.
-A stereo parametric mastering equalizer with 20 ms parameter smoothing.
+A stereo parametric mastering equalizer with 20 ms parameter smoothing; the
+first sample starts at the patched settings, so there is no startup sweep.
 Consists of five cascaded biquad sections per channel:
 1.  **HPF**: `hp_freq: 0` bypasses it (the default). Positive values enable a second-order high-pass, clamped `5..0.45*rate`, Q fixed to `0.707`.
 2.  **Low Shelf**: Low shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. Slope fixed to `1.0`.
@@ -812,7 +818,14 @@ A stereo-linked peak limiter with a fixed 2.0 ms lookahead.
 *   `gain`: Output. Current linear gain reduction factor.
 *   `gr`: Output. Current gain reduction in positive dB.
 
-Guarantees a true hard ceiling at the target threshold by looking ahead 2.0 ms (96 samples at 48 kHz) to detect peak amplitude, applying a fast 0.1 ms attack curve before the peak arrives.
+Guarantees a hard sample-peak ceiling at the threshold with a 2.0 ms lookahead
+(96 samples at 48 kHz, which is also its latency). The gain reduction each
+sample needs is peak-held over the lookahead (or `min(release, 20 ms)` if
+longer, so bass does not ripple the gain), released with the `release` time
+constant, then box-filtered over the whole lookahead: the gain ramps down
+across the full 2 ms and arrives exactly as the peak does. A 50 Hz sine under
+6 dB of reduction stays below 0.01 % THD. Sample peaks only; inter-sample
+(true) peaks can still exceed the threshold slightly.
 
 ## `follow`
 

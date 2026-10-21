@@ -37,6 +37,37 @@ class OnePole {
   float value_ = 0.0f;
 };
 
+// Maximum of the last `len` pushed values (clamped 1..N), O(1) amortised: a
+// monotonic deque after Lemire, arXiv:cs/0610046. N is a power of two. The
+// window may change length between pushes. See docs/attribution.md.
+template <unsigned N>
+class SlidingMax {
+  static_assert((N & (N - 1)) == 0);
+
+ public:
+  float push(float v, int len) {
+    const unsigned span = static_cast<unsigned>(std::clamp(len, 1, static_cast<int>(N)));
+    ++now_;
+    while (tail_ != head_ && val_[(tail_ - 1) & (N - 1)] <= v) --tail_;
+    val_[tail_ & (N - 1)] = v;
+    at_[tail_++ & (N - 1)] = now_;
+    while (now_ - at_[head_ & (N - 1)] >= span) ++head_;
+    return val_[head_ & (N - 1)];
+  }
+
+ private:
+  float val_[N] = {};
+  unsigned at_[N] = {};
+  unsigned head_ = 0, tail_ = 0, now_ = 0;
+};
+
+// Dynamics peak-hold length: bridges the troughs of |x| for fundamentals down
+// to 25 Hz (20 ms), so bass does not ripple the gain, but never outlasts the
+// release the patch asked for.
+inline int hold_samples(float release_s, float rate) {
+  return static_cast<int>(std::min(release_s, 0.02f) * rate);
+}
+
 // dB and linear conversion helpers
 inline float db_to_linear(float db) {
   return std::pow(10.0f, db / 20.0f);

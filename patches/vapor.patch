@@ -244,7 +244,7 @@ master_dc.out_l -> master_eq.in_l
 master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { threshold: -18, ratio: 2.0, knee: 8,
-                          attack: 0.05, release: 0.3, makeup: 1.0, mix: 1 }
+                          attack: 0.05, release: 0.3, makeup: 3.7, mix: 1 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 

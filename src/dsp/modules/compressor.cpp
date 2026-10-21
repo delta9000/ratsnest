@@ -6,7 +6,8 @@
 #include "dsp/mastering.h"
 
 // Paper-derived Giannoulis/Massberg/Reiss log-domain soft-knee curve and
-// ballistics. See docs/attribution.md.
+// ballistics; peak-hold before release after Luff (Signalsmith, 2022).
+// See docs/attribution.md.
 
 namespace ms::dsp {
 namespace {
@@ -43,6 +44,7 @@ class Compressor final : public Module {
     is_external_ = (sc == "external");
     
     g_smooth_ = 0.0f;
+    hold_ = {};
   }
 
   void process(const float* ins, float* outs) override {
@@ -84,10 +86,11 @@ class Compressor final : public Module {
       }
     }
     
-    float g_target = level_db - y_db;
-    if (g_target < 0.0f) g_target = 0.0f;
-    
-    // 3. Separate smoothed attack/release
+    // Peak-hold the target so release starts from the last peak instead of
+    // rippling through every trough of a bass waveform.
+    const float g_target = hold_.push(std::max(0.0f, level_db - y_db), hold_samples(release, rate_));
+
+    // 3. Branching attack/release on the held target
     if (time_key_.changed({attack, release})) {  // skip exp while times hold
       alpha_a_ = 1.0f - std::exp(-1.0f / (attack * rate_));
       alpha_r_ = 1.0f - std::exp(-1.0f / (release * rate_));
@@ -125,12 +128,14 @@ class Compressor final : public Module {
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Compressor&>(other);
     g_smooth_ = o.g_smooth_;
+    hold_ = o.hold_;
   }
 
  private:
   float rate_ = 48000.0f;
   bool is_external_ = false;
   float g_smooth_ = 0.0f;
+  SlidingMax<4096> hold_;  // 20 ms up to 192 kHz
   // Memoized libm results; see dsp/input_key.h.
   InputKey<2> time_key_;
   InputKey<1> gain_key_, makeup_key_;

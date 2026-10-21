@@ -24,9 +24,9 @@ class DcBlock final : public Module {
     (void)cfg;
     rate_ = static_cast<float>(rate);
     
-    // Initialize smoothing filter for cutoff
+    // Cutoff smoothing; the first process() snaps it to its target.
     cutoff_smooth_.set_time(0.020f, rate_);
-    cutoff_smooth_.init(10.0f);
+    primed_ = false;
     
     // Initialize state
     lp_l_ = 0.0f;
@@ -39,7 +39,9 @@ class DcBlock final : public Module {
     const float raw_in_r = sanitize(ins[1], 0.0f);
     const float raw_cutoff = sanitize_clamp(ins[2], 1.0f, 40.0f, 10.0f);
     
-    // Smooth the cutoff parameter
+    // Smooth the cutoff parameter, starting settled at the first target
+    if (!primed_) cutoff_smooth_.init(raw_cutoff);
+    primed_ = true;
     const float cutoff = cutoff_smooth_.process(raw_cutoff);
     
     // Compute alpha coefficient based on sample rate and cutoff
@@ -66,11 +68,13 @@ class DcBlock final : public Module {
     lp_l_ = o.lp_l_;
     lp_r_ = o.lp_r_;
     cutoff_smooth_ = o.cutoff_smooth_;
+    primed_ = o.primed_;
   }
 
  private:
   float rate_ = 48000.0f;
   OnePole cutoff_smooth_;
+  bool primed_ = false;
   float lp_l_ = 0.0f;
   float lp_r_ = 0.0f;
   InputKey<1> cutoff_key_;

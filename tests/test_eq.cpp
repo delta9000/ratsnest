@@ -179,3 +179,22 @@ TEST_CASE("eq: hostile values and sample rates") {
     CHECK(std::isfinite(outs[1]));
   }
 }
+
+TEST_CASE("eq: static settings start settled (no sweep from defaults)") {
+  // Non-default settings throughout; a fresh instance must sound like one
+  // that has sat at those settings for a second.
+  float ins[13] = {0, 0, 40, 200, 6, 800, -9, 2, 4000, 5, 1.5f, 8000, -6};
+  auto fresh = make_eq();
+  auto warm = make_eq();
+  float outs[2], ref[2];
+  for (int i = 0; i < 48000; ++i) warm->process(ins, ref);
+  float worst = 0.0f;
+  for (int i = 0; i < 4800; ++i) {  // first 100 ms
+    ins[0] = std::sin(2.0f * std::numbers::pi_v<float> * 100.0f * static_cast<float>(i) / 48000.0f);
+    ins[1] = (i % 48 < 24) ? 0.5f : -0.5f;
+    fresh->process(ins, outs);
+    warm->process(ins, ref);
+    worst = std::max({worst, std::abs(outs[0] - ref[0]), std::abs(outs[1] - ref[1])});
+  }
+  CHECK(worst < 1e-5f);
+}

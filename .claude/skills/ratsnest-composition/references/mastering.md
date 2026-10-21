@@ -61,6 +61,15 @@ Working backwards from a loudness target:
 
 Crest ~11 dB is loud but not bricked. Crest under 6 dB means you flattened it.
 
+The compressor's detector holds each peak for `min(release, 20 ms)`, so a
+steady tone gets exactly the static curve at its peak. A slow-attack glue comp
+on its own input (`attack: 0.05, release: 0.3`) compresses 2–3 dB harder than it
+did before that hold went in; the library's patches were rebalanced with makeup
+(+0.5..+3 dB) to keep their loudness. If an older patch comes back quieter,
+raise makeup by the difference rather than lowering the threshold. The limiter
+holds the same way, which costs a brickwalled master (≈ −8 LUFS) about 0.5 dB;
+that is the price of a clean low end, not a reason for more drive.
+
 ## The self-own that costs 2 dB
 
 A post-limiter attenuation scales the ceiling. The fade idiom

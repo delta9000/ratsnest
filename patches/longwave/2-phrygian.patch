@@ -367,7 +367,7 @@ kick_env -> master_mix.lvl4 : -0.12
 
 mast = sub { file: "../lib/master-chain.sub", low_gain: -0.2, mid1_gain: -1.6,
              mid2_gain: 1.2, high_gain: 1.2, comp_thr: -15, comp_ratio: 2.8,
-             clip_drive: 7.0, width: 1.2 }
+             clip_drive: 7.0, width: 1.2, comp_makeup: 4.0 }
 master_mix.out_l -> mast.in_l
 master_mix.out_r -> mast.in_r
 kck -> mast.side_l : 0.7

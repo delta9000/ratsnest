@@ -2,8 +2,11 @@
 #include <cmath>
 #include <numbers>
 #include <algorithm>
+#include <cstdint>
+#include <vector>
 #include "dsp/modules.h"
 #include "dsp/mastering.h"
+#include "thd.h"
 
 using namespace ms::dsp;
 
@@ -117,4 +120,50 @@ TEST_CASE("limiter: silence and hostile values") {
   CHECK(std::isfinite(outs[1]));
   CHECK(std::isfinite(outs[2]));
   CHECK(std::isfinite(outs[3]));
+}
+
+TEST_CASE("limiter: output never exceeds threshold on hostile transients") {
+  for (double rate : {44100.0, 48000.0, 96000.0, 192000.0}) {
+    for (float thr_db : {-0.1f, -6.0f, -24.0f}) {
+      auto m = make_limiter(rate);
+      const float ceiling = db_to_linear(thr_db) * 1.00001f;
+      std::uint32_t seed = 0x9e3779b9u;
+      float worst = 0.0f;
+      for (int i = 0; i < static_cast<int>(rate); ++i) {
+        seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+        const float u = static_cast<float>(seed) / 4294967296.0f;  // 0..1
+        float x = 0.3f * (2.0f * u - 1.0f);
+        if (seed % 97 == 0) x = (u - 0.5f) * 200.0f;           // lone spikes
+        if ((i / 300) % 7 == 3) x = ((i / 3) % 2) ? 8.0f : -8.0f;  // hot square bursts
+        if (i % 5000 < 3) x = 1e6f;                              // absurd clicks
+        // Release swept from 1 ms upward: recovery right before a peak.
+        float ins[4] = {x, -0.5f * x, thr_db, 0.001f + 0.01f * u};
+        float outs[4];
+        m->process(ins, outs);
+        worst = std::max({worst, std::abs(outs[0]), std::abs(outs[1])});
+      }
+      CAPTURE(rate);
+      CAPTURE(thr_db);
+      CHECK(worst <= ceiling);
+    }
+  }
+}
+
+TEST_CASE("limiter: 50 Hz under 6 dB of gain reduction stays clean") {
+  // The gain envelope must use the whole lookahead and hold across the
+  // troughs of a bass waveform; tracking the waveform is what distorts it.
+  for (float release : {0.05f, 0.2f}) {
+    auto m = make_limiter();
+    const float thr = db_to_linear(-6.0f);
+    std::vector<float> y;
+    for (int i = 0; i < 96000; ++i) {
+      const float x = 2.0f * thr * std::sin(2.0f * std::numbers::pi_v<float> * 50.0f * static_cast<float>(i) / 48000.0f);
+      float ins[4] = {x, x, -6.0f, release}, outs[4];
+      m->process(ins, outs);
+      if (i >= 48000) y.push_back(outs[0]);
+    }
+    CAPTURE(release);
+    CHECK(thd(y, 50.0, 48000.0) < 1e-4);  // < 0.01 % (was 1.06 %)
+    CHECK(*std::max_element(y.begin(), y.end()) == doctest::Approx(thr).epsilon(1e-3));
+  }
 }

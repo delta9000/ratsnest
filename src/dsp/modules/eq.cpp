@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 #include "dsp/biquad.h"
 #include "dsp/mastering.h"
@@ -27,192 +28,72 @@ constexpr OutputInfo kOuts[] = {
     {"out_r"}
 };
 
+// Parameter clamps, in kIns order from hp_freq; a negative ceiling means
+// 0.45 * rate.
+constexpr int kParams = 11;
+constexpr float kLo[kParams] = {0, 5, -24, 5, -24, 0.1f, 5, -24, 0.1f, 5, -24};
+constexpr float kHi[kParams] = {-1, -1, 24, -1, 24, 18, -1, 24, 18, -1, 24};
+
 class Eq final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     (void)cfg;
     rate_ = static_cast<float>(rate);
-    
-    // Initialize parameter smoothing (20 ms)
-    hp_freq_smooth_.set_time(0.020f, rate_);
-    low_freq_smooth_.set_time(0.020f, rate_);
-    low_gain_smooth_.set_time(0.020f, rate_);
-    mid1_freq_smooth_.set_time(0.020f, rate_);
-    mid1_gain_smooth_.set_time(0.020f, rate_);
-    mid1_q_smooth_.set_time(0.020f, rate_);
-    mid2_freq_smooth_.set_time(0.020f, rate_);
-    mid2_gain_smooth_.set_time(0.020f, rate_);
-    mid2_q_smooth_.set_time(0.020f, rate_);
-    high_freq_smooth_.set_time(0.020f, rate_);
-    high_gain_smooth_.set_time(0.020f, rate_);
-    
-    // Set initial values
-    hp_freq_smooth_.init(0.0f);
-    low_freq_smooth_.init(120.0f);
-    low_gain_smooth_.init(0.0f);
-    mid1_freq_smooth_.init(500.0f);
-    mid1_gain_smooth_.init(0.0f);
-    mid1_q_smooth_.init(0.707f);
-    mid2_freq_smooth_.init(2500.0f);
-    mid2_gain_smooth_.init(0.0f);
-    mid2_q_smooth_.init(0.707f);
-    high_freq_smooth_.init(10000.0f);
-    high_gain_smooth_.init(0.0f);
-    
-    // Clear filter states
-    state_hp_l_.clear();   state_hp_r_.clear();
-    state_low_l_.clear();  state_low_r_.clear();
-    state_mid1_l_.clear(); state_mid1_r_.clear();
-    state_mid2_l_.clear(); state_mid2_r_.clear();
-    state_high_l_.clear(); state_high_r_.clear();
-
-    // Invalidate coefficient cache — recomputed on first process() call.
-    prev_hp_freq_   = -999.0f;
-    prev_low_freq_  = prev_low_gain_  = -999.0f;
-    prev_mid1_freq_ = prev_mid1_gain_ = prev_mid1_q_ = -999.0f;
-    prev_mid2_freq_ = prev_mid2_gain_ = prev_mid2_q_ = -999.0f;
-    prev_high_freq_ = prev_high_gain_ = -999.0f;
+    for (auto& s : smooth_) s.set_time(0.020f, rate_);  // 20 ms smoothing
+    primed_ = false;
+    for (auto& ch : st_)
+      for (auto& s : ch) s.clear();
   }
 
   void process(const float* ins, float* outs) override {
-    // Clamping limits
     const float max_freq = 0.45f * rate_;
-    
-    // Sanitize and clamp control parameters
-    const float raw_hp_freq = sanitize_clamp(ins[2], 0.0f, max_freq, 0.0f);
-    const float raw_low_freq = sanitize_clamp(ins[3], 5.0f, max_freq, 120.0f);
-    const float raw_low_gain = sanitize_clamp(ins[4], -24.0f, 24.0f, 0.0f);
-    const float raw_mid1_freq = sanitize_clamp(ins[5], 5.0f, max_freq, 500.0f);
-    const float raw_mid1_gain = sanitize_clamp(ins[6], -24.0f, 24.0f, 0.0f);
-    const float raw_mid1_q = sanitize_clamp(ins[7], 0.1f, 18.0f, 0.707f);
-    const float raw_mid2_freq = sanitize_clamp(ins[8], 5.0f, max_freq, 2500.0f);
-    const float raw_mid2_gain = sanitize_clamp(ins[9], -24.0f, 24.0f, 0.0f);
-    const float raw_mid2_q = sanitize_clamp(ins[10], 0.1f, 18.0f, 0.707f);
-    const float raw_high_freq = sanitize_clamp(ins[11], 5.0f, max_freq, 10000.0f);
-    const float raw_high_gain = sanitize_clamp(ins[12], -24.0f, 24.0f, 0.0f);
-    
-    // Apply smoothing to parameters
-    const float hp_freq = hp_freq_smooth_.process(raw_hp_freq);
-    const float low_freq = low_freq_smooth_.process(raw_low_freq);
-    const float low_gain = low_gain_smooth_.process(raw_low_gain);
-    const float mid1_freq = mid1_freq_smooth_.process(raw_mid1_freq);
-    const float mid1_gain = mid1_gain_smooth_.process(raw_mid1_gain);
-    const float mid1_q = mid1_q_smooth_.process(raw_mid1_q);
-    const float mid2_freq = mid2_freq_smooth_.process(raw_mid2_freq);
-    const float mid2_gain = mid2_gain_smooth_.process(raw_mid2_gain);
-    const float mid2_q = mid2_q_smooth_.process(raw_mid2_q);
-    const float high_freq = high_freq_smooth_.process(raw_high_freq);
-    const float high_gain = high_gain_smooth_.process(raw_high_gain);
-    
-    // Recompute biquad coefficients only when smoothed params have changed.
-    // Settled patches avoid all cos/sin/pow calls on the hot path.
-    if (hp_freq != prev_hp_freq_) {
-      c_hp_ = raw_hp_freq == 0.0f ? make_bypass() : make_hpf(std::max(hp_freq, 5.0f), rate_);
-      prev_hp_freq_ = hp_freq;
-    }
-    if (low_freq != prev_low_freq_ || low_gain != prev_low_gain_) {
-      c_low_ = make_low_shelf(low_freq, low_gain, rate_);
-      prev_low_freq_ = low_freq;  prev_low_gain_ = low_gain;
-    }
-    if (mid1_freq != prev_mid1_freq_ || mid1_gain != prev_mid1_gain_ || mid1_q != prev_mid1_q_) {
-      c_mid1_ = make_peaking_eq(mid1_freq, mid1_gain, mid1_q, rate_);
-      prev_mid1_freq_ = mid1_freq;  prev_mid1_gain_ = mid1_gain;  prev_mid1_q_ = mid1_q;
-    }
-    if (mid2_freq != prev_mid2_freq_ || mid2_gain != prev_mid2_gain_ || mid2_q != prev_mid2_q_) {
-      c_mid2_ = make_peaking_eq(mid2_freq, mid2_gain, mid2_q, rate_);
-      prev_mid2_freq_ = mid2_freq;  prev_mid2_gain_ = mid2_gain;  prev_mid2_q_ = mid2_q;
-    }
-    if (high_freq != prev_high_freq_ || high_gain != prev_high_gain_) {
-      c_high_ = make_high_shelf(high_freq, high_gain, rate_);
-      prev_high_freq_ = high_freq;  prev_high_gain_ = high_gain;
-    }
+    float p[kParams];
+    for (int i = 0; i < kParams; ++i)
+      p[i] = sanitize_clamp(ins[i + 2], kLo[i], kHi[i] < 0 ? max_freq : kHi[i], kIns[i + 2].def);
+    const bool hp_on = p[0] > 0.0f;
 
-    // Left channel cascade processing
-    float x_l = sanitize(ins[0], 0.0f);
-    if (raw_hp_freq > 0.0f) x_l = Biquad::process(x_l, c_hp_, state_hp_l_);
-    else state_hp_l_.clear();
-    x_l = Biquad::process(x_l, c_low_,  state_low_l_);
-    x_l = Biquad::process(x_l, c_mid1_, state_mid1_l_);
-    x_l = Biquad::process(x_l, c_mid2_, state_mid2_l_);
-    x_l = Biquad::process(x_l, c_high_, state_high_l_);
-    outs[0] = x_l;
+    // Snap to the first targets so a static patch starts settled, not
+    // sweeping from the defaults; smooth only later motion.
+    if (!primed_)
+      for (int i = 0; i < kParams; ++i) smooth_[i].init(p[i]);
+    primed_ = true;
+    for (int i = 0; i < kParams; ++i) p[i] = smooth_[i].process(p[i]);
 
-    // Right channel cascade processing
-    float x_r = sanitize(ins[1], 0.0f);
-    if (raw_hp_freq > 0.0f) x_r = Biquad::process(x_r, c_hp_, state_hp_r_);
-    else state_hp_r_.clear();
-    x_r = Biquad::process(x_r, c_low_,  state_low_r_);
-    x_r = Biquad::process(x_r, c_mid1_, state_mid1_r_);
-    x_r = Biquad::process(x_r, c_mid2_, state_mid2_r_);
-    x_r = Biquad::process(x_r, c_high_, state_high_r_);
-    outs[1] = x_r;
+    // Recompute a section's coefficients only when its smoothed inputs move.
+    if (hp_key_.changed({p[0]})) c_[0] = make_hpf(std::max(p[0], 5.0f), rate_);
+    if (low_key_.changed({p[1], p[2]})) c_[1] = make_low_shelf(p[1], p[2], rate_);
+    if (mid1_key_.changed({p[3], p[4], p[5]})) c_[2] = make_peaking_eq(p[3], p[4], p[5], rate_);
+    if (mid2_key_.changed({p[6], p[7], p[8]})) c_[3] = make_peaking_eq(p[6], p[7], p[8], rate_);
+    if (high_key_.changed({p[9], p[10]})) c_[4] = make_high_shelf(p[9], p[10], rate_);
+
+    for (int ch = 0; ch < 2; ++ch) {
+      float x = sanitize(ins[ch], 0.0f);
+      if (hp_on) x = Biquad::process(x, c_[0], st_[ch][0]);
+      else st_[ch][0].clear();
+      for (int b = 1; b < 5; ++b) x = Biquad::process(x, c_[b], st_[ch][b]);
+      outs[ch] = x;
+    }
   }
 
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Eq&>(other);
-    hp_freq_smooth_ = o.hp_freq_smooth_;
-    low_freq_smooth_ = o.low_freq_smooth_;
-    low_gain_smooth_ = o.low_gain_smooth_;
-    mid1_freq_smooth_ = o.mid1_freq_smooth_;
-    mid1_gain_smooth_ = o.mid1_gain_smooth_;
-    mid1_q_smooth_ = o.mid1_q_smooth_;
-    mid2_freq_smooth_ = o.mid2_freq_smooth_;
-    mid2_gain_smooth_ = o.mid2_gain_smooth_;
-    mid2_q_smooth_ = o.mid2_q_smooth_;
-    high_freq_smooth_ = o.high_freq_smooth_;
-    high_gain_smooth_ = o.high_gain_smooth_;
-    
-    state_hp_l_ = o.state_hp_l_;     state_hp_r_ = o.state_hp_r_;
-    state_low_l_ = o.state_low_l_;   state_low_r_ = o.state_low_r_;
-    state_mid1_l_ = o.state_mid1_l_; state_mid1_r_ = o.state_mid1_r_;
-    state_mid2_l_ = o.state_mid2_l_; state_mid2_r_ = o.state_mid2_r_;
-    state_high_l_ = o.state_high_l_; state_high_r_ = o.state_high_r_;
+    std::copy(std::begin(o.smooth_), std::end(o.smooth_), std::begin(smooth_));
+    primed_ = o.primed_;
+    for (int ch = 0; ch < 2; ++ch)
+      std::copy(std::begin(o.st_[ch]), std::end(o.st_[ch]), std::begin(st_[ch]));
   }
 
  private:
   float rate_ = 48000.0f;
-
-  // Coefficient cache — recomputed only when the corresponding smoothed param changes.
-  // Exact float comparison works: OnePole flushes denormals and converges to
-  // target exactly, so prev_ == current once the patch is settled (~0.8 s at 48 kHz).
-  BiquadCoeffs c_hp_;   float prev_hp_freq_   = -999.0f;
-  BiquadCoeffs c_low_;  float prev_low_freq_   = -999.0f;
-                        float prev_low_gain_   = -999.0f;
-  BiquadCoeffs c_mid1_; float prev_mid1_freq_  = -999.0f;
-                        float prev_mid1_gain_  = -999.0f;
-                        float prev_mid1_q_     = -999.0f;
-  BiquadCoeffs c_mid2_; float prev_mid2_freq_  = -999.0f;
-                        float prev_mid2_gain_  = -999.0f;
-                        float prev_mid2_q_     = -999.0f;
-  BiquadCoeffs c_high_; float prev_high_freq_  = -999.0f;
-                        float prev_high_gain_  = -999.0f;
-
-  // Parameter smoothing states
-  OnePole hp_freq_smooth_;
-  OnePole low_freq_smooth_;
-  OnePole low_gain_smooth_;
-  OnePole mid1_freq_smooth_;
-  OnePole mid1_gain_smooth_;
-  OnePole mid1_q_smooth_;
-  OnePole mid2_freq_smooth_;
-  OnePole mid2_gain_smooth_;
-  OnePole mid2_q_smooth_;
-  OnePole high_freq_smooth_;
-  OnePole high_gain_smooth_;
-  
-  // Left biquad states
-  BiquadState state_hp_l_;
-  BiquadState state_low_l_;
-  BiquadState state_mid1_l_;
-  BiquadState state_mid2_l_;
-  BiquadState state_high_l_;
-  
-  // Right biquad states
-  BiquadState state_hp_r_;
-  BiquadState state_low_r_;
-  BiquadState state_mid1_r_;
-  BiquadState state_mid2_r_;
-  BiquadState state_high_r_;
+  OnePole smooth_[kParams];
+  bool primed_ = false;
+  // Section order: hp, low shelf, mid1, mid2, high shelf. Coefficients are
+  // memoized on their smoothed inputs; see dsp/input_key.h.
+  BiquadCoeffs c_[5];
+  InputKey<1> hp_key_;
+  InputKey<2> low_key_, high_key_;
+  InputKey<3> mid1_key_, mid2_key_;
+  BiquadState st_[2][5];
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Eq>(); }
