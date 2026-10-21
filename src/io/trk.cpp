@@ -47,6 +47,7 @@ struct Pattern {
   int rows = 0;
   std::vector<int> tracks;
   std::vector<Event> ev;  // row * tracks.size() + column
+  int bar = 0;            // rows per bar (`4x16`); 0: no bars
 };
 // A layer as written in the order list (`name^N`), then resolved.
 // `at` is the `@R` text (col 0: none).
@@ -163,8 +164,7 @@ class Parser {
     const std::string_view w = t[0].s;
     for (const auto& [name, fn] : kDirectives)
       if (w == name) return (this->*fn)(t);
-    int n = 0;
-    if (w == "|" || to_int(w, 0, 1 << 30, n)) return row(t);
+    if (w == "|" || std::isdigit(static_cast<unsigned char>(w[0]))) return row(t);
     err(t[0], "unknown directive '" + std::string(w) +
               "' (directives: track, pattern, lane, order; rows start with '|')" +
               dsl::did_you_mean(w, {"track", "pattern", "lane", "order"}));
@@ -212,15 +212,14 @@ class Parser {
       err(v, "track '" + std::string(v.s) + "' has no note field to read chord tones from");
   }
 
-  // pattern <name> <rows> [<track>...]
+  // pattern <name> <rows|BARSxROWS> [<track>...]
   void pattern(const std::vector<Tok>& t) {
     if (tracks_.empty()) return err(t[0], "declare tracks before patterns ('track <name> <fields>')");
     if (t.size() < 3) return err(t[0], "pattern needs a name and a row count");
     if (!is_name(t[1].s)) return err(t[1], "pattern name must be lowercase (a-z, 0-9, _)");
     if (find_named(pats_, t[1].s) >= 0) return err(t[1], "duplicate pattern '" + std::string(t[1].s) + "'");
     Pattern p{std::string(t[1].s), 0, {}, {}};
-    if (!to_int(t[2].s, 1, kTrkMaxPatternRows, p.rows))
-      return err(t[2], "row count must be an integer in 1..1024");
+    if (!size(t[2], p)) return;
     for (size_t i = 3; i < t.size(); ++i) {
       const int id = find_named(tracks_, t[i].s);
       if (id < 0) return err(t[i], "unknown track '" + std::string(t[i].s) + "'" + hint(tracks_, t[i].s));
@@ -491,10 +490,35 @@ class Parser {
   }
 
   // A row position written in pattern `p`'s terms.
-  bool to_row(const Tok& t, const Pattern&, int& out) {
-    if (to_int(t.s, 0, 1 << 30, out)) return true;
-    return err(t, "row number must be a decimal integer"), false;
+  bool to_row(const Tok& t, const Pattern& p, int& out) {
+    const size_t colon = t.s.find(':');
+    if (colon == std::string_view::npos && to_int(t.s, 0, 1 << 30, out)) return true;
+    if (colon == std::string_view::npos) return err(t, "row number must be a decimal integer or bar:row"), false;
+    if (!p.bar)
+      return err(t, "'" + std::string(t.s) + "' is bar:row, but pattern '" + p.name +
+                        "' has no bars (declare 'pattern " + p.name + " BARSxROWS', e.g. 4x16)"),
+             false;
+    int b = 0, r = 0;
+    if (to_int(t.s.substr(0, colon), 1, p.rows / p.bar, b) && to_int(t.s.substr(colon + 1), 0, p.bar - 1, r))
+      return out = (b - 1) * p.bar + r, true;
+    return err(t, "'" + std::string(t.s) + "' is not a bar:row of pattern '" + p.name + "' (bars 1.." +
+                      std::to_string(p.rows / p.bar) + ", rows 0.." + std::to_string(p.bar - 1) + ")"),
+           false;
   }
+
+  // A pattern's length: `64` rows, or `4x16` bars of rows.
+  bool size(const Tok& t, Pattern& p) {
+    const size_t x = t.s.find('x');
+    int bars = 1;
+    const bool ok = x == std::string_view::npos
+                        ? to_int(t.s, 1, kTrkMaxPatternRows, p.rows)
+                        : to_int(t.s.substr(0, x), 1, kTrkMaxPatternRows, bars) &&
+                              to_int(t.s.substr(x + 1), 1, kTrkMaxPatternRows, p.bar);
+    if (p.bar) p.rows = bars * p.bar;
+    if (ok && p.rows <= kTrkMaxPatternRows) return true;
+    return err(t, "row count must be an integer in 1..1024, or BARSxROWS (4x16) of at most 1024 rows"), false;
+  }
+
 
   void flatten() {
     TrkSong& song = out_.song;

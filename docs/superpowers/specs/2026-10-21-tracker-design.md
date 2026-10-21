@@ -362,3 +362,12 @@ or naming a track the pattern does not cover, is an error. Lanes and row
 lines mix freely in one pattern: a lane fills cells a row line left empty and
 vice versa, and writing the same field of the same cell twice is an error.
 A lane is the drum-machine view of what is otherwise one sparse row per hit.
+
+### 8.6 Bars: `pattern <name> BARSxROWS`
+
+`pattern verse 4x16 bass harm` declares four bars of 16 rows (64 rows; the
+total is still at most 1024). In such a pattern a row label may be written
+`bar:row`, bar 1-based and row 0-based (`3:06` = row 38), and so may an
+`@R` overlay start whose step's first layer has bars (`fill@4:08`). Plain
+decimal rows keep working. `bar:row` against a pattern declared without bars
+is an error that says to declare `pattern <name> BARSxROWS`.

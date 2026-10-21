@@ -403,6 +403,34 @@ TEST_CASE("trk: lane diagnostics") {
   fails(h + "lane k x\n| C4\n", 5, 3, "already written by a lane");
 }
 
+TEST_CASE("trk: BARSxROWS patterns take bar:row labels and overlay starts") {
+  auto s = ok("track a cva\ntrack k note\n"
+              "pattern verse 4x16 a\n1:00 | 1\n2:4 | 2\n3:06 | 3\n40 | 4\n4:15 | 5\n"
+              "pattern fill 2 k\n| x\n"
+              "order verse+fill@4:08\n");
+  CHECK(s.length() == 64);
+  CHECK(at(s, 19, 0).cva == 1.0f);
+  CHECK(at(s, 20, 0).cva == 2.0f);   // 2:4 = 16 + 4
+  CHECK(at(s, 38, 0).cva == 3.0f);   // 3:06 = 32 + 6
+  CHECK(at(s, 40, 0).cva == 4.0f);   // plain numbers still work
+  CHECK(at(s, 63, 0).cva == 5.0f);
+  CHECK_FALSE(at(s, 55, 1).on);
+  CHECK(at(s, 56, 1).retrig);        // 4:08 = 48 + 8
+}
+
+TEST_CASE("trk: bar diagnostics") {
+  const std::string h = "track a cva\n";
+  fails(h + "pattern p 64\n2:00 | 1\n", 3, 1, "declare 'pattern p BARSxROWS'");
+  fails(h + "pattern p 4x16\n5:00 | 1\n", 3, 1, "not a bar:row of pattern 'p' (bars 1..4, rows 0..15)");
+  fails(h + "pattern p 4x16\n0:00 | 1\n", 3, 1, "bars 1..4");
+  fails(h + "pattern p 4x16\n1:16 | 1\n", 3, 1, "rows 0..15");
+  fails(h + "pattern p 4x16\n2:00 | 1\n1:15 | 1\n", 4, 1, "row labels must increase");
+  fails(h + "pattern p 4x16\n2x | 1\n", 3, 1, "decimal integer or bar:row");
+  fails(h + "pattern p 2x1000\n", 2, 11, "at most 1024 rows");
+  fails(h + "pattern p 4x\n", 2, 11, "BARSxROWS");
+  fails(h + "pattern p 64\npattern q 2\norder p+q@1:00\n", 4, 11, "declare 'pattern p BARSxROWS'");
+}
+
 TEST_CASE("trk: the longest song fits exactly") {
   auto s = ok("track a cva\npattern p 1024\norder p*64\n");
   CHECK(s.length() == 65536);

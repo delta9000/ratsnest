@@ -711,6 +711,9 @@ Composing (all resolved when the file loads; the ports never change):
   one row per character from row 0 (spaces ignored): `.` empty, `x` hit,
   `1`–`9` hit at vel n/9 (if the track has `vel`), `0` off. Lanes and row
   lines mix; writing the same cell twice is an error.
+- **Bars:** `pattern verse 4x16 bass harm` is four bars of 16 rows (64).
+  Its row labels, and `@R` overlays over it, may then be `bar:row`, bar
+  from 1 and row from 0: `3:06` is row 38. Plain numbers still work.
 
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
 before it gates are low). A re-articulated note drops its gate for the edge
