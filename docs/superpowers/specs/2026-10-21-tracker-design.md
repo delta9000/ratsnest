@@ -120,7 +120,9 @@ arrangement can be written one section per line with a comment. Entries:
 - `name` — play pattern `name` for its length.
 - `a+b+c` — play the patterns **together** (layers). The step lasts as long
   as the **first** pattern; each other layer loops within the step (its row
-  is `step_row mod its length`). Layers must cover disjoint tracks (`@` overlays excepted, §8.4). Tracks no
+  is `step_row mod its length`), so none may be longer than the first: a
+  longer one would lose its tail unheard, and is an error (list the longest
+  layer first). Layers must cover disjoint tracks (`@` overlays excepted, §8.4). Tracks no
   layer covers are empty for the step (their values and notes hold). This is
   how a four-bar chord pattern, a one-bar drum loop and a two-bar hook stack
   without being copied into every section.
@@ -147,6 +149,7 @@ Every error carries `file:line:col` and the session keeps the last good graph
 - `row 16 is outside pattern 'beat' (16 rows: 0..15)` / `row labels must increase`
 - `unknown pattern 'drop' in order` (with did-you-mean)
 - `layers 'beat' and 'kit' both write track 'kick'`
+- `layer 'mel' (128 rows) is longer than the step (64 rows, set by 'harm'); list the longest layer first`
 - `no order list: nothing would play`
 - `song is longer than 65536 rows`
 

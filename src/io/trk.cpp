@@ -534,7 +534,7 @@ class Parser {
       const int id = find_named(pats_, n.s);
       if (id < 0) return err(n, "unknown pattern '" + std::string(n.s) + "'" + unknown(n.s));
       Layer l{id, sp.shift, -1, sp.outer};
-      if (sp.at.col ? !overlay(e, sp, l) : !own(owner, n, id)) return;
+      if (sp.at.col ? !overlay(e, sp, l) : !(own(owner, n, id) && fits(e, n, id))) return;
       e.layers.push_back(l);
     }
   }
@@ -560,6 +560,17 @@ class Parser {
       o = id;
     }
     return true;
+  }
+
+  // A looping layer longer than the step would lose its tail unheard.
+  bool fits(const Entry& e, const Tok& n, int id) {
+    if (e.layers.empty()) return true;
+    const Pattern &first = pats_[static_cast<size_t>(e.layers[0].pat)], &p = pats_[static_cast<size_t>(id)];
+    if (p.rows <= first.rows) return true;
+    return err(n, "layer '" + p.name + "' (" + std::to_string(p.rows) + " rows) is longer than the step (" +
+                      std::to_string(first.rows) + " rows, set by '" + first.name +
+                      "'); list the longest layer first"),
+           false;
   }
 
   // `name@R`: plays once from row R of the step, over the layers before it.

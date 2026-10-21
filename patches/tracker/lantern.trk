@@ -24,6 +24,12 @@ pattern achords 16x16 pad pad4 bass
 13:00 | ~D3 Fs3 B3   | ~Cs4 2261 -2 | G1 .8    # Gmaj7#11
 15:00 | ~D3 E3 A3    | ~B3 165 0    | A1 .75   # Asus2add11
 
+pattern ahalf 8x16 pad pad4 bass    # A' plays the first half of achords
+1:00  | ~Fs3 A3 Cs4  | ~E4 2197 5   | D2 .8    # Dmaj9
+3:00  | ~Fs3 A3 Cs4  | ~D4 1165 2   | B1 .75   # Bm9
+5:00  | ~Fs3 A3 B3   | ~D4 2197 -2  | G1 .8    # Gmaj9
+7:00  | ~E3 A3 B3    | ~D4 165 0    | A1 .75   # Asus2add11
+
 pattern bchords 8x16 pad pad4 bass
 1:00 | ~Fs3 A3 B3    | ~D4 2197 -2  | D2 .9    # Gmaj9/D (pedal)
 3:00 | ~Fs3 G3 B3    | ~D4 1165 -5  | .        # Em9/D
@@ -93,6 +99,6 @@ pattern mel_out 8x16 mel
 
 section a      achords+mel_a
 section b      mel_b+bchords       # 256-row melody first: chords loop twice
-section aprime mel_out+achords     # 128-row melody first: first half of A only
+section aprime ahalf+mel_out
 
 order intro a b aprime end

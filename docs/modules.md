@@ -683,7 +683,9 @@ order |: verse+beat*3       # '|:' = loop point; without one the song ends
   written). Note names are uppercase.
   **Every value holds until changed.**
 - `order` entries: `name`, `a+b` (layers: the first sets the step length,
-  the others loop inside it, tracks must not overlap), `entry*N` repeats
+  the others loop inside it and may not be longer, which is an error rather
+  than a silent cut: list the longest layer first; tracks must not overlap),
+  `entry*N` repeats
   (`*N` binds to the whole layer group: `a+b*3` is `(a+b)` three times, and
   each repeat is its own `step`), and
   `|:` the loop point. Capped at 65536 rows.

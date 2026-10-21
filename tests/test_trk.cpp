@@ -155,6 +155,19 @@ TEST_CASE("trk: layers stack; the first sets the length, the rest loop") {
   CHECK(at(s, 4, 1).cva == 2.0f);
 }
 
+TEST_CASE("trk: a looping layer longer than the step is an error, not a cut") {
+  const std::string h = "track h note\ntrack m note\npattern harm 64 h\npattern mel 128 m\n";
+  ok(h + "order mel+harm\n");  // longest first: harm loops twice
+  fails(h + "order harm+mel\n", 5, 12,
+        "layer 'mel' (128 rows) is longer than the step (64 rows, set by 'harm'); "
+        "list the longest layer first");
+  // A section is checked where it is defined.
+  fails(h + "section v harm+mel\norder v\n", 5, 16, "layer 'mel' (128 rows)");
+  // Overlays keep their own rule: they may run past the step and are cut.
+  auto s = ok(h + "order harm+mel@60\n");
+  CHECK(s.length() == 64);
+}
+
 TEST_CASE("trk: order lines accumulate, repeat, and mark a loop point") {
   auto s = ok("track a cva\npattern a1 2\n| 1\npattern b2 3\n| 2\n"
               "order a1*2\norder |: b2 a1*3\n");
@@ -469,7 +482,7 @@ TEST_CASE("trk: section diagnostics") {
   fails(h + "section v p\norder q+v@2\n", 6, 10, "a section cannot be an '@' overlay");
   fails(h + "section v p+q\norder v+p\n", 6, 9, "both write track 'a'");
   fails(h + "pattern r 2 a\nsection v r+q@1\norder p+v\n", 7, 9, "only an '@' overlay may share");
-  fails(h + "pattern r 8 a\nsection v r+p@6\norder q+v\n", 7, 10, "past the step's end ('q' has 4 rows");
+  fails(h + "pattern r 2 a\nsection v r+p@6\norder q+v\n", 6, 15, "past the step's end ('r' has 2 rows");
 }
 
 TEST_CASE("trk: a trailing '>' ramps a value to the next one in its field") {
