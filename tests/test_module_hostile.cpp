@@ -12,7 +12,7 @@
 //   * Modules run with their default config, then once per enum config value
 //     (every wave, model, mode...). Modules with a `file` config (sampler,
 //     grains) are also swept with a short WAV loaded, since an empty buffer
-//     skips most of their state. `rec` is never given a file: its destructor
+//     skips most of their state; `tracker` is also swept with a song `text`. `rec` is never given a file: its destructor
 //     would write it. Numeric configs keep their defaults.
 //   * on_midi / on_audio_in payloads are not swept: `midi` decodes bytes into
 //     discrete state (no float arithmetic), and `extin` is a pure pass-through
@@ -71,6 +71,13 @@ std::string short_wav() {
   return path.string();
 }
 
+// A small song for the tracker: notes, slurs, offs, CVs, layers, a loop.
+const char* const kTrkFixture =
+    "track a note vel cva cvb\ntrack b note\n"
+    "pattern p 4 a\n| C4 .5 1 2\n| ~D4\n| off\n| x\n"
+    "pattern q 2 b\n| x\n| x\n"
+    "order p |: p+q*2\n";
+
 std::string fmt(float v) {
   char buf[32];
   std::snprintf(buf, sizeof buf, "%g", static_cast<double>(v));
@@ -125,6 +132,12 @@ TEST_CASE("every module recovers from hostile input") {
     if (info->config("file") != nullptr && std::string(info->type) != "rec") {
       base.emplace_back("file", ConfigValue{wav, 0.0, {}, false});
       sweep(*info, base, "[file]");
+    }
+    // The tracker's song arrives as `text` (the loader embeds the .trk).
+    if (info->config("text") != nullptr) {
+      Config song;
+      song.emplace_back("text", ConfigValue{kTrkFixture, 0.0, {}, false});
+      sweep(*info, song, "[text]");
     }
     // Each enum value selects a different code path (wave, model, mode...).
     for (const ConfigInfo& c : info->configs) {

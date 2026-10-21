@@ -38,6 +38,7 @@ extern const ModuleInfo logic_info;
 extern const ModuleInfo switch_info;
 extern const ModuleInfo turing_info;
 extern const ModuleInfo stepseq_info;
+extern const ModuleInfo tracker_info;
 extern const ModuleInfo tempo_info;
 extern const ModuleInfo alloc_info;
 extern const ModuleInfo midi_info;

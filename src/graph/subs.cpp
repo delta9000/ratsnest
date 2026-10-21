@@ -712,8 +712,9 @@ PatchBuild build_patch(std::string_view src, const std::string& patch_path, doub
   b.compiled.errors = std::move(p.errors);
   if (!b.compiled.ok()) return b;
   const std::filesystem::path parent = std::filesystem::path(patch_path).parent_path();
-  b.files = expand_subs(p.ast, parent.empty() ? "." : parent.string(), read_text_file,
-                        b.compiled.errors).files;
+  const std::string dir = parent.empty() ? "." : parent.string();
+  b.files = expand_subs(p.ast, dir, read_text_file, b.compiled.errors).files;
+  if (b.compiled.ok()) embed_tracker_files(p.ast, dir, read_text_file, b.files, b.compiled.errors);
   if (!b.compiled.ok()) return b;
   b.ast = std::move(p.ast);
   b.compiled = compile(b.ast, rate);

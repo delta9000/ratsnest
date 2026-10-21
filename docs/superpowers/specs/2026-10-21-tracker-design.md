@@ -14,15 +14,15 @@ A **`tracker` module** — not a GUI and not new patch syntax:
 
     song = tracker { file: "song.trk" }
     sixteenth -> song.clock
-    song.t1.voct -> lead.v_oct
-    song.t1.gate -> env.gate
+    song.voct1 -> lead.v_oct
+    song.gate1 -> env.gate
 
 The module reads a column-aligned, human-first text file of **tracks**,
 **named patterns** of rows, and an **order list** (the arrangement). Every
 rising `clock` edge plays one row; rows-per-beat is the clock's business, so
 the same file runs at sixteenths, eighths or one row per four-bar block. The
 outputs are ordinary audio-rate floats (rule 2): per track `voct`, `gate`,
-`vel`, `cv1`, `cv2`, plus song-position signals.
+`vel`, `cva`, `cvb`, plus song-position signals.
 
 The whole file is parsed and **flattened off the audio thread** into one
 precomputed array of resolved row states (rule 3); `process()` only counts
@@ -52,17 +52,17 @@ silently cut — see §2.4). Every directive and row is one line.
 
     track <name> <field>...
 
-Declares the next track (`t1`, then `t2`, ... up to `t8`, in file order) and
+Declares the next track (track 1, then 2, ... up to 8, in file order) and
 the **fields its cells hold, in the order they are written**. Fields:
-`note`, `vel`, `cv1`, `cv2`, each at most once. `<name>` is a lowercase
+`note`, `vel`, `cva`, `cvb`, each at most once. `<name>` is a lowercase
 identifier (`[a-z][a-z0-9_]*`) used by pattern headers and diagnostics; the
-port names stay positional (`t1.*`). All tracks are declared before the first
+port names stay positional (`voct1`, `gate1`, ...). All tracks are declared before the first
 pattern.
 
-    track kick  note           # t1: gate only
-    track lead  note vel       # t2
-    track harm  note cv1 cv2   # t3: root, third, fifth as note names
-    track mix   cv1 cv2        # t4: two levels, no notes
+    track kick  note           # 1: gate only
+    track lead  note vel       # 2
+    track harm  note cva cvb   # 3: root, third, fifth as note names
+    track mix   cva cvb        # 4: two levels, no notes
 
 Declaring only the fields a track uses keeps cells short: a drum cell is one
 token, a level lane is one number.
@@ -90,7 +90,7 @@ until the next directive:
 
 Field tokens:
 
-| token | in `note` | in `vel` / `cv1` / `cv2` |
+| token | in `note` | in `vel` / `cva` / `cvb` |
 |---|---|---|
 | `.` / `...` / `-` / `---` (any run of one of them) | empty: nothing changes | empty: the value holds |
 | `C4`, `Cs4`, `Bb3`, `A3v` | new note at that pitch (v/oct, A3 = 0) | that pitch as v/oct |
@@ -106,9 +106,9 @@ accepted but unnecessary. `vel` must lie in 0..1 (unipolar, spec §4); `cv`
 values are any finite number within ±1000000.
 
 **Every value is held until changed**, across rows, patterns and steps: a
-note sounds until `off` or the next note (tracker convention); `vel`, `cv1`
-and `cv2` hold their last written value. Before anything is written a track
-holds `voct` 0, `vel` 1, `cv1`/`cv2` 0, gate off.
+note sounds until `off` or the next note (tracker convention); `vel`, `cva`
+and `cvb` hold their last written value. Before anything is written a track
+holds `voct` 0, `vel` 1, `cva`/`cvb` 0, gate off.
 
 ### 2.3 The order list
 
@@ -127,8 +127,8 @@ arrangement can be written one section per line with a comment. Entries:
 - `entry*N` — repeat the entry `N` times (1..4096).
 - `|:` — the loop point (a musical repeat sign; at most one, not last). After
   the last step the song returns to the step following `|:`. Without it the
-  song plays once and stops. The idea is the restart position of the MOD
-  format and OpenMPT's "restart position".
+  song plays once and stops. The idea is the restart position trackers keep
+  with their order list (provenance: `docs/attribution.md`).
 
 The flattened song is capped at 65536 rows (34 minutes of sixteenths at
 128 BPM); a longer order list is an error.
@@ -154,9 +154,9 @@ Every error carries `file:line:col` and the session keeps the last good graph
 
 ```text
 # demo.trk -- 4/4 at a sixteenth clock: one row per sixteenth.
-track kick  note            # t1
-track bass  note vel        # t2
-track harm  note cv1 cv2    # t3: chord root, third, fifth
+track kick  note            # 1
+track bass  note vel        # 2
+track harm  note cva cvb    # 3: chord root, third, fifth
 
 pattern beat 16 kick        # one bar, looped under longer patterns
 00 | x
@@ -200,15 +200,17 @@ Inputs (all discrete: `glide: false`):
 | `reset` | 0 | rising edge: rewind; the next clock plays row 0 of step `start` |
 | `start` | 0 | order step (0-based, rounded, clamped) that `reset` rewinds to |
 
-Outputs: eight banks `t1.voct t1.gate t1.vel t1.cv1 t1.cv2` ... `t8.*`, then
+Outputs: five banks of eight, named like `alloc`/`midi` banks: `voct1..8`,
+`gate1..8`, `vel1..8`, `cva1..8`, `cvb1..8` (track n is `voctn`, `gaten`, ...), then
 `step` (0-based order step), `pattern` (index, in file order, of the step's
 first pattern), `row` (row within the step), `step_trig` (one-sample pulse
 when a step starts), `row_trig` (one-sample pulse on every row), `end`.
-A bare `song` reads `t1.voct`. Tracks the file does not declare output 0.
+A bare `song` reads `voct1`. Tracks the file does not declare output 0.
 
 The bank is fixed at eight tracks because outputs must be declared up front
 (like `alloc`/`midi` banks); eight tracks × five columns plus six song
-outputs is 46 ports. Patterns needing more voices use a second tracker.
+outputs is 46 ports. Port names cannot contain dots (an endpoint splits at
+its last dot), hence `voct1`, not `t1.voct`. Patterns needing more voices use a second tracker.
 
 ## 4. Timing semantics
 
@@ -243,7 +245,7 @@ gate independent of the clock's duty cycle (a one-sample `transport.clock`
 works). Cost: a re-articulated gate rises one sample (21 µs) after the edge;
 a note from silence rises on the edge itself.
 
-`vel`, `cv1`, `cv2` are stepped and held: slew them with `func` if a lane
+`vel`, `cva`, `cvb` are stepped and held: slew them with `func` if a lane
 should fade (the arrangement-lane idiom of patch-craft).
 
 ## 5. Loading, hot reload and state
@@ -280,7 +282,7 @@ should fade (the arrangement-lane idiom of patch-craft).
 - **No tempo, speed or groove.** Rows advance on the clock; swing lives in
   `transport`.
 - **No polyphony inside a track.** One note per track; a chord is three
-  fields (`note cv1 cv2`) or three tracks.
+  fields (`note cva cvb`) or three tracks.
 - **No sub-row timing** (note delay, cut). Clock faster for finer grids.
 - **No recording or editing from the engine.** The file is the source of
   truth; it is written by people (and diffed by git).

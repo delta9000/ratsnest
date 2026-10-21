@@ -19,6 +19,14 @@ struct SubExpansion {
 SubExpansion expand_subs(dsl::PatchAst& ast, const std::string& patch_dir,
                          const FileReader& read, Diags& errors);
 
+// Reads each `tracker`'s `file:` (resolved against the declaring file's
+// directory, like a sub), reports .trk errors as file:line:col, and embeds
+// the song as config `text`. Every path read is appended to `files` so the
+// watcher hot-reloads .trk edits. See graph/trackfile.cpp.
+void embed_tracker_files(dsl::PatchAst& ast, const std::string& patch_dir,
+                         const FileReader& read, std::vector<std::string>& files,
+                         Diags& errors);
+
 // Patch text to graph: parse, expand subpatches against the patch file's
 // directory, compile. `ast` keeps the expanded patch for a second compile;
 // `files` lists the subpatch files read. Errors are in compiled.errors.
