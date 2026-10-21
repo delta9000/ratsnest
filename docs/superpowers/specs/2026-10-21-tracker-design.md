@@ -340,3 +340,14 @@ dependent layer's own `^N` adds on top. Tracks resolve in declaration order
 on every row, which is why the source comes first. A token naming a field the
 source does not hold is an error. This is what lets one 16-row arp or bass
 riff loop under every chord of the song instead of being rewritten per chord.
+
+### 8.4 One-shot overlays: `name@R`
+
+In a layer group, a layer written `name@R` (with `^N` before or after) plays
+**once**, starting at row R of the step, instead of looping; rows past the
+step's end are cut. For its span its **non-empty** events replace those of
+earlier layers on the same tracks (an empty cell lets the groove show
+through), so `order verse+beat+fill@48` puts a fill over the groove's last
+bar and `chords+chop+hit@0` a drop hit, without full-length copies. Only
+overlays may share tracks with other layers; the first layer sets the step
+length and cannot be one; R past the step's last row is an error.

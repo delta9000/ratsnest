@@ -703,6 +703,10 @@ Composing (all resolved when the file loads; the ports never change):
   optional semitone offset and length: `| t1+12 .8`, `| ~t3-12:2`. They work
   in the note field (a note; `~t2` slurs) and in `cva`/`cvb`. One 16-row riff
   then loops under every chord: `order chords+arp`.
+- **Overlays:** in a layer group, `name@R` plays once from row R of the step
+  (not looping), and its non-empty events replace the earlier layers' on
+  the same tracks: `order verse+beat+fill@48`. Only overlays may share
+  tracks; the first layer cannot be one.
 
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
 before it gates are low). A re-articulated note drops its gate for the edge

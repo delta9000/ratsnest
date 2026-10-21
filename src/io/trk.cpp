@@ -49,8 +49,10 @@ struct Pattern {
   std::vector<Event> ev;  // row * tracks.size() + column
 };
 // A layer as written in the order list (`name^N`), then resolved.
-struct Spec { Tok name; int shift = 0; };
-struct Layer { int pat = 0; int shift = 0; };
+// `at` is the `@R` text (col 0: none).
+struct Spec { Tok name; int shift = 0; Tok at{{}, 0}; };
+// `at`: the step row a one-shot overlay starts on; -1 loops.
+struct Layer { int pat = 0; int shift = 0; int at = -1; };
 struct Entry { std::vector<Spec> specs; int repeat = 1; std::vector<Layer> layers; };
 // A track's state while flattening: the row so far and the song row its
 // sounding note's length runs out (-1: none).
@@ -237,7 +239,7 @@ class Parser {
     size_t i = 0;
     int r = next_row_;
     if (t[0].s != "|") {
-      if (!to_int(t[0].s, 0, 1 << 30, r)) return err(t[0], "row number must be a decimal integer");
+      if (!to_row(t[0], p, r)) return;
       if (r < next_row_) return err(t[0], "row labels must increase");
       if (t.size() < 2 || t[1].s != "|") return err(t[0], "expected '|' after the row number");
       i = 1;
@@ -373,11 +375,19 @@ class Parser {
   }
 
   // One layer: `name` with an optional `^N` transposition in semitones.
+  // One layer: `name` with an optional `^N` transposition in semitones and
+  // `@R` start row, in either order.
   Spec spec(const Tok& t) {
-    const size_t hat = std::min(t.s.find('^'), t.s.size());
-    Spec sp{{t.s.substr(0, hat), t.col}, 0};
-    if (hat < t.s.size() && !to_int(t.s.substr(hat + 1), -48, 48, sp.shift))
-      err(t.col + static_cast<int>(hat), "transpose must be '^N' with N in -48..48 semitones");
+    size_t cut = std::min(t.s.find_first_of("^@"), t.s.size());
+    Spec sp{{t.s.substr(0, cut), t.col}};
+    while (cut < t.s.size() && out_.errors.empty()) {
+      const size_t next = std::min(t.s.find_first_of("^@", cut + 1), t.s.size());
+      const Tok arg{t.s.substr(cut + 1, next - cut - 1), t.col + static_cast<int>(cut) + 1};
+      if (t.s[cut] == '@') sp.at = arg;
+      else if (!to_int(arg.s, -48, 48, sp.shift))
+        err(arg.col - 1, "transpose must be '^N' with N in -48..48 semitones");
+      cut = next;
+    }
     return sp;
   }
 
@@ -404,15 +414,42 @@ class Parser {
       const Tok& n = sp.name;
       const int id = find_named(pats_, n.s);
       if (id < 0) return err(n, "unknown pattern '" + std::string(n.s) + "' in order" + hint(pats_, n.s));
-      for (int tr : pats_[static_cast<size_t>(id)].tracks) {
-        int& o = owner[static_cast<size_t>(tr)];
-        if (o >= 0)
-          return err(n, "layers '" + pats_[static_cast<size_t>(o)].name + "' and '" + std::string(n.s) +
-                            "' both write track '" + tracks_[static_cast<size_t>(tr)].name + "'");
-        o = id;
-      }
-      e.layers.push_back({id, sp.shift});
+      Layer l{id, sp.shift, -1};
+      if (sp.at.col ? !overlay(e, sp, l) : !own(owner, n, id)) return;
+      e.layers.push_back(l);
     }
+  }
+
+  // Claims pattern `id`'s tracks for a looping layer.
+  bool own(std::vector<int>& owner, const Tok& n, int id) {
+    for (int tr : pats_[static_cast<size_t>(id)].tracks) {
+      int& o = owner[static_cast<size_t>(tr)];
+      if (o >= 0)
+        return err(n, "layers '" + pats_[static_cast<size_t>(o)].name + "' and '" + std::string(n.s) +
+                          "' both write track '" + tracks_[static_cast<size_t>(tr)].name +
+                          "' (only an '@' overlay may share tracks)"),
+               false;
+      o = id;
+    }
+    return true;
+  }
+
+  // `name@R`: plays once from row R of the step, over the layers before it.
+  bool overlay(const Entry& e, const Spec& sp, Layer& l) {
+    if (e.layers.empty())
+      return err(sp.at.col - 1, "the first layer sets the step length; put an '@' overlay after it"), false;
+    const Pattern& first = pats_[static_cast<size_t>(e.layers[0].pat)];
+    if (!to_row(sp.at, first, l.at)) return false;
+    if (l.at < first.rows) return true;
+    return err(sp.at, "overlay start " + std::to_string(l.at) + " is past the step's end ('" + first.name +
+                          "' has " + std::to_string(first.rows) + " rows: 0.." + std::to_string(first.rows - 1) + ")"),
+           false;
+  }
+
+  // A row position written in pattern `p`'s terms.
+  bool to_row(const Tok& t, const Pattern&, int& out) {
+    if (to_int(t.s, 0, 1 << 30, out)) return true;
+    return err(t, "row number must be a decimal integer"), false;
   }
 
   void flatten() {
@@ -455,11 +492,18 @@ class Parser {
   }
 
   // What layer `l` plays on step row `r`, per track.
+  // An overlay plays only within its span, and only its non-empty events.
   void cues(const Layer& l, int r, Cue* cue) const {
     const Pattern& p = pats_[static_cast<size_t>(l.pat)];
-    const size_t base = static_cast<size_t>(r % p.rows) * p.tracks.size();
-    for (size_t c = 0; c < p.tracks.size(); ++c) cue[p.tracks[c]] = {&p.ev[base + c], l.shift};
+    const int pr = l.at < 0 ? r % p.rows : r - l.at;
+    if (pr < 0 || pr >= p.rows) return;
+    const size_t base = static_cast<size_t>(pr) * p.tracks.size();
+    for (size_t c = 0; c < p.tracks.size(); ++c) {
+      const Event& ev = p.ev[base + c];
+      if (l.at < 0 || ev.kind != Kind::None || ev.set) cue[p.tracks[c]] = {&ev, l.shift};
+    }
   }
+
 
   // Track `tr` on song row `row`: a note whose length ran out ends, then
   // the row's event applies.

@@ -295,7 +295,8 @@ about −80 dB per block):
 - **Layer, don't copy.** `order chords+chop+hook+beat` stacks a four-bar
   chord pattern with one-bar and two-bar loops: the step lasts as long as
   the first pattern and the rest wrap inside it. Put the longest pattern
-  first. A one-shot (a drop hit) needs a full-length pattern, or it loops.
+  first. A one-shot (a drop hit, a fill) is an overlay, `hit@0` or
+  `fill@48`: it plays once and overrides the loop under it.
 - **The gate is the trigger.** Each note or `x` re-articulates with a
   one-sample gap, so `gateN` drives `func.trig`, `adsr.gate`, `lpg.strike`
   and `vco.sync` directly; no `stepseq.trig`, no `logic { op: and }` with a

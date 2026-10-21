@@ -327,6 +327,41 @@ TEST_CASE("trk: chord tone diagnostics") {
   fails(h + "track arp note vel from pad\npattern p 1 arp\n| t1 t2\n", 4, 6, "for vel");
 }
 
+TEST_CASE("trk: an @R overlay plays once over the groove") {
+  auto s = ok("track k note\ntrack h cva\n"
+              "pattern bar 8 h\n| 1\n"
+              "pattern groove 2 k\n| x\n| off\n"
+              "pattern fill 3 k h\n| x | 5\n| x\n"
+              "order bar+groove+fill@4^2 bar+fill^2@6\n");
+  // Rows 0..3: the groove alone.
+  CHECK(at(s, 2, 0).retrig);
+  CHECK_FALSE(at(s, 3, 0).on);
+  CHECK(at(s, 3, 1).cva == 1.0f);
+  // Row 4: fill row 0 replaces the groove's x and writes h.
+  CHECK(at(s, 4, 0).retrig);
+  CHECK(at(s, 4, 1).cva == 5.0f);
+  // Row 5: fill row 1 (x) overrides the groove's off.
+  CHECK(at(s, 5, 0).on);
+  CHECK(at(s, 5, 0).retrig);
+  // Row 6: fill row 2 is empty, so the groove's x shows through; row 7 is
+  // past the fill and the groove's off plays.
+  CHECK(at(s, 6, 0).retrig);
+  CHECK_FALSE(at(s, 7, 0).on);
+  // Step 2: the fill starts on row 6 and does not loop back to row 0.
+  CHECK_FALSE(at(s, 8, 0).on);
+  CHECK(at(s, 14, 0).retrig);
+  CHECK(at(s, 14, 1).cva == 5.0f);
+}
+
+TEST_CASE("trk: overlay diagnostics") {
+  const std::string h = "track a note\npattern p 4\npattern q 2\n";
+  fails(h + "order q@1+p\n", 4, 8, "the first layer sets the step length");
+  fails(h + "order p+q@4\n", 4, 11, "past the step's end ('p' has 4 rows: 0..3)");
+  fails(h + "order p+q@x\n", 4, 11, "decimal");
+  fails(h + "order p+q^x@1\n", 4, 10, "'^N'");
+  fails(h + "order p+q\n", 4, 9, "only an '@' overlay may share tracks");
+}
+
 TEST_CASE("trk: the longest song fits exactly") {
   auto s = ok("track a cva\npattern p 1024\norder p*64\n");
   CHECK(s.length() == 65536);
