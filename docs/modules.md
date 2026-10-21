@@ -833,7 +833,10 @@ shaped blend. Inputs `in` 0 (mono), `drive` 0.5 (pre-gain into the curve, up to
 ~2^14× on `rat`; ranges run hot so the sustain keeps grinding, not just the
 attack), `tone` 0.5 (sweeps the tone lowpass), `level` 0.5 (±2-octave
 makeup), `mix` 1 (dry/wet; lower it for the transparent "clean blend" of the
-`tubescreamer`/`klon` voicings — ~0.5). Output `out`. Config `model`:
+`tubescreamer`/`klon` voicings — ~0.5). Output `out`. All four controls clamp
+to `0..1` (a `drive: 2` reads as 1). They are read every 32 samples: `drive`
+then ramps per sample and `mix`/`level` are smoothed over 5 ms, but `tone`
+steps, so a fast audio-rate tone sweep is coarser than the other inputs. Config `model`:
 `tubescreamer` (default, mid-hump soft clip), `klon` (transparent, more
 headroom), `rat` (hard clip, huge gain, dark), `ds1` (mid-scooped), `mxr`
 (bright soft clip), `muff` (two cascaded stages — fuzz), `clean` (flat-voiced

@@ -101,7 +101,8 @@ class Overdrive final : public Module {
         voice_.two_stage ? make_lpf(voice_.inter_lp, os_rate) : make_bypass();
     tone_coeffs_ = make_lpf(voice_.tone_hi, rate_);
 
-    drive_gain_ = 1.0f;
+    drive_gain_ = -1.0f;  // sentinel: the first block snaps, no ramp from it
+    drive_step_ = 0.0f;
     mix_target_ = 1.0f;
     level_target_ = 1.0f;
     countdown_ = 0;
@@ -114,6 +115,9 @@ class Overdrive final : public Module {
     // Bounded far above any audio level so the ADAA antiderivative's x*x
     // cannot overflow to inf and poison the oversampler and filter states.
     const float in0 = sanitize_clamp(ins[0], -1e6f, 1e6f);
+    // Drive is read every kBlock samples but ramps per sample: a stepped
+    // pre-gain into the shaper zippers audibly under modulation.
+    drive_gain_ += drive_step_;
     const float x = in0 * drive_gain_;
     const float xf = Biquad::process(x, pre_coeffs_, pre_state_);
 
@@ -185,7 +189,9 @@ class Overdrive final : public Module {
     const float level = clamp_nan(ins[3], 0.0f, 1.0f);
     mix_target_ = clamp_nan(ins[4], 0.0f, 1.0f);
 
-    drive_gain_ = std::exp2(drive * voice_.drive_span);
+    const float drive_target = std::exp2(drive * voice_.drive_span);
+    if (drive_gain_ < 0.0f) drive_gain_ = drive_target;
+    drive_step_ = (drive_target - drive_gain_) * (1.0f / kBlock);
     level_target_ = std::exp2((level - 0.5f) * 4.0f);  // +/-2 octaves makeup
 
     const float lo = std::log2(voice_.tone_lo);
@@ -204,7 +210,8 @@ class Overdrive final : public Module {
   float dc_x1_ = 0.0f, dc_y1_ = 0.0f;
   OnePole post_, mix_, level_;
   float clean_z1_ = 0.0f;
-  float drive_gain_ = 1.0f;
+  float drive_gain_ = -1.0f;
+  float drive_step_ = 0.0f;
   float mix_target_ = 1.0f;
   float level_target_ = 1.0f;
   int countdown_ = 0;
