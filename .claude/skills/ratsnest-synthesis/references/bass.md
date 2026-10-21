@@ -191,8 +191,10 @@ set it to the darkest note you want and scale the env cable up from there.
 130 Hz base + 900 env is an acid squelch; 180 + 260 is dub; 240 + 0 is a
 reese that only moves when the notch does.
 
-Second knob: `res`. Above ~0.9 on `ladder` the resonance eats the
-fundamental — compensate with the sine sub layer, not with more gain.
+Second knob: `res`. `ladder` compensates part of its bass loss (about −7 dB
+at 0.5, −4.5 dB at 0.9), but the resonant peak still dominates above ~0.85,
+and past ~0.93 the filter whistles at the cutoff on its own — back off, or
+lean on the sine sub layer, not more gain.
 
 ## Modulating it
 

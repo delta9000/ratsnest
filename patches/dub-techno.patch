@@ -52,7 +52,7 @@ filter_wander -> stab_filter.cutoff : 95
 filter_breath -> stab_filter.res : 0.08
 
 warm = drive { amount: 0.28, mode: soft }
-stab_filter -> warm.in
+stab_filter -> warm.in : 0.78           # -2.2 dB: ladder now compensates part of its res loss
 
 # ---- dub space ----
 # 369 ms is a dotted eighth at 122 BPM; 738 ms is three eighth notes.
