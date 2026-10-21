@@ -328,7 +328,7 @@ metal_pattern.trig -> metal_env.trig
 metal_noise = noise { color: white, seed: 31 }
 metal_tone = vco { freq: 1174.66hz, wave: pulse, pw: 0.5 }
 metal_note -> metal_tone.v_oct
-metal_ring = math { op: mult }
+metal_ring = math { op: mult, b: 1 }
 metal_noise -> metal_ring.a : 0.65
 metal_tone -> metal_ring.b : 0.5
 metal_filter = svf { cutoff: 2900, res: 0.74 }
