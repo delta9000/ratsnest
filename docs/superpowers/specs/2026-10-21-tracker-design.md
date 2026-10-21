@@ -298,3 +298,20 @@ position continuity, empty/garbage text, the registry-wide hostile sweep
 a `.trk` error reports `file:line:col` through `build_patch`; the `.trk` is
 listed among the watched files. Musical: `patches/mainstage-trk.patch` ports
 `mainstage.patch` and renders with matching section boundaries and levels.
+
+## 8. Composing
+
+Three composers wrote songs with the first version; they needed 430–600 lines
+for 13–105 musical ideas, because the format could not say "this riff over the
+current chord", "this section up a whole step", "notes last one row" or "a
+fill over the groove". These additions all resolve while the file is parsed
+and flattened (non-RT); the flattened `TrkRow` array, the module and its ports
+are unchanged.
+
+### 8.1 Transposition: `name^N`
+
+Any layer of an order entry may carry `^N`, N in −48..48 semitones:
+`order verse verse^5`, `bass^-2+beat`, `a^2+b+c^2`. It adds N/12 v/oct to
+every note the layer writes (note-name or numeric) and to `cva`/`cvb` values
+**written as note names**; the parser records per value whether it was a
+pitch, so numeric levels are never shifted. `x` keeps the held pitch.

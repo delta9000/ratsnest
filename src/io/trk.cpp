@@ -23,15 +23,23 @@ enum class Kind : std::uint8_t { None, Note, Slur, Off, Hit };
 struct Tok { std::string_view s; int col; };
 struct Track { std::string name; std::vector<int> fields; };
 // One cell as written: a note event plus the value fields it sets (bit f of
-// `set` for v[f]).
-struct Event { Kind kind = Kind::None; std::uint8_t set = 0; float v[4] = {}; };
+// `set` for v[f]); bit f of `pitch` marks a cv value written as a note name,
+// which an order-list `^N` transposes along with the note.
+struct Event {
+  Kind kind = Kind::None;
+  std::uint8_t set = 0, pitch = 0;
+  float v[4] = {};
+};
 struct Pattern {
   std::string name;
   int rows = 0;
   std::vector<int> tracks;
   std::vector<Event> ev;  // row * tracks.size() + column
 };
-struct Entry { std::vector<Tok> names; int repeat = 1; std::vector<int> layers; };
+// A layer as written in the order list (`name^N`), then resolved.
+struct Spec { Tok name; int shift = 0; };
+struct Layer { int pat = 0; int shift = 0; };
+struct Entry { std::vector<Spec> specs; int repeat = 1; std::vector<Layer> layers; };
 
 bool is_name(std::string_view s) {
   constexpr std::string_view kLower = "abcdefghijklmnopqrstuvwxyz";
@@ -254,6 +262,7 @@ class Parser {
       return err(t, "vel must be a number in 0..1 (a cell's values follow the track's field order)");
     e.v[f] = v;
     e.set = static_cast<std::uint8_t>(e.set | (1u << f));
+    if (std::isupper(static_cast<unsigned char>(t.s[0]))) e.pitch = static_cast<std::uint8_t>(e.pitch | (1u << f));
   }
 
   // order <entry>...  with entry = name[+name...][*N], or the loop mark '|:'.
@@ -279,13 +288,22 @@ class Parser {
       s = s.substr(0, star);
     }
     size_t at = 0;
-    while (at <= s.size()) {
+    while (at <= s.size() && out_.errors.empty()) {
       const size_t plus = std::min(s.find('+', at), s.size());
-      e.names.push_back({s.substr(at, plus - at), t.col + static_cast<int>(at)});
+      e.specs.push_back(spec({s.substr(at, plus - at), t.col + static_cast<int>(at)}));
       at = plus + 1;
     }
     entries_.push_back(std::move(e));
     entry_lines_.push_back(line_);
+  }
+
+  // One layer: `name` with an optional `^N` transposition in semitones.
+  Spec spec(const Tok& t) {
+    const size_t hat = std::min(t.s.find('^'), t.s.size());
+    Spec sp{{t.s.substr(0, hat), t.col}, 0};
+    if (hat < t.s.size() && !to_int(t.s.substr(hat + 1), -48, 48, sp.shift))
+      err(t.col + static_cast<int>(hat), "transpose must be '^N' with N in -48..48 semitones");
+    return sp;
   }
 
   // Resolve the order list, then flatten it into song rows.
@@ -307,7 +325,8 @@ class Parser {
 
   void resolve(Entry& e) {
     std::vector<int> owner(tracks_.size(), -1);
-    for (const Tok& n : e.names) {
+    for (const Spec& sp : e.specs) {
+      const Tok& n = sp.name;
       const int id = find_named(pats_, n.s);
       if (id < 0) return err(n, "unknown pattern '" + std::string(n.s) + "' in order" + hint(pats_, n.s));
       for (int tr : pats_[static_cast<size_t>(id)].tracks) {
@@ -317,7 +336,7 @@ class Parser {
                             "' both write track '" + tracks_[static_cast<size_t>(tr)].name + "'");
         o = id;
       }
-      e.layers.push_back(id);
+      e.layers.push_back({id, sp.shift});
     }
   }
 
@@ -330,11 +349,11 @@ class Parser {
       const Entry& e = entries_[i];
       for (int k = 0; k < e.repeat; ++k) {
         song.step_start.push_back(static_cast<int>(total));
-        song.step_pattern.push_back(e.layers[0]);
-        total += pats_[static_cast<size_t>(e.layers[0])].rows;
+        song.step_pattern.push_back(e.layers[0].pat);
+        total += pats_[static_cast<size_t>(e.layers[0].pat)].rows;
         if (total > kTrkMaxRows) {
           line_ = entry_lines_[i];
-          return err(e.names[0].col, "song is longer than 65536 rows");
+          return err(e.specs[0].name.col, "song is longer than 65536 rows");
         }
       }
     }
@@ -348,27 +367,29 @@ class Parser {
 
   // Writes one step's rows from `at`; returns the next write position.
   size_t play(const Entry& e, TrkRow* state, size_t at) {
-    const int len = pats_[static_cast<size_t>(e.layers[0])].rows;
+    const int len = pats_[static_cast<size_t>(e.layers[0].pat)].rows;
     for (int r = 0; r < len; ++r) {
       for (size_t tr = 0; tr < tracks_.size(); ++tr) state[tr].retrig = false;
-      for (int id : e.layers) {
-        const Pattern& p = pats_[static_cast<size_t>(id)];
+      for (const Layer& l : e.layers) {
+        const Pattern& p = pats_[static_cast<size_t>(l.pat)];
         const size_t base = static_cast<size_t>(r % p.rows) * p.tracks.size();
         for (size_t c = 0; c < p.tracks.size(); ++c)
-          apply(p.ev[base + c], state[p.tracks[c]]);
+          apply(p.ev[base + c], static_cast<float>(l.shift) / 12.0f, state[p.tracks[c]]);
       }
       for (size_t tr = 0; tr < tracks_.size(); ++tr) out_.song.rows[at++] = state[tr];
     }
     return at;
   }
 
-  static void apply(const Event& e, TrkRow& s) {
-    if (e.kind == Kind::Note || e.kind == Kind::Slur) s.voct = e.v[kNote];
+  // `up` (v/oct) shifts the note and the cv values written as note names.
+  static void apply(const Event& e, float up, TrkRow& s) {
+    const auto val = [&](int f) { return e.v[f] + ((e.pitch >> f) & 1u ? up : 0.0f); };
+    if (e.kind == Kind::Note || e.kind == Kind::Slur) s.voct = e.v[kNote] + up;
     if (e.kind == Kind::Note || e.kind == Kind::Hit) s.retrig = true;
     if (e.kind != Kind::None) s.on = e.kind != Kind::Off;
     if (e.set & (1u << kVel)) s.vel = e.v[kVel];
-    if (e.set & (1u << kCva)) s.cva = e.v[kCva];
-    if (e.set & (1u << kCvb)) s.cvb = e.v[kCvb];
+    if (e.set & (1u << kCva)) s.cva = val(kCva);
+    if (e.set & (1u << kCvb)) s.cvb = val(kCvb);
   }
 
   static std::string field_list(const Track& t) {

@@ -223,6 +223,23 @@ TEST_CASE("trk: diagnostics carry line and column") {
   fails(h + "pattern p 1024\norder p*65\n", 3, 7, "longer than 65536 rows");
 }
 
+TEST_CASE("trk: ^N in the order list transposes notes and note-name cvs") {
+  auto s = ok("track a note cva cvb\ntrack b note\n"
+              "pattern p 2 a\n| C4 E4 .5\n| 0\npattern q 1 b\n| A3\n"
+              "order p^5 p^-2+q^12 p\n");
+  CHECK(at(s, 0, 0).voct == doctest::Approx(8.0f / 12));   // C4 + 5
+  CHECK(at(s, 0, 0).cva == doctest::Approx(12.0f / 12));   // E4 + 5: a pitch
+  CHECK(at(s, 0, 0).cvb == doctest::Approx(0.5f));         // a level: untouched
+  CHECK(at(s, 1, 0).voct == doctest::Approx(5.0f / 12));   // a numeric note moves too
+  CHECK(at(s, 2, 0).voct == doctest::Approx(1.0f / 12));   // C4 - 2
+  CHECK(at(s, 2, 0).cva == doctest::Approx(5.0f / 12));
+  CHECK(at(s, 2, 1).voct == doctest::Approx(1.0f));        // q^12, layer-local
+  CHECK(at(s, 4, 0).voct == doctest::Approx(0.25f));       // untransposed again
+  fails("track a note\npattern p 1\norder p^49\n", 3, 8, "'^N' with N in -48..48");
+  fails("track a note\npattern p 1\norder p^x*2\n", 3, 8, "'^N'");
+  fails("track a note\npattern p 1\norder q^2\n", 3, 7, "unknown pattern 'q'");
+}
+
 TEST_CASE("trk: the longest song fits exactly") {
   auto s = ok("track a cva\npattern p 1024\norder p*64\n");
   CHECK(s.length() == 65536);

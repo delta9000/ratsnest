@@ -688,6 +688,12 @@ order |: verse+beat*3       # '|:' = loop point; without one the song ends
   each repeat is its own `step`), and
   `|:` the loop point. Capped at 65536 rows.
 
+Composing (all resolved when the file loads; the ports never change):
+
+- **Transpose** a layer in the order list: `order verse verse^5 bass^-2+beat`
+  (semitones, ±48). It moves the note field and any `cva`/`cvb` value written
+  as a note name; numeric levels stay put.
+
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
 before it gates are low). A re-articulated note drops its gate for the edge
 sample only, so gates work with any clock duty, one-sample pulses included;
