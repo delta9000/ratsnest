@@ -35,10 +35,10 @@ kclick = func { rise: 0.0002, fall: 0.0015 }
 quarter -> kclick.trig
 kbody = svf { cutoff: 48hz, res: 0.99 }
 kclick -> kbody.in : 1.6
-kpitch = func { rise: 0.0004, fall: 0.045, curve: exp }
+kpitch = func { rise: 0.0004, fall: 0.14, curve: exp }
 quarter -> kpitch.trig
 kpitch -> kbody.cutoff : 130
-kdecay = func { rise: 0.002, fall: 0.22, curve: exp }
+kdecay = func { rise: 0.002, fall: 0.66, curve: exp }
 quarter -> kdecay.trig
 kamp = vca { gain: 0 }
 kbody.lp -> kamp.in
@@ -52,7 +52,7 @@ quarter -> spat.clock
 snz = noise { color: white, seed: 5 }
 sbp = svf { cutoff: 1.9khz, res: 0.3 }
 snz -> sbp.in
-senv = func { rise: 0.0004, fall: 0.11, curve: exp }
+senv = func { rise: 0.0004, fall: 0.33, curve: exp }
 spat.trig -> senv.trig
 sbody = svf { cutoff: 185hz, res: 0.93 }
 sclick = func { rise: 0.0002, fall: 0.002 }
@@ -83,7 +83,7 @@ hstack2 = svf { cutoff: 7khz, res: 0.05 }
 hstack.hp -> hstack2.in
 hpat = euclid { steps: 8, hits: 5, rot: 2 }
 eighth -> hpat.clock
-henv = func { rise: 0.0002, fall: 0.05, curve: exp }
+henv = func { rise: 0.0002, fall: 0.15, curve: exp }
 hpat.trig -> henv.trig
 hamp = vca { gain: 0 }
 hstack2.hp -> hamp.in
@@ -109,11 +109,11 @@ difference tone that reads as a wood block, which is the exact bug
 env than the pitch env by an order of magnitude; that ratio *is* the 808.
 
 ```text
-k8_p = func { rise: 0.0005, fall: 0.03, curve: exp }
+k8_p = func { rise: 0.0005, fall: 0.09, curve: exp }
 clk -> k8_p.trig
 k8_osc = vco { wave: sine, freq: 48hz }
 k8_p -> k8_osc.v_oct : 2.2
-k8_env = func { rise: 0.002, fall: 0.65, curve: exp }
+k8_env = func { rise: 0.002, fall: 1.95, curve: exp }
 clk -> k8_env.trig
 k8_amp = vca { gain: 0 }
 k8_osc -> k8_amp.in
@@ -127,9 +127,9 @@ k8_amp -> k8.in
 click layer sits on top. The click is what makes it cut on a laptop.
 
 ```text
-k9_p = func { rise: 0.0003, fall: 0.012, curve: exp }
-k9_p -> k9_osc.v_oct : 3.4              # vs 808's 2.2 over 30 ms
-k9_env = func { rise: 0.001, fall: 0.19, curve: exp }
+k9_p = func { rise: 0.0003, fall: 0.036, curve: exp }
+k9_p -> k9_osc.v_oct : 3.4              # vs 808's 2.2 over 90 ms
+k9_env = func { rise: 0.001, fall: 0.57, curve: exp }
 k9_n = noise { color: white, seed: 9 }
 k9_hp = svf { cutoff: 2.2khz, res: 0.2 }
 k9_n -> k9_hp.in
@@ -154,7 +154,7 @@ cb_b = vco { wave: pulse, freq: 540hz }
 cb_bp = svf { cutoff: 2.64khz, res: 0.45 }
 cb_a -> cb_bp.in : 0.5
 cb_b -> cb_bp.in : 0.5
-cb_env = func { rise: 0.0005, fall: 0.36, curve: exp }
+cb_env = func { rise: 0.0005, fall: 1.08, curve: exp }
 eig -> cb_env.trig
 cb = vca { gain: 0 }
 cb_bp.bp -> cb.in
@@ -176,7 +176,7 @@ cl_b = func { rise: 0.0002, fall: 0.006 }
 cl_pre -> cl_b.trig
 cl_d1 -> cl_b.trig
 cl_d2 -> cl_b.trig
-cl_t = func { rise: 0.001, fall: 0.14, curve: exp }
+cl_t = func { rise: 0.001, fall: 0.42, curve: exp }
 cl_d2 -> cl_t.trig
 ```
 
@@ -202,14 +202,16 @@ pitch, gentler bend. `ladder` at `res: 0.96` rings longer and darker than
 ```text
 tm = ladder { cutoff: 150hz, res: 0.96, drive: 0.4 }
 tm_click -> tm.in : 3
-tm_p -> tm.cutoff : 220             # func { fall: 0.09, curve: exp }
+tm_p -> tm.cutoff : 220             # func { fall: 0.27, curve: exp }
 ```
 
 ## The knob that matters
 
 **The ratio of pitch-envelope fall to amp-envelope fall.** Everything else is
-taste. 30 ms pitch into 650 ms amp is an 808; 12 ms into 190 ms is a 909; 6 ms
-into 95 ms is `lib/kick.sub`'s click-and-thud. Equal falls give you a tom.
+taste. With `curve: exp` (stage time = the −60 dB time; the sweep is mostly
+over by a third of it), 90 ms pitch into 1.95 s amp is an 808 and 36 ms into
+570 ms is a 909; `lib/kick.sub`'s linear 6 ms into 95 ms is its
+click-and-thud. Equal falls give you a tom.
 Longer pitch than amp gives you a laser.
 
 For pinged filters the second knob is resonance: below ~0.9 there is no

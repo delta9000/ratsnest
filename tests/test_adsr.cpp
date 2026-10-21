@@ -1,5 +1,8 @@
 #include <doctest/doctest.h>
 #include <algorithm>
+#include <cmath>
+#include <limits>
+#include <vector>
 #include <string>
 #include "dsp/modules.h"
 
@@ -93,22 +96,84 @@ TEST_CASE("curves shape the attack without changing its duration") {
   AdsrRig linear("lin");
   AdsrRig exponential("exp");
   AdsrRig logarithmic("log");
-  float lin_mid = 0.0f, exp_mid = 0.0f, log_mid = 0.0f;
+  AdsrRig quadratic("quad");
+  float lin_mid = 0.0f, exp_mid = 0.0f, log_mid = 0.0f, quad_mid = 0.0f;
   for (int i = 0; i < 5; ++i) {
     lin_mid = linear.tick(1.0f);
     exp_mid = exponential.tick(1.0f);
     log_mid = logarithmic.tick(1.0f);
+    quad_mid = quadratic.tick(1.0f);
   }
-  CHECK(exp_mid < lin_mid);
+  CHECK(exp_mid > lin_mid);  // convex RC charge
+  CHECK(exp_mid == doctest::Approx(1.5 * (1.0 - std::pow(3.0, -0.5))).epsilon(1e-4));
   CHECK(log_mid > lin_mid);
+  CHECK(quad_mid == doctest::Approx(0.25f));
   for (int i = 5; i < 10; ++i) {
     lin_mid = linear.tick(1.0f);
     exp_mid = exponential.tick(1.0f);
     log_mid = logarithmic.tick(1.0f);
+    quad_mid = quadratic.tick(1.0f);
   }
   CHECK(lin_mid == doctest::Approx(1.0f));
-  CHECK(exp_mid == doctest::Approx(1.0f));
+  CHECK(exp_mid == 1.0f);  // exact arrival, not asymptotic
   CHECK(log_mid == doctest::Approx(1.0f));
+  CHECK(quad_mid == doctest::Approx(1.0f));
+}
+
+namespace {
+// Decay from 1 to sustain 0 over 1 s at 1 kHz; returns the level after n
+// decay samples.
+std::vector<float> decay_trace(const char* curve) {
+  AdsrRig env(curve);
+  env.ins[1] = 0.0f;  // one-sample attack
+  env.ins[2] = 1.0f;
+  env.ins[3] = 0.0f;
+  (void)env.tick(1.0f);  // attack lands on 1
+  std::vector<float> trace;
+  for (int i = 0; i < 1001; ++i) trace.push_back(env.tick(1.0f));
+  return trace;
+}
+}  // namespace
+
+TEST_CASE("exp decays like an RC: -30 dB at half the stage, exact arrival") {
+  const auto e = decay_trace("exp");
+  // (e^(-ln1000/2) - 0.001) / 0.999 = 0.0307: a natural T60 decay.
+  CHECK(e[499] == doctest::Approx(0.0307).epsilon(0.01));
+  for (std::size_t i = 1; i < e.size(); ++i) CHECK(e[i] <= e[i - 1]);
+  CHECK(e[998] > 0.0f);  // still approaching, not yet snapped
+  CHECK(e[999] == 0.0f);  // on target exactly at the stage time
+  const auto q = decay_trace("quad");
+  CHECK(q[499] == doctest::Approx(0.75f).epsilon(0.01));  // the old hang
+  CHECK(q[999] == 0.0f);
+}
+
+TEST_CASE("exp segments survive zero, huge and non-finite times") {
+  for (float t : {0.0f, 1e30f, std::numeric_limits<float>::infinity(),
+                  std::numeric_limits<float>::quiet_NaN()}) {
+    AdsrRig env("exp");
+    env.ins[1] = env.ins[2] = env.ins[4] = t;
+    for (int i = 0; i < 50; ++i) {
+      const float o = env.tick(i < 25 ? 1.0f : 0.0f);
+      CHECK(std::isfinite(o));
+      CHECK(o >= 0.0f);
+      CHECK(o <= 1.0f);
+    }
+  }
+}
+
+TEST_CASE("exp retrigger and release mid-stage continue from the current level") {
+  AdsrRig env("exp");
+  env.ins[2] = 1.0f;  // slow decay, sustain 0.5
+  for (int i = 0; i < 40; ++i) (void)env.tick(1.0f);  // mid-decay
+  const float before = env.tick(1.0f);
+  const float released = env.tick(0.0f);
+  CHECK(released < before);
+  CHECK(before - released < 0.15f);  // one release step, no jump
+  for (int i = 0; i < 3; ++i) (void)env.tick(0.0f);
+  const float low = env.tick(0.0f);
+  const float retrig = env.tick(1.0f);
+  CHECK(retrig >= low);
+  CHECK(retrig - low < 0.1f);  // first attack step from where it was
 }
 
 TEST_CASE("idle envelope stays at zero and output range is unipolar") {

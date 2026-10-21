@@ -107,7 +107,7 @@ root  -> arp.in8
 
 bosc  = vco { wave: saw, freq: 220hz }   # 220 base: `arp` carries `…v` note
 arp -> bosc.v_oct                        # names, so 55 would put A1 at 14 Hz
-benv  = func { rise: 0.003, fall: 0.1, curve: exp }
+benv  = func { rise: 0.003, fall: 0.3, curve: exp }
 master -> benv.trig
 bfilt = ladder { cutoff: 320, res: 0.2 }
 bosc -> bfilt.in

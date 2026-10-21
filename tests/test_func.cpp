@@ -71,7 +71,7 @@ TEST_CASE("function curves shape progress without changing timing") {
     exponential.tick(exp);
     logarithmic.tick(log);
   }
-  CHECK(exp[0] < lin[0]);
+  CHECK(exp[0] > lin[0]);  // convex RC rise
   CHECK(log[0] > lin[0]);
   for (int i = 5; i < 10; ++i) {
     linear.tick(lin);
@@ -126,4 +126,26 @@ TEST_CASE("idle function generator slews its input") {
   func.ins[1] = 0.0f;
   for (int i = 0; i < 10; ++i) func.tick(out);
   CHECK(out[0] == doctest::Approx(0.5f));
+}
+
+TEST_CASE("func exp fall is an RC decay that lands on zero; quad keeps x^2") {
+  FuncRig exponential("exp");
+  FuncRig quadratic("quad");
+  exponential.ins[2] = quadratic.ins[2] = 0.0f;  // instant rise
+  exponential.ins[3] = quadratic.ins[3] = 1.0f;  // 1000-sample fall
+  float e[3], q[3];
+  exponential.trigger(e);
+  quadratic.trigger(q);
+  float prev = 1.0f;
+  for (int i = 0; i < 500; ++i) {
+    exponential.tick(e);
+    quadratic.tick(q);
+    CHECK(e[0] <= prev);
+    prev = e[0];
+  }
+  CHECK(e[0] == doctest::Approx(0.0307).epsilon(0.01));
+  CHECK(q[0] == doctest::Approx(0.75).epsilon(0.01));
+  for (int i = 500; i < 1000; ++i) exponential.tick(e);
+  CHECK(e[0] == 0.0f);
+  CHECK(e[2] == 1.0f);  // end of cycle on time
 }

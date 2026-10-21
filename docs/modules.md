@@ -303,7 +303,7 @@ and input edge counts as step zero.
 `func { rise: 0.01, fall: 0.1, curve: lin, cycle: off }` — inputs rising-edge
 `trig`, slew `in`, rise/fall seconds; outputs unipolar `out` and two
 one-sample pulses: `eor` when the rise reaches 1, `eoc` when the fall reaches 0.
-Curves (as in `adsr`): `lin`, `exp`, `log`; cycle: `off`/`on`. A trigger
+Curves (as in `adsr`): `lin`, `exp`, `log`, `quad`; cycle: `off`/`on`. A trigger
 mid-cycle rises again from the current level. With nothing
 patched to `trig`, `out` slews toward `in` at the rise/fall rates — this is
 the intended way to smooth stepped CV (section fades, portamento).
@@ -506,11 +506,19 @@ Inputs `gate`, `attack` .005 s, `decay` .15 s, `sustain` .7 (`0..1`, live),
 rather than jumping. Segment times are durations, whatever the start level; 0
 is a one-sample jump.
 
-Config `curve` bends every segment by progress `x` through it: `lin` is
-linear, `exp` is `x²` (slow start: a soft attack, but decays and releases that
-hang near the top, then drop — measured 0.75 at half the decay time), `log` is
-`√x` (fast start: the snappy, percussive fall; 0.29 at half the decay). None
-is a true RC exponential; for plucks and drums use `log`.
+Config `curve` bends every segment by progress `x` through it, always
+arriving on its target exactly at the segment time: `lin` is linear; `exp` is
+a true RC exponential, normalized to land on time — decays and releases run
+`(1 − e^(−kx)) / (1 − e^(−k))` with `k = ln 1000`, so the stage time is the
+−60 dB time (T60): 0.03 of the way left at half the decay (−30 dB), the
+natural percussive/plucked fall. Attacks use `k = ln 3`, the analog shape
+that charges toward 1.5 and stops at 1 (convex: 0.63 at half the attack).
+`log` is `√x` (0.29 left at half the decay); `quad` is `x²` (slow start: a
+soft swelling attack, but decays and releases that hang near the top, then
+drop — 0.75 at half the decay time; this was `exp` before it became a true
+exponential). An `exp` decay reaches −20 dB at a third of the stage, `quad`
+at 95%: write about 3x the time for the same heard length
+(`docs/patch-craft.md` has the conversion and level makeup).
 
 ## `reverb`
 
@@ -1041,8 +1049,9 @@ before its level, so `fb` means the same timbre on any op whatever its
 1/n spectrum, 0.8 the brightest clean saw (inharmonic floor below −40 dB), and
 only past ~0.9 does it turn to noise), `vel_sens` (0..1; op level ×=
 (1−sens)+sens·vel), `t1..t4` segment seconds (0 = one-sample jump),
-`l1..l3` segment levels, `curve` (`lin`/`exp`/`log`, default `lin` — `log`
-is the natural percussive fall), `sync` (`on`/`off`, default `on`: a gate
+`l1..l3` segment levels, `curve` (`lin`/`exp`/`log`/`quad`, default `lin`,
+as in `adsr`; rising segments take the attack shape — `exp` or `log` is the
+natural percussive fall), `sync` (`on`/`off`, default `on`: a gate
 rise resets every operator phase only when each carrier's envelope × level
 is below −60 dB, so notes from silence start identically while a retrigger
 of a still-ringing voice carries its phases on rather than stepping — a

@@ -18,11 +18,11 @@ trig -> body.strike
 acc -> body.brightness : 0.3
 
 # Crack: clamp the ring into a tight percussive envelope.
-cenv = func { rise: 0.0002, fall: 0.06, curve: exp }
+cenv = func { rise: 0.0002, fall: 0.18, curve: exp }
 trig -> cenv.trig
 camp = vca { gain: 0 }
 body -> camp.in
-cenv -> camp.cv
+cenv -> camp.cv : 1.2
 
 lvl = vca { gain: 0.5 }
 camp -> lvl.in

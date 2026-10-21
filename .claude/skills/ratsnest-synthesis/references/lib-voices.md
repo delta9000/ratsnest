@@ -71,23 +71,23 @@ Each sub instantiated alone, `main -> out.in` at unity, 120 BPM triggers,
 
 | Sub | peak | RMS | Note |
 |---|---|---|---|
-| `bass.sub` | **0.0** | −6.4 | **clips at unity.** Stage at 0.4–0.5. Also carries −0.006 DC — block it |
+| `bass.sub` | **+3.5** | −8.5 | **clips at unity.** Stage at 0.4–0.5. Also carries −0.006 DC — block it |
 | `kick.sub` | −0.6 | −17.9 | the peak anchor; ~0.85 on its channel is the house setting |
 | `mallet.sub` | −0.3 | −13.4 | the worked example in `writing-subs.md`; `aux` gives you its envelope |
 | `kit/kick.sub` | −3.7 | −21.5 | quieter than `kick.sub`; needs ~+3 dB to swap in |
 | `kit/tom.sub` | −3.7 | −19.8 | |
-| `kit/hat.sub` | −3.7 | −26.0 | |
+| `kit/hat.sub` | −3.8 | −27.1 | |
 | `hat.sub` | −3.5 | −27.7 | |
-| `kit/clap.sub` | −3.1 | −27.7 | |
+| `kit/clap.sub` | −2.4 | −28.9 | |
 | `kit/snare.sub` | −4.1 | −29.8 | |
-| `kit/rim.sub` | −4.8 | −25.2 | |
-| `kit/hat_model.sub` | −6.9 | −30.4 | the quietest voice; lift it ~3 dB against `kit/hat` |
+| `kit/rim.sub` | −3.6 | −26.5 | |
+| `kit/hat_model.sub` | −6.3 | −31.5 | the quietest voice; lift it ~3 dB against `kit/hat` |
 | `sym-drone.sub` | −5.5 | −27.9 | sustained, so RMS is the meaningful figure |
 | `frozen-cloud.sub` | −11.2 | −26.9 | measured through its own demo; feed it **hot** (×2) — its staging assumes a string-level input |
 
 Two consequences worth internalising:
 
-- **The kit is not level-matched.** Peaks span 3.8 dB and RMS spans 10 dB. A
+- **The kit is not level-matched.** Peaks span 3.9 dB and RMS spans 12 dB. A
   bare `mix { levels: [1,1,1,1] }` across the kit is a bad mix by default.
 - **`bass.sub` is the only voice that clips at unity.** Every "why is my mix
   distorting" investigation should check it first.

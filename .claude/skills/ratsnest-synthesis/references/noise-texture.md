@@ -73,7 +73,7 @@ flick -> sheet.cv : 0.07
 drops = clock { bpm: 1800 }
 coin = bern { prob: 0.12, seed: 5 }
 drops -> coin.gate
-denv = func { rise: 0.0004, fall: 0.018, curve: exp }
+denv = func { rise: 0.0004, fall: 0.054, curve: exp }
 coin.a -> denv.trig
 dpitch = random { rate: 30hz, smooth: 0, seed: 41 }
 drop = svf { cutoff: 2600, res: 0.9 }
@@ -104,7 +104,7 @@ body, bandpassed so it is paper and not fizz:
 fast = clock { bpm: 2400 }
 coin = bern { prob: 0.04, seed: 33 }
 fast -> coin.gate
-tick = func { rise: 0.0002, fall: 0.006, curve: exp }
+tick = func { rise: 0.0002, fall: 0.018, curve: exp }
 coin.a -> tick.trig
 n = noise { color: white, seed: 8 }
 cr = vca { gain: 0 }

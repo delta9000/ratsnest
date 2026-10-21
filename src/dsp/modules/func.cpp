@@ -9,7 +9,7 @@ namespace {
 
 constexpr InputInfo kIns[] = {
     {"trig", 0.f}, {"in", 0.f}, {"rise", 0.01f}, {"fall", 0.1f}};
-constexpr const char* kCurves[] = {"lin", "exp", "log", nullptr};
+constexpr const char* kCurves[] = {"lin", "exp", "log", "quad", nullptr};
 constexpr const char* kCycle[] = {"off", "on", nullptr};
 constexpr ConfigInfo kCfg[] = {{"curve", kCurves}, {"cycle", kCycle}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"eor"}, {"eoc"}};
@@ -30,7 +30,7 @@ class FuncModule final : public Module {
 
     if (stage_ == Stage::Rise) {
       progress_ = std::min(1.0, progress_ + rise_increment(ins[2]));
-      level_ = rise_start_ + (1.0 - rise_start_) * shape(progress_);
+      level_ = rise_start_ + (1.0 - rise_start_) * shape(progress_, true);
       if (progress_ >= 1.0) {
         level_ = 1.0;
         stage_ = Stage::Fall;
@@ -39,7 +39,7 @@ class FuncModule final : public Module {
       }
     } else if (stage_ == Stage::Fall) {
       progress_ = std::min(1.0, progress_ + fall_increment(ins[3]));
-      level_ = 1.0 - shape(progress_);
+      level_ = 1.0 - shape(progress_, false);
       if (progress_ >= 1.0) {
         level_ = 0.0;
         outs[2] = 1.0f;
@@ -68,7 +68,7 @@ class FuncModule final : public Module {
 
   // progress_/level_ are double: see env_increment.
   double increment(float seconds) const { return env_increment(seconds, rate_); }
-  double shape(double x) const { return env_curve(curve_, x); }
+  double shape(double x, bool rising) const { return env_curve(curve_, x, rising); }
 
   // The division above, memoized while the time input holds still.
   double rise_increment(float seconds) {

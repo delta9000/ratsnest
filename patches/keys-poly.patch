@@ -18,7 +18,7 @@ keys = voice { notes: mid }
 keys.osc = vco { freq: 220hz, wave: saw }
 mid.voct -> keys.osc.v_oct
 
-keys.env = adsr { attack: 0.006, decay: 0.25, sustain: 0.65, release: 0.6, curve: exp }
+keys.env = adsr { attack: 0.006, decay: 1.25, sustain: 0.65, release: 3, curve: exp }
 mid.gate -> keys.env.gate
 
 keys.filt = ladder { cutoff: 800, res: 0.25 }
@@ -28,7 +28,7 @@ mid.cc1 -> keys.filt.cutoff : 4000
 
 keys.amp = vca { gain: 0, response: exp }
 keys.filt -> keys.amp.in
-keys.env -> keys.amp.cv : 0.8
+keys.env -> keys.amp.cv : 0.96
 mid.vel -> keys.amp.cv : 0.5
 
 # ---- straight sum of all voices (inside -> outside, rule 4) into a gentle

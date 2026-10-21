@@ -93,7 +93,7 @@ hall.out_l -> m.in6
 hall.out_r -> m.in7
 
 # duck everything melodic off the kick's own quarter pulse
-duck = func { rise: 0.004, fall: 0.24, curve: exp }
+duck = func { rise: 0.004, fall: 0.72, curve: exp }
 kick_gate -> duck.trig
 duck -> m.lvl2 : -0.3
 duck -> m.lvl3 : -0.12

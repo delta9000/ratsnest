@@ -11,7 +11,7 @@ constexpr InputInfo kIns[] = {{"gate", 0.f},
                               {"decay", 0.15f},
                               {"sustain", 0.7f},
                               {"release", 0.3f}};
-constexpr const char* kCurves[] = {"lin", "exp", "log", nullptr};
+constexpr const char* kCurves[] = {"lin", "exp", "log", "quad", nullptr};
 constexpr ConfigInfo kCfg[] = {{"curve", kCurves}};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
@@ -45,7 +45,7 @@ class Adsr final : public Module {
     switch (stage_) {
       case Stage::Attack:
         progress_ = std::min(1.0, progress_ + increment(ins[1]));
-        level_ = start_ + (1.0 - start_) * shape(progress_);
+        level_ = start_ + (1.0 - start_) * shape(progress_, true);
         if (progress_ >= 1.0) {
           level_ = 1.0;
           start_ = 1.0;
@@ -56,7 +56,7 @@ class Adsr final : public Module {
       case Stage::Decay:
         progress_ = std::min(1.0, progress_ + increment(ins[2]));
         // Live sustain: the tail bends toward wherever sustain is now.
-        level_ = sus + (1.0 - sus) * (1.0 - shape(progress_));
+        level_ = sus + (1.0 - sus) * (1.0 - shape(progress_, false));
         if (progress_ >= 1.0) {
           level_ = sus;
           stage_ = Stage::Sustain;
@@ -67,7 +67,7 @@ class Adsr final : public Module {
         break;
       case Stage::Release:
         progress_ = std::min(1.0, progress_ + increment(ins[4]));
-        level_ = start_ * (1.0 - shape(progress_));
+        level_ = start_ * (1.0 - shape(progress_, false));
         if (progress_ >= 1.0) {
           level_ = 0.0;
           stage_ = Stage::Idle;
@@ -95,7 +95,7 @@ class Adsr final : public Module {
 
   // progress_/level_ are double: see env_increment.
   double increment(float seconds) const { return env_increment(seconds, rate_); }
-  double shape(double x) const { return env_curve(curve_, x); }
+  double shape(double x, bool rising) const { return env_curve(curve_, x, rising); }
 
   double rate_ = 48000.0;
   int curve_ = 0;

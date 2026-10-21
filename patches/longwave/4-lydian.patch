@@ -201,7 +201,7 @@ kck = sub { file: "../lib/kit/kick.sub", tune: 50hz, decay: 0.38 }
 kick_on -> kck.trig
 l_kick  -> kck.accent : 0.35
 0.6     -> kck.accent
-kick_env = func { rise: 0.001, fall: 0.22, curve: exp }
+kick_env = func { rise: 0.001, fall: 0.66, curve: exp }
 kick_on -> kick_env.trig
 
 # === CLAP -- 2 and 4 ===
@@ -292,11 +292,11 @@ l_brgt -> lead_filt.cutoff : 5200
 lead_on = logic { op: and, threshold: 0.02 }
 mot_seq.gate -> lead_on.a
 arr_lead.cv  -> lead_on.b
-lead_env = func { rise: 0.01, fall: 0.34, curve: exp }
+lead_env = func { rise: 0.01, fall: 1.02, curve: exp }
 lead_on -> lead_env.trig
 lead_amp = vca { gain: 0 }
 lead_filt.lp -> lead_amp.in
-lead_env -> lead_amp.cv
+lead_env -> lead_amp.cv : 1.4
 lead_out = vca { gain: 0 }
 lead_amp -> lead_out.in
 l_lead   -> lead_out.cv : 0.8
@@ -315,13 +315,13 @@ crash = sub { file: "../lib/kit/hat_model.sub", decay: 1.4s }
 arr_fx.gate -> crash.trig
 0.85 -> crash.accent
 
-imp_env = func { rise: 0.002, fall: 1.1, curve: exp }
+imp_env = func { rise: 0.002, fall: 3.3, curve: exp }
 arr_fx.gate -> imp_env.trig
 imp_osc = vco { freq: 58hz, wave: sine }
 imp_env -> imp_osc.fm : 55
 imp_amp = vca { gain: 0 }
 imp_osc -> imp_amp.in
-imp_env -> imp_amp.cv : 0.8
+imp_env -> imp_amp.cv : 1.12
 
 # === BAND MIX -- pump layer 1 ===
 band = mix { levels: [0.40, 0.18, 0.10, 0.6, 0.45, 0.46, 0.5, 0.5],

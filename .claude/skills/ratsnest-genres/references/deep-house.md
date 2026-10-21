@@ -37,7 +37,7 @@ bar -> four_bar.in
 | Rhodes | `fm { algo: dual }` | ratio 14 modulator, `curve: log`, long t2 |
 | bass | `vco { wave: tri }` + `ladder` | cutoff 160, res 0.15, offbeat eighths |
 | kick | `vco` sine + `func { curve: log }` | 48 Hz, fall 0.2, bend 1.6 — soft, not techno |
-| duck | `func { rise: 0.004, fall: 0.26, curve: exp }` on `quarter` | the instrument |
+| duck | `func { rise: 0.004, fall: 0.78, curve: exp }` on `quarter` | the instrument |
 | hats | `noise` → `svf.hp` on offbeat eighths + 16th shaker | 8 k / 6 k |
 | glue | `compressor { sidechain: external }` | ratio 4, attack 1 ms, release 150 ms |
 
@@ -103,7 +103,7 @@ gl_3 -> chc.v_oct
 ch_seq = stepseq { steps: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
                    gates: [0,0,1,0, 0,1,0,0, 0,0,1,0, 0,1,0,1] }
 master -> ch_seq.clock
-ch_env = func { rise: 0.008, fall: 0.55, curve: exp }
+ch_env = func { rise: 0.008, fall: 2.75, curve: exp }
 ch_seq.gate -> ch_env.trig
 ch_filt = svf { cutoff: 900, res: 0.2 }
 cha -> ch_filt.in : 0.24
@@ -141,7 +141,7 @@ values are attack ~1 ms, release 120–180 ms, ratio 4:1, 4–6 dB of reduction.
 
 ```text
 # ---- kick + the three-layer duck ----
-duck = func { rise: 0.004, fall: 0.26, curve: exp }
+duck = func { rise: 0.004, fall: 0.78, curve: exp }
 quarter -> duck.trig
 kick_env = func { rise: 0.001, fall: 0.2, curve: log }
 quarter -> kick_env.trig
@@ -159,7 +159,7 @@ quarter -> beat_not.a
 offbeat = logic { op: and }
 eighth -> offbeat.a
 beat_not -> offbeat.b
-bass_env = func { rise: 0.002, fall: 0.15, curve: exp }
+bass_env = func { rise: 0.002, fall: 0.45, curve: exp }
 offbeat -> bass_env.trig
 bass_osc = vco { freq: 110hz, wave: tri }   # 110, not 220, *on purpose*: the
 ch_root.cv -> bass_osc.v_oct                # bass sits an octave under the

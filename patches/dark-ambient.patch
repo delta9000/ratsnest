@@ -147,7 +147,7 @@ pump124 -> bass_filter.cutoff : 70
 
 # One 32-bar performance arc: a 16-bar build followed by a 16-bar release.
 # Exponential rise holds tension early and accelerates into the drop.
-arrangement = func { rise: 30.968, fall: 30.968, curve: exp, cycle: on }
+arrangement = func { rise: 30.968, fall: 30.968, curve: quad, cycle: on }
 cycle32 -> arrangement.trig
 arrangement -> bass_bus.gain : 0.1
 arrangement -> bass_filter.cutoff : 500

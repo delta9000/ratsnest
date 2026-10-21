@@ -112,19 +112,19 @@ quarter -> snr_seq.clock
 snr_gate = logic { op: and }
 snr_seq.trig -> snr_gate.a
 arr_kick.cv -> snr_gate.b
-snr_env = func { rise: 0.001, fall: 0.18, curve: exp }
+snr_env = func { rise: 0.001, fall: 0.54, curve: exp }
 snr_gate -> snr_env.trig
 snr_noise = noise { color: pink, seed: 17 }
 snr_filter = svf { cutoff: 1400, res: 0.4 }
 snr_noise -> snr_filter.in
 snr_amp = vca { gain: 0 }
 snr_filter.bp -> snr_amp.in
-snr_env -> snr_amp.cv : 0.5
+snr_env -> snr_amp.cv : 0.7
 
 # ---- sparse ticks: 3-of-16 euclid, brushed ----
 hat_pattern = euclid { steps: 16, hits: 3, rot: 5 }
 master -> hat_pattern.clock
-hat_env = func { rise: 0.001, fall: 0.05, curve: exp }
+hat_env = func { rise: 0.001, fall: 0.15, curve: exp }
 hat_pattern.trig -> hat_env.trig
 hat_noise = noise { color: white, seed: 23 }
 hat_filter = svf { cutoff: 7500, res: 0.2 }
@@ -134,7 +134,7 @@ hat_filter.hp -> hat_amp.in
 # The env alone can't open the VCA (gain 0); it only speaks when the perc
 # lane is up, scaled so intro/break stay tickless without a negative bias.
 hat_mult = math { op: mult }
-hat_env -> hat_mult.a
+hat_env -> hat_mult.a : 1.4
 perc_lvl -> hat_mult.b : 1.5
 hat_mult -> hat_amp.cv : 0.6
 
@@ -190,7 +190,7 @@ grn_lvl -> halo_r.cv : 0.6
 # ---- sub bass: glided roots, swelling once per bar ----
 sub_glide = func { rise: 0.15, fall: 0.15 }
 ch_root.cv -> sub_glide.in
-sub_env = adsr { attack: 0.4, decay: 0.5, sustain: 0.8, release: 1.0, curve: exp }
+sub_env = adsr { attack: 0.4, decay: 0.5, sustain: 0.8, release: 1.0, curve: quad }
 bar -> sub_env.gate
 sub_osc = vco { freq: 55hz, wave: sine }
 sub_glide -> sub_osc.v_oct

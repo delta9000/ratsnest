@@ -65,9 +65,9 @@ master -> acid_seq.clock
 master -> acid_slide.clock
 master -> acid_acc.clock
 
-acid_env = func { rise: 0.001, fall: 0.11, curve: exp }
+acid_env = func { rise: 0.001, fall: 0.33, curve: exp }
 acid_seq.gate -> acid_env.trig
-acc_env = func { rise: 0.001, fall: 0.14, curve: exp }
+acc_env = func { rise: 0.001, fall: 0.42, curve: exp }
 acid_acc.gate -> acc_env.trig
 
 acid_depth = math { op: mult, b: 1 }  # unaccented = env x 1
@@ -118,7 +118,7 @@ click (near-instant) — then saturation, so the peak anchors the mix.
 
 ```text
 # ---- 909 kick ----
-k9_penv = func { rise: 0.0004, fall: 0.035, curve: exp }
+k9_penv = func { rise: 0.0004, fall: 0.11, curve: exp }
 quarter -> k9_penv.trig
 k9_aenv = func { rise: 0.0006, fall: 0.18, curve: log }
 quarter -> k9_aenv.trig
@@ -129,7 +129,7 @@ k9_amp = vca { gain: 0 }
 k9_osc -> k9_amp.in
 k9_aenv -> k9_amp.cv : 0.95
 
-k9_cenv = func { rise: 0.0002, fall: 0.004, curve: exp }
+k9_cenv = func { rise: 0.0002, fall: 0.012, curve: exp }
 quarter -> k9_cenv.trig
 k9_noise = noise { color: white, seed: 3 }
 k9_click = svf { cutoff: 3000, res: 0.2 }
@@ -156,7 +156,7 @@ k8_ping = func { rise: 0.0002, fall: 0.002 }
 quarter -> k8_ping.trig
 k8_body = svf { cutoff: 52, res: 0.97 }
 k8_ping -> k8_body.in : 2
-k8_drop = func { rise: 0.0005, fall: 0.12, curve: exp }
+k8_drop = func { rise: 0.0005, fall: 0.36, curve: exp }
 quarter -> k8_drop.trig
 k8_drop -> k8_body.cutoff : 40
 k8_amp = vca { gain: 0 }
@@ -205,7 +205,7 @@ hv_b = vco { freq: 220hz, wave: pulse, pw: 0.5 }
 hv_c = vco { freq: 220hz, wave: saw }
 hv_pwm -> hv_a.pwm : 0.35
 hv_pwm -> hv_b.pwm : -0.3
-hv_dive = func { rise: 0.002, fall: 0.5, curve: exp }
+hv_dive = func { rise: 0.002, fall: 1.5, curve: exp }
 bar -> hv_dive.trig
 hv_dive -> hv_a.v_oct : 0.5
 hv_dive -> hv_b.v_oct : 0.5

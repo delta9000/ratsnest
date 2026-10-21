@@ -7,7 +7,11 @@ main  = output {}
 
 # FM voice: 2-op, op2 modulates op1, op2 level shaped by the envelope
 fm = fm { algo: dual, freq: pitch,
-          ratios: [1, 2], levels: [0.6, 0.5], curve: exp }
+          ratios: [1, 2], levels: [0.6, 0.5],
+          t2: [0.5, 0.5], t3: [2, 2], t4: [1, 1], curve: exp }
+# Segment times are 5x the fm defaults: `exp` times are -60 dB times and the
+# brightness follows the index nonlinearly: measured in groove.patch, 5x
+# leaves the 2.5 kHz band 3.4 dB under the old x^2 shape, where 3x left 6.4.
 
 # Low-pass to roll off the FM brightness
 filt = ladder { cutoff: 1800hz, res: 0.3 }
@@ -27,11 +31,17 @@ filt.out -> od.in
 # Amplitude envelope — `decay` shapes the pluck (post-overdrive, so the
 # tail decays instead of buzzing at the saturation ceiling) and mutes the
 # ring-out before the sequencer steps the pitch under it.
-env = func { rise: 0.002, fall: decay, curve: exp }
+# `decay` keeps its meaning (how long the pluck is heard). An `exp` stage time
+# is its -60 dB point, so the fall runs 3x decay (the -20 dB point stays
+# within 6% of the old x^2 curve's), and the amp depth is 1.2 to win back
+# some of the energy a natural decay carries less of than a held one.
+tail = math { op: mult, a: decay, b: 3 }
+env = func { rise: 0.002, fall: 0, curve: exp }
+tail -> env.fall
 trig -> env.trig
 amp = vca { gain: 0 }
 od -> amp.in
-env -> amp.cv
+env -> amp.cv : 1.2
 amp -> main.in
 
 # Audition: `mise run play -- patches/lib/bass.sub`

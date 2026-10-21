@@ -147,7 +147,7 @@ and the pad opens up into the drop on its own.
 gate_seq = stepseq { steps: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
                      gates: [1,0,1,1, 0,1,0,1, 1,0,1,0, 1,1,0,1] }
 master -> gate_seq.clock
-gate_env = func { rise: 0.002, fall: 0.06, curve: exp }
+gate_env = func { rise: 0.002, fall: 0.18, curve: exp }
 gate_seq.gate -> gate_env.trig
 pad_chop = vca { gain: 0 }
 pad_filt.lp -> pad_chop.in
@@ -198,7 +198,7 @@ rise_cv -> riser_amp.cv : 0.6
 roll_pat = euclid { steps: 16, hits: 4, rot: 0 }
 master -> roll_pat.clock
 rise_cv -> roll_pat.hits : 10
-roll_env = func { rise: 0.001, fall: 0.05, curve: exp }
+roll_env = func { rise: 0.001, fall: 0.15, curve: exp }
 roll_pat.trig -> roll_env.trig
 roll_n = noise { color: white, seed: 41 }
 roll_f = svf { cutoff: 2600, res: 0.45 }
@@ -235,7 +235,7 @@ quarter -> beat_not.a
 offbeat = logic { op: and }
 eighth -> offbeat.a
 beat_not -> offbeat.b
-bass_env = func { rise: 0.0015, fall: 0.13, curve: exp }
+bass_env = func { rise: 0.0015, fall: 0.39, curve: exp }
 offbeat -> bass_env.trig
 bass_osc = vco { freq: 110hz, wave: saw }   # 110, not 220, *on purpose*: the
 ch_root.cv -> bass_osc.v_oct                # bass sits an octave under the

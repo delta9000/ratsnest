@@ -123,14 +123,14 @@ kick_env -> kick_osc.v_oct : 1.5
 kick_amp = vca { gain: 0 }
 kick_osc -> kick_amp.in
 kick_env -> kick_amp.cv : 0.95
-kclk_env = func { rise: 0.0002, fall: 0.006, curve: exp }
+kclk_env = func { rise: 0.0002, fall: 0.018, curve: exp }
 kick_gate -> kclk_env.trig
 kclk_noise = noise { color: white, seed: 9 }
 kclk_hp = svf { cutoff: 2400, res: 0.2 }
 kclk_noise -> kclk_hp.in
 kclk_amp = vca { gain: 0 }
 kclk_hp.hp -> kclk_amp.in
-kclk_env -> kclk_amp.cv : 0.12
+kclk_env -> kclk_amp.cv : 0.17
 kick_mix = mix { levels: [1.0, 0.3] }
 kick_amp -> kick_mix.in1
 kclk_amp -> kick_mix.in2
@@ -143,28 +143,28 @@ quarter -> clap_seq.clock
 clap_gate = logic { op: and }
 clap_seq.trig -> clap_gate.a
 arr_kick.cv -> clap_gate.b
-clap_env = func { rise: 0.001, fall: 0.15, curve: exp }
+clap_env = func { rise: 0.001, fall: 0.45, curve: exp }
 clap_gate -> clap_env.trig
 clap_noise = noise { color: white, seed: 5 }
 clap_filter = svf { cutoff: 1400, res: 0.45 }
 clap_noise -> clap_filter.in
 clap_amp = vca { gain: 0 }
 clap_filter.bp -> clap_amp.in
-clap_env -> clap_amp.cv : 0.55
+clap_env -> clap_amp.cv : 0.77
 
 # ---- hats: sparse euclid sixteenths, density rides the section ----
 hat_pattern = euclid { steps: 16, hits: 1, rot: 5 }
 master -> hat_pattern.clock
 hats_lvl -> hat_pattern.hits : 5
-hat_env = func { rise: 0.0006, fall: 0.035, curve: exp }
+hat_env = func { rise: 0.0006, fall: 0.11, curve: exp }
 hat_pattern.trig -> hat_env.trig
-hats_lvl -> hat_env.fall : 0.025
+hats_lvl -> hat_env.fall : 0.075
 hat_noise = noise { color: white, seed: 19 }
 hat_filter = svf { cutoff: 9000, res: 0.25 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.38
+hat_env -> hat_amp.cv : 0.53
 quarter -> hat_amp.cv : -0.1
 
 # ---- offbeat open hat ----
@@ -173,14 +173,14 @@ quarter -> beat_not.a
 offbeat = logic { op: and }
 eighth -> offbeat.a
 beat_not -> offbeat.b
-oh_env = func { rise: 0.001, fall: 0.2, curve: exp }
+oh_env = func { rise: 0.001, fall: 0.6, curve: exp }
 offbeat -> oh_env.trig
 oh_noise = noise { color: white, seed: 37 }
 oh_filter = svf { cutoff: 6500, res: 0.3 }
 oh_noise -> oh_filter.in
 oh_amp = vca { gain: 0 }
 oh_filter.hp -> oh_amp.in
-oh_env -> oh_amp.cv : 0.25
+oh_env -> oh_amp.cv : 0.35
 perc_lvl -> oh_amp.cv : 0.45
 
 # ---- Reese bass + sub, darker and gliding (portamento ache) ----
@@ -276,7 +276,7 @@ pad_breath -> pad_filt_l.cutoff : 150
 pad_breath -> pad_filt_r.cutoff : -130
 pad_lvl -> pad_filt_l.cutoff : 600
 pad_lvl -> pad_filt_r.cutoff : 600
-pad_env = adsr { attack: 0.6, decay: 0.4, sustain: 0.8, release: 1.6, curve: exp }
+pad_env = adsr { attack: 0.6, decay: 0.4, sustain: 0.8, release: 1.6, curve: quad }
 bar -> pad_env.gate
 pad_amp_l = vca { gain: 0 }
 pad_amp_r = vca { gain: 0 }
@@ -321,7 +321,7 @@ str.out -> str_amp.in
 str_lvl -> str_amp.cv : 0.7
 
 # ---- supersaw lead: the hook's drop-2 answer, darker than mainstage ----
-lead_env = func { rise: 0.008, fall: 0.5, curve: exp }
+lead_env = func { rise: 0.008, fall: 1.5, curve: exp }
 lead_seq.gate -> lead_env.trig
 lead_a = vco { freq: 220hz, wave: saw }
 lead_b = vco { freq: 220hz, wave: saw }
@@ -345,7 +345,7 @@ lead_wander = lfo { freq: 0.05hz, wave: tri }
 lead_wander -> lead_filt.cutoff : 250
 lead_amp = vca { gain: 0 }
 lead_filt.lp -> lead_amp.in
-lead_env -> lead_amp.cv : 0.5
+lead_env -> lead_amp.cv : 0.7
 lead_post = vca { gain: 0 }
 lead_amp -> lead_post.in
 lead_lvl -> lead_post.cv : 0.8
@@ -372,25 +372,25 @@ rise_cv -> riser_amp.cv : 0.5
 roll_pattern = euclid { steps: 16, hits: 4, rot: 0 }
 master -> roll_pattern.clock
 rise_cv -> roll_pattern.hits : 12
-roll_env = func { rise: 0.001, fall: 0.055, curve: exp }
+roll_env = func { rise: 0.001, fall: 0.17, curve: exp }
 roll_pattern.trig -> roll_env.trig
 roll_noise = noise { color: white, seed: 41 }
 roll_filter = svf { cutoff: 2600, res: 0.45 }
 roll_noise -> roll_filter.in
 roll_amp = vca { gain: 0 }
 roll_filter.bp -> roll_amp.in
-roll_env -> roll_amp.cv : 0.18
+roll_env -> roll_amp.cv : 0.25
 rise_cv -> roll_amp.cv : 0.14
 
 # ---- one soft crash per drop downbeat ----
-crash_env = func { rise: 0.001, fall: 1.5, curve: exp }
+crash_env = func { rise: 0.001, fall: 4.5, curve: exp }
 arr_fx.cv -> crash_env.trig
 crash_noise = noise { color: white, seed: 21 }
 crash_hp = svf { cutoff: 5000, res: 0.1 }
 crash_noise -> crash_hp.in
 crash_amp = vca { gain: 0 }
 crash_hp.hp -> crash_amp.in
-crash_env -> crash_amp.cv : 0.35
+crash_env -> crash_amp.cv : 0.49
 
 # ---- dry band: kick ducks the tonal channels (pump layer 1) ----
 band = mix { levels: [0.82, 0.7, 0.5, 0.42, 0.42, 0.55, 0.6, 0.62],

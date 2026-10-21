@@ -46,7 +46,7 @@ constexpr InputInfo kIns[] = {
     {"fbmod", 0.f}};
 constexpr const char* kAlgos[] = {"free",  "triad", "dual", "cascade",
                                   "crown", "weave", "custom", nullptr};
-constexpr const char* kCurves[] = {"lin", "exp", "log", nullptr};
+constexpr const char* kCurves[] = {"lin", "exp", "log", "quad", nullptr};
 constexpr const char* kSyncs[] = {"on", "off", nullptr};
 constexpr const char* kWaves[] = {"sine", "half", "abs", "quarter", "fold", nullptr};
 constexpr ConfigInfo kCfg[] = {
@@ -111,7 +111,7 @@ void env_gate(OpEnv& e, bool rising, bool falling) {
 bool env_segment(OpEnv& e, double target, double seconds, int curve,
                  double rate) {
   e.progress = std::min(1.0, e.progress + env_increment(seconds, rate));
-  e.level = e.start + (target - e.start) * env_curve(curve, e.progress);
+  e.level = e.start + (target - e.start) * env_curve(curve, e.progress, target > e.start);
   if (e.progress < 1.0) return false;
   e.level = target;
   e.start = target;

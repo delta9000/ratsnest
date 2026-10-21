@@ -75,7 +75,7 @@ wet.out_r -> r.in
 # Audition: `mise run play -- patches/lib/tape-echo.sub` -- a sparse stab into
 # the room at the default 126 BPM, so the echo grid is audible on its own.
 demo.clk  = clock { bpm: 63 }
-demo.env  = func { rise: 0.002, fall: 0.18, curve: exp }
+demo.env  = func { rise: 0.002, fall: 0.54, curve: exp }
 demo.clk -> demo.env.trig
 demo.osc  = vco { freq: 220hz, wave: saw }
 demo.filt = svf { cutoff: 900hz, res: 0.3 }

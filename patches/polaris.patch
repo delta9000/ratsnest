@@ -134,28 +134,28 @@ quarter -> clap_seq.clock
 clap_gate = logic { op: and }
 clap_seq.trig -> clap_gate.a
 arr_kick.cv -> clap_gate.b
-clap_env = func { rise: 0.001, fall: 0.15, curve: exp }
+clap_env = func { rise: 0.001, fall: 0.45, curve: exp }
 clap_gate -> clap_env.trig
 clap_noise = noise { color: white, seed: 11 }
 clap_filter = svf { cutoff: 1700, res: 0.5 }
 clap_noise -> clap_filter.in
 clap_amp = vca { gain: 0 }
 clap_filter.bp -> clap_amp.in
-clap_env -> clap_amp.cv : 0.7
+clap_env -> clap_amp.cv : 0.98
 
 # ---- hats: euclid sixteenth ticks whose density rides the arrangement ----
 hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
 master -> hat_pattern.clock
 hats_lvl -> hat_pattern.hits : 6
-hat_env = func { rise: 0.0006, fall: 0.035, curve: exp }
+hat_env = func { rise: 0.0006, fall: 0.11, curve: exp }
 hat_pattern.trig -> hat_env.trig
-hats_lvl -> hat_env.fall : 0.03
+hats_lvl -> hat_env.fall : 0.09
 hat_noise = noise { color: white, seed: 23 }
 hat_filter = svf { cutoff: 9500, res: 0.25 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.5
+hat_env -> hat_amp.cv : 0.7
 quarter -> hat_amp.cv : -0.13
 
 # ---- offbeat open hat: eighth AND NOT quarter, phase-locked to the kick ----
@@ -164,14 +164,14 @@ quarter -> beat_not.a
 offbeat = logic { op: and }
 eighth -> offbeat.a
 beat_not -> offbeat.b
-oh_env = func { rise: 0.001, fall: 0.19, curve: exp }
+oh_env = func { rise: 0.001, fall: 0.57, curve: exp }
 offbeat -> oh_env.trig
 oh_noise = noise { color: white, seed: 37 }
 oh_filter = svf { cutoff: 6500, res: 0.3 }
 oh_noise -> oh_filter.in
 oh_amp = vca { gain: 0 }
 oh_filter.hp -> oh_amp.in
-oh_env -> oh_amp.cv : 0.3
+oh_env -> oh_amp.cv : 0.42
 perc_lvl -> oh_amp.cv : 0.6
 
 # ---- the pluck motif: a fixed one-bar motif of INTERVALS (root, 5th, 9th,
@@ -196,7 +196,7 @@ plk_b = vco { freq: 440hz, wave: saw }
 plk_note -> plk_a.v_oct
 plk_note -> plk_b.v_oct
 0.005 -> plk_b.v_oct
-plk_env = func { rise: 0.0008, fall: 0.16, curve: exp }
+plk_env = func { rise: 0.0008, fall: 0.48, curve: exp }
 plk_seq.trig -> plk_env.trig
 plk_filt = svf { cutoff: 750, res: 0.4 }
 plk_a -> plk_filt.in : 0.45
@@ -207,7 +207,7 @@ plk_wander = lfo { freq: 0.04hz, wave: tri }
 plk_wander -> plk_filt.cutoff : 250
 plk_amp = vca { gain: 0 }
 plk_filt.lp -> plk_amp.in
-plk_env -> plk_amp.cv : 0.55
+plk_env -> plk_amp.cv : 0.77
 plk_post = vca { gain: 0 }
 plk_amp -> plk_post.in
 plk_lvl -> plk_post.cv : 0.85
@@ -224,7 +224,7 @@ sub_amp = vca { gain: 0 }
 sub_filt -> sub_amp.in
 bass_lvl -> sub_amp.cv : 0.7
 
-bass_env = func { rise: 0.0015, fall: 0.15, curve: exp }
+bass_env = func { rise: 0.0015, fall: 0.45, curve: exp }
 eighth -> bass_env.trig
 bass_osc = vco { freq: 110hz, wave: saw }
 ch_root.cv -> bass_osc.v_oct
@@ -234,7 +234,7 @@ bass_env -> bass_filt.cutoff : 800
 bass_lvl -> bass_filt.cutoff : 200
 bass_amp = vca { gain: 0 }
 bass_filt -> bass_amp.in
-bass_env -> bass_amp.cv : 0.85
+bass_env -> bass_amp.cv : 1.19
 bass_post = vca { gain: 0 }
 bass_amp -> bass_post.in
 bass_lvl -> bass_post.cv : 0.8
@@ -274,7 +274,7 @@ pad_breath -> pad_filt_l.cutoff : 150
 pad_breath -> pad_filt_r.cutoff : -140
 pad_lvl -> pad_filt_l.cutoff : 800
 pad_lvl -> pad_filt_r.cutoff : 800
-pad_env = adsr { attack: 0.6, decay: 0.3, sustain: 0.85, release: 1.5, curve: exp }
+pad_env = adsr { attack: 0.6, decay: 0.3, sustain: 0.85, release: 1.5, curve: quad }
 bar -> pad_env.gate
 pad_amp_l = vca { gain: 0 }
 pad_amp_r = vca { gain: 0 }
@@ -309,7 +309,7 @@ lead_seq = stepseq { steps: [.16667,.16667,.41667,.41667, .75,.75,.58333,.41667,
                              .16667,.16667,0,0, .16667,.16667,.16667,.16667],
                      gates: [1,0,1,0, 1,0,1,1, 1,0,1,0, 1,0,0,0] }
 eighth -> lead_seq.clock
-lead_env = func { rise: 0.008, fall: 0.5, curve: exp }
+lead_env = func { rise: 0.008, fall: 1.5, curve: exp }
 lead_seq.trig -> lead_env.trig
 lead_a = vco { freq: 440hz, wave: saw }
 lead_b = vco { freq: 440hz, wave: saw }
@@ -327,7 +327,7 @@ lead_env -> lead_filt.cutoff : 1800
 lead_lvl -> lead_filt.cutoff : 1500
 lead_amp = vca { gain: 0 }
 lead_filt.lp -> lead_amp.in
-lead_env -> lead_amp.cv : 0.5
+lead_env -> lead_amp.cv : 0.7
 lead_post = vca { gain: 0 }
 lead_amp -> lead_post.in
 lead_lvl -> lead_post.cv : 0.8
@@ -345,14 +345,14 @@ rise_cv -> riser_amp.cv : 0.55
 roll_pattern = euclid { steps: 16, hits: 4, rot: 0 }
 master -> roll_pattern.clock
 rise_cv -> roll_pattern.hits : 12
-roll_env = func { rise: 0.001, fall: 0.06, curve: exp }
+roll_env = func { rise: 0.001, fall: 0.18, curve: exp }
 roll_pattern.trig -> roll_env.trig
 roll_noise = noise { color: white, seed: 41 }
 roll_filter = svf { cutoff: 2500, res: 0.45 }
 roll_noise -> roll_filter.in
 roll_amp = vca { gain: 0 }
 roll_filter.bp -> roll_amp.in
-roll_env -> roll_amp.cv : 0.22
+roll_env -> roll_amp.cv : 0.31
 rise_cv -> roll_amp.cv : 0.18
 
 # ---- dry band. Kick center, bass center, hats/oh split, pluck just right,

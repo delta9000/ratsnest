@@ -91,8 +91,11 @@ currently is. Defaults are `t = [.002, .1, .4, .2]`, `l = [1, .75, .5]`.
 
 The percussive idiom is `l1: 1, l2: 0, l3: 0` with `t2` as the decay time and
 `t3` tiny — the note dies whether or not you release the gate. The sustained
-idiom is `l3` nonzero. `curve: log` is the natural percussive fall; `lin` is
-right for brass and pads.
+idiom is `l3` nonzero. `curve: exp` is a true RC fall whose segment time is
+the −60 dB time — write about 5x what a linear fall would need, since
+brightness follows the index nonlinearly (measured on `fm-tests`); `log` is
+a gentler fast-start fall; `lin` is right for brass and pads; `quad` (x²)
+hangs near the top and then drops.
 
 **Everything else.** `fb[k] > 0` is op *k*'s self-edge (never put a self-edge
 in `route`); 0 is a pure sine, ~0.6 a saw-like 1/n spectrum, ~0.8 the
@@ -201,9 +204,9 @@ v = fm { algo: dual, freq: 220hz,
          levels: [.85, .45, .18, .30, .12, 0],
          fb: [0, .68, 0, 0, 0, 0],
          t1: [.001, .001, .001, .001, .001, 0],
-         t2: [.30, .045, .05, .30, .04, .1],
-         t3: [.8, .12, .1, .8, .1, .4],
-         t4: [.10, .06, .06, .10, .06, .2],
+         t2: [1.5, .23, .25, 1.5, .2, .5],
+         t3: [4, .6, .5, 4, .5, 2],
+         t4: [.5, .3, .3, .5, .3, 1],
          l1: [1, 1, 1, 1, 1, 0],
          l2: [.9, .35, .25, .8, .2, 0],
          l3: [.75, .12, .05, .6, .05, 0],

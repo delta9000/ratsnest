@@ -37,7 +37,7 @@ four_bar -> sixteen_bar.in
 | transposition | second `stepseq` → `seq.transpose` | 16-bar clock, `[0, 0, -0.41667, -0.16667]` |
 | voice | two `vco { wave: saw }` at `freq: A3`, `0.004` detune | note names need an A base |
 | filter | `ladder { cutoff: 220, res: 0.42, drive: 0.5 }` | base = darkest point of the arc |
-| envelope | `func { rise: 0.004, fall: 0.16, curve: exp }` | fires from `seq.trig` |
+| envelope | `func { rise: 0.004, fall: 0.48, curve: exp }` | fires from `seq.trig` |
 | counterpoint | two `delay { mix: 1 }` at 3/8 and 1/8, cross-fed | `feedback` 0.6–0.66 |
 | the arc | `lfo { freq: 0.0021hz }` → `ladder.cutoff` | 8-minute cycle, depth 1900 |
 | pad | sustained saws under it, no envelope | one chord, or none |
@@ -71,7 +71,7 @@ seq.cv -> lead2.v_oct
 vcf = ladder { cutoff: 220, res: 0.42, drive: 0.5 }
 lead  -> vcf.in : 0.4
 lead2 -> vcf.in : 0.4
-env = func { rise: 0.004, fall: 0.16, curve: exp }
+env = func { rise: 0.004, fall: 0.48, curve: exp }
 seq.trig -> env.trig
 env -> vcf.cutoff : 900
 lead_amp = vca { gain: 0 }
@@ -123,7 +123,7 @@ transp.cv -> sq_b.transpose
 voice_b = vco { freq: A3, wave: tri }
 sq_b.cv -> voice_b.v_oct
 1 -> voice_b.v_oct              # an octave up, quieter
-env_b = func { rise: 0.002, fall: 0.1, curve: exp }
+env_b = func { rise: 0.002, fall: 0.3, curve: exp }
 sq_b.trig -> env_b.trig
 amp_b = vca { gain: 0 }
 voice_b -> amp_b.in

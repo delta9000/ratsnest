@@ -17,12 +17,12 @@ scale = quant { root: 5, scale: [0, 3, 5, 7, 10] }
 notes -> scale.in : 0.4
 
 # ---- plucked string (Karplus-Strong via tuned delay) ----
-burst = func { rise: 0.001, fall: 0.014, curve: exp }
+burst = func { rise: 0.001, fall: 0.042, curve: exp }
 clk -> burst.trig
 hiss = noise { color: white, seed: 8 }
 exciter = vca { gain: 0 }
 hiss -> exciter.in
-burst -> exciter.cv
+burst -> exciter.cv : 1.2
 string = delay { time: 9.09ms, feedback: 0.94, tone: 2800, mix: 1, slew: 0 }
 exciter -> string.in
 scale -> string.pitch

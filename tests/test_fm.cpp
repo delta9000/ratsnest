@@ -170,7 +170,14 @@ TEST_CASE("fm: curve shapes the segment") {
   cfg.push_back({"t1", arr({.016})});
   FmRig rig(1000.0, cfg);
   (void)rig.env4(1.0f);
-  CHECK(rig.env4(1.0f) < 0.15f);  // x² at progress 5/16 ≈ .098 (lin would be .3125)
+  CHECK(rig.env4(1.0f) > 0.4f);  // RC rise 1.5(1 - 3^-x) at 5/16 ≈ .44 (lin .3125)
+
+  Config cfgq;
+  cfgq.push_back({"curve", str("quad")});
+  cfgq.push_back({"t1", arr({.016})});
+  FmRig rigq(1000.0, cfgq);
+  (void)rigq.env4(1.0f);
+  CHECK(rigq.env4(1.0f) < 0.15f);  // x² at progress 5/16 ≈ .098
 
   Config cfg2;
   cfg2.push_back({"curve", str("log")});

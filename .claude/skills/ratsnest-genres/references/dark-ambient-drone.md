@@ -16,7 +16,7 @@ fall.
 
 ```text
 pulse = lfo { wave: square, freq: 0.0028hz }   # one edge every ~6 min
-arc = func { rise: 180, fall: 60, curve: exp }
+arc = func { rise: 180, fall: 60, curve: quad }
 pulse -> arc.trig
 ```
 

@@ -92,7 +92,13 @@ nz -> wash.in
 
 # Two-stage envelope: fast transient stage, then exponential tail.
 env1 = func { rise: 0.0002, fall: 0.015 }
-env2 = func { rise: 0.0005, fall: decay, curve: exp }
+# `decay` keeps its meaning (the length of the tail you hear). An `exp` stage
+# time is its -60 dB point and this tail sits 6 dB under the transient, so
+# the fall runs 5x decay (as in hat.sub; measured -20 dB point within 15% of
+# the old x^2 curve's).
+tail = math { op: mult, a: decay, b: 5 }
+env2 = func { rise: 0.0005, fall: 0, curve: exp }
+tail -> env2.fall
 trig -> env1.trig
 trig -> env2.trig
 

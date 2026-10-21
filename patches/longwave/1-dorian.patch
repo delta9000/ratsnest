@@ -243,7 +243,7 @@ l_kick  -> kck.accent : 0.35
 0.55    -> kck.accent
 # A parallel envelope from the same trigger: the kit voices have no env out,
 # and every duck in the patch is derived from this one signal.
-kick_env = func { rise: 0.001, fall: 0.30, curve: exp }
+kick_env = func { rise: 0.001, fall: 0.9, curve: exp }
 kick_on -> kick_env.trig
 
 # === HATS -- euclid, density on a lane ===
@@ -280,11 +280,11 @@ stab_a -> stab_filt.in : 0.34
 stab_b -> stab_filt.in : 0.33
 stab_c -> stab_filt.in : 0.33
 l_brgt -> stab_filt.cutoff : 900
-stab_env = func { rise: 0.004, fall: 0.42, curve: exp }
+stab_env = func { rise: 0.004, fall: 1.26, curve: exp }
 stab_on -> stab_env.trig
 stab_amp = vca { gain: 0 }
 stab_filt -> stab_amp.in
-stab_env  -> stab_amp.cv
+stab_env  -> stab_amp.cv : 1.4
 # Post-fader: sends are tapped AFTER this, so a muted stab leaves no ghost
 # ringing in the room (docs/patch-craft.md).
 stab_out = vca { gain: 0 }

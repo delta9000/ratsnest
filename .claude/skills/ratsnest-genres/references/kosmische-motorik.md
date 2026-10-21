@@ -61,7 +61,7 @@ kick_env -> kick_amp.cv : 0.95
 
 snare_pat = stepseq { steps: [0,0,0,0], gates: [0,1,0,1] }
 quarter -> snare_pat.clock
-snare_env = func { rise: 0.001, fall: 0.14, curve: exp }
+snare_env = func { rise: 0.001, fall: 0.42, curve: exp }
 snare_pat.trig -> snare_env.trig
 snare_n = noise { color: white, seed: 5 }
 snare_bp = svf { cutoff: 1900, res: 0.45 }
@@ -78,7 +78,7 @@ notq -> offbeat.b
 rim = modal { modes: 12, freq: 440hz, structure: 0.14, brightness: 0.7,
               damping: 0.2, position: 0.4 }
 offbeat -> rim.strike
-rim_env = func { rise: 0.0005, fall: 0.05, curve: exp }
+rim_env = func { rise: 0.0005, fall: 0.15, curve: exp }
 offbeat -> rim_env.trig
 rim_amp = vca { gain: 0 }
 rim.out -> rim_amp.in

@@ -206,7 +206,7 @@ lattice = voice { notes: lattice_alloc }
 lattice.osc = vco { freq: 293.66hz, wave: saw }
 lattice_alloc.voct -> lattice.osc.v_oct
 lattice_alloc.spread -> lattice.osc.v_oct : 0.007
-lattice.fenv = func { rise: 0.002, fall: 0.5, curve: exp }
+lattice.fenv = func { rise: 0.002, fall: 1.5, curve: exp }
 lattice_alloc.gate -> lattice.fenv.trig
 lattice.filt = svf { cutoff: 380, res: 0.32 }
 lattice.osc -> lattice.filt.in
@@ -237,14 +237,14 @@ eighth -> sub_euclid.clock
 arr_sub.cv -> sub_euclid.hits : 2
 sub_osc = vco { freq: 73.416hz, wave: tri }
 harm -> sub_osc.v_oct
-sub_env = func { rise: 0.004, fall: 0.32, curve: exp }
+sub_env = func { rise: 0.004, fall: 0.96, curve: exp }
 sub_euclid.trig -> sub_env.trig
 sub_filter = ladder { cutoff: 170, res: 0.12, drive: 0.35 }
 sub_osc -> sub_filter.in
 sub_env -> sub_filter.cutoff : 360
 sub_amp = vca { gain: 0 }
 sub_filter -> sub_amp.in
-sub_env -> sub_amp.cv : 0.75
+sub_env -> sub_amp.cv : 1.05
 sub_post = vca { gain: 0 }
 sub_amp -> sub_post.in
 sub_lvl -> sub_post.cv : 0.72
@@ -261,7 +261,7 @@ minor_notes -> shadow_note.in
 shadow_euclid.trig -> shadow_note.trig
 shadow_osc = vco { freq: 146.83hz, wave: saw }
 shadow_note -> shadow_osc.v_oct
-shadow_env = func { rise: 0.003, fall: 0.42, curve: exp }
+shadow_env = func { rise: 0.003, fall: 1.26, curve: exp }
 shadow_euclid.trig -> shadow_env.trig
 shadow_filter = ladder { cutoff: 220, res: 0.3, drive: 0.6 }
 shadow_osc -> shadow_filter.in
@@ -269,7 +269,7 @@ shadow_env -> shadow_filter.cutoff : 780
 shadow_lvl -> shadow_filter.cutoff : 200
 shadow_amp = vca { gain: 0 }
 shadow_filter -> shadow_amp.in
-shadow_env -> shadow_amp.cv : 0.8
+shadow_env -> shadow_amp.cv : 1.12
 shadow_post = vca { gain: 0 }
 shadow_amp -> shadow_post.in
 shadow_lvl -> shadow_post.cv : 0.75
@@ -301,14 +301,14 @@ beat_not -> offbeat.b
 off_gate = logic { op: and }
 offbeat -> off_gate.a
 arr_kick.cv -> off_gate.b
-off_env = func { rise: 0.001, fall: 0.07, curve: exp }
+off_env = func { rise: 0.001, fall: 0.21, curve: exp }
 off_gate -> off_env.trig
 off_noise = noise { color: pink, seed: 23 }
 off_filter = svf { cutoff: 3400, res: 0.4 }
 off_noise -> off_filter.in
 off_amp = vca { gain: 0 }
 off_filter.bp -> off_amp.in
-off_env -> off_amp.cv : 0.4
+off_env -> off_amp.cv : 0.56
 off_post = vca { gain: 0 }
 off_amp -> off_post.in
 perc_lvl -> off_post.cv : 0.8
@@ -323,7 +323,7 @@ arr_rotb.cv -> metal_pattern.rot
 metal_note = sh { mode: sample }
 minor_notes -> metal_note.in
 metal_pattern.trig -> metal_note.trig
-metal_env = func { rise: 0.0005, fall: 0.09, curve: exp }
+metal_env = func { rise: 0.0005, fall: 0.27, curve: exp }
 metal_pattern.trig -> metal_env.trig
 metal_noise = noise { color: white, seed: 31 }
 metal_tone = vco { freq: 1174.66hz, wave: pulse, pw: 0.5 }
@@ -336,7 +336,7 @@ metal_ring -> metal_filter.in
 metal_env -> metal_filter.cutoff : 2400
 metal_amp = vca { gain: 0 }
 metal_filter.bp -> metal_amp.in
-metal_env -> metal_amp.cv : 0.48
+metal_env -> metal_amp.cv : 0.67
 metal_post = vca { gain: 0 }
 metal_amp -> metal_post.in
 perc_lvl -> metal_post.cv : 0.75
@@ -351,14 +351,14 @@ tick_pattern.trig -> tick_coin.gate
 tick_gate = logic { op: and }
 tick_coin.a -> tick_gate.a
 arr_kick.cv -> tick_gate.b
-tick_env = func { rise: 0.0004, fall: 0.035, curve: exp }
+tick_env = func { rise: 0.0004, fall: 0.11, curve: exp }
 tick_gate -> tick_env.trig
 tick_noise = noise { color: white, seed: 17 }
 tick_filter = svf { cutoff: 9200, res: 0.25 }
 tick_noise -> tick_filter.in
 tick_amp = vca { gain: 0 }
 tick_filter.hp -> tick_amp.in
-tick_env -> tick_amp.cv : 0.36
+tick_env -> tick_amp.cv : 0.5
 tick_post = vca { gain: 0 }
 tick_amp -> tick_post.in
 perc_lvl -> tick_post.cv : 0.7

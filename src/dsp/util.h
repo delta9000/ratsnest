@@ -59,12 +59,21 @@ struct Declick {
   }
 };
 
-// Envelope segment curve over progress x in [0, 1], indexed like the
-// lin/exp/log `curve` configs.
-inline double env_curve(int curve, double x) {
-  if (curve == 1) return x * x;
-  if (curve == 2) return std::sqrt(x);
-  return x;
+// Envelope segment curve: the fraction of the way from start to target after
+// progress x in [0, 1], indexed like the lin/exp/log/quad `curve` configs.
+// `exp` is a normalized RC segment (1 - e^-kx) / (1 - e^-k): fast, then
+// asymptotic, snapped onto its target at x = 1 so stage times keep meaning.
+// Falls use k = ln 1000, so the stage time is the -60 dB time (T60); rises use
+// k = ln 3, the analog attack that charges toward 1.5 and stops at 1.
+// `quad` is x^2, the slow-start shape `exp` named before.
+inline double env_curve(int curve, double x, bool rising) {
+  switch (curve) {
+    case 1: return rising ? 1.5 * (1.0 - std::exp(-1.0986122886681098 * x))
+                          : (1.0 - std::exp(-6.907755278982137 * x)) / 0.999;
+    case 2: return std::sqrt(x);
+    case 3: return x * x;
+    default: return x;
+  }
 }
 // Per-sample progress through a segment of `seconds`. Double accumulation:
 // float increments drop below half a ULP past 2^25 samples (~11.6 min at
