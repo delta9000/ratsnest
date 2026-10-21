@@ -55,6 +55,8 @@ struct Spec { Tok name; int shift = 0; Tok at{{}, 0}; };
 // `at`: the step row a one-shot overlay starts on; -1 loops.
 struct Layer { int pat = 0; int shift = 0; int at = -1; };
 struct Entry { std::vector<Spec> specs; int repeat = 1; std::vector<Layer> layers; };
+// `section <name> <layers>`: a named layer group for the order list.
+struct Section { std::string name; std::vector<Spec> specs; int line = 0; };
 // A track's state while flattening: the row so far and the song row its
 // sounding note's length runs out (-1: none).
 struct Voice { TrkRow s; int off_at = -1; };
@@ -160,14 +162,14 @@ class Parser {
     using Directive = void (Parser::*)(const std::vector<Tok>&);
     static constexpr std::pair<std::string_view, Directive> kDirectives[] = {
         {"track", &Parser::track}, {"pattern", &Parser::pattern}, {"lane", &Parser::lane},
-        {"order", &Parser::order}};
+        {"section", &Parser::section}, {"order", &Parser::order}};
     const std::string_view w = t[0].s;
     for (const auto& [name, fn] : kDirectives)
       if (w == name) return (this->*fn)(t);
     if (w == "|" || std::isdigit(static_cast<unsigned char>(w[0]))) return row(t);
     err(t[0], "unknown directive '" + std::string(w) +
-              "' (directives: track, pattern, lane, order; rows start with '|')" +
-              dsl::did_you_mean(w, {"track", "pattern", "lane", "order"}));
+              "' (directives: track, pattern, lane, section, order; rows start with '|')" +
+              dsl::did_you_mean(w, {"track", "pattern", "lane", "section", "order"}));
   }
 
   // track <name> <field>... [len <rows>] [from <track>]
@@ -217,7 +219,7 @@ class Parser {
     if (tracks_.empty()) return err(t[0], "declare tracks before patterns ('track <name> <fields>')");
     if (t.size() < 3) return err(t[0], "pattern needs a name and a row count");
     if (!is_name(t[1].s)) return err(t[1], "pattern name must be lowercase (a-z, 0-9, _)");
-    if (find_named(pats_, t[1].s) >= 0) return err(t[1], "duplicate pattern '" + std::string(t[1].s) + "'");
+    if (taken(t[1])) return;
     Pattern p{std::string(t[1].s), 0, {}, {}};
     if (!size(t[2], p)) return;
     for (size_t i = 3; i < t.size(); ++i) {
@@ -407,17 +409,36 @@ class Parser {
         return err(t.col + static_cast<int>(star), "repeat must be '*N' with N in 1..4096");
       s = s.substr(0, star);
     }
-    size_t at = 0;
-    while (at <= s.size() && out_.errors.empty()) {
-      const size_t plus = std::min(s.find('+', at), s.size());
-      e.specs.push_back(spec({s.substr(at, plus - at), t.col + static_cast<int>(at)}));
-      at = plus + 1;
-    }
+    group({s, t.col}, e.specs);
     entries_.push_back(std::move(e));
     entry_lines_.push_back(line_);
   }
 
-  // One layer: `name` with an optional `^N` transposition in semitones.
+  // section <name> <layers>
+  void section(const std::vector<Tok>& t) {
+    if (t.size() != 3) return err(t[0], "section needs a name and one layer group ('section verse a+b^2+c')");
+    if (!is_name(t[1].s)) return err(t[1], "section name must be lowercase (a-z, 0-9, _)");
+    if (taken(t[1])) return;
+    sections_.push_back({std::string(t[1].s), {}, line_});
+    group(t[2], sections_.back().specs);
+  }
+
+  // Patterns and sections share one namespace.
+  bool taken(const Tok& n) {
+    if (find_named(pats_, n.s) < 0 && find_named(sections_, n.s) < 0) return false;
+    return err(n, "duplicate name '" + std::string(n.s) + "' (patterns and sections share names)"), true;
+  }
+
+  // `a+b^2+c@8`: layers joined by '+'.
+  void group(const Tok& t, std::vector<Spec>& out) {
+    size_t at = 0;
+    while (at <= t.s.size() && out_.errors.empty()) {
+      const size_t plus = std::min(t.s.find('+', at), t.s.size());
+      out.push_back(spec({t.s.substr(at, plus - at), t.col + static_cast<int>(at)}));
+      at = plus + 1;
+    }
+  }
+
   // One layer: `name` with an optional `^N` transposition in semitones and
   // `@R` start row, in either order.
   Spec spec(const Tok& t) {
@@ -444,11 +465,37 @@ class Parser {
       line_ = loop_tok_.first;
       return err(loop_tok_.second, "the loop point '|:' needs an order entry after it");
     }
+    for (size_t i = 0; i < sections_.size() && out_.errors.empty(); ++i) {
+      line_ = sections_[i].line;
+      Entry e{sections_[i].specs, 1, {}};
+      resolve(e);
+    }
     for (size_t i = 0; i < entries_.size() && out_.errors.empty(); ++i) {
       line_ = entry_lines_[i];
+      expand(entries_[i]);
       resolve(entries_[i]);
     }
     if (out_.errors.empty()) flatten();
+  }
+
+  // Splices each section into its layers; `verse^2` adds 2 to every one.
+  void expand(Entry& e) {
+    std::vector<Spec> out;
+    for (const Spec& sp : e.specs) {
+      const int id = find_named(sections_, sp.name.s);
+      if (id < 0) {
+        out.push_back(sp);
+        continue;
+      }
+      if (sp.at.col) return err(sp.at.col - 1, "a section cannot be an '@' overlay (overlay a pattern)");
+      for (Spec in : sections_[static_cast<size_t>(id)].specs) {
+        in.shift += sp.shift;
+        in.name.col = sp.name.col;  // errors point at the section's use
+        if (in.at.col) in.at.col = sp.name.col + 1;
+        out.push_back(in);
+      }
+    }
+    e.specs = std::move(out);
   }
 
   void resolve(Entry& e) {
@@ -456,11 +503,20 @@ class Parser {
     for (const Spec& sp : e.specs) {
       const Tok& n = sp.name;
       const int id = find_named(pats_, n.s);
-      if (id < 0) return err(n, "unknown pattern '" + std::string(n.s) + "' in order" + hint(pats_, n.s));
+      if (id < 0) return err(n, "unknown pattern '" + std::string(n.s) + "'" + unknown(n.s));
       Layer l{id, sp.shift, -1};
       if (sp.at.col ? !overlay(e, sp, l) : !own(owner, n, id)) return;
       e.layers.push_back(l);
     }
+  }
+
+  // Why a layer name is not a pattern: a nested section, or a typo.
+  std::string unknown(std::string_view n) const {
+    if (find_named(sections_, n) >= 0) return " (a section holds patterns, not sections)";
+    std::vector<std::string> names;
+    for (const auto& p : pats_) names.push_back(p.name);
+    for (const auto& x : sections_) names.push_back(x.name);
+    return dsl::did_you_mean(n, names);
   }
 
   // Claims pattern `id`'s tracks for a looping layer.
@@ -614,6 +670,8 @@ class Parser {
   std::vector<Pattern> pats_;
   std::vector<Entry> entries_;
   std::vector<int> entry_lines_;
+  std::vector<Section> sections_;
+
 };
 
 }  // namespace

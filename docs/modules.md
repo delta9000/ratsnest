@@ -714,6 +714,10 @@ Composing (all resolved when the file loads; the ports never change):
 - **Bars:** `pattern verse 4x16 bass harm` is four bars of 16 rows (64).
   Its row labels, and `@R` overlays over it, may then be `bar:row`, bar
   from 1 and row from 0: `3:06` is row 38. Plain numbers still work.
+- **Sections:** `section verse mel+pad+bass+beat` names one layer group
+  (with `^N` and `@R` as usual); then `order verse*2 chorus verse^2+fill@48`.
+  A section's `^N` adds to each of its layers. Sections share the pattern
+  namespace and hold patterns, not other sections.
 
 Timing: row 0 sounds on the first edge (t = 0 under a `clock`/`div` chain;
 before it gates are low). A re-articulated note drops its gate for the edge

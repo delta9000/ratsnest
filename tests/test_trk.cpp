@@ -196,7 +196,7 @@ TEST_CASE("trk: diagnostics carry line and column") {
   fails(h + "pattern p 2000\n", 2, 11, "1..1024");
   fails(h + "pattern p 4 b\n", 2, 13, "unknown track 'b'");
   fails(h + "pattern p 4 a a\n", 2, 15, "listed twice");
-  fails(h + "pattern p 4\npattern p 4\n", 3, 9, "duplicate pattern 'p'");
+  fails(h + "pattern p 4\npattern p 4\n", 3, 9, "duplicate name 'p'");
   fails(h + "pattern p 4\n| C#4\n", 3, 3, "Cs4 for sharp");
   fails(h + "pattern p 4\n| H4\n", 3, 3, "is not a note");
   fails(h + "pattern p 4\n| ~\n", 3, 3, "is not a note");
@@ -429,6 +429,40 @@ TEST_CASE("trk: bar diagnostics") {
   fails(h + "pattern p 2x1000\n", 2, 11, "at most 1024 rows");
   fails(h + "pattern p 4x\n", 2, 11, "BARSxROWS");
   fails(h + "pattern p 64\npattern q 2\norder p+q@1:00\n", 4, 11, "declare 'pattern p BARSxROWS'");
+}
+
+TEST_CASE("trk: sections name layer groups; ^N moves all their layers") {
+  auto s = ok("track a note\ntrack b note\ntrack c cva\n"
+              "section verse p^2+q\n"  // patterns may come later
+              "pattern p 4 a\n| C4\npattern q 2 b\n| A3\npattern f 1 c\n| 7\n"
+              "order verse verse^-2+f@3 |: verse*2\n");
+  CHECK(s.steps() == 4);
+  CHECK(s.loop == 2);
+  CHECK(s.step_pattern[0] == 0);
+  CHECK(at(s, 0, 0).voct == doctest::Approx(5.0f / 12));
+  CHECK(at(s, 2, 1).retrig);  // q loops inside the section's step
+  CHECK(at(s, 4, 0).voct == doctest::Approx(3.0f / 12));
+  CHECK(at(s, 4, 1).voct == doctest::Approx(-2.0f / 12));
+  CHECK(at(s, 6, 2).cva == 0.0f);
+  CHECK(at(s, 7, 2).cva == 7.0f);  // an overlay added to a section's group
+  CHECK(at(s, 8, 0).voct == doctest::Approx(5.0f / 12));
+}
+
+TEST_CASE("trk: section diagnostics") {
+  const std::string h = "track a note\ntrack b note\npattern p 4 a\npattern q 4 b\n";
+  fails(h + "section\n", 5, 1, "section needs a name and one layer group");
+  fails(h + "section v p q\n", 5, 1, "one layer group");
+  fails(h + "section V p\n", 5, 9, "lowercase");
+  fails(h + "section p q\n", 5, 9, "duplicate name 'p' (patterns and sections share names)");
+  fails(h + "section v p\npattern v 2\n", 6, 9, "duplicate name 'v'");
+  fails(h + "section v p+r\norder v\n", 5, 13, "unknown pattern 'r'");
+  fails(h + "section v p+q\norder v^x\n", 6, 8, "'^N'");
+  fails(h + "section verse p+q\norder vers\n", 6, 7, "did you mean 'verse'");
+  fails(h + "section v p\nsection w v+q\norder w\n", 6, 11, "holds patterns, not sections");
+  fails(h + "section v p\norder q+v@2\n", 6, 10, "a section cannot be an '@' overlay");
+  fails(h + "section v p+q\norder v+p\n", 6, 9, "both write track 'a'");
+  fails(h + "pattern r 2 a\nsection v r+q@1\norder p+v\n", 7, 9, "only an '@' overlay may share");
+  fails(h + "pattern r 8 a\nsection v r+p@6\norder q+v\n", 7, 10, "past the step's end ('q' has 4 rows");
 }
 
 TEST_CASE("trk: the longest song fits exactly") {

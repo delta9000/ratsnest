@@ -371,3 +371,16 @@ total is still at most 1024). In such a pattern a row label may be written
 `@R` overlay start whose step's first layer has bars (`fill@4:08`). Plain
 decimal rows keep working. `bar:row` against a pattern declared without bars
 is an error that says to declare `pattern <name> BARSxROWS`.
+
+### 8.7 Sections: `section <name> <layers>`
+
+`section verse mel_v+pad_v+bass+beat` names one layer group (layers may
+carry `^N` and `@R`); the order list then uses the name like a pattern:
+`order verse*2 chorus verse^2`. In an order entry a section is spliced into
+its layers, so `^N` on it adds to every layer's own transposition and more
+layers may follow it (`verse+fill@48`); a section cannot itself be an `@`
+overlay or contain another section. Sections share the pattern namespace
+(a clash is an error; a typo gets a did-you-mean over both) and may be
+declared before the patterns they name. Each section is checked at its own
+line; errors that arise only from how an order entry combines it are
+reported at the entry.
