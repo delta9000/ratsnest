@@ -22,6 +22,11 @@ for a listener. A limited kick can still overwhelm the music.
   6–8 dB below the drops. Intro ≈ −25 dB RMS or lower.
 - **Hygiene**: overall peak ≤ the limiter threshold, `dc` ≈ 0, no flat
   peak==RMS windows (that's a brick), no dead air after the fade.
+- **Per part**: the mix's timeline mostly measures the kick. `--tap NAME[=node[.port]]`
+  (repeatable) prints the same table for one endpoint — a voice, a strip's
+  `l`/`r`, a return — and writes it as `<out-stem>.NAME.wav`, with the patch
+  untouched. Set the window to the section length and one render gives every
+  part's level per section; no `rec` sinks, no numpy.
 
 Use measurements to investigate a specific concern, then audition the result.
 Float renders preserve overs, so a peak above 0 dBFS is useful evidence of

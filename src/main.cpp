@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <thread>
@@ -19,6 +20,7 @@
 #include "engine/rt_runner.h"
 #include "graph/graph.h"
 #include "graph/subs.h"
+#include "graph/tap.h"
 #include "io/wav.h"
 #include "io/watcher.h"
 #include "rt/denormal.h"
@@ -35,6 +37,8 @@ int usage() {
       "      -o <file.wav>     output path (default out.wav)\n"
       "      --rate <hz>       sample rate (default 48000)\n"
       "      --stats [<dur>]   print peak/RMS/DC and a level timeline per window (default 10s)\n"
+      "      --tap NAME[=node[.port]]  also write <out>.NAME.wav from that endpoint (stereo\n"
+      "                        if it has l/r or out_l/out_r) and print its stats; repeatable\n"
       "  ratsnest play   <patch> [options]   live PipeWire output; hot-reloads on save\n"
       "      --latency <N/RATE>  e.g. 256/48000\n"
       "      --rate <hz>         sample rate (default 48000)\n"
@@ -125,15 +129,20 @@ void report(const std::string& patch, const ms::Diags& ds) {
                  d.line, d.col, d.msg.c_str());
 }
 
-// Returns compiled graph or nullptr after printing diagnostics.
-std::unique_ptr<ms::graph::Graph> load(const std::string& path, double rate) {
+// Returns compiled graph or nullptr after printing diagnostics. `taps`
+// (render --tap) adds capture nodes and learns their indices.
+std::unique_ptr<ms::graph::Graph> load(const std::string& path, double rate,
+                                       std::vector<ms::graph::Tap>& taps) {
   std::string src;
   if (!ms::graph::read_text_file(path, src)) {
     std::fprintf(stderr, "error: cannot read '%s'\n", path.c_str());
     return nullptr;
   }
-  auto c = ms::graph::build_patch(src, path, rate).compiled;
+  auto b = ms::graph::build_patch(src, path, rate);
+  auto& c = b.compiled;
   if (!c.ok()) { report(path, c.errors); return nullptr; }
+  const std::string tap_err = ms::graph::add_taps(b, src, path, rate, taps);
+  if (!tap_err.empty()) { std::fprintf(stderr, "error: %s\n", tap_err.c_str()); return nullptr; }
   if (c.graph->in_cables[static_cast<size_t>(c.graph->out_node)].empty())
     std::fprintf(stderr, "%s: warning: nothing is cabled into 'out'; the patch is silent\n",
                  path.c_str());
@@ -141,7 +150,8 @@ std::unique_ptr<ms::graph::Graph> load(const std::string& path, double rate) {
 }
 
 int cmd_check(const std::string& patch) {
-  if (!load(patch, 48000.0)) return 1;
+  std::vector<ms::graph::Tap> none;
+  if (!load(patch, 48000.0, none)) return 1;
   std::printf("ok\n");
   return 0;
 }
@@ -184,7 +194,9 @@ std::string meter(int fill) {
 struct RenderOpts {
   double seconds = 10.0, rate = 48000.0, start_sec = 0.0;
   std::string out_path = "out.wav";
-  double stats_window = 0.0;  // 0 = no stats
+  double stats_window = 10.0;  // also the window of each --tap's table
+  bool stats = false;
+  std::vector<ms::graph::Tap> taps;
 };
 
 bool parse_render(int argc, char** argv, RenderOpts& o) {
@@ -193,9 +205,10 @@ bool parse_render(int argc, char** argv, RenderOpts& o) {
     else if (const char* v = option(argc, argv, i, "-o")) o.out_path = v;
     else if (const char* v = option(argc, argv, i, "--start")) o.start_sec = parse_duration(v);
     else if (const char* v = option(argc, argv, i, "--rate")) o.rate = std::atof(v);
+    else if (const char* v = option(argc, argv, i, "--tap")) o.taps.push_back(ms::graph::parse_tap(v));
     else if (!std::strcmp(argv[i], "--stats")) {
       // The window length is optional: take the next word only if it is one.
-      o.stats_window = 10.0;
+      o.stats = true;
       if (i + 1 < argc && parse_duration(argv[i + 1]) > 0.0)
         o.stats_window = parse_duration(argv[++i]);
     }
@@ -255,15 +268,53 @@ void skip_frames(ms::engine::Engine& engine, size_t skip) {
   }
 }
 
-bool write_stereo(const RenderOpts& o, const std::vector<float>& l,
-                  const std::vector<float>& r) {
-  std::vector<float> interleaved(l.size() * 2);
+// A mono take (channels 1) writes `l`; its `r` carries the same signal.
+bool write_take(const std::string& path, double rate, const std::vector<float>& l,
+                const std::vector<float>& r, size_t channels) {
+  std::vector<float> interleaved(l.size() * channels);
   for (size_t i = 0; i < l.size(); ++i) {
-    interleaved[2 * i] = l[i];
-    interleaved[2 * i + 1] = r[i];
+    interleaved[channels * i + channels - 1] = r[i];
+    interleaved[channels * i] = l[i];
   }
-  return ms::io::write_wav_f32(o.out_path, interleaved.data(), l.size(), 2,
-                               static_cast<int>(o.rate));
+  return ms::io::write_wav_f32(path, interleaved.data(), l.size(), static_cast<int>(channels),
+                               static_cast<int>(rate));
+}
+
+// One tapped endpoint's samples, captured beside the mix.
+struct Take {
+  std::vector<float> l, r;
+};
+
+// Writes each tap's take (`take.wav` -> `take.kick.wav`) and prints its
+// stats block, the table --stats prints for the mix.
+bool finish_taps(const RenderOpts& o, const std::vector<Take>& takes) {
+  for (size_t i = 0; i < takes.size(); ++i) {
+    const ms::graph::Tap& t = o.taps[i];
+    const std::string path =
+        std::filesystem::path(o.out_path).replace_extension("." + t.name + ".wav").string();
+    if (!write_take(path, o.rate, takes[i].l, takes[i].r, 1u + t.stereo)) {
+      std::fprintf(stderr, "error: cannot write '%s'\n", path.c_str());
+      return false;
+    }
+    const char* const kind[] = {"mono", "stereo"};
+    std::printf("\ntap %s = %s (%s) -> %s\n", t.name.c_str(), t.endpoint.c_str(),
+                kind[t.stereo], path.c_str());
+    print_stats(takes[i].l, takes[i].r, o);
+  }
+  return true;
+}
+
+// Runs the take one sample at a time so each tap's capture node can be read
+// (the result is identical: Engine::process is per-sample).
+void run_take(ms::engine::Engine& engine, const RenderOpts& o, std::vector<float>& l,
+              std::vector<float>& r, std::vector<Take>& takes) {
+  for (size_t f = 0; f < l.size(); ++f) {
+    engine.process(&l[f], &r[f], 1);
+    for (size_t i = 0; i < takes.size(); ++i) {
+      takes[i].l[f] = engine.output_value(static_cast<size_t>(o.taps[i].node_l), 0);
+      takes[i].r[f] = engine.output_value(static_cast<size_t>(o.taps[i].node_r), 0);
+    }
+  }
 }
 
 int cmd_render(const std::string& patch, int argc, char** argv) {
@@ -273,7 +324,7 @@ int cmd_render(const std::string& patch, int argc, char** argv) {
   if (!(o.seconds > 0.0)) { std::fprintf(stderr, "error: -d needs a positive duration (90, 90s, 500ms, 2m)\n"); return 2; }
   if (!(o.start_sec >= 0.0)) { std::fprintf(stderr, "error: --start needs a duration >= 0 (90, 90s, 500ms, 2m)\n"); return 2; }
 
-  auto g = load(patch, o.rate);
+  auto g = load(patch, o.rate, o.taps);
   if (!g) return 1;
   ms::engine::Engine engine(std::move(g));
 
@@ -283,8 +334,9 @@ int cmd_render(const std::string& patch, int argc, char** argv) {
   // Decaying filter tails hit denormals; match the PipeWire thread's FTZ.
   ms::rt::flush_denormals_on_this_thread();
   skip_frames(engine, skip);
-  engine.process(l.data(), r.data(), frames);
-  if (!write_stereo(o, l, r)) {
+  std::vector<Take> takes(o.taps.size(), {std::vector<float>(frames), std::vector<float>(frames)});
+  run_take(engine, o, l, r, takes);
+  if (!write_take(o.out_path, o.rate, l, r, 2)) {
     std::fprintf(stderr, "error: cannot write '%s'\n", o.out_path.c_str());
     return 1;
   }
@@ -292,8 +344,8 @@ int cmd_render(const std::string& patch, int argc, char** argv) {
     std::printf("rendered %.1fs from %.1fs -> %s\n", o.seconds, o.start_sec, o.out_path.c_str());
   else
     std::printf("rendered %.1fs -> %s\n", o.seconds, o.out_path.c_str());
-  if (o.stats_window > 0.0) print_stats(l, r, o);
-  return 0;
+  if (o.stats) print_stats(l, r, o);
+  return !finish_taps(o, takes);
 }
 
 // ---- play -------------------------------------------------------------------

@@ -82,3 +82,16 @@ add_test(NAME cli_check_warns_silent
   COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/silent.patch)
 set_tests_properties(cli_check_warns_silent PROPERTIES
   PASS_REGULAR_EXPRESSION "warning: nothing is cabled into 'out'")
+
+# --tap: a take per endpoint beside the mix, with its own stats block; a tap
+# that does not resolve is an error naming it.
+add_test(NAME cli_render_tap
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+          -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first-tap.wav --tap saw=osc2)
+set_tests_properties(cli_render_tap PROPERTIES
+  PASS_REGULAR_EXPRESSION "tap saw = osc2 \\(mono\\) -> .*first-tap\\.saw\\.wav\npeak +-?[0-9]")
+add_test(NAME cli_render_tap_unknown
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+          -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first-tap.wav --tap x=osc3)
+set_tests_properties(cli_render_tap_unknown PROPERTIES
+  PASS_REGULAR_EXPRESSION "error: --tap x=osc3: .*did you mean")

@@ -135,8 +135,9 @@ mix.out_r -> r.in_r
 - `rec` writes on graph teardown (session end or hot reload), buffer
   preallocated at `secs` (1..600). With `gate` unpatched it records
   continuously to the cap.
-- Under an offline `render`, a `rec` drops a second clean take alongside the
-  main mix — useful for capturing a stem without a second render.
+- For an offline stem, prefer `render --tap NAME[=node[.port]]`: it writes
+  `<out>.NAME.wav` beside the mix and prints its level table without
+  touching the patch. Keep `rec` for live takes under `play`.
 
 ## Turning a render patch into an instrument
 

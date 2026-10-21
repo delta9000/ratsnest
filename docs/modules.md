@@ -33,7 +33,14 @@ seconds. Pick the suffix that matches the input's unit (Hz for `freq`/`cutoff`/
 `rate`, seconds for times, BPM for `bpm`). Omitted output means the first output
 (a bare `stepseq` name reads its `cv`, a bare `svf` its `lp`). Validate with
 `ratsnest check patch.patch`; `ratsnest render ... --stats [dur]` prints
-overall peak/RMS/DC plus a per-window level timeline for mix work. CLI
+overall peak/RMS/DC plus a per-window level timeline for mix work, and
+`--tap NAME[=node[.port]]` (repeatable) measures one part in place: it also
+writes `<out-stem>.NAME.wav` from that endpoint (stereo when it has `l`/`r`
+or `out_l`/`out_r`; a sub's output, a voice member or a default port, as a
+cable source is written) and prints the same table per tap, without
+editing the patch (`render x.patch -o take.wav --stats 8s --tap kick --tap
+pad=pad_s` writes `take.kick.wav` and `take.pad.wav`). A tap reads the
+endpoint itself, before any cable gain, and does not change the mix. CLI
 durations (`-d`, `--start`, `--stats`) take `90`, `90s`, `500ms` or `2m`;
 `ratsnest` with no arguments prints every option and its default.
 `ratsnest describe` lists the runtime modules as JSON; `ratsnest describe fm`
@@ -987,7 +994,8 @@ is high it captures the stereo input into a preallocated buffer (`secs` seconds,
 clamped `1..600`), and writes a 32-bit float stereo WAV to `file` when the graph
 is torn down (session end or hot reload). With `gate` unpatched it records
 continuously until the cap. For an offline `render`, this drops one clean take
-alongside the main mix. Editing the patch while recording restarts the take
+alongside the main mix (to measure a part offline, `render --tap` needs no
+`rec` in the patch; see "DSL essentials"). Editing the patch while recording restarts the take
 (the buffer is not migrated across reload — the outgoing take is written, the
 new one overwrites on teardown). The `file:` string must be quoted; paths are
 working-directory-relative.

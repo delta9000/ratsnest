@@ -52,6 +52,11 @@ mise run render -- patches/x.patch -d 30s -o /tmp/x.wav --stats 4s
 - **section boundary in the wrong window** → your div chain or grid is off.
 - **DC ≠ 0** → a `pulse` at `pw != 0.5`, an `abs`, or a folder. Add `dcblock`.
 
+The mix's table is dominated by its loudest part (usually the kick). To see
+one part per section, tap it: `--tap bass --tap pad=pad_s` adds a table (and
+a `<out>.NAME.wav`) per endpoint without editing the patch
+(`ratsnest-debugging`, "The solo probe").
+
 Iterate on numbers, not vibes. Two or three passes converges.
 
 ## Five rules that break patches
