@@ -143,8 +143,8 @@ essentials.
 |---|---|---|---|
 | `vco` | band-limited oscillator (shared Fourier-series tables; analytic sine) | `freq`, `wave` (sine\|tri\|saw\|pulse), `pw` | in: `v_oct` `fm` `pwm` `sync` `phase` · out: `out` |
 | `noise` | noise source | `color` (white\|pink\|brown\|blue\|violet), `seed` | out |
-| `svf` | state-variable filter | `cutoff`, `res` | in · out: `lp` (default) `bp` `hp` |
-| `ladder` | 4-pole ZDF ladder LPF | `cutoff`, `res`, `drive` | in · out |
+| `svf` | state-variable filter; bounded, self-oscillates at the top of `res` | `cutoff`, `res` | in · out: `lp` (default) `bp` `hp` |
+| `ladder` | 4-pole ZDF ladder LPF; saturating feedback, self-oscillates at the top of `res` | `cutoff`, `res`, `drive` | in · out |
 | `vca` | amplifier | `gain`, `response` (lin\|exp) | `in` `cv` · out |
 | `lpg` | vactrol-model low pass gate | `damp`, `decay` | `in` `cv` `strike` · out |
 | `fold` | wavefolder | `fold`, `sym` | `in` `fold` · out |

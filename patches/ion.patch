@@ -180,7 +180,7 @@ acid_env -> acid_filt.cutoff : 1600
 acid_acc_env -> acid_filt.cutoff : 1100
 acid_lvl -> acid_filt.cutoff : 500
 acid_amp = vca { gain: 0 }
-acid_filt -> acid_amp.in
+acid_filt -> acid_amp.in : 0.42           # ladder passband compensation: -7.6 dB keeps the old level
 acid_env -> acid_amp.cv : 0.8
 acid_acc_env -> acid_amp.cv : 0.15
 acid_post = vca { gain: 0 }

@@ -54,7 +54,7 @@ bass_vcf = ladder { cutoff: 120, res: 0.35, drive: 0.6 }
 bass_osc -> bass_vcf.in
 bass_env -> bass_vcf.cutoff : 900
 bass_amp = vca { gain: 0, response: exp }
-bass_vcf -> bass_amp.in
+bass_vcf -> bass_amp.in : 0.89          # -1 dB: ladder now compensates part of its res loss
 bass_env -> bass_amp.cv : 0.9
 
 # ---- kick: synced sine with a fast log pitch-drop envelope, soft drive ----

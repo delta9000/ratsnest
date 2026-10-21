@@ -313,12 +313,18 @@ the intended way to smooth stepped CV (section fades, portamento).
 `svf { cutoff: 1000, res: 0, v_oct: 0 }` — inputs `in`, cutoff Hz,
 resonance `0..1`, octave tracking `v_oct`; outputs `lp`, `bp`, `hp`.
 Effective cutoff = `cutoff * 2^v_oct`, clamped to `5..0.45 * sample_rate`
-(`v_oct` clamps to ±24). Linear and unconditionally stable; it does not
-self-oscillate. `res` maps to Q 0.5..50 (measured: −6 dB at the cutoff at
-`res: 0`, unity at 0.5, +13 dB at 0.9, **+34 dB at 1**), with no output
-compensation or saturation — a resonant sweep across a bright source gets
-very loud. Patch note pitch into `v_oct` for musical tracking. Modulate `cutoff` for additive
-Hz movement, or `v_oct` for proportional movement; both remain audio-rate.
+(`v_oct` clamps to ±24). Small-signal response at the cutoff: −6 dB at
+`res: 0`, unity at 0.5, +14 dB at 0.9, +23 dB at 0.95. Damping grows with the
+band-pass level (scaled by `res`, so `res: 0` is exactly linear and unchanged),
+which keeps loud resonance bounded: a 0.8 sine at the cutoff peaks at 1.7 at
+`res: 0.9` and 2.2 at `res: 1` (a ±4 input: 3.5 / 3.7). Above about **0.97 it
+self-oscillates** with no input into a clean sine of about ±1 on all three
+outputs (THD ≈0.4 % `lp`, 1.3 % `bp`, 4 % `hp`), within ~1 cent of the
+effective cutoff from 55 Hz to 3.5 kHz — at `res: 1` it is a sine oscillator
+played through `v_oct`. Input still mixes in, and a loud input pulls the
+oscillation's level around. Patch note pitch into `v_oct` for musical
+tracking. Modulate `cutoff` for additive Hz movement, or `v_oct` for
+proportional movement; both remain audio-rate.
 
 ## `noise`
 
@@ -404,13 +410,18 @@ while low.
 
 Inputs `in` 0, `cutoff` 1000 Hz, `res` 0 (`0..1`), `drive` 0 (`0..4`),
 `v_oct` 0; four-pole low-pass output `out`. Effective cutoff = `cutoff * 2^v_oct`,
-clamped to `5..0.45*rate` (`v_oct` clamps to ±24). The ladder is linear: `drive`
-saturates the input only (0 is an exact bypass), never the feedback loop. As
-on the hardware, the passband drops as `res` rises (measured at 100 Hz:
-−9 dB at 0.5, −14 dB at 1), with no compensation. `res: 1` is exactly the
-self-oscillation edge: the ring never decays, and an input at the cutoff is
-not bounded (a 0.8 sine peaked near 900) — stay below about 0.95 or put a
-limiter/`drive` downstream. Example: `env -> filter.cutoff : 1800` adds Hz;
+clamped to `5..0.45*rate` (`v_oct` clamps to ±24). `drive` saturates the
+input (0 is an exact bypass); the feedback path has its own tanh saturator,
+so resonance is bounded: a 0.8 sine at the cutoff peaks at 1.5 at `res: 0.9`
+and 2.2 at `res: 1` (a ±4 input: 4.0 / 5.5). Small-signal gain at the cutoff:
+−12 dB at `res: 0`, −4 dB at 0.5, +6 dB at 0.75, +21 dB at 0.9. Above about
+**0.93 it self-oscillates** with no input into a clean sine (THD ≈0.25 %) that
+reaches ±1 at `res: 1`, within 0.5 cent of the effective cutoff — play it as
+an oscillator through `v_oct`. The passband still drops as `res` rises, but
+only partly (input gain `1 + 0.6·k·res²` against the loop's `1/(1+k)`): at
+100 Hz, cutoff 1 kHz, −5.6 dB at 0.25 (uncompensated −5.9), −7 dB at 0.5
+(−9.5), −6 dB at 0.75 (−12), −4.5 dB at 0.9 (−13). At `res: 0` it is
+unchanged. Example: `env -> filter.cutoff : 1800` adds Hz;
 `notes.cv -> filter.v_oct` tracks pitch by octaves without a negative cutoff.
 
 ## `lpg`

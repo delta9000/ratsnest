@@ -31,7 +31,7 @@ osc2 -> vcf.in : 0.5
 filt_env -> vcf.cutoff : 3200
 
 amp = vca { gain: 0, response: exp }
-vcf -> amp.in
+vcf -> amp.in : 0.81                    # -1.8 dB: ladder now compensates part of its res loss
 amp_env -> amp.cv : 0.9
 
 # ---- space: echo hand-tuned to the tempo (dotted eighth at 100 BPM) ----

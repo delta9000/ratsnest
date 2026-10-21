@@ -180,16 +180,17 @@ sweep sounds like rather than how much.
 
 ## Gotchas
 
-- Neither `ladder` nor `svf` self-oscillates from silence — both are linear
-  zero-delay-feedback designs, so no input means no output, forever. `ladder`
-  at `res: 1.0` is *marginally stable*: excite it once and it rings
-  indefinitely, and successive pings stack instead of replacing (measured:
-  level climbing across four hits, never falling). Use 0.95–0.98 for a
-  decaying ping and reserve 1.0 for deliberate drones. (Probed: at `res: 1.0`
-  the ring sits at a flat level between one-per-second pings and each new hit
-  interferes with the old one instead of replacing it.)
-- `svf.res` is 0..1 mapping to damping `k = 2 - 1.98*res`; even at 1.0 that is
-  Q ≈ 50, resonant but tame compared with `ladder` at 0.9.
+- Both filters **self-oscillate at the top of `res`**: `ladder` from about
+  0.93, `svf` from about 0.97, into a clean sine that reaches ±1 at `res: 1`
+  and sits within a cent of the cutoff. Below the edge they ring and decay;
+  above it they sing forever with no input. For a decaying ping stay under
+  0.92 (`ladder`) or 0.96 (`svf`); at 1.0 either one is a sine oscillator —
+  patch pitch into `v_oct` and it plays in tune. Both saturate, so a loud
+  input at resonance stays within a few units instead of exploding.
+- `svf` below 0.9 has the same Q curve it always had (−6 dB at the cutoff at
+  0, unity at 0.5, +14 dB at 0.9); `ladder` partly compensates its passband
+  loss (−7 dB at 0.5, −4.5 dB at 0.9, where an uncompensated ladder loses
+  13 dB). See `docs/modules.md` for the measured tables.
 - `vco.fm` is *relative linear* FM scaled by the `freq` base, not the current
   pitch: `f = freq * 2^v_oct + fm * freq`. Depth stays constant in Hz as you
   play up the keyboard, so a fixed FM index gets relatively weaker up high.
@@ -226,6 +227,7 @@ the bass card (`bass.md`) takes the acid and reese variants further.
 - Sync the master oscillator to the *sequencer clock* instead of another
   oscillator (`clk -> osc.sync`) — every note starts at identical phase, which
   is how you get a kick-tight attack transient with no click.
-- Ping a `res: 1.0` ladder once at the start of a piece and never again. It
-  rings for the whole track; treat it as a drone source and duck it with the
-  kick.
+- A `res: 1.0` ladder needs no input at all: it is a ±1 sine at the cutoff.
+  Track it with `v_oct`, sweep `cutoff`, and feed it a little of the bass so
+  the oscillation bends against the input — treat it as a drone source and
+  duck it with the kick.

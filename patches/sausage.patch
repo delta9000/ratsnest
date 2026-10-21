@@ -189,7 +189,7 @@ bass_vcf = ladder { cutoff: 200, res: 0.4, drive: 2.0 }
 bass_osc -> bass_vcf.in
 bass_env -> bass_vcf.cutoff : 1000.0
 bass_amp = vca { gain: 0.0 }
-bass_vcf.out -> bass_amp.in
+bass_vcf.out -> bass_amp.in : 0.84      # -1.5 dB: ladder now compensates part of its res loss
 bass_env -> bass_amp.cv : 1.0
 
 # Layer 2: Deep sine sub-bass (follows chord root)
