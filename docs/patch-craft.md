@@ -363,8 +363,8 @@ about −80 dB per block). Three songs in `patches/tracker/` show the composing
 features: `whole-step` (chord tones from one harmony track, `chorus^2` for the
 key change, sections), `dorian-sidestep` (lanes with ghost notes, overlay
 fills, `^N` and `@R` motif variation, swing from `transport`) and `lantern`
-(extended chords, `>` ramps for the form, a counter-line in chord degrees
-through `quant`):
+(extended chords, `>` ramps for the form, a free-running `ctr~`
+counter-line in chord degrees through `quant`):
 
 - **Two trackers, two clocks.** One for notes at the finest grid the song
   needs (`clock { bpm: 4 × tempo }` = sixteenths), one for the form clocked
@@ -385,6 +385,12 @@ through `quant`):
   the first pattern and the rest wrap inside it. Put the longest pattern
   first (a longer later layer is an error, not a silent cut). A one-shot (a drop hit, a fill) is an overlay, `hit@0` or
   `fill@48`: it plays once and overrides the loop under it.
+- **Polymeter is a `~` layer, not a second tracker.** `section verse
+  bar+seven~` loops a 7-row figure on the song's row count, so it keeps its
+  phase across steps and sections and realigns with 16-row bars every 7
+  bars. No second tracker, no LCM master clock (`lantern` used to run a
+  1280 BPM clock and three dividers for a 7-against-5 counter-line). It may
+  outlast the step; put it in every section that should hear it.
 - **The gate is the trigger.** Each note or `x` re-articulates with a
   one-sample gap, so `gateN` drives `func.trig`, `adsr.gate`, `lpg.strike`
   and `vco.sync` directly; no `stepseq.trig`, no `logic { op: and }` with a

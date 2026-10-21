@@ -362,6 +362,28 @@ bar and `chords+chop+hit@0` a drop hit, without full-length copies. Only
 overlays may share tracks with other layers; the first layer sets the step
 length and cannot be one; R past the step's last row is an error.
 
+### 8.4b Free-running layers: `name~`
+
+In a layer group, a layer written `name~` (with `^N` before or after) loops
+on the **song** row instead of the step row: on song row s it plays its row
+s mod its length, so its phase carries across steps and sections instead of
+restarting at each. A 7-row figure over 16-row bars therefore drifts through
+the bar and realigns every 7 bars, with no second tracker and no
+least-common-multiple clock. It follows the looping layers' rules otherwise
+(it may not share tracks; every event replaces the held state), except that
+it may be longer than the step, since its tail plays in the steps that
+follow. It must be repeated in every step that should hear it (a section is
+the place to put it once). The first layer sets the step length and cannot
+be free-running; a layer cannot be both `~` and an `@` overlay. Phase counts
+from the first row of the song, so a `start` or a `|:` wrap replays the
+phase it had there the first time through.
+
+`~` was chosen because it already means "carries on" in a cell (`~D4`, a
+slur: the note continues without re-attack) and is not one of the order
+list's other marks (`+ ^ @ * |:`); a word (`free:name`) would not compose
+with `^N`/`@R` the same way, and a second order list per layer would split
+one song across two timelines.
+
 ### 8.5 Drum lanes: `lane <track> <steps>`
 
 Inside a pattern, `lane kick x... x... x..x x.0.` writes one row per

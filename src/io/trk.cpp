@@ -52,8 +52,11 @@ struct Pattern {
 // A layer as written in the order list (`name^N`), then resolved.
 // `at` is the `@R` text (col 0: none). `outer` is a section's `^N`, which
 // moves written pitches but not chord tones: those follow their source.
-struct Spec { Tok name; int shift = 0; Tok at{{}, 0}; int outer = 0; };
-// `at`: the step row a one-shot overlay starts on; -1 loops.
+// `free` is the column of a `~` (0: none).
+struct Spec { Tok name; int shift = 0; Tok at{{}, 0}; int outer = 0; int free = 0; };
+// `at`: the step row a one-shot overlay starts on; -1 loops within the
+// step; kFree loops on the song row, so its phase carries across steps.
+constexpr int kFree = -2;
 struct Layer { int pat = 0; int shift = 0; int at = -1; int outer = 0; };
 struct Entry { std::vector<Spec> specs; int repeat = 1; std::vector<Layer> layers; };
 // `section <name> <layers>`: a named layer group for the order list.
@@ -446,15 +449,16 @@ class Parser {
     }
   }
 
-  // One layer: `name` with an optional `^N` transposition in semitones and
-  // `@R` start row, in either order.
+  // One layer: `name` with an optional `^N` transposition in semitones,
+  // `@R` start row and `~` free-running mark, in any order.
   Spec spec(const Tok& t) {
-    size_t cut = std::min(t.s.find_first_of("^@"), t.s.size());
+    size_t cut = std::min(t.s.find_first_of("^@~"), t.s.size());
     Spec sp{{t.s.substr(0, cut), t.col}};
     while (cut < t.s.size() && out_.errors.empty()) {
-      const size_t next = std::min(t.s.find_first_of("^@", cut + 1), t.s.size());
+      const size_t next = std::min(t.s.find_first_of("^@~", cut + 1), t.s.size());
       const Tok arg{t.s.substr(cut + 1, next - cut - 1), t.col + static_cast<int>(cut) + 1};
       if (t.s[cut] == '@') sp.at = arg;
+      else if (t.s[cut] == '~') sp.free = arg.s.empty() ? arg.col - 1 : (err(arg, "'~' takes no value (a free-running layer is 'name~')"), 0);
       else if (!to_int(arg.s, -48, 48, sp.shift))
         err(arg.col - 1, "transpose must be '^N' with N in -48..48 semitones");
       cut = next;
@@ -533,8 +537,9 @@ class Parser {
       const Tok& n = sp.name;
       const int id = find_named(pats_, n.s);
       if (id < 0) return err(n, "unknown pattern '" + std::string(n.s) + "'" + unknown(n.s));
-      Layer l{id, sp.shift, -1, sp.outer};
-      if (sp.at.col ? !overlay(e, sp, l) : !(own(owner, n, id) && fits(e, n, id))) return;
+      Layer l{id, sp.shift, sp.free ? kFree : -1, sp.outer};
+      if (sp.free && !runs_free(e, sp)) return;
+      if (sp.at.col ? !overlay(e, sp, l) : !(own(owner, n, id) && (sp.free || fits(e, n, id)))) return;
       e.layers.push_back(l);
     }
   }
@@ -571,6 +576,14 @@ class Parser {
                       std::to_string(first.rows) + " rows, set by '" + first.name +
                       "'); list the longest layer first"),
            false;
+  }
+
+  // `name~` loops on the song row, so it may outlast the step; it cannot set
+  // the step's length or be a one-shot.
+  bool runs_free(const Entry& e, const Spec& sp) {
+    if (sp.at.col) return err(sp.free, "a layer is either free-running '~' or a one-shot '@' overlay, not both"), false;
+    if (!e.layers.empty()) return true;
+    return err(sp.free, "the first layer sets the step length; put a free-running '~' layer after it"), false;
   }
 
   // `name@R`: plays once from row R of the step, over the layers before it.
@@ -644,8 +657,8 @@ class Parser {
     const int len = pats_[static_cast<size_t>(e.layers[0].pat)].rows;
     for (int r = 0; r < len; ++r) {
       Cue cue[kTrkTracks];
-      for (const Layer& l : e.layers) cues(l, r, cue);
       const int row = static_cast<int>(at / tracks_.size());
+      for (const Layer& l : e.layers) cues(l, l.at == kFree ? row : r, cue);
       for (size_t tr = 0; tr < tracks_.size(); ++tr) {
         tick(tr, cue[tr], row);
         out_.song.rows[at++] = voice_[tr].s;
@@ -654,7 +667,7 @@ class Parser {
     return at;
   }
 
-  // What layer `l` plays on step row `r`, per track.
+  // What layer `l` plays on step row `r` (song row, if free), per track.
   // An overlay plays only within its span, and only its non-empty events.
   void cues(const Layer& l, int r, Cue* cue) const {
     const Pattern& p = pats_[static_cast<size_t>(l.pat)];

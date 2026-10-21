@@ -1,26 +1,16 @@
 # lantern -- slow, harmonically rich, 64 BPM, 48 bars = 180 s.
-#   lantern.trk     pad (4 voices over 2 tracks), bass, melody, plus the
-#                current chord's quant mask and root for the generative parts
-#   lantern-counter.trk  a 7-step phrase of chord DEGREES at 5 rows per bar
-#   lantern-form.trk     eight level/filter columns, one row per bar
+#   lantern.trk       pad (4 voices over 2 tracks), bass, melody, the current
+#                     chord's quant mask and root for the generative parts, and
+#                     a free-running 7-step counter-line of chord DEGREES
+#   lantern-form.trk  eight level/filter columns, one row per bar
 # Generative sparkle: euclid -> turing -> quant (chord mask) -> mallet.
-#
-# Clock tree: 1280 BPM master = 80 ticks/bar (LCM of 16ths and 5-per-bar).
+# One transport clocks everything: sixteenths for the notes, bars for the form.
 
-master  = clock { bpm: 1280 }
-six     = div { by: 5 }       # sixteenths
-quin    = div { by: 16 }      # five per bar
-bar     = div { by: 80 }
-master -> six.in
-master -> quin.in
-master -> bar.in
-
+t    = transport { bpm: 64, division: 4 }
 song = tracker { file: "lantern.trk" }
-ctr  = tracker { file: "lantern-counter.trk" }
 form = tracker { file: "lantern-form.trk" }
-six  -> song.clock
-quin -> ctr.clock
-bar  -> form.clock
+t.clock -> song.clock
+t.bar   -> form.clock
 
 # ---- form lanes, slewed ----
 pad_lvl  = func { rise: 3, fall: 3 }
@@ -149,10 +139,10 @@ A4v -> cq.in
 song.cvb2 -> cq.root
 song.cva2 -> cq.mask
 -4095 -> cq.mask                 # mask input base is 4095 and cables sum onto it
-ctr.cva1 -> cq.degree
-ctr.gate1 -> cq.clock
+song.cva5 -> cq.degree
+song.gate5 -> cq.clock
 ctr_v = sub { file: "../lib/mallet.sub", tune: A3, decay: 2.2s }
-ctr.gate1 -> ctr_v.trig
+song.gate5 -> ctr_v.trig
 cq.out -> ctr_v.cv
 c_amp = vca { gain: 0 }
 ctr_v.main -> c_amp.in
@@ -160,7 +150,7 @@ ctr_lvl -> c_amp.cv : 0.45
 
 # ---- sparkle: euclid sixteenths -> turing -> quant (same chord mask) ----
 spk_pat = euclid { steps: 16, hits: 1, rot: 3 }
-six -> spk_pat.clock
+t.clock -> spk_pat.clock
 spk_lvl -> spk_pat.hits : 5
 tm = turing { len: 11, prob: 0.12, seed: 4 }
 spk_pat.trig -> tm.clock

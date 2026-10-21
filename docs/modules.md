@@ -739,6 +739,18 @@ Composing (all resolved when the file loads; the ports never change):
   (not looping), and its non-empty events replace the earlier layers' on
   the same tracks: `order verse+beat+fill@48`. Only overlays may share
   tracks; the first layer cannot be one.
+- **Free-running layers (polymeter):** in a layer group, `name~` loops on
+  the song's row count instead of restarting each step, so its phase carries
+  across steps and sections (it may outlast the step; it may not share
+  tracks, be the first layer, or be an `@` overlay). `~` because it already
+  means "carries on" (a slur). A 7-row figure over 16-row bars:
+
+  ```text
+  pattern bar 16 kick         # the one-bar groove, restarted every step
+  pattern seven 7 bell        # 7 rows: realigns with the bar every 7 bars
+  section verse bar+seven~    # put it in every step that should hear it
+  order verse*7 verse^5*7
+  ```
 - **Drum lanes:** inside a pattern, `lane kick x... x... x..x x.0.` writes
   one row per character from row 0 (spaces ignored): `.` empty, `x` hit,
   `1`–`9` hit at vel n/9 (if the track has `vel`), `0` off. Lanes and row

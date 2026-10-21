@@ -393,6 +393,50 @@ TEST_CASE("trk: overlay diagnostics") {
   fails(h + "order p+q\n", 4, 9, "only an '@' overlay may share tracks");
 }
 
+TEST_CASE("trk: a '~' layer runs free across steps and sections") {
+  // A 3-row figure over 4-row steps: its phase follows the song row, so it
+  // never restarts at a step boundary; a plain loop layer does.
+  auto s = ok("track k note\ntrack c cva\ntrack d cva\n"
+              "pattern bar 4 k\n| x\n"
+              "pattern three 3 c\n| 1\n| 2\n| 3\n"
+              "pattern two 2 d\n| 7\n| 8\n"
+              "pattern long 6 c\n| 10\n05 | 15\n"
+              "section verse bar+three~^12\n"
+              "order bar+three~+two bar+two+three~ verse\n"
+              "order bar+long~*2\n");
+  REQUIRE(s.length() == 20);
+  for (int r = 0; r < 12; ++r) {
+    CAPTURE(r);
+    CHECK(at(s, r, 1).cva == static_cast<float>(r % 3 + 1));
+    CHECK(at(s, r, 2).cva == (r < 8 ? static_cast<float>(r % 4 % 2 + 7) : 8.0f));
+  }
+  // Steps 3 and 4 (rows 12..19): a free layer longer than the step is fine.
+  CHECK(at(s, 12, 1).cva == 10.0f);
+  CHECK(at(s, 17, 1).cva == 15.0f);
+  CHECK(at(s, 18, 1).cva == 10.0f);   // 18 % 6 = 0, mid-step
+  // Spliced in by a section, the free layer keeps the song's phase (row 8
+  // is 8 % 3 = 2), and its ^12 leaves numeric values alone.
+  CHECK(at(s, 8, 1).cva == 3.0f);
+
+  // docs/modules.md's example: a 7-row figure over 16-row bars.
+  s = ok("track kick note\ntrack bell note\n"
+         "pattern bar 16 kick\n| x\npattern seven 7 bell\n| C4\n"
+         "section verse bar+seven~\norder verse*7 verse^5*7\n");
+  REQUIRE(s.length() == 224);
+  for (int r = 0; r < 224; ++r) CHECK(at(s, r, 1).retrig == (r % 7 == 0));
+  CHECK(at(s, 112, 1).voct == doctest::Approx(at(s, 0, 1).voct + 5.0f / 12));
+}
+
+TEST_CASE("trk: free-running layer diagnostics") {
+  const std::string h = "track a note\ntrack b cva\npattern p 4 a\npattern q 2 b\npattern r 2 a\n";
+  fails(h + "order q~+p\n", 6, 8, "the first layer sets the step length; put a free-running '~' layer after it");
+  fails(h + "order p+q~@1\n", 6, 10, "either free-running '~' or a one-shot");
+  fails(h + "order p+q@1~\n", 6, 12, "either free-running '~' or a one-shot");
+  fails(h + "order p+q~x\n", 6, 11, "'~' takes no value");
+  fails(h + "order p+r~\n", 6, 9, "only an '@' overlay may share tracks");
+  fails(h + "section s q~\norder p\n", 6, 12, "the first layer sets the step length");
+}
+
 TEST_CASE("trk: drum lanes write one row per character") {
   auto s = ok("track kick note\ntrack hat note vel len 1\ntrack bass note\n"
               "pattern beat 8\n"

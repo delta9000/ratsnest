@@ -1,10 +1,12 @@
 # lantern.trk -- "Lantern" notes. 64 BPM, 16 rows per bar.
 # intro 4 bars | A 16 | B (D pedal, climax) 16 | A' 8 | end 4 = 48 bars.
+# The counter-line (track 5) is a free-running layer: see pattern ctr.
 
 track pad   note cva cvb    # 1: pad voices 1, 2, 3 (low to high)
 track pad4  note cva cvb    # 2: pad voice 4 | quant mask | root (semitones from A)
 track bass  note vel        # 3
 track mel   note vel        # 4
+track ctr   note cva        # 5: strike | chord DEGREE (quant.degree)
 
 # masks: bit k = semitone k above the root
 #   maj9 2197  m9 1165  sus2add11 165  m7add11 1193  maj7#11 2261
@@ -97,8 +99,40 @@ pattern mel_out 8x16 mel
 6:00 | A4:14 .35
 8:00 | B4:12 .35
 
-section a      achords+mel_a
-section b      mel_b+bchords       # 256-row melody first: chords loop twice
-section aprime ahalf+mel_out
+# counter: the 7-step phrase 0 2 . 1 3 . -1 (chord DEGREES; the patch steps
+# them through the current chord's mask, so it re-harmonizes under every
+# chord) at five steps per bar, each on its nearest sixteenth. Seven steps
+# against five realign every 7 bars: 112 rows = five phrases. It runs free
+# (`ctr~`), so the sections' 4/16/16/8/4 bars never restart it.
+pattern ctr 7x16 ctr
+1:00 | x 0
+1:03 | x 2
+1:10 | x 1
+1:13 | x 3
+2:03 | x -1
+2:06 | x 0
+2:10 | x 2
+3:00 | x 1
+3:03 | x 3
+3:10 | x -1
+3:13 | x 0
+4:00 | x 2
+4:06 | x 1
+4:10 | x 3
+5:00 | x -1
+5:03 | x 0
+5:06 | x 2
+5:13 | x 1
+6:00 | x 3
+6:06 | x -1
+6:10 | x 0
+6:13 | x 2
+7:03 | x 1
+7:06 | x 3
+7:13 | x -1
 
-order intro a b aprime end
+section a      achords+mel_a+ctr~
+section b      mel_b+bchords+ctr~  # 256-row melody first: chords loop twice
+section aprime ahalf+mel_out+ctr~
+
+order intro+ctr~ a b aprime end+ctr~
