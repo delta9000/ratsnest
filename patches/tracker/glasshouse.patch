@@ -92,43 +92,21 @@ bass -> bass_s.in
 bass_lvl -> bass_s.level
 duck_bass -> bass_s.duck
 
-# Pad: four voices on the chord + extension, one shared brightness lane.
-padv = subdef {}
-padv.voct = input {}
-padv.gate = input {}
-padv.cut  = input {}
-padv.main = output {}
-padv.v = sub { file: "../lib/synth-voice.sub", blend: 0, osc_lvl: 0.22, slope: 0,
-               track: 0, cutoff: 900, res: 0.2, env_amt: 0, curve: lin, hp: 260,
-               attack: 0.3, decay: 1, sustain: 0.8, release: 1.5 }
-padv.voct -> padv.v.voct
-padv.gate -> padv.v.gate
-padv.cut  -> padv.v.cut
-padv.v -> padv.main.in
-pad1 = sub { def: padv }
-pad2 = sub { def: padv }
-pad3 = sub { def: padv }
-pad4 = sub { def: padv }
-song.voct4 -> pad1.voct
-song.cva4  -> pad2.voct
-song.cvb4  -> pad3.voct
-song.voct5 -> pad4.voct
-0.005  -> pad2.voct
--0.005 -> pad3.voct
-0.003  -> pad4.voct
-song.gate4 -> pad1.gate
-song.gate4 -> pad2.gate
-song.gate4 -> pad3.gate
-song.gate4 -> pad4.gate
-cut_lvl -> pad1.cut : 4500
-cut_lvl -> pad2.cut : 4500
-cut_lvl -> pad3.cut : 4500
-cut_lvl -> pad4.cut : 4500
+# Pad: one poly-pad.sub -- a `chord` bank stamping one synth-voice per
+# tone -- on the chord + extension, one shared brightness lane.
+pad = sub { file: "../lib/poly-pad.sub", blend: 0, osc_lvl: 0.22, track: 0,
+            res: 0.2, hp: 260 }
+song.gate4 -> pad.gate
+song.voct4 -> pad.p1
+song.cva4  -> pad.p2
+song.cvb4  -> pad.p3
+song.voct5 -> pad.p4
+0.005  -> pad.p2
+-0.005 -> pad.p3
+0.003  -> pad.p4
+cut_lvl -> pad.cut : 4500
 pad_s = sub { file: "../lib/strip.sub", gain: 1.98, send_gain: 0.202 }
-pad1 -> pad_s.in
-pad2 -> pad_s.in
-pad3 -> pad_s.in
-pad4 -> pad_s.in
+pad -> pad_s.in
 pad_lvl -> pad_s.level
 duck_pad -> pad_s.duck
 p_cho = chorus { voices: 3, depth: 0.6, mix: 0.5 }

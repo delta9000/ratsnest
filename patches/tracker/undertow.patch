@@ -94,37 +94,19 @@ riff -> riff_s.in
 riff_lvl -> riff_s.level
 duck_riff -> riff_s.duck
 
-# ---- pad: three saws on harm, adsr per bar, opened by the riser ----
-padv = subdef {}
-padv.voct = input {}
-padv.gate = input {}
-padv.cut  = input {}
-padv.main = output {}
-padv.v = sub { file: "../lib/synth-voice.sub", blend: 0, osc_lvl: 0.3, slope: 0,
-               track: 0, cutoff: 600, res: 0.2, env_amt: 0, curve: lin, hp: 220,
-               attack: 0.6, decay: 1, sustain: 0.8, release: 1.5 }
-padv.voct -> padv.v.voct
-padv.gate -> padv.v.gate
-padv.cut  -> padv.v.cut
-padv.v -> padv.main.in
-pad1 = sub { def: padv }
-pad2 = sub { def: padv }
-pad3 = sub { def: padv }
-song.voct6 -> pad1.voct
-song.cva6  -> pad2.voct
-song.cvb6  -> pad3.voct
-0.005  -> pad2.voct
--0.005 -> pad3.voct
-song.gate6 -> pad1.gate
-song.gate6 -> pad2.gate
-song.gate6 -> pad3.gate
-riser_lvl -> pad1.cut : 2500
-riser_lvl -> pad2.cut : 2500
-riser_lvl -> pad3.cut : 2500
+# ---- pad: three saws on harm (one poly-pad.sub), adsr per bar, opened by
+# the riser ----
+pad = sub { file: "../lib/poly-pad.sub", n: 3, blend: 0, osc_lvl: 0.3, track: 0,
+            cutoff: 600, res: 0.2, hp: 220, attack: 0.6 }
+song.gate6 -> pad.gate
+song.voct6 -> pad.p1
+song.cva6  -> pad.p2
+song.cvb6  -> pad.p3
+0.005  -> pad.p2
+-0.005 -> pad.p3
+riser_lvl -> pad.cut : 2500
 pad_s = sub { file: "../lib/strip.sub", gain: 1.697, send_gain: 0.177 }
-pad1 -> pad_s.in
-pad2 -> pad_s.in
-pad3 -> pad_s.in
+pad -> pad_s.in
 pad_lvl -> pad_s.level
 duck_pad -> pad_s.duck
 p_cho = chorus { voices: 3, depth: 0.6, mix: 0.5 }

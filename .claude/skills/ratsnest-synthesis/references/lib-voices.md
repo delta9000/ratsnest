@@ -27,6 +27,7 @@ overrides a `param`; unknown keys are compile errors, so a typo is caught by
 | `lib/sym-drone.sub` | `tune` E2, `damp` .84, `damp2` .88, `pos` .28, `pos2` .35, `prate` .18, `pdepth` .45, `pfb` .15 | `trig`, `root` (0), `fifth` (0.58333), `phmix` (0.35) | `main`, `aux` |
 | `lib/frozen-cloud.sub` | `secs` 2.5, `seed` 7 | `in`, `freeze`, `lvl` (1) | `main`, `dry`, `hall` |
 | `lib/synth-voice.sub` | `wave1` saw, `wave2` pulse, `blend` .35, `osc_lvl` 1, `detune` .004, `oct2` 0, `pw` .5, `sublvl` 0, `sub_oct` −1, `cutoff` 1200hz, `res` .25, `drive` 0, `slope` 1 (ladder; 0 = svf), `track` .5, `env_amt` 2500hz, `attack`/`decay`/`sustain`/`release` .01/.4/.7/.2, `curve` exp, `hp` 5hz, `glide` 0, `vib` 0, `vib_rate` 5.3hz | `voct`, `gate`, `vel` (1), `level` (1), `cut` (0, Hz) | `main` |
+| `lib/poly-pad.sub` | `n` 4 (1..4), `strum` 0 (s), synth-voice's `wave1`/`wave2`/`blend`/`detune`/`cutoff`/`res`/`slope`/`track`/`env_amt`/`hp`/ADSR/`curve` at its pad preset, `osc_lvl` .25 per voice | `p1`..`p4` (v/oct), `gate`, `vel` (1), `level` (1), `cut` (0, Hz) | `main` (sum of voices) |
 | `lib/strip.sub` | `gain` 1, `pos` 0, `width` 1, `send_gain` 0 | `in` or `in_l`/`in_r`, `level` (1), `duck` (1), `pan` (0), `send` (1) | `l`, `r`, `fx` |
 | `lib/duck.sub` | `depth_db` −6, `attack` .004, `release` .25, `curve` lin | `trig`, `amount` (1) | `gain` |
 | `lib/master-chain.sub` | EQ, `comp_thr` −16, `comp_ratio` 2.4, `comp_blend` .85, `key_bus` 0, `clip_drive` 6.5, `clip_blend` .32, `ceiling` −0.4, `true_peak` off | `in_l`/`in_r`, `side_l`/`side_r`, `width` (1.15), `makeup` (3.0 dB) | `l`, `r` |
@@ -58,8 +59,22 @@ lead_s.fx -> room.in_l            # post-fader, post-duck
   sub_oct: 0, cutoff: 200, drive: 0.5, sustain: 0, decay: 0.5, release: 0.5`.
   Set `track: 0` to reproduce a hand-built voice with an untracked filter.
   Velocity into `vel` brightens as well as louder; into `level` it only
-  louder. A chord pad is one instance per chord tone (an inline `subdef`
-  holds the shared params: `patches/tracker/glasshouse.patch`).
+  louder.
+- **Chord pads** are one tone stamped per note, never an instance per chord
+  tone by hand. `lib/poly-pad.sub` is one line plus a cable per pitch:
+
+  ```text
+  pad = sub { file: "../lib/poly-pad.sub", n: 3, cutoff: 600, attack: 0.6 }
+  song.gate6 -> pad.gate
+  song.voct6 -> pad.p1             # track harm note cva cvb
+  song.cva6  -> pad.p2
+  song.cvb6  -> pad.p3
+  pad -> pad_s.in
+  ```
+
+  For a tone poly-pad does not expose, bind any voice to a `chord` bank by
+  hand (`pad = voice { notes: ch }`, `pad.v = sub {...}`): docs/patch-craft.md
+  "Chord pads".
 - **strip** replaces `mix` for anything but a static mono kit: no slot limit
   (cables into the master's inputs sum), a stereo source is one strip, the
   `fx` send is tapped after the fader and the duck (a part muted by its lane
@@ -131,6 +146,7 @@ Each sub instantiated alone, `main -> out.in` at unity, 120 BPM triggers,
 | `kit/hat_model.sub` | −6.3 | −31.5 | the quietest voice; lift it ~3 dB against `kit/hat` |
 | `kit/crash.sub` | −5.1 | −21.6 | one hit, RMS over its first second; −20 dB at 0.98 s, centroid 5.7 kHz |
 | `synth-voice.sub` | −3.2 | −18.0 | lead defaults, accented eighths A2–A3; pluck −3.3/−20.2, pad −2.1/−12.6, bass −4.4/−20.3 |
+| `poly-pad.sub` | −3.3 | −17.3 | defaults, four voices, the demo's Am7/Fmaj7; a straight sum, so level follows `n` |
 | `strip.sub` | — | — | unity: mono at centre −3.0 dB per side, stereo pair at centre 0 dB |
 | `duck.sub` | — | — | `gain` 1.0 at rest, 0.501 at the −6 dB dip, back to 0.99 at `release` |
 | `sym-drone.sub` | −5.5 | −27.9 | sustained, so RMS is the meaningful figure |

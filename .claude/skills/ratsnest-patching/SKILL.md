@@ -88,6 +88,22 @@ Iterate on numbers, not vibes. Two or three passes converges.
   voice only for what synth-voice cannot do. Interfaces:
   `ratsnest-synthesis/references/lib-voices.md`; worked:
   `patches/tracker/glasshouse.patch`, `undertow.patch`.
+- **Chord pads: one tone, stamped per note.** A chord track (`note cva cvb
+  cvd`, one gate) feeds a `chord` bank; a `voice` group bound to it stamps
+  the tone once per pitch. Never hand-instantiate a voice per chord tone:
+
+  ```text
+  pad = sub { file: "../lib/poly-pad.sub", n: 3, cutoff: 600 }
+  song.gate6 -> pad.gate
+  song.voct6 -> pad.p1
+  song.cva6  -> pad.p2
+  song.cvb6  -> pad.p3
+  pad -> pad_s.in
+  ```
+
+  `strum:` staggers the gates; a slur moves pitches with no retrigger. Any
+  other tone: `ch = chord {}`, `pad = voice { notes: ch }`, `pad.v = sub
+  {...}` (docs/patch-craft.md "Chord pads").
 - **Clock tree, not clocks.** One `clock` at 4× the tempo, then a chain of
   `div { by: 2 }`. Every rhythm in the patch is phase-locked for free, and
   "offbeat" is `logic{and}` of eighth with `logic{not}` of quarter.

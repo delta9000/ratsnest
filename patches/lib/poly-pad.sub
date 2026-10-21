@@ -1,0 +1,100 @@
+# poly-pad.sub -- a chord pad: one `synth-voice.sub` per chord tone, stamped
+# by a voice group from a `chord` bank. Define the tone once; the chord
+# plays it per note (the ZEN-Core "tone" idea). Replaces a hand-instantiated
+# voice template per chord tone (about eleven lines each).
+#
+#   pad = sub { file: "lib/poly-pad.sub", n: 3, cutoff: 600, attack: 0.6 }
+#   song.gate6 -> pad.gate
+#   song.voct6 -> pad.p1             # a tracker chord track: note cva cvb
+#   song.cva6  -> pad.p2
+#   song.cvb6  -> pad.p3
+#   pad -> pad_strip.in
+#
+# Inputs: `p1`..`p4` (v/oct, one per voice; cable a small constant onto one
+# to detune that voice, `0.005 -> pad.p2`), `gate` (one gate for the whole
+# chord; a one-sample drop retriggers every voice, a pitch change under a
+# held gate -- a tracker slur -- glides nothing and retriggers nothing),
+# `vel` (default 1, latched per chord), `level` (default 1, per voice,
+# post-envelope), `cut` (Hz summed onto `cutoff`: `lane -> pad.cut : 4000`).
+# Output `main`: the straight sum of the `n` voices (no hidden 1/n).
+#
+# Params: `n` voices (1..4 here; `chord` itself takes 8), `strum` (seconds
+# between successive voices' gates, negative = top voice first), and the
+# synth-voice params a pad uses, defaulting to synth-voice's pad preset
+# except `osc_lvl` 0.25 per voice, so four voices sum near one voice.
+# For anything else (glide, sub osc, vibrato), write the group by hand: it
+# is six lines (docs/patch-craft.md, "Chord pads").
+#
+# Measured, main -> out.in at unity, the demo's Am7/Fmaj7 (four voices,
+# defaults): peak -3.3 dBFS, RMS -17.3.
+#
+# Gotcha avoided here: `chord.vel` has base 1, so a cable into it sums to 2
+# -- `ch` is declared `vel: 0` and this file's `vel` (default 1) sets it.
+
+n       = param { default: 4 }
+strum   = param { default: 0 }
+wave1   = param { default: saw }
+wave2   = param { default: saw }
+blend   = param { default: 0.5 }
+osc_lvl = param { default: 0.25 }   # per voice: four sum near one synth-voice
+detune  = param { default: 0.004 }
+cutoff  = param { default: 900hz }
+res     = param { default: 0.25 }
+slope   = param { default: 0 }
+track   = param { default: 0.5 }
+env_amt = param { default: 0hz }
+hp      = param { default: 5hz }
+attack  = param { default: 0.3 }
+decay   = param { default: 1 }
+sustain = param { default: 0.8 }
+release = param { default: 1.5 }
+curve   = param { default: lin }
+
+p1    = input {}
+p2    = input {}
+p3    = input {}
+p4    = input {}
+gate  = input {}
+vel   = input { default: 1 }
+level = input { default: 1 }
+cut   = input {}
+main  = output {}
+
+ch = chord { n: n, strum: strum, vel: 0 }   # vel base 0: `vel` (default 1) sets it
+gate -> ch.gate
+vel  -> ch.vel
+p1 -> ch.p1
+p2 -> ch.p2
+p3 -> ch.p3
+p4 -> ch.p4
+
+tone = voice { notes: ch }
+tone.v = sub { file: "synth-voice.sub", wave1: wave1, wave2: wave2, blend: blend,
+               osc_lvl: osc_lvl, detune: detune, cutoff: cutoff, res: res,
+               slope: slope, track: track, env_amt: env_amt, hp: hp,
+               attack: attack, decay: decay, sustain: sustain,
+               release: release, curve: curve }
+ch.voct -> tone.v.voct
+ch.gate -> tone.v.gate
+ch.vel  -> tone.v.vel
+level -> tone.v.level
+cut   -> tone.v.cut
+tone.v -> main.in
+
+# Audition: `mise run play -- patches/lib/poly-pad.sub` -- Am7 then Fmaj7,
+# two seconds each, at 0.5.
+demo.clk = clock { bpm: 30 }
+demo.s1 = stepseq { steps: [A2v, F2v] }
+demo.s2 = stepseq { steps: [C3v, A2v] }
+demo.s3 = stepseq { steps: [E3v, C3v] }
+demo.s4 = stepseq { steps: [G3v, E3v] }
+demo.clk -> demo.s1.clock
+demo.clk -> demo.s2.clock
+demo.clk -> demo.s3.clock
+demo.clk -> demo.s4.clock
+demo.s1.gate -> gate
+demo.s1.cv -> p1
+demo.s2.cv -> p2
+demo.s3.cv -> p3
+demo.s4.cv -> p4
+main -> demo.out.in : 0.5

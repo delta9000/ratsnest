@@ -143,6 +143,41 @@ negative cable onto `lvlN`. The default now:
 Rebuilt that way, `patches/tracker/glasshouse.patch` and `undertow.patch`
 match their hand-built originals to 0.1 and 0.4 dB per section.
 
+## Chord pads: one tone, stamped per note
+
+A chord track carries up to four pitches on one gate (`track pad note cva
+cvb cvd`). Do not instantiate a voice per chord tone by hand (glasshouse and
+undertow each carried an eleven-line template per tone). Write the tone once
+and let a `chord` bank stamp it per note — the ZEN-Core "tone" idea:
+
+```text
+ch = chord { n: 3 }
+song.gate6 -> ch.gate
+song.voct6 -> ch.p1
+song.cva6  -> ch.p2
+song.cvb6  -> ch.p3
+pad = voice { notes: ch }
+pad.v = sub { file: "../lib/synth-voice.sub", attack: 0.6, slope: 0, env_amt: 0 }
+ch.voct -> pad.v.voct
+ch.gate -> pad.v.gate
+pad.v -> pad_s.in                  # the straight sum of the voices
+```
+
+Or one line: `pad = sub { file: "../lib/poly-pad.sub", n: 3, ... }` with
+`p1..p4`, `gate`, `vel`, `level`, `cut` in and `main` out (synth-voice's pad
+params, `osc_lvl` 0.25 per voice). That is what glasshouse (four tones, the
+fourth from another track) and undertow (three) use: 23 and 19 fewer lines,
+section RMS within 0.01 dB of the template versions.
+
+- **Broadcasts are free.** A cable from outside into a member (`lane ->
+  pad.v.cut : 4000`, or `-> pad.cut` on poly-pad) reaches every voice.
+- **Detune a voice on its pitch:** `0.005 -> ch.p2` sums onto that voice only.
+- **Strum:** `chord { strum: 0.03 }` rises voice i's gate i × 30 ms late
+  (negative: top voice first). A slur (`~`) moves the pitches without a
+  retrigger; a held voice tracks, a released one holds its pitch for its tail.
+- **Input bases sum (again).** `chord.vel` has base 1: cabling a velocity
+  into it gives 1 + vel. Declare `chord { vel: 0 }` when you cable one.
+
 ## Input bases sum — zero them first
 
 Cables sum onto input bases. Two classic self-owns:
@@ -352,6 +387,8 @@ through `quant`):
 - **Chords are one track.** `track harm note cva cvb` carries root, third
   and fifth as note names; every voice reads `voct5`/`cva5`/`cvb5`. A
   seventh or ninth goes in `cvd` (`note cva cvb cvd`, read as `cvd5`, `t4`).
+  Pad it with a `chord` bank (or `lib/poly-pad.sub`), one tone stamped per
+  note: "Chord pads" above.
   Sixteen tracks: one `.trk` holds notes and form levels together.
 - **Write a riff once.** `track arp note vel from harm` and cells like
   `t1+12`, `~t3`, `t2-12:2` follow harm's chord on every row, so one bar of
