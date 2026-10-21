@@ -2,21 +2,13 @@
 #include <cmath>
 #include "dsp/modules.h"
 #include "dsp/util.h"
+#include "dsp/voice_bank.h"
 
 namespace ms::dsp {
 namespace {
 constexpr InputInfo kIns[] = {{"gate", 0.f}, {"voct", 0.f}, {"vel", 1.f}};
 constexpr const char* kModes[] = {"rr", "unison", nullptr};
 constexpr ConfigInfo kCfg[] = {{"n", nullptr}, {"mode", kModes}};
-constexpr OutputInfo kOuts[] = {
-    {"gate1"}, {"gate2"}, {"gate3"}, {"gate4"},
-    {"gate5"}, {"gate6"}, {"gate7"}, {"gate8"},
-    {"voct1"}, {"voct2"}, {"voct3"}, {"voct4"},
-    {"voct5"}, {"voct6"}, {"voct7"}, {"voct8"},
-    {"vel1"}, {"vel2"}, {"vel3"}, {"vel4"},
-    {"vel5"}, {"vel6"}, {"vel7"}, {"vel8"},
-    {"spread1"}, {"spread2"}, {"spread3"}, {"spread4"},
-    {"spread5"}, {"spread6"}, {"spread7"}, {"spread8"}};
 
 // Voice allocator: spreads a mono gate/voct/vel stream across up to eight
 // indexed output banks. `rr` claims the next voice round-robin on each
@@ -42,7 +34,7 @@ class Alloc final : public Module {
       outs[i] = as_gate(active && gate_[i] && !gap_[i]);
       outs[8 + i] = active ? voct_[i] : 0.f;
       outs[16 + i] = active ? vel_[i] : 0.f;
-      outs[24 + i] = active ? spread(i) : 0.f;
+      outs[24 + i] = active ? voice_spread(i, n_) : 0.f;
       gap_[i] = false;
     }
   }
@@ -72,12 +64,6 @@ class Alloc final : public Module {
       vel_[i] = vel;
     }
   }
-  // Stereo position of voice i, spread evenly over -1..1.
-  float spread(int i) const {
-    if (n_ == 1) return 0.f;
-    return -1.f + 2.f * static_cast<float>(i) / static_cast<float>(n_ - 1);
-  }
-
   int n_ = 4;
   int newest_ = -1;
   bool unison_ = false;
@@ -89,5 +75,5 @@ class Alloc final : public Module {
 };
 std::unique_ptr<Module> make() { return std::make_unique<Alloc>(); }
 }  // namespace
-const ModuleInfo alloc_info{"alloc", kIns, kCfg, kOuts, &make};
+const ModuleInfo alloc_info{"alloc", kIns, kCfg, kVoiceBankOutputs, &make};
 }  // namespace ms::dsp

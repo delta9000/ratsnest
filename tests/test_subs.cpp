@@ -465,3 +465,23 @@ TEST_CASE("composition: voice group inside a sub file") {
     if (n.name == "s.v.osc#0") found = true;
   CHECK(found);
 }
+
+TEST_CASE("composition: a chord bank stamps a sub per chord tone") {
+  // `chord` inherits n = 4 by default; the sub's input fans out per voice.
+  auto e = expand(
+      "ch = chord {}\n"
+      "pad = voice { notes: ch }\n"
+      "pad.v = sub { file: \"lib/tone.sub\" }\n"
+      "ch.voct -> pad.v.voct\n"
+      "pad.v -> out.in\n",
+      {{"patches/lib/tone.sub",
+        "voct = input {}\nmain = output {}\n"
+        "osc = vco { wave: sine }\nvoct -> osc.v_oct\nosc -> main.in\n"}});
+  REQUIRE(e.errors.empty());
+  auto c = graph::compile(e.ast, 48000.0);
+  REQUIRE(c.ok());
+  int stamped = 0;
+  for (const auto& n : c.graph->nodes)
+    if (n.name.rfind("pad.v.osc#", 0) == 0) ++stamped;
+  CHECK(stamped == 4);
+}

@@ -90,7 +90,7 @@ harp.pluck -> out.in : 0.45     # inside -> outside: straight sum of voices
 once per voice, as `name.<member>#i` (`#` starts a comment in source, so
 instance names never collide with user names; `watch` shows `harp.osc#2`
 like any node). Voice count `n` is inherited from the module bound by
-`notes:` — usually `alloc` — which must expose the indexed banks
+`notes:` — usually `alloc`, `chord` or `midi` — which must expose the indexed banks
 (`gate1..N`; `voct`/`vel` follow the same convention — validation keys on
 `gate1`); an
 explicit `n:` on the `voice` block must match or it is a compile error.
@@ -117,6 +117,26 @@ See `patches/strum.patch` for a complete three-voice recipe (clocked
 random melody -> quantizer -> `alloc` -> a `vco` + `lpg` voice group), and
 `docs/superpowers/specs/2026-07-11-voice-alloc-design.md` for the full design.
 
+A held chord (several pitches, one gate) is `chord` instead of `alloc`: voice
+i plays `p<i>`. A member may be a `sub`, so the tone is written once and
+stamped per chord tone:
+
+```text
+ch = chord { n: 3 }
+song.gate6 -> ch.gate
+song.voct6 -> ch.p1
+song.cva6  -> ch.p2
+song.cvb6  -> ch.p3
+pad = voice { notes: ch }
+pad.v = sub { file: "lib/synth-voice.sub", attack: 0.6, slope: 0 }
+ch.voct -> pad.v.voct
+ch.gate -> pad.v.gate
+pad.v -> strip.in               # the sum of the three voices
+```
+
+`patches/lib/poly-pad.sub` wraps exactly this (a voice group works inside a
+`.sub`): `pad = sub { file: "lib/poly-pad.sub", n: 3 }` with `p1..p4`, `gate`.
+
 ### Subpatches
 
 A subpatch is a reusable voice in its own file (convention:
@@ -132,7 +152,7 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 | Sources | `vco`, `additive`, `lfo`, `noise`, `dust`, `random`, `sampler`, `modal`, `string`, `fm` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
-| Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tracker`, `tempo`, `alloc`, `midi` |
+| Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tracker`, `tempo`, `alloc`, `chord`, `midi` |
 | Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `rec`, `extin`, `out` |
 
 ## `vca`
@@ -757,6 +777,23 @@ claim and holds it after, so release tails keep pitch. Reclaims insert a
 one-sample gap (a defensive guarantee of the bank convention — unreachable
 from a mono gate, where every reclaim already follows a low sample; midi
 exercises it). Strum polyphony from any mono sequencer; see `voice`.
+
+## `chord`
+
+`chord { n: 4, strum: 0 }` — inputs `gate`, `vel` 1, `strum` 0 (seconds),
+`p1..p8` 0 (v/oct); the same output banks as `alloc` (`gate1..8`, `voct1..8`,
+`vel1..8`, `spread1..8`), so `voice { notes: ch }` stamps one voice per chord
+tone (`n` 1..8, inherited by the group; default 4). Voice i sounds `p<i>`
+while `gate` is high. Each rising gate latches `vel` for every voice and
+restarts the strum: voice i's gate rises `(i − 1) × strum` seconds late
+(`strum` clamped to ±0.5; negative is a down-strum, voice n first). A voice
+tracks its pitch while its gate is high — a tracker slur (`~`) moves it with
+no retrigger — and holds it while low, so release tails and not-yet-strummed
+voices keep their old pitch. The tracker's one-sample gate drop on a new
+note retriggers every voice. Unpatched pitches read 0 (A3): patch one per
+voice. Built for a tracker chord track (`note cva cvb cvd` -> `voctN`,
+`cvaN`, `cvbN`, `cvdN`); cabling a small constant onto a `p` detunes that
+voice (`0.005 -> ch.p2`). See Voice groups and `lib/poly-pad.sub`.
 
 ## `midi`
 

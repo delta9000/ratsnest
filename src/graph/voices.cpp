@@ -48,13 +48,14 @@ std::string inst_chain(const std::string& base, int i, const std::string& port) 
 }
 
 // Voice count from the bound module's config: `n`, else `voices`, else the
-// type default (alloc 4, otherwise 1).
+// type default (alloc and chord 4, otherwise 1).
 // A negative count also falls back to the default.
 int inherited_count(const dsl::ModuleDecl& bound) {
   int n = -1;
   if (const dsl::ParamDecl* pn = find_param(bound, "n")) n = count_of(*pn);
   else if (const dsl::ParamDecl* pv = find_param(bound, "voices")) n = count_of(*pv);
-  return n >= 0 ? n : bound.type == "alloc" ? 4 : 1;
+  if (n >= 0) return n;
+  return bound.type == "alloc" || bound.type == "chord" ? 4 : 1;
 }
 
 // Bank stems: the full 8-wide family <stem>1..<stem>8, matching the bank

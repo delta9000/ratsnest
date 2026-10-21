@@ -41,6 +41,7 @@ extern const ModuleInfo stepseq_info;
 extern const ModuleInfo tracker_info;
 extern const ModuleInfo tempo_info;
 extern const ModuleInfo alloc_info;
+extern const ModuleInfo chord_info;
 extern const ModuleInfo midi_info;
 extern const ModuleInfo dcblock_info;
 extern const ModuleInfo stereo_info;
