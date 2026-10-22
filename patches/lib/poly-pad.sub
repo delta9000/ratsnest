@@ -10,7 +10,7 @@
 #   song.cvb6  -> pad.p3
 #   pad -> pad_strip.in
 #
-# Inputs: `p1`..`p4` (v/oct, one per voice; cable a small constant onto one
+# Inputs: `p1`..`p8` (v/oct, one per voice; cable a small constant onto one
 # to detune that voice, `0.005 -> pad.p2`), `gate` (one gate for the whole
 # chord; a one-sample drop retriggers every voice, a pitch change under a
 # held gate -- a tracker slur -- glides nothing and retriggers nothing),
@@ -18,7 +18,8 @@
 # post-envelope), `cut` (Hz summed onto `cutoff`: `lane -> pad.cut : 4000`).
 # Output `main`: the straight sum of the `n` voices (no hidden 1/n).
 #
-# Params: `n` voices (1..4 here; `chord` itself takes 8), `strum` (seconds
+# Params: `n` voices (1..8, as `chord`; voice i plays `p<i>`, so cable p1..pN:
+# an uncabled one reads 0 v/oct and sounds A3 under every chord), `strum` (seconds
 # between successive voices' gates, negative = top voice first), and the
 # synth-voice params a pad uses, defaulting to synth-voice's pad preset
 # except `osc_lvl` 0.25 per voice, so four voices sum near one voice.
@@ -54,6 +55,10 @@ p1    = input {}
 p2    = input {}
 p3    = input {}
 p4    = input {}
+p5    = input {}
+p6    = input {}
+p7    = input {}
+p8    = input {}
 gate  = input {}
 vel   = input { default: 1 }
 level = input { default: 1 }
@@ -67,6 +72,10 @@ p1 -> ch.p1
 p2 -> ch.p2
 p3 -> ch.p3
 p4 -> ch.p4
+p5 -> ch.p5
+p6 -> ch.p6
+p7 -> ch.p7
+p8 -> ch.p8
 
 tone = voice { notes: ch }
 tone.v = sub { file: "synth-voice.sub", wave1: wave1, wave2: wave2, blend: blend,

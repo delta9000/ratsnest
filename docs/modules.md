@@ -142,7 +142,7 @@ pad.v -> strip.in               # the sum of the three voices
 ```
 
 `patches/lib/poly-pad.sub` wraps exactly this (a voice group works inside a
-`.sub`): `pad = sub { file: "lib/poly-pad.sub", n: 3 }` with `p1..p4`, `gate`.
+`.sub`): `pad = sub { file: "lib/poly-pad.sub", n: 3 }` with `p1..pN` (one per voice, up to 8), `gate`.
 
 ### Subpatches
 

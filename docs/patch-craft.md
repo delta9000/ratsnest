@@ -169,7 +169,7 @@ pad.v -> pad_s.in                  # the straight sum of the voices
 ```
 
 Or one line: `pad = sub { file: "../lib/poly-pad.sub", n: 3, ... }` with
-`p1..p4`, `gate`, `vel`, `level`, `cut` in and `main` out (synth-voice's pad
+`p1..pN` (one per voice; N up to 8), `gate`, `vel`, `level`, `cut` in and `main` out (synth-voice's pad
 params, `osc_lvl` 0.25 per voice). That is what glasshouse (four tones, the
 fourth from another track) and undertow (three) use: 23 and 19 fewer lines,
 section RMS within 0.01 dB of the template versions.

@@ -139,6 +139,31 @@ TEST_CASE("patches/lib/kick.sub compiles standalone and renders a kick") {
   CHECK(peak <= 1.0f);
 }
 
+// poly-pad's `n` reaches `chord` unclamped (1..8), so every voice it can
+// stamp needs a pitch input: p5..p8 must exist, or n > 4 drones on 0 v/oct.
+TEST_CASE("patches/lib/poly-pad.sub takes a pitch per voice up to chord's eight") {
+  namespace fs = std::filesystem;
+  const auto root = fs::path(__FILE__).parent_path().parent_path();
+  const std::string patch = (root / "patches" / "pp.patch").string();
+  std::string src = "pad = sub { file: \"lib/poly-pad.sub\", n: 8 }\n1 -> pad.gate\n";
+  for (int i = 1; i <= 8; ++i)
+    src += "0." + std::to_string(i) + " -> pad.p" + std::to_string(i) + "\n";
+  src += "pad -> out.in : 0.1\n";
+  auto b = graph::build_patch(src, patch, 48000.0);
+  REQUIRE_MESSAGE(b.compiled.ok(), b.compiled.errors[0].msg);
+  // Each voice's pitch reaches its own stamped synth-voice.
+  engine::Engine e(std::move(b.compiled.graph));
+  std::vector<float> l(64), r(64);
+  e.process(l.data(), r.data(), l.size());
+  const graph::Graph& g = e.graph();
+  int voices = 0;
+  for (size_t i = 0; i < g.nodes.size(); ++i)
+    if (g.nodes[i].info->type == std::string("chord"))
+      for (int v = 0; v < 8; ++v)
+        voices += e.output_value(i, static_cast<size_t>(8 + v)) == doctest::Approx(0.1 * (v + 1));
+  CHECK(voices == 8);
+}
+
 // `render --start` runs the graph from zero and throws the skipped samples
 // away -- a stateful graph has no seek. That is only honest if block size
 // cannot change the result, so pin it: a chunked skip followed by a capture
