@@ -68,6 +68,7 @@ struct Ctx {
   std::unordered_map<std::string, dsl::PatchAst> cache;
   std::vector<std::string> labels;
   std::unordered_set<std::string> stack;
+  SubOutputs outputs;
 
   bool failed() const { return errors.size() != err0; }
 
@@ -482,6 +483,7 @@ void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl&
   if (ctx.failed()) return;
   handle_demo(ctx, body_file, body, /*top=*/false);
   if (ctx.failed()) return;
+  const size_t nested = ctx.outputs.size();
   expand_in(ctx, body, body_dir, body_file);
   if (ctx.failed()) return;
   if (parent.modules.size() + body.modules.size() > kMaxExpanded)
@@ -491,6 +493,9 @@ void do_body(Ctx& ctx, dsl::PatchAst& parent, size_t idx, const dsl::ModuleDecl&
   if (ctx.failed()) return;
 
   stamp_body(body, decl.name, body_file);
+  for (size_t i = nested; i < ctx.outputs.size(); ++i)
+    ctx.outputs[i].first = decl.name + "." + ctx.outputs[i].first;
+  ctx.outputs.emplace_back(decl.name, f.outputs);
   parent.modules.erase(parent.modules.begin() + static_cast<long>(idx));
   parent.modules.insert(parent.modules.begin() + static_cast<long>(idx),
                         std::make_move_iterator(body.modules.begin()),
@@ -688,7 +693,7 @@ SubExpansion expand_subs(dsl::PatchAst& ast, const std::string& patch_dir,
       }))
     return out;
 
-  Ctx ctx{read, errors, errors.size(), {}, {}, {}, {}, {}};
+  Ctx ctx{read, errors, errors.size(), {}, {}, {}, {}, {}, {}};
   dsl::PatchAst work = ast;
   // A subpatch file checked on its own is its own instance: its params take
   // their defaults, its demo section plays, and its ports splice into itself.
@@ -702,6 +707,7 @@ SubExpansion expand_subs(dsl::PatchAst& ast, const std::string& patch_dir,
   if (!ctx.failed()) {
     ast = std::move(work);
     out.files = std::move(ctx.files);
+    out.outputs = std::move(ctx.outputs);
   }
   return out;
 }
@@ -713,7 +719,9 @@ PatchBuild build_patch(std::string_view src, const std::string& patch_path, doub
   if (!b.compiled.ok()) return b;
   const std::filesystem::path parent = std::filesystem::path(patch_path).parent_path();
   const std::string dir = parent.empty() ? "." : parent.string();
-  b.files = expand_subs(p.ast, dir, read_text_file, b.compiled.errors).files;
+  SubExpansion x = expand_subs(p.ast, dir, read_text_file, b.compiled.errors);
+  b.files = std::move(x.files);
+  b.sub_outputs = std::move(x.outputs);
   if (b.compiled.ok()) embed_tracker_files(p.ast, dir, read_text_file, b.files, b.compiled.errors);
   if (!b.compiled.ok()) return b;
   b.ast = std::move(p.ast);

@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 #include "dsl/ast.h"
 #include "dsl/diag.h"
@@ -12,8 +13,13 @@ using FileReader = std::function<bool(const std::string& path, std::string& out)
 
 bool read_text_file(const std::string& path, std::string& out);
 
+// Each sub instance's full name and its declared output names, so a tool
+// (render --tap) can ask what an instance exposes after it is flattened.
+using SubOutputs = std::vector<std::pair<std::string, std::vector<std::string>>>;
+
 struct SubExpansion {
   std::vector<std::string> files;
+  SubOutputs outputs;
 };
 
 SubExpansion expand_subs(dsl::PatchAst& ast, const std::string& patch_dir,
@@ -33,6 +39,7 @@ void embed_tracker_files(dsl::PatchAst& ast, const std::string& patch_dir,
 struct PatchBuild {
   dsl::PatchAst ast;
   std::vector<std::string> files;
+  SubOutputs sub_outputs;
   CompileResult compiled;
 };
 PatchBuild build_patch(std::string_view src, const std::string& patch_path, double rate);

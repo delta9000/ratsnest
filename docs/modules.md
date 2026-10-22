@@ -39,7 +39,8 @@ writes `<out-stem>.NAME.wav` from that endpoint (stereo when it has `l`/`r`
 or `out_l`/`out_r`; a sub's output, a voice member or a default port, as a
 cable source is written) and prints the same table per tap, without
 editing the patch (`render x.patch -o take.wav --stats 8s --tap kick --tap
-pad=pad_s` writes `take.kick.wav` and `take.pad.wav`). A tap reads the
+pad=pad_s` writes `take.kick.wav` and `take.pad.wav`; each NAME is
+distinct, non-empty, and free of `/`, `\` and `..`). A tap reads the
 endpoint itself, before any cable gain, and does not change the mix. CLI
 durations (`-d`, `--start`, `--stats`) take `90`, `90s`, `500ms` or `2m`;
 `ratsnest` with no arguments prints every option and its default.
