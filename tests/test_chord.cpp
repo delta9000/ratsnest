@@ -183,6 +183,61 @@ TEST_CASE("chord: strum delays voice i's rise by i x strum") {
   }
 }
 
+// Holds the gate for `samples`, setting `strum` from strum_at(s) before each
+// sample, and counts each voice's gate rises and falls.
+template <class F>
+void count_edges(ChordRig& m, int samples, int* rises, int* falls, const F& strum_at) {
+  float prev[4] = {};
+  m.set("gate", 1.f);
+  for (int s = 0; s < samples; ++s) {
+    m.set("strum", strum_at(s));
+    m.step();
+    for (int i = 0; i < 4; ++i) {
+      const float g = m.gate(i + 1);
+      rises[i] += g > prev[i];
+      falls[i] += g < prev[i];
+      prev[i] = g;
+    }
+  }
+}
+
+TEST_CASE("chord: a sounding voice stays open while strum moves mid-hold") {
+  int rises[4] = {}, falls[4] = {};
+  SUBCASE("strum ramped up while held") {
+    ChordRig m(4);
+    // 0 -> 0.5 s over the hold: every voice opens at once, then strum grows.
+    count_edges(m, 48000, rises, falls, [](int s) { return static_cast<float>(s) / 96000.f; });
+    for (int i = 0; i < 4; ++i) CHECK(m.gate(i + 1) == 1.f);
+  }
+  SUBCASE("strum sign flipped while held") {
+    ChordRig m(4);
+    // Up-strum 10 ms per voice; once voice 2 is open, flip to a down-strum.
+    count_edges(m, 4000, rises, falls, [](int s) { return s < 600 ? 0.01f : -0.01f; });
+  }
+  for (int i = 0; i < 4; ++i) {
+    CAPTURE(i);
+    CHECK(rises[i] == 1);
+    CHECK(falls[i] == 0);
+  }
+}
+
+TEST_CASE("chord: the gate falling still closes latched voices") {
+  ChordRig m(2);
+  m.set("gate", 1.f);
+  m.step(10);
+  m.set("strum", 0.4f);
+  m.step(10);
+  CHECK(m.gate(2) == 1.f);
+  m.set("gate", 0.f);
+  m.step();
+  CHECK(m.gate(1) == 0.f);
+  CHECK(m.gate(2) == 0.f);
+  m.set("gate", 1.f);
+  m.step();
+  CHECK(m.gate(1) == 1.f);
+  CHECK(m.gate(2) == 0.f);  // the new strum applies to the new note
+}
+
 TEST_CASE("chord: state survives a hot-reload copy mid-strum") {
   ChordRig a(2), b(2);
   a.set("strum", 0.01f);

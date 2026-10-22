@@ -18,7 +18,9 @@ constexpr int kCountCap = 1 << 30;     // far past the longest strum (3.5 s)
 // gate, `voct`/`cva`/`cvb`/`cvd`) plays one stamped voice per chord tone.
 // Voice i sounds p<i+1> while `gate` is high. Each rising gate latches `vel`
 // and restarts the strum clock: voice i's gate rises i x `strum` seconds
-// late (negative `strum` = down-strum, the top voice first). A voice tracks
+// late (negative `strum` = down-strum, the top voice first). Once a voice's
+// gate opens it stays open until `gate` falls, so moving or flipping
+// `strum` mid-hold only reschedules voices not yet sounding. A voice tracks
 // its pitch while its gate is high (a slur moves it without a retrigger)
 // and holds it while low, so release tails and not-yet-strummed voices keep
 // their old pitch. A gate drop of one sample retriggers every voice.
@@ -40,9 +42,9 @@ class Chord final : public Module {
     for (int i = 0; i < 8; ++i) {
       const bool active = i < n_;
       const int rank = strum < 0.f ? n_ - 1 - i : i;
-      const bool on = active && high && elapsed >= static_cast<float>(rank) * step;
-      if (on) voct_[i] = ins[kPitch + i];
-      outs[i] = as_gate(on);
+      on_[i] = active && high && (on_[i] || elapsed >= static_cast<float>(rank) * step);
+      if (on_[i]) voct_[i] = ins[kPitch + i];
+      outs[i] = as_gate(on_[i]);
       outs[8 + i] = active ? voct_[i] : 0.f;
       outs[16 + i] = active ? vel_ : 0.f;
       outs[24 + i] = active ? voice_spread(i, n_) : 0.f;
@@ -55,6 +57,7 @@ class Chord final : public Module {
     count_ = o.count_;
     vel_ = o.vel_;
     std::copy(std::begin(o.voct_), std::end(o.voct_), std::begin(voct_));
+    std::copy(std::begin(o.on_), std::end(o.on_), std::begin(on_));
   }
 
  private:
@@ -63,6 +66,7 @@ class Chord final : public Module {
   int count_ = 0;  // samples since the gate rose
   float vel_ = 0.f;
   float voct_[8] = {};
+  bool on_[8] = {};  // latched: open until the gate falls
   RisingEdge gate_edge_;
 };
 std::unique_ptr<Module> make() { return std::make_unique<Chord>(); }
