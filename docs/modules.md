@@ -751,6 +751,12 @@ Composing (all resolved when the file loads; the ports never change):
   section verse bar+seven~    # put it in every step that should hear it
   order verse*7 verse^5*7
   ```
+
+  `~` marks a pattern, never a section use (`order verse~` is an error:
+  mark the patterns inside the section). A song that loops (`|:`) must
+  loop a multiple of every free layer's length in the looped part, since
+  the wrap would otherwise jump its phase; the check names the layer and
+  both lengths.
 - **Drum lanes:** inside a pattern, `lane kick x... x... x..x x.0.` writes
   one row per character from row 0 (spaces ignored): `.` empty, `x` hit,
   `1`–`9` hit at vel n/9 (if the track has `vel`), `0` off. Lanes and row

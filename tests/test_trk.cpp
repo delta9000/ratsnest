@@ -435,6 +435,22 @@ TEST_CASE("trk: free-running layer diagnostics") {
   fails(h + "order p+q~x\n", 6, 11, "'~' takes no value");
   fails(h + "order p+r~\n", 6, 9, "only an '@' overlay may share tracks");
   fails(h + "section s q~\norder p\n", 6, 12, "the first layer sets the step length");
+  // '~' marks patterns; on a section use it would be dropped, so it is an error.
+  fails(h + "section s p+q~\norder p s~\n", 7, 10, "a section cannot be free-running '~'");
+}
+
+TEST_CASE("trk: a looped span must be whole cycles of its free layers") {
+  const std::string h = "track a note\ntrack b cva\npattern p 4 a\npattern t 3 b\n| 1\n| 2\n| 3\n";
+  // 12 looped rows = four cycles of t: the wrap lands on t's phase 0.
+  const auto s = ok(h + "order |: p+t~*3\n");
+  CHECK(s.loop == 0);
+  ok(h + "order p+t~*2\n");          // no loop: the song ends
+  ok(h + "order p+t~ |: p*3\n");     // the free layer is not in the loop
+  fails(h + "order p+t~ |: p+t~*2\n", 8, 17,
+        "free-running layer 't' (3 rows) would jump phase at the loop: the span from '|:' to the end is "
+        "8 rows, not a multiple of 3");
+  // Spliced by a section, the error points at the section's use.
+  fails(h + "section v p+t~\norder |: v\n", 9, 10, "make the looped span a multiple of 3 rows");
 }
 
 TEST_CASE("trk: drum lanes write one row per character") {

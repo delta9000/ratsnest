@@ -521,6 +521,7 @@ class Parser {
         continue;
       }
       if (sp.at.col) return err(sp.at.col - 1, "a section cannot be an '@' overlay (overlay a pattern)");
+      if (sp.free) return err(sp.free, "a section cannot be free-running '~' (mark its patterns 'name~' inside the section)");
       for (Spec in : sections_[static_cast<size_t>(id)].specs) {
         in.outer += sp.shift;
         in.name.col = sp.name.col;  // errors point at the section's use
@@ -646,10 +647,29 @@ class Parser {
       }
     }
     song.step_start.push_back(static_cast<int>(total));
+    if (song.loop >= 0 && !loops_whole(total - song.step_start[static_cast<size_t>(song.loop)])) return;
     song.rows.resize(static_cast<size_t>(total) * tracks_.size());
     size_t at = 0;
     for (size_t i = 0; i < entries_.size(); ++i)
       for (int k = 0; k < entries_[i].repeat; ++k) at = play(entries_[i], at);
+  }
+
+  // A free layer's phase is the song row, and the loop jumps back `span`
+  // rows, so the looped span must be whole cycles of every free layer in it.
+  bool loops_whole(long span) {
+    for (size_t i = static_cast<size_t>(loop_entry_); i < entries_.size(); ++i)
+      for (size_t j = 0; j < entries_[i].layers.size(); ++j) {
+        const Pattern& p = pats_[static_cast<size_t>(entries_[i].layers[j].pat)];
+        if (entries_[i].layers[j].at != kFree || span % p.rows == 0) continue;
+        line_ = entry_lines_[i];
+        const std::string n = std::to_string(p.rows), sp = std::to_string(span);
+        return err(entries_[i].specs[j].name,
+                   "free-running layer '" + p.name + "' (" + n + " rows) would jump phase at the loop: the span from '|:' to the end is " +
+                       sp + " rows, not a multiple of " + n + "; make the looped span a multiple of " + n +
+                       " rows, or the layer a length that divides " + sp),
+               false;
+      }
+    return true;
   }
 
   // Writes one step's rows from `at`; returns the next write position.
