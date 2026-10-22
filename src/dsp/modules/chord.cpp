@@ -9,7 +9,7 @@ namespace {
 constexpr InputInfo kIns[] = {{"gate", 0.f}, {"vel", 1.f}, {"strum", 0.f},
                               {"p1", 0.f},   {"p2", 0.f},  {"p3", 0.f}, {"p4", 0.f},
                               {"p5", 0.f},   {"p6", 0.f},  {"p7", 0.f}, {"p8", 0.f}};
-constexpr ConfigInfo kCfg[] = {{"n", nullptr}};
+constexpr ConfigInfo kCfg[] = {{"n", nullptr, ConfigKind::Number, 4.0}};
 constexpr int kPitch = 3;              // index of p1
 constexpr int kCountCap = 1 << 30;     // far past the longest strum (3.5 s)
 
@@ -28,7 +28,7 @@ class Chord final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = static_cast<float>(rate);
-    n_ = static_cast<int>(std::clamp(cfg_num(cfg, "n", 4.0), 1.0, 8.0));
+    n_ = static_cast<int>(std::clamp(cfg_num(cfg, "n", kCfg[0].def), 1.0, 8.0));
   }
   void process(const float* ins, float* outs) override {
     const bool high = ins[0] > 0.5f;

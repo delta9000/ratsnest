@@ -8,7 +8,7 @@ namespace ms::dsp {
 namespace {
 constexpr InputInfo kIns[] = {{"gate", 0.f}, {"voct", 0.f}, {"vel", 1.f}};
 constexpr const char* kModes[] = {"rr", "unison", nullptr};
-constexpr ConfigInfo kCfg[] = {{"n", nullptr}, {"mode", kModes}};
+constexpr ConfigInfo kCfg[] = {{"n", nullptr, ConfigKind::Number, 4.0}, {"mode", kModes}};
 
 // Voice allocator: spreads a mono gate/voct/vel stream across up to eight
 // indexed output banks. `rr` claims the next voice round-robin on each
@@ -18,7 +18,7 @@ constexpr ConfigInfo kCfg[] = {{"n", nullptr}, {"mode", kModes}};
 class Alloc final : public Module {
  public:
   void init(double, const Config& cfg) override {
-    n_ = static_cast<int>(std::clamp(cfg_num(cfg, "n", 4.0), 1.0, 8.0));
+    n_ = static_cast<int>(std::clamp(cfg_num(cfg, "n", kCfg[0].def), 1.0, 8.0));
     unison_ = cfg_str(cfg, "mode", "rr") == "unison";
   }
   void process(const float* ins, float* outs) override {

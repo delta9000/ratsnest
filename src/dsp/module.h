@@ -17,6 +17,7 @@ struct ConfigInfo {
   const char* name;
   const char* const* enum_vals;
   ConfigKind kind = ConfigKind::Number;
+  double def = 0.0;  // a Number config's default, where code outside the module needs it
 };
 struct OutputInfo { const char* name; };
 

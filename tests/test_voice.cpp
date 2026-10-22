@@ -1,6 +1,7 @@
 #include <string>
 #include <doctest/doctest.h>
 #include "dsl/parser.h"
+#include "dsp/module.h"
 #include "graph/graph.h"
 #include "graph/voices.h"
 
@@ -172,6 +173,29 @@ TEST_CASE("voice count and banks are inherited from the bound module") {
   CHECK_FALSE(has_module(ast, "v.o#4"));
   CHECK(has_cable(ast, "poly.spread1", "v.o#0.v_oct"));
   CHECK(has_cable(ast, "poly.spread4", "v.o#3.v_oct"));
+}
+
+// The group's count with `n`/`voices` unset is the bound module's declared
+// config default (the same constant the module's init reads), for every
+// bank-producing module, so a new one cannot silently stamp the wrong count.
+// A bank module with no count config (the tracker's per-track gates) is one.
+TEST_CASE("an unset voice count is the bound module's declared default") {
+  int banks = 0;
+  for (const dsp::ModuleInfo* info : dsp::all_modules()) {
+    if (info->output_index("gate1") < 0) continue;
+    CAPTURE(info->type);
+    ++banks;
+    const dsp::ConfigInfo* c = info->config("n");
+    if (!c) c = info->config("voices");
+    const int want = c ? static_cast<int>(c->def) : 1;
+    CHECK(want >= 1);
+    const std::string src = std::string("b = ") + info->type + " {}\nv = voice { notes: b }\nv.o = vco\n";
+    auto ast = go(src.c_str());
+    int stamped = 0;
+    while (has_module(ast, ("v.o#" + std::to_string(stamped)).c_str())) ++stamped;
+    CHECK(stamped == want);
+  }
+  CHECK(banks >= 3);  // alloc, chord, midi, ...
 }
 
 // A dotted decl whose prefix is not a voice group is an ordinary module

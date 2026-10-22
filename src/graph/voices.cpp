@@ -47,15 +47,18 @@ std::string inst_chain(const std::string& base, int i, const std::string& port) 
   return s;
 }
 
-// Voice count from the bound module's config: `n`, else `voices`, else the
-// type default (alloc and chord 4, otherwise 1).
-// A negative count also falls back to the default.
-int inherited_count(const dsl::ModuleDecl& bound) {
-  int n = -1;
-  if (const dsl::ParamDecl* pn = find_param(bound, "n")) n = count_of(*pn);
-  else if (const dsl::ParamDecl* pv = find_param(bound, "voices")) n = count_of(*pv);
-  if (n >= 0) return n;
-  return bound.type == "alloc" || bound.type == "chord" ? 4 : 1;
+// Voice count from the bound module's `n` (alloc, chord) or `voices` (midi)
+// config; unset or negative, that config's declared default, so the group
+// and the module cannot disagree.
+int inherited_count(const dsl::ModuleDecl& bound, const dsp::ModuleInfo& info) {
+  for (const char* key : {"n", "voices"}) {
+    const dsp::ConfigInfo* c = info.config(key);
+    if (!c) continue;
+    const dsl::ParamDecl* p = find_param(bound, key);
+    const int n = p ? count_of(*p) : -1;
+    return n >= 0 ? n : static_cast<int>(c->def);
+  }
+  return 1;
 }
 
 // Bank stems: the full 8-wide family <stem>1..<stem>8, matching the bank
@@ -141,7 +144,7 @@ class Expander {
                                        "' has no voice banks (gate1..)");
       return;
     }
-    const int n = inherited_count(b);
+    const int n = inherited_count(b, *info);
     g.n = std::clamp(n, 1, 8);
     g.stems = bank_stems(*info);
     // An explicit n: on the voice decl must match the inherited count.

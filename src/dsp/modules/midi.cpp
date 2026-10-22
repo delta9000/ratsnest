@@ -11,7 +11,7 @@
 namespace ms::dsp {
 namespace {
 constexpr const char* kModes[] = {"last", "lowest", nullptr};
-constexpr ConfigInfo kCfg[] = {{"channel", nullptr}, {"voices", nullptr},
+constexpr ConfigInfo kCfg[] = {{"channel", nullptr}, {"voices", nullptr, ConfigKind::Number, 1.0},
                                {"mode", kModes},       {"bend", nullptr},
                                {"cc", nullptr, ConfigKind::Numbers}};
 constexpr OutputInfo kOuts[] = {
@@ -31,7 +31,7 @@ constexpr int kCcSlots = 4;
 class Midi final : public Module {
  public:
   void init(double sample_rate, const Config& cfg) override {
-    voices_ = static_cast<int>(std::clamp(cfg_num(cfg, "voices", 1.0), 1.0, 8.0));
+    voices_ = static_cast<int>(std::clamp(cfg_num(cfg, "voices", kCfg[1].def), 1.0, 8.0));
     channel_ = static_cast<int>(std::clamp(cfg_num(cfg, "channel", 0.0), 0.0, 16.0));
     bend_semis_ = static_cast<float>(std::clamp(cfg_num(cfg, "bend", 2.0), 0.0, 24.0));
     lowest_ = cfg_str(cfg, "mode", "last") == "lowest";
