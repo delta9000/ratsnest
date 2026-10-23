@@ -17,6 +17,7 @@ class Engine {
   void set_param(size_t node, size_t slot, float target, size_t glide_samples);
   // Last processed sample's value on an output port; 0.0f if out of range.
   float output_value(size_t node, size_t slot) const;
+  size_t copy_outputs(std::span<float> destination) const;
   const graph::Graph& graph() const { return *g_; }
   // Copy migratable module state from the engine being replaced, following
   // graph().migrate_pairs. RT-called at swap adoption, when the RT thread
@@ -54,7 +55,31 @@ class Engine {
   std::unique_ptr<graph::Graph> g_;
   std::vector<float> outs_;        // flat persistent [node][out_slot]
   std::vector<size_t> out_offset_; // per node
-  std::vector<float> ins_;         // scratch, sized to max input count
+  // Flat persistent [node][in_slot]. An uncabled slot mirrors its
+  // input_base (write_base keeps them in step); a cabled slot is rebuilt
+  // every sample by its cables, so no per-sample copy of the bases is needed.
+  std::vector<float> ins_;
+  std::vector<size_t> in_offset_;  // per node
+  struct Step {
+    dsp::Module* mod = nullptr;
+    const float* ins = nullptr;   // the node's slice of ins_
+    float* outs = nullptr;        // the node's slice of outs_
+    size_t n_outs = 0;
+    size_t cable_begin = 0, cable_end = 0;  // range in cables_
+  };
+  // *dst = *init + *src * depth. The first cable into a slot starts from the
+  // slot's input_base (init); later ones accumulate (init == dst), so each
+  // slot sums in exactly the order the graph lists its cables.
+  struct FlatCable {
+    float* dst;
+    const float* init;
+    const float* src;
+    float depth;
+  };
+  void write_base(size_t node, size_t slot, float v);
+  std::vector<Step> steps_;        // one per node, in schedule order
+  std::vector<FlatCable> cables_;  // grouped by destination node
+  size_t out_index_ = 0;           // flat outs_ index of the out node's left
   std::array<Glide, kMaxGlides> glides_{};
   size_t n_glides_ = 0;
 };

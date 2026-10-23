@@ -4,6 +4,7 @@
 #include <numbers>
 #include "dsp/modules.h"
 #include "dsp/resonate.h"
+#include "dsp/util.h"
 
 // Code-derived from Mutable Instruments Rings (MIT), substantially adapted.
 // See docs/attribution.md and THIRD_PARTY_NOTICES.md.
@@ -21,11 +22,6 @@ constexpr int kBlock = 32;
 // 8192-sample line: reaches ~5.9 Hz at 48 kHz, so Rings' sub-11.7 Hz
 // linear upsampler is not needed. 4 guard samples for the Hermite read.
 constexpr float kMaxDelay = 8188.0f;
-
-float sane(float x, float lo, float hi) {
-  if (!(x >= lo)) return lo;
-  return x > hi ? hi : x;
-}
 
 class StringModule final : public Module {
  public:
@@ -56,7 +52,7 @@ class StringModule final : public Module {
     pos_raw_ = 0.25f;
     dispersion_noise_ = 0.0f;
     curved_bridge_ = 0.0f;
-    prev_strike_ = 0.0f;
+    strike_edge_ = RisingEdge{};
     countdown_ = 0;
   }
 
@@ -64,9 +60,7 @@ class StringModule final : public Module {
     if (countdown_ == 0) update_block(ins);
     --countdown_;
 
-    const bool strike = ins[3] > 0.5f && prev_strike_ <= 0.5f;
-    prev_strike_ = ins[3];
-    if (strike) {
+    if (strike_edge_(ins[3])) {
       // Effective f0 from the clamped delay: hostile freq cannot request a
       // multi-minute noise burst.
       plucker_.trigger(1.0f / delay_target_, 8.0f * exc_fc_, pos_raw_);
@@ -81,59 +75,8 @@ class StringModule final : public Module {
     // Pickup tap uses the raw (uncompensated) delay, as in Rings.
     const float comb_delay =
         std::clamp(delay_ * position_, 0.0f, kMaxDelay);
-
-    float delay = delay_ * comp_ - 1.0f;  // IIR + FIR phase compensation
-    float s;
-    {
-      // Dispersion path runs unconditionally; at dispersion == 0 every term
-      // vanishes and it reduces to a plain Hermite read (the RNG still
-      // advances, keeping seeds comparable across structure values).
-      const float d = dispersion_;
-      float noise = noise_rng_.bipolar();
-      noise *= 1.0f / (0.2f + noise_filter_);
-      dispersion_noise_ += noise_filter_ * (noise - dispersion_noise_);
-
-      const float stretch_point =
-          d <= 0.0f ? 0.0f : d * (2.0f - d) * 0.475f;
-      float noise_amount = d > 0.75f ? 4.0f * (d - 0.75f) : 0.0f;
-      noise_amount = noise_amount * noise_amount * 0.025f;
-      const float ac_amount = d < 0.0f ? -d : 0.0f;
-      const float bridge_curving = ac_amount * ac_amount * 0.01f;
-      const float ap_gain = -0.618f * d / (0.15f + std::abs(d));
-
-      float delay_fm = 1.0f;
-      delay_fm += dispersion_noise_ * noise_amount;
-      delay_fm -= curved_bridge_ * bridge_curving;
-      delay *= delay_fm;
-      if (!(delay >= 4.0f)) delay = 4.0f;
-      if (delay > kMaxDelay) delay = kMaxDelay;
-
-      const float ap_delay = delay * stretch_point;
-      const float main_delay = delay - ap_delay;
-      if (ap_delay >= 4.0f && main_delay >= 4.0f) {
-        s = line_.read_hermite(main_delay);
-        s = stretch_.allpass(s, static_cast<std::size_t>(ap_delay), ap_gain);
-      } else {
-        s = line_.read_hermite(delay);
-      }
-      const float s_ac = bridge_dc_.process(s);
-      s += ac_amount * (s_ac - s);
-      // Curved-bridge nonlinearity: dead-zoned asymmetric rectifier whose
-      // output FMs the delay on the next sample (gong/sitar behavior).
-      const float value = std::abs(s) - 0.025f;
-      const float sign = s > 0.0f ? 1.0f : -1.5f;
-      curved_bridge_ = (std::abs(value) + value) * sign;
-    }
-
-    // Excitation: external audio (headroom-scaled, brightness lowpass)
-    // plus the pluck burst, DC-blocked, summed into the loop.
-    float exc = ins[0];
-    if (!(exc > -1e6f && exc < 1e6f)) exc = 0.0f;
-    exc = exciter_.process_lp(exc * 0.70710678f);
-    exc += plucker_.process();
-    exc = exc_dc_.process(exc);
-
-    s += exc;
+    float s = read_string(delay_ * comp_ - 1.0f);  // IIR + FIR phase compensation
+    s += excite(ins[0]);
     s = fir_.process(s);
     s = iir_.process_lp(s);
     // Heal the loop: a NaN/inf write would otherwise circulate forever.
@@ -172,25 +115,79 @@ class StringModule final : public Module {
     pos_raw_ = o.pos_raw_;
     dispersion_noise_ = o.dispersion_noise_;
     curved_bridge_ = o.curved_bridge_;
-    prev_strike_ = o.prev_strike_;
+    strike_edge_ = o.strike_edge_;
     countdown_ = 0;
   }
 
  private:
+  // Reads the loop through the dispersion path. It runs unconditionally; at
+  // dispersion == 0 every term vanishes and it reduces to a plain Hermite read
+  // (the RNG still advances, keeping seeds comparable across structure
+  // values).
+  float read_string(float delay) {
+    const float d = dispersion_;
+    float noise = noise_rng_.bipolar();
+    noise *= 1.0f / (0.2f + noise_filter_);
+    dispersion_noise_ += noise_filter_ * (noise - dispersion_noise_);
+
+    const float stretch_point =
+        d <= 0.0f ? 0.0f : d * (2.0f - d) * 0.475f;
+    float noise_amount = d > 0.75f ? 4.0f * (d - 0.75f) : 0.0f;
+    noise_amount = noise_amount * noise_amount * 0.025f;
+    const float ac_amount = d < 0.0f ? -d : 0.0f;
+    const float bridge_curving = ac_amount * ac_amount * 0.01f;
+    const float ap_gain = -0.618f * d / (0.15f + std::abs(d));
+
+    float delay_fm = 1.0f;
+    delay_fm += dispersion_noise_ * noise_amount;
+    delay_fm -= curved_bridge_ * bridge_curving;
+    delay *= delay_fm;
+    if (!(delay >= 4.0f)) delay = 4.0f;
+    if (delay > kMaxDelay) delay = kMaxDelay;
+
+    const float ap_delay = delay * stretch_point;
+    const float main_delay = delay - ap_delay;
+    float s;
+    if (ap_delay >= 4.0f && main_delay >= 4.0f) {
+      s = line_.read_hermite(main_delay);
+      s = stretch_.allpass(s, static_cast<std::size_t>(ap_delay), ap_gain);
+    } else {
+      s = line_.read_hermite(delay);
+    }
+    const float s_ac = bridge_dc_.process(s);
+    s += ac_amount * (s_ac - s);
+    // Curved-bridge nonlinearity: dead-zoned asymmetric rectifier whose
+    // output FMs the delay on the next sample (gong/sitar behavior).
+    const float value = std::abs(s) - 0.025f;
+    const float sign = s > 0.0f ? 1.0f : -1.5f;
+    curved_bridge_ = (std::abs(value) + value) * sign;
+    return s;
+  }
+
+  // Excitation: external audio (headroom-scaled, brightness lowpass) plus
+  // the pluck burst, DC-blocked, summed into the loop.
+  float excite(float in) {
+    float exc = in;
+    if (!(exc > -1e6f && exc < 1e6f)) exc = 0.0f;
+    exc = exciter_.process_lp(exc * 0.70710678f);
+    exc += plucker_.process();
+    return exc_dc_.process(exc);
+  }
+
   void update_block(const float* ins) {
     countdown_ = kBlock;
-    const float freq = sane(ins[1], 0.0f, 24000.0f);
-    const float voct = sane(ins[2], -10.0f, 10.0f);
+    const float freq = clamp_nan(ins[1], 0.0f, 24000.0f);
+    const float voct = clamp_nan(ins[2], -10.0f, 10.0f);
     float f = freq * std::exp2(voct) / rate_;
     // Clamp through the delay line's reach: [4, kMaxDelay] samples.
-    f = sane(f, 1.0f / kMaxDelay, 0.25f);
+    f = clamp_nan(f, 1.0f / kMaxDelay, 0.25f);
     f_ = f;
     delay_target_ = 1.0f / f;
 
-    const float structure = sane(ins[4], 0.0f, 0.9995f);
-    const float b_knob = sane(ins[5], 0.0f, 1.0f);
-    const float damping = sane(ins[6], 0.0f, 1.0f);
-    pos_raw_ = sane(ins[7], 0.0f, 1.0f);
+    const float structure = clamp_nan(ins[4], 0.0f, 0.9995f);
+    const float b_knob = clamp_nan(ins[5], 0.0f, 1.0f);
+    const float damping = clamp_nan(ins[6], 0.0f, 1.0f);
+    pos_raw_ = clamp_nan(ins[7], 0.0f, 1.0f);
     const float folded = 0.5f - 0.98f * std::abs(pos_raw_ - 0.5f);
 
     // Loop gain from target RT60 (string.cc): decay time exponential in
@@ -274,7 +271,7 @@ class StringModule final : public Module {
   float pos_raw_ = 0.25f;
   float dispersion_noise_ = 0.0f;
   float curved_bridge_ = 0.0f;
-  float prev_strike_ = 0.0f;
+  RisingEdge strike_edge_;
   int countdown_ = 0;
 };
 

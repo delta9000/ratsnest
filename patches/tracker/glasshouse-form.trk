@@ -1,0 +1,30 @@
+# glasshouse-form.trk -- one row per bar (72 bars); '>' ramps to the next value.
+track drums cva   # 1
+track bass  cva   # 2
+track pad   cva   # 3  pad level
+track cut   cva   # 4  pad brightness 0..1
+track lead  cva   # 5
+track pluck cva   # 6
+track verb  cva   # 7  reverb send
+track main  cva   # 8  master fade
+
+pattern form 72
+#    drums  bass   pad    cut    lead   pluck  verb   main
+00 | .8   | .8   | .5   | .2>  | .9   | .8   | .5   | 1      # intro
+03 | .    | .    | .    | .3   | .    | .    | .    | .
+04 | .    | .    | .45  | .3   | .    | .    | .35  | .      # verse
+12 | .    | .    | .5>  | .35> | .    | .    | .    | .      # pre: rising
+16 | .    | .    | .7   | .7   | .    | .    | .45  | .      # chorus
+24 | .    | .    | .45  | .3   | .    | .8   | .35  | .      # verse 2 (arp)
+32 | .    | .    | .5>  | .35> | .    | .    | .    | .      # pre
+36 | .    | .    | .6>  | .6>  | .    | 1.2  | .45  | .      # chorus 2: pad swells
+43 | .    | .    | .9   | .85  | .    | .    | .    | .
+44 | .    | .6   | .3   | .2>  | .5   | .    | .5   | .      # bridge: breakdown
+48 | .    | .7>  | .4>  | .3>  | .6>  | .    | .5   | .      # build
+51 | .    | .8   | .8   | .6   | .    | .    | .    | .
+52 | .    | .85  | .9   | .85  | 1    | 1.2  | .45  | .      # double chorus
+60 | .    | .9   | 1    | 1    | .    | 1.3  | .5   | .      # up a step
+68 | .    | .7   | .9>  | .7>  | .9   | .    | .7>  | 1>     # outro
+71 | .    | .    | .5   | .3   | .    | .    | .9   | 0
+
+order form

@@ -5,6 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A software modular synthesizer for Linux where **the patch is a plain-text file**.
 Hand-written C++20 DSP, PipeWire out, hot-reload on save. Personal instrument;
 single author. Non-goals: DAW, plugin host, livecoding language, marketplace.
+The GUI (node editor) is shelved; current focus is correctness and performance
+of the DSP core (spec §10).
 
 Authoritative design: `docs/superpowers/specs/2026-07-10-ratsnest-design.md`.
 Implemented module palette and patch syntax: `docs/modules.md` (read this before
@@ -45,6 +47,15 @@ Prefer mise tasks (see `mise tasks`):
     mise run ci           # warnings-as-errors gate (build-ci/)
     mise run render -- patches/first.patch -d 10s -o take.wav
     mise run play -- patches/first.patch          # live PipeWire + hot-reload
+    mise run complexity   # score for src/; fails past docs/complexity.json
+
+## Complexity budget
+
+`tools/complexity.py` scores `src/` as decisions + 10×hotspots + loc/50 +
+5×modules (hotspot: cyclomatic > 15 or body > 80 lines). Every change should
+hold the score or lower it. A change may grow it up to 2% past
+`docs/complexity.json`; past that, simplify, or raise the baseline with
+`--update` in the same commit and say why in the message.
 
 ## Non-negotiable design rules
 

@@ -103,7 +103,7 @@ gallop = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 1] }
 clk -> gallop.clock
 half = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 0] }
 beat -> half.clock
-strike_src = switch { mode: addr, n: 2 }
+strike_src = switch { mode: addr, n: 2, fade: 0 }
 gallop.trig -> strike_src.in1
 half.trig   -> strike_src.in2
 arr_halftime.cv -> strike_src.addr     # 0 = gallop, 1 = half-time
@@ -246,7 +246,7 @@ master_dc = dcblock { cutoff: 12hz }
 master_l -> master_dc.in_l
 master_r -> master_dc.in_r
 master_comp = compressor { threshold: -14, ratio: 2.0, knee: 4,
-                           attack: 0.015, release: 0.12, makeup: 1.5, mix: 0.6 }
+                           attack: 0.015, release: 0.12, makeup: 2.3, mix: 0.6 }
 master_dc.out_l -> master_comp.in_l
 master_dc.out_r -> master_comp.in_r
 

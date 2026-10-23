@@ -1,6 +1,8 @@
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -13,19 +15,18 @@ constexpr OutputInfo kOuts[] = {{"out"}};
 class Lfo final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
-    rate_ = static_cast<float>(rate);
-    const std::string w = cfg_str(cfg, "wave", "sine");
-    wave_ = w == "tri" ? 1 : w == "saw" ? 2 : w == "square" ? 3 : 0;
+    rate_ = rate;
+    wave_ = cfg_enum(cfg, "wave", kWaves);
     phase_ = 0.0f;
-    prev_reset_ = 0.0f;
+    reset_edge_ = RisingEdge{};
   }
 
   void process(const float* ins, float* outs) override {
-    if (ins[1] > 0.5f && prev_reset_ <= 0.5f) phase_ = 0.0f;
-    prev_reset_ = ins[1];
+    if (reset_edge_(ins[1])) phase_ = 0.0f;
 
-    float p = phase_ + ins[2];
-    p -= std::floor(p);
+    double phase = phase_ + static_cast<double>(ins[2]);
+    phase -= std::floor(phase);
+    const float p = static_cast<float>(phase);
 
     switch (wave_) {
       case 0: outs[0] = std::sin(2.0f * std::numbers::pi_v<float> * p); break;
@@ -34,21 +35,25 @@ class Lfo final : public Module {
       case 3: outs[0] = p < 0.5f ? 1.0f : -1.0f; break;
     }
 
-    phase_ += std::max(ins[0], 0.0f) / rate_;
+    if (freq_key_.changed({ins[0]}))  // skip the division at a held rate
+      inc_ = static_cast<double>(std::max(sanitize(ins[0]), 0.0f)) / rate_;
+    phase_ += inc_;
     phase_ -= std::floor(phase_);
   }
 
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Lfo&>(other);
     phase_ = o.phase_;
-    prev_reset_ = o.prev_reset_;
+    reset_edge_ = o.reset_edge_;
   }
 
  private:
-  float rate_ = 48000.0f;
+  double rate_ = 48000.0;
   int wave_ = 0;
-  float phase_ = 0.0f;
-  float prev_reset_ = 0.0f;
+  double phase_ = 0.0;
+  RisingEdge reset_edge_;
+  InputKey<1> freq_key_;
+  double inc_ = 0.0;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Lfo>(); }

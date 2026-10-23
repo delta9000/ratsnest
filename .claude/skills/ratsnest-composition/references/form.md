@@ -93,7 +93,7 @@ before the drop, a 3-beat stutter. Twice and it reads as a mistake.
 range: a filter, a pitch, a noise level, a reverb send.
 
 ```text
-riser_env = func { rise: 12, fall: 0.4, curve: exp }
+riser_env = func { rise: 12, fall: 0.4, curve: quad }
 arr_riser.cv -> riser_env.trig      # steps to 1 at the build block
 riser_env -> riser_filt.cutoff : 6000
 riser_env -> riser_amp.cv : 0.7

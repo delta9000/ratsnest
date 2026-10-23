@@ -1,11 +1,13 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 #include "dsp/mastering.h"
 
 // Paper-derived Giannoulis/Massberg/Reiss log-domain soft-knee curve and
-// ballistics. See docs/attribution.md.
+// ballistics; peak-hold before release after Luff (Signalsmith, 2022).
+// See docs/attribution.md.
 
 namespace ms::dsp {
 namespace {
@@ -42,6 +44,7 @@ class Compressor final : public Module {
     is_external_ = (sc == "external");
     
     g_smooth_ = 0.0f;
+    hold_ = {};
   }
 
   void process(const float* ins, float* outs) override {
@@ -83,12 +86,16 @@ class Compressor final : public Module {
       }
     }
     
-    float g_target = level_db - y_db;
-    if (g_target < 0.0f) g_target = 0.0f;
-    
-    // 3. Separate smoothed attack/release
-    const float alpha_a = 1.0f - std::exp(-1.0f / (attack * rate_));
-    const float alpha_r = 1.0f - std::exp(-1.0f / (release * rate_));
+    // Peak-hold the target so release starts from the last peak instead of
+    // rippling through every trough of a bass waveform.
+    const float g_target = hold_.push(std::max(0.0f, level_db - y_db), hold_samples(release, rate_));
+
+    // 3. Branching attack/release on the held target
+    if (time_key_.changed({attack, release})) {  // skip exp while times hold
+      alpha_a_ = 1.0f - std::exp(-1.0f / (attack * rate_));
+      alpha_r_ = 1.0f - std::exp(-1.0f / (release * rate_));
+    }
+    const float alpha_a = alpha_a_, alpha_r = alpha_r_;
     
     if (g_target > g_smooth_) {
       g_smooth_ += alpha_a * (g_target - g_smooth_);
@@ -98,18 +105,19 @@ class Compressor final : public Module {
     g_smooth_ = flush_denormal(g_smooth_);
     
     // 4. Convert back to linear gain reduction
-    const float g_linear = std::pow(10.0f, -g_smooth_ / 20.0f);
+    if (gain_key_.changed({g_smooth_})) g_linear_ = std::pow(10.0f, -g_smooth_ / 20.0f);
+    const float g_linear = g_linear_;
     
     // 5. Apply makeup and crossfade mix
-    const float makeup_linear = std::pow(10.0f, makeup / 20.0f);
+    if (makeup_key_.changed({makeup})) makeup_linear_ = std::pow(10.0f, makeup / 20.0f);
+    const float makeup_linear = makeup_linear_;
     const float wet_gain = g_linear * makeup_linear;
     
     const float wet_l = in_l * wet_gain;
     const float wet_r = in_r * wet_gain;
     
-    const float mix_angle = mix * (std::numbers::pi_v<float> / 2.0f);
-    const float gain_dry = std::cos(mix_angle);
-    const float gain_wet = std::sin(mix_angle);
+    const float gain_dry = 1.0f - mix;
+    const float gain_wet = mix;
     
     outs[0] = gain_dry * in_l + gain_wet * wet_l;
     outs[1] = gain_dry * in_r + gain_wet * wet_r;
@@ -120,12 +128,18 @@ class Compressor final : public Module {
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Compressor&>(other);
     g_smooth_ = o.g_smooth_;
+    hold_ = o.hold_;
   }
 
  private:
   float rate_ = 48000.0f;
   bool is_external_ = false;
   float g_smooth_ = 0.0f;
+  SlidingMax<4096> hold_;  // 20 ms up to 192 kHz
+  // Memoized libm results; see dsp/input_key.h.
+  InputKey<2> time_key_;
+  InputKey<1> gain_key_, makeup_key_;
+  float alpha_a_ = 0.0f, alpha_r_ = 0.0f, g_linear_ = 1.0f, makeup_linear_ = 1.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Compressor>(); }

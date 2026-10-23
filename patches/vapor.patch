@@ -121,19 +121,20 @@ sub_dry = vca { gain: 1 }
 sub_amp -> sub_dry.in
 
 # === WATER TONES: pitched-noise bands, bern-gated every 6 s ===
-# Pink noise into a very narrow bandpass (Q=12). The center frequency
+# Pink noise into a very narrow bandpass (res 0.96, Q~27: just under the
+# svf self-oscillation edge, so it stays pitched noise, not a sine). The center frequency
 # tracks the quantizer, so as the turing drifts the band sweeps through
 # the pentatonic. bern 0.5 every 6 s opens the gate for ~6 s at a time,
 # so each tone rings out before the next. Feed goes to the wet bus only.
 bern_water = bern { prob: 0.5, seed: 31 }
 gate6 -> bern_water.gate
 water_n = noise { color: pink, seed: 17 }
-water_bp = svf { cutoff: 700, res: 12 }
+water_bp = svf { cutoff: 700, res: 0.96 }
 water_n -> water_bp.in
 quant_minor -> water_bp.cutoff : 1500
 water_amp = vca { gain: 0 }
 water_bp.bp -> water_amp.in
-bern_water.a -> water_amp.cv : 0.45
+bern_water.a -> water_amp.cv : 0.82
 water_wet = vca { gain: 1 }
 water_amp -> water_wet.in
 
@@ -243,7 +244,7 @@ master_dc.out_l -> master_eq.in_l
 master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { threshold: -18, ratio: 2.0, knee: 8,
-                          attack: 0.05, release: 0.3, makeup: 1.0, mix: 1 }
+                          attack: 0.05, release: 0.3, makeup: 3.7, mix: 1 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 

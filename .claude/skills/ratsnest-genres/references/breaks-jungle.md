@@ -38,7 +38,7 @@ into a voice for ratchets — see move 4.
 | kit resynth | `lib/kit/*.sub` | kick `tune: 44hz`, snare `snap: 0.7`, hat `decay: 0.1` |
 | smear | `grains` | `size: 0.09`, `density: 26`, `jitter: 0.25` |
 | reese | 3× `vco{saw}` + `svf.bp` subtract | detune ±0.006 v/oct, notch 420 Hz `res: 0.72` |
-| sub | `vco{sine}` + `func` | 55 Hz, `fall: 0.22`, `curve: exp` |
+| sub | `vco{sine}` + `func` | 55 Hz, `fall: 0.66`, `curve: exp` |
 | grit | `overdrive` | `model: klon, drive: 0.35, mix: 0.5` on the reese only |
 | glue | `compressor` | `ratio: 3, attack: 8ms, release: 120ms, mix: 0.6` |
 
@@ -100,8 +100,8 @@ The hats keep sixteenth density on top.
 ### 3. Reese: detune, then carve the notch by subtraction
 
 There is no notch output on `svf`. Build one: take the dry sum, subtract a
-resonant bandpass from it, and sweep the bandpass. `math { op: sub }` defaults
-`b: 1`, which would add a constant — zero it.
+resonant bandpass from it, and sweep the bandpass. `math` inputs default
+to 0, so the bandpass cable into `b` owns the subtraction outright.
 
 ```text
 r1 = vco { wave: saw, freq: 55hz }
@@ -152,7 +152,7 @@ churns.
 
 ```text
 sub_osc = vco { wave: sine, freq: 55hz }
-sub_env = func { rise: 0.004, fall: 0.22, curve: exp }
+sub_env = func { rise: 0.004, fall: 0.66, curve: exp }
 quarter -> sub_env.trig
 sub_vca = vca { gain: 0 }
 sub_osc -> sub_vca.in

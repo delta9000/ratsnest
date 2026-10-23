@@ -91,7 +91,9 @@ On save, the engine diffs old vs new IR:
 - **Topology change:** new graph built off-thread; every module whose
   `(name, type)` pair survives has its internal state migrated (oscillator
   phase, envelope stage, delay/register buffers); pointer-swap, then ~50 ms
-  equal-power crossfade old→new. Renaming a module intentionally resets it.
+  linear crossfade old→new. Renaming a module intentionally resets it.
+  A topology save that lands during that crossfade is held, newest only,
+  and applied as soon as the fade completes; it is never dropped.
 - **Parse/validation error:** last good graph keeps playing; error reported
   with line/column. The drone never stops because of a typo.
 
@@ -139,24 +141,24 @@ essentials.
 
 | Module | Role | Key params | Key ports |
 |---|---|---|---|
-| `vco` | polyBLEP anti-aliased oscillator | `freq`, `wave` (sine\|tri\|saw\|pulse), `pw` | in: `v_oct` `fm` `pwm` `sync` · out: `out` |
-| `noise` | noise source | `color` (white\|pink), `seed` | out |
-| `svf` | state-variable filter | `cutoff`, `res` | in · out: `lp` (default) `bp` `hp` |
-| `ladder` | 4-pole ZDF ladder LPF | `cutoff`, `res`, `drive` | in · out |
+| `vco` | band-limited oscillator (shared Fourier-series tables; analytic sine) | `freq`, `wave` (sine\|tri\|saw\|pulse), `pw` | in: `v_oct` `fm` `pwm` `sync` `phase` · out: `out` |
+| `noise` | noise source | `color` (white\|pink\|brown\|blue\|violet), `seed` | out |
+| `svf` | state-variable filter; bounded, self-oscillates at the top of `res` | `cutoff`, `res` | in · out: `lp` (default) `bp` `hp` |
+| `ladder` | 4-pole ZDF ladder LPF; saturating feedback, self-oscillates at the top of `res` | `cutoff`, `res`, `drive` | in · out |
 | `vca` | amplifier | `gain`, `response` (lin\|exp) | `in` `cv` · out |
 | `lpg` | vactrol-model low pass gate | `damp`, `decay` | `in` `cv` `strike` · out |
 | `fold` | wavefolder | `fold`, `sym` | `in` `fold` · out |
 | `drive` | saturation | `amount`, `mode` (soft\|hard) | in · out |
 | `func` | Maths-style function generator | `rise`, `fall`, `curve`, `cycle` (bool) | in: `trig` `in`(slew) `rise` `fall` · out: `out` `eor` `eoc` |
-| `lfo` | multi-wave LFO | `freq`, `wave`, `phase` | in: `reset` `rate` · out |
+| `lfo` | multi-wave LFO | `freq`, `wave` (sine\|tri\|saw\|square), `phase` | in: `freq` `reset` `phase` · out |
 | `random` | smooth/stepped wandering voltage | `rate`, `smooth`, `seed` | out: `out` `stepped` |
 | `sh` | sample & hold / track & hold | `mode` (sample\|track) | `in` `trig` · out |
-| `quant` | quantizer | `scale` (array), `root`, `transpose` | `in` `transpose` · out: `out` `changed`(gate) |
-| `math` | signal math (= ring mod, rectifier, min/max, …) | `op` (add\|sub\|mult\|min\|max\|abs\|clip\|wrap), `b` | `a` `b` · out |
-| `xfade` | equal-power crossfader | `mix` | `a` `b` `mix` · out |
+| `quant` | quantizer | `scale` (array), `mode` (continuous\|clock), `root`, `transpose` | `in` `root` `transpose` `clock` `mask` `degree` · out: `out` `changed`(one-sample trigger) |
+| `math` | signal math (= ring mod, rectifier, min/max, …) | `op` (add\|sub\|mult\|min\|max\|abs\|clip\|wrap\|exp2), `b` | `a` `b` · out |
+| `xfade` | linear crossfader, optional equal-power law | `mix`, `law` | `a` `b` `mix` · out |
 | `mix` | stereo mixer | `levels` (array), `pans` (array); defaults 1.0 / center | `in1..in8` `lvl1..lvl8` · out: `out_l` `out_r` |
 | `scope` | probe/meter for TUI & logs | `label` | in |
-| `out` | master out: limiter + PipeWire sink | `level` | `left` `right` `in`(→both) |
+| `out` | master out: float sum; PipeWire boundary clips | `level` | `left` `right` `in`(→both) |
 
 Build order note: `svf` before `ladder` (much easier; instant gratification),
 `vco` first overall (polyBLEP is DSP lesson one).
@@ -166,7 +168,7 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 | Module | Role | Notes |
 |---|---|---|
 | `midi` | note/CC → CV | cfg `channel`(0=omni) `voices`(1..8) `mode`(last\|lowest) `bend`(semitones) `cc`(≤4 controller numbers); outs banks `gate1..8` `voct1..8` `vel1..8`, plus `bend` `at` `cc1..cc4`. No mono `gate`/`voct`/`vel` outs — those bare names are reserved by the voice-group bank-resolution rule (§6); a mono synth is `voices: 1` and `mid.gate1`. PipeWire MIDI |
-| `adsr` | keyboard envelope | ins `gate` `attack` `decay` `sustain`(0..1, live) `release` · out (0..1); `curve` (lin\|exp\|log); release from current level, retrigger from current level |
+| `adsr` | keyboard envelope | ins `gate` `attack` `decay` `sustain`(0..1, live) `release` · out (0..1); `curve` (lin\|exp\|log\|quad; exp is a true RC, stage time = T60); release from current level, retrigger from current level |
 | `delay` | tape-style feedback delay, 10 s max | ins `in` `time`(s) `pitch`(v_oct: t·2^−p) `feedback`(0..1.2, tanh loop) `mix` `tone`(Hz) `slew`(s) · out. Clock-sync stays patchable (clock→seconds module later) |
 | `reverb` | Dattorro 1997 plate | ins `in_l` `in_r` `decay` `damp` `mix` `freeze`(gate) · outs `out_l` `out_r`; cfg `predelay`(s) `bandwidth` `mod_rate` `mod_depth`. FDN variant is a Phase 5+ sibling |
 | `alloc` | voice allocator | cfg `n`(1..8, default 4) `mode`(rr\|unison); ins `gate` `voct` `vel`; outs `gate1..8` `voct1..8` `vel1..8` `spread1..8`. Distributes a mono note stream across indexed banks for `voice` groups; see `2026-07-11-voice-alloc-design.md` |
@@ -178,11 +180,11 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 | `clock` | master clock | `bpm`; ins `run` `reset` · outs `out` + `run` gate |
 | `div` | clock divider | `by`; ins `in` `reset` · out. Multiplication deferred |
 | `euclid` | Euclidean rhythm | ins `clock` `reset` `steps`(1..64) `hits`(0..steps) `rot`(wrapped); outs `trig`(one sample) `gate`(clock width). Live integer params round; reset makes the coincident/next edge step zero |
-| `stepseq` | step sequencer | cfg `steps`/`gates` arrays, `dir` (forward\|reverse\|pingpong\|random), `seed`; ins `clock` `reset` `len` `transpose`; outs `cv` `trig` `gate` `eoc` |
+| `stepseq` | step sequencer | cfg `steps`/`gates`/`lens`/`ties`/`vels` arrays, `dir` (forward\|reverse\|pingpong\|random), `seed`; ins `clock` `reset` `len` `transpose`; outs `cv` `trig` `gate` `eoc` `vel` |
 | `turing` | lockable shift register | ins `clock` `write` `clear` `len`(1..16) `prob`; cfg `seed`; outs `out` `pulse` `bit1..bit8`. Volts/Pulses expanders = cables |
-| `bern` | Bernoulli gate | ins `gate` `prob`; cfg `seed`; mutually exclusive gate-width outs `a` `b` |
+| `bern` | Bernoulli gate | ins `gate` `prob` `reset` `length` `reroll`; cfg `seed`; mutually exclusive gate-width outs `a` `b`, held draw `value` |
 | `logic` | gate logic + comparator | ins `a` `b` `threshold`; cfg `op` (and\|or\|xor\|not\|cmp); out |
-| `switch` | sequential/addressed switch | ins `in1..in8` `clock` `reset` `addr` `n`; cfg `mode` (seq\|addr); out |
+| `switch` | sequential/addressed switch | ins `in1..in8` `clock` `reset` `addr` `n`; cfg `mode` (seq\|addr), `fade` (s, default 0.005; 0 = instant cut for CV/gates); out |
 | `tempo` | musical time conversion | ins `bpm` `beats`; outs `seconds` `hz` |
 
 Transposition (Berlin school) needs no module: pitch CVs sum on `v_oct`.
@@ -209,10 +211,10 @@ bridge. See `docs/modules.md` for behavior.)
 |---|---|---|
 | `dcblock` | stereo DC blocker | first-order high-pass filter, parameter smoothing around 20 ms, denormal flushing |
 | `stereo` | stereo utility | normalized M/S width, equal-power balance, level-sensed mono/swap, 300 ms correlation meter |
-| `compressor` | stereo linked compressor | stereo-linked feed-forward log-domain soft-knee curve, attack/release smoothing, makeup and dry/wet |
+| `compressor` | stereo linked compressor | stereo-linked feed-forward log-domain soft-knee curve, peak-held detector, attack/release smoothing, makeup and dry/wet |
 | `eq` | stereo mastering EQ | five-band parametric EQ (HPF, low shelf, mid1 peaking, mid2 peaking, high shelf), shared coefficients, 20 ms parameter smoothing, zero-gain bypass |
 | `clipper` | oversampled stereo clipper | hard/soft (tanh) oversampled clipping, 4x polyphase allpass IIR half-band oversampling, dry-delay latency alignment |
-| `limiter` | lookahead peak limiter | fixed 2.0 ms lookahead, peak detection window, fast 0.1 ms attack, log-domain smoothing |
+| `limiter` | lookahead peak limiter | fixed 2.0 ms lookahead, peak-hold of required gain reduction, release, box-filter attack across the whole lookahead |
 
 ### Phase 6 — granular (+1)
 
@@ -274,7 +276,7 @@ patch.file ──▶ dsl/     lexer → parser → Patch IR (modules, cables, pa
   Static registry; no plugin loading.
 - **`engine/`** — RT runner, PipeWire backend (`pw_stream`), SPSC command
   queue in (param glides, graph swaps), ring buffers out (meters, scope taps,
-  record feed). Output limiter + NaN/denormal guards at the sink. (`pw_filter`
+  record feed). Float output preserves headroom; the device boundary clips. NaN/denormal guards protect the signal path. (`pw_filter`
   DSP nodes are never auto-routed by WirePlumber 0.5.15 — `create-item.lua`
   string-matches `media.class` "Audio" to `si-audio-adapter`, which requires
   node-level `EnumFormat` that filter nodes don't expose; `pw_stream` was
@@ -294,14 +296,17 @@ swap; old graph freed on the main thread.
 ratsnest play   drone.patch          # watch + play + meters
 ratsnest render drone.patch -d 30s -o take.wav   # offline, faster than RT
 ratsnest render drone.patch -d 300s --stats 8s   # + peak/RMS/DC level timeline
+ratsnest render song.patch -o t.wav --tap kick   # + t.kick.wav and its own timeline
 ratsnest check  drone.patch          # parse/validate — editor lint
+ratsnest describe [module_type]      # JSON interfaces from the runtime registry
 ```
 
 ### 7.5 Error handling
 
 - Parse/validation errors: report, keep last good graph running (§3.3).
 - Runtime: denormal flushing (FTZ/DAZ), NaN guard per module output (replace
-  with 0, count + report), brickwall limiter on `out`.
+  with 0, count + report). Device output clips to -1..1; use an explicit
+  limiter for dynamics control.
 - PipeWire xruns/disconnects: reconnect with silence fill; never crash the
   session.
 
@@ -345,6 +350,13 @@ ratsnest/
 4. **Sound design** — sampler, rec, extin, follow.
 5. **Later** — GUI canvas over the same file (layout sidecar), granular,
    physical modeling.
+
+**GUI: shelved (2026-10-19).** A native SDL3/ImGui node editor plus a stdio
+MCP bridge ("studio") was built as commit `4858f5d` on `feat/longwave` and
+deliberately not merged: it pulled effort away from the engine. Current
+priority is correctness and performance of the CLI/DSP core. The commit stays
+on that branch for reference; reviving it is a fresh design decision, and
+rule 1 (the patch file is the source of truth) still binds any GUI.
 
 ## 11. Prior art notes
 

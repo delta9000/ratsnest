@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <numbers>
 #include <vector>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 // Paper-derived Dattorro 1997 plate: topology, delay lengths, coefficients,
@@ -87,13 +88,14 @@ class Reverb final : public Module {
     freeze_ += (ftarget - freeze_) * fa;
     if (freeze_ < 1e-20f) freeze_ = 0.0f;
 
-    const float decay_in = std::clamp(ins[2], 0.0f, 0.9995f);
+    const float decay_in = std::clamp(sanitize(ins[2]), 0.0f, 0.9995f);
     const float decay = decay_in + (1.0f - decay_in) * freeze_;
-    const float damp = std::clamp(ins[3], 0.0f, 1.0f) * (1.0f - freeze_);
+    const float damp = std::clamp(sanitize(ins[3]), 0.0f, 1.0f) * (1.0f - freeze_);
     const float kd2 = std::clamp(decay + 0.15f, 0.25f, 0.5f);
 
     // mono sum -> predelay -> bandwidth lowpass -> 4 input diffusers
-    float x = 0.5f * (ins[0] + ins[1]) * (1.0f - freeze_);
+    // Non-finite input never enters the tank: it would circulate forever.
+    float x = 0.5f * (sanitize(ins[0]) + sanitize(ins[1])) * (1.0f - freeze_);
     const float delayed = dread(ln_[kPre], pre_back_);
     dwrite(ln_[kPre], x);
     x = delayed;
@@ -148,10 +150,13 @@ class Reverb final : public Module {
     wl *= 0.6f;
     wr *= 0.6f;
 
-    const float m = std::clamp(ins[4], 0.0f, 1.0f);
-    const float ang = m * (std::numbers::pi_v<float> / 2.0f);
-    const float dry = std::cos(ang);
-    const float wet = std::sin(ang);
+    if (mix_key_.changed({ins[4]})) {  // skip cos/sin while mix holds
+      const float m = std::clamp(ins[4], 0.0f, 1.0f);
+      const float ang = m * (std::numbers::pi_v<float> / 2.0f);
+      dry_ = std::cos(ang);
+      wet_ = std::sin(ang);
+    }
+    const float dry = dry_, wet = wet_;
     outs[0] = ins[0] * dry + wl * wet;
     outs[1] = ins[1] * dry + wr * wet;
   }
@@ -213,6 +218,8 @@ class Reverb final : public Module {
   }
 
   float rate_ = 48000.0f;
+  InputKey<1> mix_key_;
+  float dry_ = 1.0f, wet_ = 0.0f;
   std::vector<float> arena_;
   Line ln_[kLineCount] = {};
   std::size_t lenA1_ = 0, lenB1_ = 0, pre_back_ = 1;

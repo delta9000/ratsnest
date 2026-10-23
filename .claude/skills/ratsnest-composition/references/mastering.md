@@ -16,7 +16,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.4,
                            knee: 5, attack: 0.012, release: 0.14,
-                           makeup: 1.5, mix: 0.85 }
+                           makeup: 7.0, mix: 0.85 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.7
@@ -44,6 +44,9 @@ Order matters: DC first (so nothing downstream sees offset), EQ before dynamics
 (so the compressor isn't triggered by mud you were going to cut anyway), width
 after compression (so the compressor stays stereo-linked on the real signal),
 clipper before limiter (the clipper shaves peaks so the limiter barely works).
+For a release master add `true_peak: on` to the limiter: sample-peak limiting
+lets dense mixes overshoot by 1.6–2.3 dB between samples (see `limiter` in
+`docs/modules.md`).
 
 ## The calibration numbers
 
@@ -52,7 +55,7 @@ Working backwards from a loudness target:
 | Stage | Target |
 |---|---|
 | premaster peak | ≈ −3 dBFS |
-| glue comp makeup | +1.5 .. +3 dB |
+| glue comp makeup | +6.5 .. +8.5 dB at `mix` 0.75–0.85 (linear blend; measured on mainstage/ion/polaris/halcyon) |
 | clipper drive | 1 .. 6.5 dB (it is **dB**), parallel `mix` ~0.3 |
 | limiter threshold | −0.4 .. −0.5 dBFS |
 | drop-window RMS (club) | ≈ −12 dBFS, peaks −0.4 → crest ~11 dB |
@@ -60,6 +63,50 @@ Working backwards from a loudness target:
 | intro | ≈ −25 dBFS RMS or lower |
 
 Crest ~11 dB is loud but not bricked. Crest under 6 dB means you flattened it.
+
+The compressor's detector holds each peak for `min(release, 20 ms)`, so a
+steady tone gets exactly the static curve at its peak. A slow-attack glue comp
+on its own input (`attack: 0.05, release: 0.3`) compresses 2–3 dB harder than it
+did before that hold went in; the library's patches were rebalanced with makeup
+(+0.5..+3 dB) to keep their loudness. If an older patch comes back quieter,
+raise makeup by the difference rather than lowering the threshold. The limiter
+holds the same way, which costs a brickwalled master (≈ −8 LUFS) about 0.5 dB;
+that is the price of a clean low end, not a reason for more drive.
+
+## The lib chains: `master-chain.sub` and `club-master.sub`
+
+`patches/lib/master-chain.sub` is the chain above as one instance; its
+`width` and `makeup` are inputs, so form lanes can ride them. Measured on two
+full songs (glasshouse, synth-pop; undertow, melodic techno), four things it
+does that you have to plan around:
+
+- **Polite by default.** All defaults on whole-step: −13.5 LUFS integrated;
+  the synth-pop mix, staged lower, came back at −16.7. Loudness comes from
+  `makeup` and `clip_drive`, about 0.5 LUFS per dB of either near the top.
+- **Kick-keyed compression leaves kick-less sections uncompressed — and
+  still adds `makeup`.** The key is external (`side_l`/`side_r` ← kick), so a
+  breakdown with no kick gets no gain reduction but the full makeup: one
+  measured breakdown came back 1 dB under the chorus it was mixed 6 dB
+  below. Mix kick-less sections ~6 dB lower than you want them, ride
+  `makeup` down with the form lane, or key from the bus too
+  (`key_bus: 0.35` adds that share of the bus to the key, so the glue holds
+  every section).
+- **The clipper overshoots its threshold.** At the default `clip_blend` 0.32
+  the clip is parallel: the dry 68 % passes unclipped, so the clipper's
+  output overshoots its −2.5 dB threshold by 2.4–3.4 dB. It rounds peaks; the
+  limiter sets the ceiling. `clip_blend: 1` makes it a real (serial) clipper.
+- **The limiter is sample-peak unless told otherwise.** With the default
+  `true_peak: off`, inter-sample peaks exceed `ceiling` by 1.6–2.3 dB on a
+  loud master (whole-step: −0.4 dBFS sample peak, +1.7 dBTP). Set
+  `true_peak: on`, or keep the ceiling at −2.5 dBFS or lower, for a release.
+
+`patches/lib/club-master.sub` is the club preset: glue at −18 dB 3:1 keyed
+by kick plus 35 % bus, serial soft clip at `drive` 12.5 dB, makeup 10.5 dB
+(an input), true-peak limiter at −1.0 dBTP. On undertow's bus it measured
+**−8.5 LUFS integrated, −1.0 dBFS sample peak, −0.5 dBTP**, drops −7.8 dBFS
+RMS (crest ~7 dB: loud, as club masters are). `drive: 13` with `makeup` 11
+reaches −8.0. At that density a kick-less break sits only ~2.3 dB under the
+drop, so mix breaks lower still.
 
 ## The self-own that costs 2 dB
 
@@ -95,7 +142,7 @@ Check, in order:
 4. **Section RMS steps** land at the seconds your block table predicts.
 5. **No dead air** after the fade, and no return of the intro (grid wrap).
 
-For LUFS and true-peak, that's outside the patch — use `ffmpeg`:
+For LUFS, and to confirm the true peak, measure outside the patch with `ffmpeg`:
 
 ```bash
 ffmpeg -i take.wav -af ebur128=peak=true -f null -

@@ -130,28 +130,28 @@ quarter -> rim_seq.clock
 rim_gate = logic { op: and }
 rim_seq.trig -> rim_gate.a
 arr_kick.cv -> rim_gate.b
-rim_env = func { rise: 0.0008, fall: 0.09, curve: exp }
+rim_env = func { rise: 0.0008, fall: 0.27, curve: exp }
 rim_gate -> rim_env.trig
 rim_noise = noise { color: white, seed: 13 }
 rim_filter = svf { cutoff: 2100, res: 0.65 }
 rim_noise -> rim_filter.in
 rim_amp = vca { gain: 0 }
 rim_filter.bp -> rim_amp.in
-rim_env -> rim_amp.cv : 0.6
+rim_env -> rim_amp.cv : 0.84
 
 # ---- hats: soft euclid ticks, density on the lane ----
 hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
 master -> hat_pattern.clock
 hats_lvl -> hat_pattern.hits : 5
-hat_env = func { rise: 0.0006, fall: 0.03, curve: exp }
+hat_env = func { rise: 0.0006, fall: 0.09, curve: exp }
 hat_pattern.trig -> hat_env.trig
-hats_lvl -> hat_env.fall : 0.025
+hats_lvl -> hat_env.fall : 0.075
 hat_noise = noise { color: white, seed: 29 }
 hat_filter = svf { cutoff: 8200, res: 0.2 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.42
+hat_env -> hat_amp.cv : 0.59
 quarter -> hat_amp.cv : -0.1
 
 # ---- offbeat open hat ----
@@ -160,14 +160,14 @@ quarter -> beat_not.a
 offbeat = logic { op: and }
 eighth -> offbeat.a
 beat_not -> offbeat.b
-oh_env = func { rise: 0.001, fall: 0.16, curve: exp }
+oh_env = func { rise: 0.001, fall: 0.48, curve: exp }
 offbeat -> oh_env.trig
 oh_noise = noise { color: white, seed: 43 }
 oh_filter = svf { cutoff: 5800, res: 0.3 }
 oh_noise -> oh_filter.in
 oh_amp = vca { gain: 0 }
 oh_filter.hp -> oh_amp.in
-oh_env -> oh_amp.cv : 0.26
+oh_env -> oh_amp.cv : 0.36
 perc_lvl -> oh_amp.cv : 0.55
 
 # ---- BELL motif: modal resonator, bell-stretched partials, striking a
@@ -202,7 +202,7 @@ bell_lvl -> bell_amp.cv : 0.7
 str_lift = math { op: add }
 ch_root.cv -> str_lift.a
 1 -> str_lift.b
-str_switch = switch { mode: seq, n: 8 }
+str_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> str_switch.clock
 ch_root.cv -> str_switch.in1
 ch_v3.cv   -> str_switch.in2
@@ -229,7 +229,7 @@ str.out -> str_amp.in
 str_lvl -> str_amp.cv : 0.75
 
 # ---- bass: rolling offbeat eighths + glide sub, both on the roots ----
-bass_env = func { rise: 0.0015, fall: 0.13, curve: exp }
+bass_env = func { rise: 0.0015, fall: 0.39, curve: exp }
 offbeat -> bass_env.trig
 bass_osc = vco { freq: 110hz, wave: saw }
 ch_root.cv -> bass_osc.v_oct
@@ -239,7 +239,7 @@ bass_env -> bass_filt.cutoff : 900
 bass_lvl -> bass_filt.cutoff : 220
 bass_amp = vca { gain: 0 }
 bass_filt -> bass_amp.in
-bass_env -> bass_amp.cv : 0.9
+bass_env -> bass_amp.cv : 1.26
 bass_post = vca { gain: 0 }
 bass_amp -> bass_post.in
 bass_lvl -> bass_post.cv : 0.8
@@ -280,7 +280,7 @@ pad_breath -> pad_filt_l.cutoff : 130
 pad_breath -> pad_filt_r.cutoff : -120
 pad_lvl -> pad_filt_l.cutoff : 650
 pad_lvl -> pad_filt_r.cutoff : 650
-pad_env = adsr { attack: 0.7, decay: 0.3, sustain: 0.85, release: 1.6, curve: exp }
+pad_env = adsr { attack: 0.7, decay: 0.3, sustain: 0.85, release: 1.6, curve: quad }
 bar -> pad_env.gate
 pad_amp_l = vca { gain: 0 }
 pad_amp_r = vca { gain: 0 }
@@ -318,14 +318,14 @@ rise_cv -> riser_amp.cv : 0.5
 roll_pattern = euclid { steps: 16, hits: 4, rot: 0 }
 master -> roll_pattern.clock
 rise_cv -> roll_pattern.hits : 12
-roll_env = func { rise: 0.001, fall: 0.06, curve: exp }
+roll_env = func { rise: 0.001, fall: 0.18, curve: exp }
 roll_pattern.trig -> roll_env.trig
 roll_noise = noise { color: white, seed: 41 }
 roll_filter = svf { cutoff: 2200, res: 0.45 }
 roll_noise -> roll_filter.in
 roll_amp = vca { gain: 0 }
 roll_filter.bp -> roll_amp.in
-roll_env -> roll_amp.cv : 0.2
+roll_env -> roll_amp.cv : 0.28
 rise_cv -> roll_amp.cv : 0.16
 
 # ---- dry band: bells just left, strings just right, deep pad pump ----
@@ -404,7 +404,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.2,
                            knee: 5, attack: 0.012, release: 0.15,
-                           makeup: 1.4, mix: 0.85 }
+                           makeup: 6.5, mix: 0.85 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.7
@@ -425,4 +425,4 @@ master_clip.out_r -> master_limit.in_r
 master_limit.out_l -> out.left
 master_limit.out_r -> out.right
 -1 -> out.level
-main_out -> out.level : 0.8
+main_out -> out.level : 1.0

@@ -36,7 +36,7 @@ ch.cv -> o2.v_oct
 ch.cv -> o3.v_oct
 0.25 -> o2.v_oct                    # minor third
 0.58333 -> o3.v_oct                 # fifth
-senv = func { rise: 0.006, fall: 0.3, curve: exp }
+senv = func { rise: 0.006, fall: 1.5, curve: exp }
 bar -> senv.trig
 samp = vca { gain: 0, response: exp }
 o1 -> samp.in : 0.34

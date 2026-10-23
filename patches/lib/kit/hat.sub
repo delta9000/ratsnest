@@ -25,7 +25,13 @@ trig -> acc.trig
 # plus exponential tail (real hats: ~-0.6 dB/ms for 20 ms, then slow).
 nz = noise { color: white, seed: 23 }
 env1 = func { rise: 0.0002, fall: 0.02 }
-env2 = func { rise: 0.0005, fall: decay, curve: exp }
+# `decay` keeps its meaning (the length of the tail you hear). An `exp` stage
+# time is its -60 dB point and this tail sits 6 dB under the transient, so
+# the fall runs 5x decay: measured, the hit's -20 dB point stays at 208 ms
+# for the default 0.25 (same as the old x^2 curve), energy -1.4 dB.
+tail = math { op: mult, a: decay, b: 5 }
+env2 = func { rise: 0.0005, fall: 0, curve: exp }
+tail -> env2.fall
 trig -> env1.trig
 trig -> env2.trig
 drv = vca { gain: 0 }

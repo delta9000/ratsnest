@@ -25,6 +25,7 @@ class PatchWatcher {
   };
   void arm(DirWatch& w);
   void drain();
+  bool settled();
 
   int fd_ = -1;
   std::vector<DirWatch> watches_;

@@ -10,8 +10,15 @@
 
 namespace ms::dsp {
 
-struct InputInfo  { const char* name; float def; };
-struct ConfigInfo { const char* name; const char* const* enum_vals; };
+// Discrete controls bypass parameter glides on reload/live edits.
+struct InputInfo  { const char* name; float def; bool glide = true; };
+enum class ConfigKind { Number, Text, Numbers, Enums };
+struct ConfigInfo {
+  const char* name;
+  const char* const* enum_vals;
+  ConfigKind kind = ConfigKind::Number;
+  double def = 0.0;  // a Number config's default, where code outside the module needs it
+};
 struct OutputInfo { const char* name; };
 
 struct ConfigValue {
@@ -29,6 +36,10 @@ std::string cfg_str(const Config& c, std::string_view name, std::string_view def
 double cfg_num(const Config& c, std::string_view name, double def);
 const std::vector<double>& cfg_arr(const Config& c, std::string_view name);
 const std::vector<std::string>& cfg_str_arr(const Config& c, std::string_view name);
+// Position of `s` in a nullptr-terminated enum list, or `def` if absent.
+int enum_index(const char* const* vals, std::string_view s, int def = 0);
+// The named config's position in `vals`; `def` when unset or unknown.
+int cfg_enum(const Config& c, std::string_view name, const char* const* vals, int def = 0);
 
 // Raw MIDI event as delivered to on_midi: up to 4 status/data bytes (running
 // status is expanded by the producer, so len is 1..3 for channel voice

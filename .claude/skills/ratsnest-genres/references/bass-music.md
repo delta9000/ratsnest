@@ -71,7 +71,7 @@ master -> note.clock
 wob = lfo { freq: 0hz, wave: tri }
 wrate.hz -> wob.freq
 note.trig -> wob.reset
-depth = func { rise: 0.42, fall: 0.12, curve: exp }
+depth = func { rise: 0.42, fall: 0.36, curve: exp }
 note.trig -> depth.trig
 wdepth = vca { gain: 0 }
 wob   -> wdepth.in
@@ -120,7 +120,7 @@ operator gives the growl its long arc.
 ```text
 growl = fm { algo: dual, ratios: [1, 1, 3.5, 1, 7, 2],
              levels: [0.9, 0.35, 0.2, 0.6, 0.15, 0.25],
-             fb: [0, 0.3, 0, 0, 0.45, 0], curve: log,
+             fb: [0, 0.55, 0, 0, 0.35, 0], curve: log,
              t4: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05] }
 note.gate -> growl.gate
 note.cv   -> growl.v_oct
@@ -131,15 +131,15 @@ idx2 -> growl.lvl5 : 0.12
 ```
 
 Non-integer ratios (3.5, 7, 2) put the sidebands off the harmonic series,
-which is what separates a growl from a bell. `fb` on ops 2 and 5 adds the
-noise floor that reads as grit. Detune `idx.freq` a few Hz per section and the
+which is what separates a growl from a bell. `fb` on ops 2 and 5 turns those
+modulators saw-like, and the dense sidebands read as grit. Detune `idx.freq` a few Hz per section and the
 "vowel" changes.
 
 ### 4. Formant morphing from parallel bandpasses
 
 Three resonant `svf.bp` at vowel-ish frequencies, crossfaded by one LFO
-through a chain of two `xfade`s. Equal-power crossfade means both bands sit
-−3 dB at the midpoint, which is exactly the vowel-in-between you want.
+through a chain of two `xfade { law: equal_power }`s (the default law is now
+linear). Equal-power means both bands sit −3 dB at the midpoint, which is exactly the vowel-in-between you want.
 
 ```text
 f1 = svf { cutoff: 700,  res: 0.85 }
@@ -149,11 +149,11 @@ growl -> f1.in
 growl -> f2.in
 growl -> f3.in
 vow = lfo { freq: 0.6hz, wave: tri }
-x1 = xfade { mix: 0.5 }
+x1 = xfade { mix: 0.5, law: equal_power }
 f1.bp -> x1.a
 f2.bp -> x1.b
 vow -> x1.mix : 0.5
-x2 = xfade { mix: 0.35 }
+x2 = xfade { mix: 0.35, law: equal_power }
 x1    -> x2.a
 f3.bp -> x2.b
 vow -> x2.mix : 0.25

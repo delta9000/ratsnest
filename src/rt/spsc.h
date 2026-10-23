@@ -25,6 +25,13 @@ class SpscQueue {
   static_assert(Cap >= 2 && (Cap & (Cap - 1)) == 0, "Cap must be a power of 2");
 
  public:
+  // Producer-side capacity check. A concurrent consumer can only free space.
+  size_t write_available() const {
+    const size_t t = tail_.load(std::memory_order_relaxed);
+    const size_t h = head_.load(std::memory_order_acquire);
+    return (h - t - 1) & kMask;
+  }
+
   bool try_push(const T& v) {
     const size_t t = tail_.load(std::memory_order_relaxed);
     const size_t next = (t + 1) & kMask;

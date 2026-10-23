@@ -6,23 +6,49 @@ render, a failed check, or a quiet master to learn — not the things
 `docs/modules.md` already documents. Read `docs/modules.md` first; read this
 before writing a song-length or mastered patch.
 
-## Verify without ears: the `--stats` workflow
+## Measure the render; audition the music
 
-You cannot listen. `ratsnest render patch -d Ns -o out.wav --stats 4s` is
-your ears — a per-window peak/RMS timeline that validates almost everything:
+`ratsnest render patch -d Ns -o out.wav --stats 4s` produces a per-window
+peak/RMS timeline. It catches technical faults and helps locate arrangement
+changes. It cannot establish whether the balance, groove or transition works
+for a listener. A limited kick can still overwhelm the music.
 
 - **Arrangement timing**: each section boundary should show an RMS step at
   the expected second (drop slams +4 dB, breakdown dips −7 dB, fade reaches
   −240 by the end). If a boundary lands at the wrong time, the grid or a div
   is off.
-- **Loudness targets**: mastered EDM drop windows ≈ −12 dBFS RMS with
+- **Loudness examples**: mastered EDM drop windows ≈ −12 dBFS RMS with
   −0.4 dBFS peaks (crest ~11 dB = loud, not bricked). Breakdown should sit
   6–8 dB below the drops. Intro ≈ −25 dB RMS or lower.
 - **Hygiene**: overall peak ≤ the limiter threshold, `dc` ≈ 0, no flat
   peak==RMS windows (that's a brick), no dead air after the fade.
+- **Per part**: the mix's timeline mostly measures the kick. `--tap NAME[=node[.port]]`
+  (repeatable) prints the same table for one endpoint — a voice, a strip's
+  `l`/`r`, a return — and writes it as `<out-stem>.NAME.wav`, with the patch
+  untouched. Set the window to the section length and one render gives every
+  part's level per section; no `rec` sinks, no numpy.
 
-Iterate on numbers, not vibes: change a level, re-render, re-read the
-timeline. Two or three iterations converges.
+Use measurements to investigate a specific concern, then audition the result.
+Float renders preserve overs, so a peak above 0 dBFS is useful evidence of
+overload. Live output clips at the device boundary; an explicit limiter remains
+the way to control peaks. Compressor/clipper dry-wet blends and hot reload now
+use linear interpolation, so old equal-power gain boosts are gone. Compressor
+and limiter detectors peak-hold for `min(release, 20 ms)` (clean bass, but a
+slow-attack glue comp now reduces 2–3 dB more; raise its makeup). Rebalance
+older mastered patches by measurement rather than assuming old numbers still hold.
+Those EDM levels are calibration examples, not acceptance criteria for every
+style. Compare at similar playback loudness. Render a short, full-tempo clip
+that includes the approach, entrance and settled groove; a good steady groove
+does not validate how it arrives. Treat listener feedback as musical evidence.
+
+`--start Ns` captures a later window (`--start 10m -d 60s`) and reports
+absolute offsets, but it does **not** skip the work: the graph is stateful,
+so it still runs from zero. For a song-length patch the cheap probe is to
+divide the arrangement grid instead — drop the divisor that clocks the
+tracker lanes by 10-15x and the whole form plays in a minute. That verifies
+section boundaries, lane crossfades and grid wrap; it does *not* verify
+anything with a real time constant (reverb tails, multi-second `func` slews,
+tempo ramps, granular freeze windows), which still needs a full pass.
 
 ## Verify timbre, not just level
 
@@ -68,11 +94,11 @@ choose a render duration that ends after the fade but before the wrap:
 Asymmetric rise/fall is the whole trick: risers attack slow (6–15 s) and
 release fast (0.4 s) so the drop lands clean.
 
-## Mastering: the calibration numbers
+## Mastering choices
 
-The proven chain is `dcblock → eq → compressor(external kick sidechain) →
+An explicit mastering recipe is `dcblock → eq → compressor(external kick sidechain) →
 stereo width → clipper(soft) → limiter` (see `halcyon`/`ion`/`mainstage`).
-What the docs don't tell you:
+These settings are starting points, not neutral defaults:
 
 - **A post-limiter attenuation scales the ceiling.** The idiom
   `-1 -> out.level; main_out -> out.level : 0.8` fades the whole track, but
@@ -81,12 +107,81 @@ What the docs don't tell you:
   drive fixes it without crushing. Use `out.level : 1.0` and let the limiter
   own the ceiling.
 - **Working backwards from loudness**: premaster peak ≈ −3 dBFS, glue comp
-  makeup +1.5..3 dB, clipper drive 1..6.5 dB, in dB (parallel mix ~0.3), limiter
+  makeup +6.5..8.5 dB at mix ~0.85 (blends are linear now; the old +1.5..3 leaned on the equal-power boost), clipper drive 1..6.5 dB, in dB (parallel mix ~0.3), limiter
   −0.4 dBFS. Kick channel level ~0.85 with the kick saturated to ~±1 sets
   the track's peak anchor; everything else stages under it.
-- The pump is three layers deep, not one: per-channel `kick_env -> mix.lvlN
-  : -0.2`, the same on the FX returns, plus the external-sidechain glue comp
-  on the master bus. One layer alone sounds like a demo.
+- The pump is three layers deep, not one: per-channel ducking, the same on
+  the FX returns, plus the external-sidechain glue comp on the master bus.
+  One layer alone sounds like a demo. Duck with `lib/duck.sub` into each
+  strip's `duck` (below): `kick_env -> mix.lvlN : -0.2` subtracts a fixed
+  amount, so its depth in dB depends on the lane level (and a quiet section
+  ducks to silence).
+- **The lib chains** (`lib/master-chain.sub`, `lib/club-master.sub`):
+  `width`/`makeup` are inputs for lanes. Their kick-keyed compressor does
+  nothing in a kick-less section but still applies makeup (a breakdown came
+  back 1 dB under its chorus); the default parallel clipper overshoots its
+  threshold by 2.4–3.4 dB; the limiter is sample-peak unless `true_peak: on`
+  (+1.6–2.3 dB between samples otherwise). Numbers and fixes:
+  `ratsnest-composition/references/mastering.md`.
+
+## A song's voices and mix: synth-voice, strip, duck
+
+Two finished songs hand-built every pitched voice as osc → filter → env →
+`math` velocity multiply → vca → level vca (about nine nodes and twenty
+lines each), and mixed through `mix`, which cost them three bugs: eight
+mono slots (a stereo pad takes two, plus VCAs), a reverb send tapped before
+the level lane (a pad ghosted into the drums-only intro), and ducking by a
+negative cable onto `lvlN`. The default now:
+
+- **Voice:** `lib/synth-voice.sub` — `voct`, `gate`, `vel`, `level`, `cut`
+  in; mono audio out already × env × vel × level. Lead by default; pluck,
+  pad and bass by params (`lib-voices.md`). Watch `track` (key tracking,
+  default 0.5) when porting an untracked hand-built filter.
+- **Channel:** `lib/strip.sub` — fader `level × gain × duck`, equal-power
+  pan, `fx` send tapped post-fader and post-duck. Cable `l`/`r` straight
+  into the master's `in_l`/`in_r`: sub inputs sum any number of cables, so
+  there is no slot limit. Keep `mix` for a static mono kit.
+- **Pump:** `lib/duck.sub` per depth, `gain` into the strips' `duck`.
+- **Sends:** a `reverb`'s tank reads the *mean* of `in_l`/`in_r`, so a mono
+  send into one side needs depth 2 to match feeding both.
+
+Rebuilt that way, `patches/tracker/glasshouse.patch` and `undertow.patch`
+match their hand-built originals to 0.1 and 0.4 dB per section.
+
+## Chord pads: one tone, stamped per note
+
+A chord track carries up to four pitches on one gate (`track pad note cva
+cvb cvd`). Do not instantiate a voice per chord tone by hand (glasshouse and
+undertow each carried an eleven-line template per tone). Write the tone once
+and let a `chord` bank stamp it per note — the ZEN-Core "tone" idea:
+
+```text
+ch = chord { n: 3 }
+song.gate6 -> ch.gate
+song.voct6 -> ch.p1
+song.cva6  -> ch.p2
+song.cvb6  -> ch.p3
+pad = voice { notes: ch }
+pad.v = sub { file: "../lib/synth-voice.sub", attack: 0.6, slope: 0, env_amt: 0 }
+ch.voct -> pad.v.voct
+ch.gate -> pad.v.gate
+pad.v -> pad_s.in                  # the straight sum of the voices
+```
+
+Or one line: `pad = sub { file: "../lib/poly-pad.sub", n: 3, ... }` with
+`p1..pN` (one per voice; N up to 8), `gate`, `vel`, `level`, `cut` in and `main` out (synth-voice's pad
+params, `osc_lvl` 0.25 per voice). That is what glasshouse (four tones, the
+fourth from another track) and undertow (three) use: 23 and 19 fewer lines,
+section RMS within 0.01 dB of the template versions.
+
+- **Broadcasts are free.** A cable from outside into a member (`lane ->
+  pad.v.cut : 4000`, or `-> pad.cut` on poly-pad) reaches every voice.
+- **Detune a voice on its pitch:** `0.005 -> ch.p2` sums onto that voice only.
+- **Strum:** `chord { strum: 0.03 }` rises voice i's gate i × 30 ms late
+  (negative: top voice first). A slur (`~`) moves the pitches without a
+  retrigger; a held voice tracks, a released one holds its pitch for its tail.
+- **Input bases sum (again).** `chord.vel` has base 1: cabling a velocity
+  into it gives 1 + vel. Declare `chord { vel: 0 }` when you cable one.
 
 ## Input bases sum — zero them first
 
@@ -95,36 +190,31 @@ Cables sum onto input bases. Two classic self-owns:
 - `tempo.seconds -> dly.time` with the default `time: 0.4` base gives a
   0.75 s delay, not a dotted 8th. Write `delay { time: 0ms }` and let the
   tempo module own the input outright.
-- Filter cutoff is `base + env + LFO + ...` — the config value is the
-  *floor* of the sweep, not the sweep amount. Set the base to the darkest
-  sound you want and scale the env cables up from there.
+- `math` now defaults both inputs to zero. Multiplication needs an explicit
+  factor or a cable into `b`; addition no longer adds an accidental 1.
+- Filter `cutoff` sums in Hz, so bipolar modulation can move below the declared
+  base. Use `v_oct` for octave tracking: effective cutoff is
+  `(base + Hz cables) * 2^(v_oct cables)`. This keeps low notes from requesting
+  negative cutoffs.
 
-## Note names need a **220 Hz** oscillator base
+## Absolute pitch and transposition
 
-`A3v = 0.0` means "absolute pitch = 220 × 2^value", but a `vco` computes
-`freq_base × 2^v_oct`. So a note name lands at its written pitch **only** on
-a 220 Hz base. Every other A base is in tune but in the wrong octave:
+`A3v = 0.0` uses a 220 Hz reference. The default `vco`, `fm`, and `additive`
+base is 220 Hz, so note literals sound at their written pitch. Setting `freq`
+to 110/440 transposes one octave down/up; setting it to 55 transposes two down.
+Other bases transpose by other intervals. Use bare fractions for relative
+intervals (`1` = octave, `0.0833333` = semitone), and uppercase note names for
+absolute pitch (`D2v`). Lowercase names in numeric arrays are validation errors.
 
-| `freq:` base | `D2v -> osc.v_oct` gives | Error |
-|---|---|---|
-| `220hz` | 73.4 Hz (D2) | correct |
-| `110hz` | 36.7 Hz (D1) | one octave down |
-| `55hz` | 18.4 Hz | two octaves down — inaudible |
-| `440hz` | 146.8 Hz (D3) | one octave up |
-| `659hz` | 220 Hz | detuned *and* transposed |
+For a harmonic stack, use `additive { levels: [...] }` and one external
+amplitude envelope. Use `ratios` for inharmonic partials, `phases` for their
+relative phases, and `tilt` for live spectral balance. This avoids repeating
+FM envelope arrays when there is no phase-modulation routing.
 
-The 55 Hz case is the dangerous one: it is the natural base to reach for on a
-sub voice, and it silently produces sub-audio. **`--stats` cannot see this
-bug** — all three bases above render byte-for-byte identical peak and RMS
-(measured: −6.0 dBFS peak, −9.0 dBFS RMS for every one). Your only defence is
-the arithmetic. If a bass is inaudible on a render that looks healthy, check
-this before anything else.
-
-Detune via the freq base (219/221 Hz) or
-via `v_oct` constants (±0.007 ≈ ±12 cents); both keep note names intact.
-Offsets are bare fractions: `0.25 -> osc.v_oct` is up a minor third from
-whatever the pitch input carries — there is no note-name form for
-intervals.
+Noise choice is independent of envelope/filter choice: `noise` offers white,
+pink, brown, blue, and violet spectra; `dust` supplies irregular impulses;
+`random` supplies slow stepped/smooth CV. Different colors have different RMS
+levels. Render at comparable levels before judging timbre.
 
 ## Free-ringing voices ghost; ADSR voices don't
 
@@ -153,12 +243,44 @@ The stereo version of the same bug: a voice muted by a mixer lane still
 bleeds into reverb/delay if the send is tapped pre-mute. Gate the voice
 *before* its sends (a post-fader VCA, e.g. `stab_out`), then tap the sends
 from there. (`meridian.patch` demonstrates this; it's why its stabs vanish
-cleanly instead of leaving reverb ghosts.)
+cleanly instead of leaving reverb ghosts.) `lib/strip.sub`'s `fx` output is
+tapped there by construction.
+
+## `curve: exp` times are −60 dB times
+
+`curve: exp` on `adsr`/`func`/`fm` is a true RC decay normalized to land on
+time, so its stage time is where the tail reaches −60 dB; it passes −20 dB at
+a third of the stage. (Before it became a true exponential, `exp` was `x²`,
+now `quad`, which holds near the top and passes −20 dB at 95% of the stage.)
+When converting a linear or `quad` decay, or a number from an older note:
+
+- **Time ×3** keeps the −20 dB point (the heard length) where it was.
+  A squared amp (`vca { response: exp }`) halves every dB, so it needs ×5;
+  so do `fm` segments, whose brightness follows the index nonlinearly.
+  A tail summed under a louder transient (the kit hats) needs more: measure.
+- **Amp depth ×1.4 (+3 dB)** roughly restores the level: a natural decay
+  carries ~4 dB less energy than a held one of the same heard length, at the
+  same peak (×1.2 on the cv of a squared amp). Measured across the 2026-10
+  rebalance: percussion bands back within ~2 dB (most within 1), mastered
+  tracks within ±0.5 dB RMS.
+- **Keep `quad`** where the hang is the point: bar-gated pads and subs that
+  "swell per bar" (the release bridges the gate's low half) and slow
+  arrangement arcs that should hold tension and then accelerate.
 
 ## Composition idioms that read as "composed"
 
 Learned by diffing the good patches (`meridian`/`halcyon`/`ion`) against
 the flat ones:
+
+- **Entrances need phrase cues.** In the first `pressure-gradient`, a kick
+  faded up over about thirteen beats at bar 61. Its timing was regular, but
+  the listener found its arrival unpredictable. Gate the strikes on a clear
+  phrase boundary and let each envelope finish; keep long fades for the room
+  and sustained textures. Check the kick's tail against the bass onset.
+- **Activity changes alone do not create tension and release.** Establish a
+  motif, make a directed change in density or harmony, leave a deliberate
+  breath, then resolve on a recognizable downbeat. Keep the main rhythm
+  dependable while varying accents and tone around it.
 
 - **Chord lanes re-voice everything.** Three bar-clocked stepseqs — root,
   third, fifth as absolute v/oct (note names) — feed bass, pad, arp, and
@@ -168,10 +290,21 @@ the flat ones:
   lanes makes an arp/riff that is consonant over every chord. `math { op:
   add }` with `b: 1` is the octave lift. An `sh` after the switch holds
   pitch through each note's decay so ringing notes never retune mid-tail.
+  Give that switch `fade: 0`: its default 5 ms declick slew would glide
+  the pitch, and the `sh` sampling on the same eighth would catch it
+  mid-slew. The same goes for any `switch` carrying gates or stepped CV.
 - **Fixed phrases are fine if they're pentatonic.** A minor-pentatonic hook
   has no avoid notes over an i–VI–III–VII cadence ("big, dumb, correct" —
   `ion.patch`). If the phrase isn't pentatonic, use the chord-tracking
   switch contour instead (`halcyon.patch` explains the clash math).
+- **An accent lane is not a fader.** The kit subs take `accent` (per-hit
+  dynamics) and `trig`; neither sets how loud the channel is. Driving only
+  `accent` from an arrangement lane makes a drum play at full mixer level
+  the instant it is gated on, so "the kick arrives" and "everything is here"
+  measure the same in `--stats` -- verified: two sections designed 15 dB
+  apart came back 0.4 dB apart. Put the lane on `mix.lvlN` as well, with the
+  config `levels` entry as the floor. (A tight glue comp hides the mistake
+  further; loosen the master before concluding the arrangement is wrong.)
 - **Euclid density is an automation target.** `lane -> euclid.hits : 7`
   thickens hats/rolls/arps into a drop; `lane -> func.fall : 0.03` opens
   hat decays; a glacial LFO into `euclid.rot` rotates a pattern over
@@ -192,6 +325,108 @@ inputs — timbre is modulatable), echo feedback/tone, and reverb decay, plus
 a low-probability `turing` for harmony drift. Do the render's fade-in/out
 **in post** (`ffmpeg -af "afade=t=in:st=0:d=4,afade=t=out:st=291:d=9"`),
 not in the patch — verify with `ffmpeg astats` on the first/last seconds.
+
+## Score-length patches: the form lane and the switch trap
+
+Learned building `patches/symphony/` (four movements, fifteen mono parts):
+
+- **The form is a `stepseq` whose `lens` are bars.** Clock it by the bar
+  divider; its `trig` fires once at every section start. Clock every role
+  and dynamics lane from that trig (one value per section, no block
+  arithmetic) and reset every theme from it, so a section always begins on
+  its theme's first note. Section boundaries then land exactly where the
+  bar count says; `--stats` verifies them at a glance.
+- **A theme carries its own harmony.** Melody and chord lanes in one `.sub`,
+  sharing `clock`/`reset`/`transpose`, mean "the horn plays the second
+  subject in Bb" is one transposition cable, not four.
+- **`switch` defaults to `mode: seq` and ignores `addr`.** A selector fed
+  by a lane without `mode: addr` sits on `in1` for the whole render -- and
+  since `in1` is conventionally silence, the symptom is an almost silent
+  render, not an error. (`check` cannot catch it: the patch is valid.) A
+  selector routing lanes or gates also wants `fade: 0`, the instant cut.
+- **`quant` ties snap down**, so a minor-to-major "re-reading" through a
+  major quantizer turns F into E, not F#. Nudge the input up a quarter-tone
+  (`0.04167 -> q.in`) and every off-scale note snaps up while in-scale
+  notes stay put.
+- **Orchestral low end runs away.** Basses doubling cellos an octave down,
+  plus timpani, put half the mix's energy below 80 Hz before anyone
+  notices; keep the bass channel around a third of the cello's level and
+  shelve the master below 90 Hz. Check band-energy fractions (an FFT per 8 s window),
+  not just the RMS timeline.
+
+## Writing a song with tracker
+
+For anything with a form, write the score as `.trk` files and keep the patch
+about sound (`docs/modules.md` `tracker`; worked port:
+`patches/mainstage-trk.patch`, which nulls against `mainstage.patch` to
+about −80 dB per block). Three songs in `patches/tracker/` show the composing
+features: `whole-step` (chord tones from one harmony track, `chorus^2` for the
+key change, sections), `dorian-sidestep` (lanes with ghost notes, overlay
+fills, `^N` and `@R` motif variation, swing from `transport`) and `lantern`
+(extended chords, `>` ramps for the form, a free-running `ctr~`
+counter-line in chord degrees through `quant`):
+
+- **One transport, two trackers.** The song clock is a `transport`, not a
+  `clock` at 4× tempo and a chain of `div`s: `t = transport { bpm: 128,
+  division: 4, swing: s }`, then `t.clock -> song.clock` (one row per
+  sixteenth, at the finest grid the song needs) and `t.bar -> form.clock`
+  (one form row per bar; `div { by: 4 }` off `t.bar` for four-bar blocks).
+  Tempo and swing live in one module and every rhythm, `euclid` and
+  `stepseq` clocked off `t.clock` or `t.beat` stays phase-locked to the
+  notes. The form file is a table: one row per bar or block, one `cva`
+  column per section level, read down like a mix sheet. Slew each column
+  through `func` exactly as the old arrangement lanes did; the tracker's
+  values are stepped and held. When every order step of the notes is one
+  block, `song.step_trig -> form.clock` ties the form to the order list
+  instead: one form row per step, whatever each step's length.
+  `patches/tracker/lantern.patch` is the whole tree: one transport, two
+  trackers.
+- **Swing is the transport's.** The tracker has no groove; `swing` on the
+  transport delays every second sixteenth while downbeats and bars stay
+  put. Drum-machine swing P% (the first sixteenth of a pair takes P% of it:
+  50 % straight, 66 % triplet) is `s = 2P − 1`: 54 % → .08, 58 % → .16,
+  66 % → .32, 75 % → .5 (the cap .75 is 87.5 %). A `clock`/`div` tree cannot
+  swing at all.
+- **Div chains are for tricks.** Keep `clock → div` for what a transport
+  does not do: polyrhythm off one master (`div { by: 3 }` against
+  `by: 4`), ratchets and bursts faster than the grid, offbeat logic. A
+  phrase in another meter is a free-running `~` layer in the `.trk`, not a
+  second tracker on a least-common-multiple clock.
+- **Layer, don't copy.** `order chords+chop+hook+beat` stacks a four-bar
+  chord pattern with one-bar and two-bar loops: the step lasts as long as
+  the first pattern and the rest wrap inside it. Put the longest pattern
+  first (a longer later layer is an error, not a silent cut). A one-shot (a drop hit, a fill) is an overlay, `hit@0` or
+  `fill@48`: it plays once and overrides the loop under it.
+- **Polymeter is a `~` layer, not a second tracker.** `section verse
+  bar+seven~` loops a 7-row figure on the song's row count, so it keeps its
+  phase across steps and sections and realigns with 16-row bars every 7
+  bars. No second tracker, no LCM master clock (`lantern` used to run a
+  1280 BPM clock and three dividers for a 7-against-5 counter-line). It may
+  outlast the step; put it in every section that should hear it.
+- **The gate is the trigger.** Each note or `x` re-articulates with a
+  one-sample gap, so `gateN` drives `func.trig`, `adsr.gate`, `lpg.strike`
+  and `vco.sync` directly; no `stepseq.trig`, no `logic { op: and }` with a
+  lane. Write `off` where the old gate fell if you care about gate length.
+- **Chords are one track.** `track harm note cva cvb` carries root, third
+  and fifth as note names; every voice reads `voct5`/`cva5`/`cvb5`. A
+  seventh or ninth goes in `cvd` (`note cva cvb cvd`, read as `cvd5`, `t4`).
+  Pad it with a `chord` bank (or `lib/poly-pad.sub`), one tone stamped per
+  note: "Chord pads" above.
+  Sixteen tracks: one `.trk` holds notes and form levels together.
+- **Write a riff once.** `track arp note vel from harm` and cells like
+  `t1+12`, `~t3`, `t2-12:2` follow harm's chord on every row, so one bar of
+  arp or bass loops under the whole progression; `verse^5` or a section's
+  `^N` moves a whole key change. `len 1` on a drum or pluck track and
+  `lane hat x.x. 9x5x` write rhythm without an `off` row per hit; a trailing
+  `>` ramps a level across a build. `pattern verse 4x16` lets labels read
+  `3:06`. The full list is `docs/modules.md` `tracker`, "Composing".
+
+- **No wrap hazard.** Without `|:` the song ends after its last row (gates
+  fall, `end` goes high), so the guard-step arithmetic of the arrangement
+  grid section is unnecessary. Add `|:` only for an endless loop.
+- **Edit while it plays.** `play` watches the `.trk` files; a save keeps the
+  current order step and row. A typo reports `song.trk:line:col` and the last
+  good version keeps playing.
 
 ## Small gotchas
 

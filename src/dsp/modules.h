@@ -1,12 +1,19 @@
 #pragma once
+#include "dsp/mastering.h"  // sanitize(): the shared non-finite guard
 #include "dsp/module.h"
 
 namespace ms::dsp {
 extern const ModuleInfo vca_info;
 extern const ModuleInfo out_info;
 extern const ModuleInfo vco_info;
+extern const ModuleInfo additive_info;
+extern const ModuleInfo dust_info;
 extern const ModuleInfo lfo_info;
 extern const ModuleInfo clock_info;
+extern const ModuleInfo transport_info;
+extern const ModuleInfo phrase_info;
+extern const ModuleInfo scene_info;
+extern const ModuleInfo channel_info;
 extern const ModuleInfo div_info;
 extern const ModuleInfo func_info;
 extern const ModuleInfo svf_info;
@@ -31,8 +38,10 @@ extern const ModuleInfo logic_info;
 extern const ModuleInfo switch_info;
 extern const ModuleInfo turing_info;
 extern const ModuleInfo stepseq_info;
+extern const ModuleInfo tracker_info;
 extern const ModuleInfo tempo_info;
 extern const ModuleInfo alloc_info;
+extern const ModuleInfo chord_info;
 extern const ModuleInfo midi_info;
 extern const ModuleInfo dcblock_info;
 extern const ModuleInfo stereo_info;

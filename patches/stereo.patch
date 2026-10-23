@@ -15,8 +15,7 @@ st = stereo { width: 1.0, balance: 0.0 }
 osc1 -> st.in_l
 osc2 -> st.in_r
 
-# Modulate width (LFO is -1..1, width input accepts 0..2)
-1.0   -> st.width
+# Modulate width: base 1 + LFO (-1..1) sweeps 0 (mono) .. 2 (ultra-wide)
 lfo_w -> st.width : 1.0
 
 # Modulate balance (LFO is -1..1, balance input accepts -1..1)
@@ -25,3 +24,4 @@ lfo_b -> st.balance
 # Connect to master output
 st.out_l -> out.left
 st.out_r -> out.right
+-0.65 -> out.level   # two full-scale saws, widened: keep peaks under 0 dBFS

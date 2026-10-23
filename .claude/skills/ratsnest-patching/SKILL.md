@@ -21,6 +21,7 @@ Then load the skill that matches the job:
 | a timbre, voice, drum, texture, effect chain | `ratsnest-synthesis` |
 | a self-playing / evolving / never-repeating patch | `ratsnest-generative` |
 | a named genre, a track "like X", a groove | `ratsnest-genres` |
+| a song with sections, a melody, a written-out score | a `.trk` file played by `tracker` (below) |
 | structure, harmony, arrangement, mixing, mastering | `ratsnest-composition` |
 | "surprise me", a starting point, a way out of a rut | `ratsnest-inspiration` |
 | MIDI, polyphony, chords, live play, capture, writing a `.sub` | `ratsnest-instrument` |
@@ -51,6 +52,11 @@ mise run render -- patches/x.patch -d 30s -o /tmp/x.wav --stats 4s
 - **section boundary in the wrong window** → your div chain or grid is off.
 - **DC ≠ 0** → a `pulse` at `pw != 0.5`, an `abs`, or a folder. Add `dcblock`.
 
+The mix's table is dominated by its loudest part (usually the kick). To see
+one part per section, tap it: `--tap bass --tap pad=pad_s` adds a table (and
+a `<out>.NAME.wav`) per endpoint without editing the patch
+(`ratsnest-debugging`, "The solo probe").
+
 Iterate on numbers, not vibes. Two or three passes converges.
 
 ## Five rules that break patches
@@ -60,7 +66,8 @@ Iterate on numbers, not vibes. Two or three passes converges.
    `cutoff:` config is the *floor* of the sweep, not the amount.
 2. **Note names are Hz; `…v` names are v/oct.** `A3v = 0.0`, and a `vco`
    computes `freq_base × 2^v_oct` — so a note name lands at its written pitch
-   **only on a 220 Hz base**. 110 is an octave down, 55 is two octaves down
+   **only on a 220 Hz base** (the `vco`/`fm`/`additive` default, so leave
+   `freq` unset). 110 is an octave down, 55 is two octaves down
    (inaudible, and `--stats` reads identical), 440 is an octave up. Reaching
    for `freq: 55hz` on a sub voice is the classic silent-bass bug. Intervals
    are bare fractions — `0.5833 -> osc.v_oct` is a fifth up. There is no
@@ -74,10 +81,59 @@ Iterate on numbers, not vibes. Two or three passes converges.
 
 ## Shapes to reach for
 
-- **Clock tree, not clocks.** One `clock` at 4× the tempo, then a chain of
-  `div { by: 2 }`. Every rhythm in the patch is phase-locked for free, and
-  "offbeat" is `logic{and}` of eighth with `logic{not}` of quarter.
-- **Arrangement grid.** Bar-clocked `stepseq` lanes of 0..1 levels → `func`
+- **A song's parts: voice → strip → master.** Every pitched part is one
+  `lib/synth-voice.sub` (osc, filter, env, velocity and level in one
+  instance: lead by default, pluck/pad/bass by params) cabled from the
+  tracker's `voctN`/`gateN`/`velN`; every channel is a `lib/strip.sub`
+  (`level` lane × `gain` × `duck`, equal-power pan, a post-fader `fx` send)
+  whose `l`/`r` cable straight into the master's inputs — no `mix` slots to
+  run out of, no ghost sends; the pump is a `lib/duck.sub` per depth on the
+  strips' `duck` (relative dB, not an absolute dip). Master with
+  `lib/master-chain.sub` (`club-master.sub` for −8.5 LUFS). Hand-build a
+  voice only for what synth-voice cannot do. Interfaces:
+  `ratsnest-synthesis/references/lib-voices.md`; worked:
+  `patches/tracker/glasshouse.patch`, `undertow.patch`.
+- **Chord pads: one tone, stamped per note.** A chord track (`note cva cvb
+  cvd`, one gate) feeds a `chord` bank; a `voice` group bound to it stamps
+  the tone once per pitch. Never hand-instantiate a voice per chord tone:
+
+  ```text
+  pad = sub { file: "../lib/poly-pad.sub", n: 3, cutoff: 600 }
+  song.gate6 -> pad.gate
+  song.voct6 -> pad.p1
+  song.cva6  -> pad.p2
+  song.cvb6  -> pad.p3
+  pad -> pad_s.in
+  ```
+
+  `strum:` staggers the gates; a slur moves pitches with no retrigger. Any
+  other tone: `ch = chord {}`, `pad = voice { notes: ch }`, `pad.v = sub
+  {...}` (docs/patch-craft.md "Chord pads").
+- **One `transport` clocks the song.** It holds the tempo and the swing in
+  one place, and every output is phase-locked to it:
+
+  ```text
+  t    = transport { bpm: 124, division: 4, swing: 0.16 }   # swung sixteenths
+  song = tracker { file: "song.trk" }
+  form = tracker { file: "song-form.trk" }
+  t.clock -> song.clock       # one row per sixteenth
+  t.bar   -> form.clock       # one form row per bar
+  ```
+
+  `t.beat` pulses quarters, `t.phrase` every `bars:` bars, `t.gate` is a
+  50%-duty gate per subdivision (the pulses are one sample long), and
+  `t.phrase_phase` into an `lfo { freq: 0 }`'s `phase` locks a slow sweep
+  to the form. Polymeter is
+  a free-running `name~` layer in the `.trk`, not a second clock. Keep
+  `clock → div` chains for tricks off a shared master: polyrhythm
+  (`div { by: 3 }` against `by: 4`), ratchets and bursts faster than the
+  grid, and offbeat logic (`logic{and}` of eighth with `logic{not}` of
+  quarter).
+- **Songs with a form: write a `.trk`.** Notes, sections and the arrangement
+  go in a plain-text tracker file; the patch stays about sound.
+  `docs/modules.md` `tracker` has the format, `docs/patch-craft.md` "Writing a
+  song with tracker" the craft, `patches/tracker/` three worked songs (chords, groove, ambient).
+- **Arrangement grid.** (Pre-tracker; still right for a lane of levels.) `stepseq` lanes on `t.bar`, of 0..1 levels → `func`
   (nothing on `trig`, so it slews) → `vca.cv`. One lane per element. Asymmetric
   rise/fall is the trick: risers rise for seconds and fall in 0.4 s.
 - **Chord lanes.** Three bar-clocked `stepseq`s carrying root/third/fifth as
@@ -96,7 +152,10 @@ Iterate on numbers, not vibes. Two or three passes converges.
 | Delay time is wrong | forgot to zero the `time:` base before the `tempo` cable |
 | Everything transposed by octaves | note names on a `freq:` base that isn't 220 Hz |
 | Note retunes during its own tail | no `sh` holding pitch after the switch/quantizer |
-| Reverb ghosts of a muted part | send tapped pre-mute; tap it from the post-fader `vca` |
+| Reverb ghosts of a muted part | send tapped pre-mute; use `strip.sub`'s `fx` (post-fader, post-duck) |
+| Pump mutes a quiet section, barely touches a loud one | negative envelope on `mix.lvlN` is absolute; use `duck.sub` into a strip's `duck` |
+| Breakdown comes back as loud as the chorus | kick-keyed master comp: no kick, no compression, full makeup (mastering.md) |
+| `curve: exp` hit far shorter than its time | the time is the −60 dB point: write ~3x a linear time (patch-craft.md) |
 | Intro reappears at the end | the arrangement grid wrapped; render shorter than `steps × block` |
 | `quant` output missing | it's `quant.out`; only `stepseq` has `.cv` |
 | Voice muted for a whole section | `logic{and}` thresholds at 0.5 and your lane sits below it — compare against a floor with `logic{op:cmp}` instead |

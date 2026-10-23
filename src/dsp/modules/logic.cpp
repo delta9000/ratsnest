@@ -10,8 +10,7 @@ constexpr OutputInfo kOuts[] = {{"out"}};
 class Logic final : public Module {
  public:
   void init(double, const Config& cfg) override {
-    const std::string op = cfg_str(cfg, "op", "and");
-    for (int i = 0; kOps[i]; ++i) if (op == kOps[i]) op_ = i;
+    op_ = cfg_enum(cfg, "op", kOps);
   }
   void process(const float* ins, float* outs) override {
     const bool a = ins[0] > ins[2];

@@ -9,6 +9,7 @@
 #include <spa/pod/builder.h>
 #pragma GCC diagnostic pop
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <mutex>
@@ -36,8 +37,10 @@ struct AudioIn::Impl {
     if (b == nullptr) return;
     spa_buffer* buf = b->buffer;
     if (buf->n_datas >= 1 && buf->datas[0].data != nullptr) {
-      const uint32_t offset = buf->datas[0].chunk->offset;
-      const uint32_t size = buf->datas[0].chunk->size;
+      // The chunk is peer-written metadata: keep the read inside maxsize.
+      const uint32_t maxsize = buf->datas[0].maxsize;
+      const uint32_t offset = std::min(buf->datas[0].chunk->offset, maxsize);
+      const uint32_t size = std::min(buf->datas[0].chunk->size, maxsize - offset);
       const uint32_t stride = buf->datas[0].chunk->stride > 0
           ? static_cast<uint32_t>(buf->datas[0].chunk->stride)
           : static_cast<uint32_t>(sizeof(float));

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 #include "dsp/mastering.h"
 
@@ -75,9 +76,12 @@ class Stereo final : public Module {
     float r_val = m_width - s_width;
     
     // 4. Equal-power balance
-    const float angle = (balance + 1.0f) * (std::numbers::pi_v<float> / 4.0f);
-    const float gain_l = std::cos(angle);
-    const float gain_r = std::sin(angle);
+    if (balance_key_.changed({balance})) {  // skip cos/sin while balance holds
+      const float angle = (balance + 1.0f) * (std::numbers::pi_v<float> / 4.0f);
+      gain_l_ = std::cos(angle);
+      gain_r_ = std::sin(angle);
+    }
+    const float gain_l = gain_l_, gain_r = gain_r_;
     
     float l_bal = l_val * gain_l;
     float r_bal = r_val * gain_r;
@@ -134,6 +138,8 @@ class Stereo final : public Module {
   float s_xx_ = 0.0f;
   float s_yy_ = 0.0f;
   float s_xy_ = 0.0f;
+  InputKey<1> balance_key_;
+  float gain_l_ = 1.0f, gain_r_ = 0.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Stereo>(); }

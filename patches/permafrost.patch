@@ -155,7 +155,7 @@ hat_lvl -> chat_amp.cv
 hat_lvl -> ohat_amp.cv : 0.6
 
 # ---- kick duck, gated by the kick lane so breakdowns don't pump ----
-duck_env = func { rise: 0.004, fall: 0.28, curve: exp }
+duck_env = func { rise: 0.004, fall: 0.84, curve: exp }
 quarter -> duck_env.trig
 duck = vca { gain: 0 }
 duck_env -> duck.in

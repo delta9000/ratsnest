@@ -27,7 +27,7 @@ clk -> mel.clock
 ep = fm { algo: dual, freq: 220hz,
           ratios: [1, 1, 14, 1, 3.5, 1],
           levels: [.55, .30, .12, .40, .18, 0],
-          fb: [0, 0, 0, 0, .40, 0],
+          fb: [0, 0, 0, 0, .36, 0],
           vel_sens: [.3, .7, .8, .3, .7, 0],
           t1: [.001, .001, .001, .001, .001, .001],
           t2: [.60, .09, .05, .50, .06, .10],
@@ -46,7 +46,7 @@ mel.gate -> ep.gate
 tine = lfo { freq: 0.037hz, wave: sine }
 tine -> ep.lvl3 : 0.10
 bite = lfo { freq: 0.023hz, wave: tri }
-bite -> ep.fbmod : 0.12
+bite -> ep.fbmod : 0.11
 
 amp = vca { gain: 0 }
 ep -> amp.in
@@ -91,11 +91,17 @@ currently is. Defaults are `t = [.002, .1, .4, .2]`, `l = [1, .75, .5]`.
 
 The percussive idiom is `l1: 1, l2: 0, l3: 0` with `t2` as the decay time and
 `t3` tiny — the note dies whether or not you release the gate. The sustained
-idiom is `l3` nonzero. `curve: log` is the natural percussive fall; `lin` is
-right for brass and pads.
+idiom is `l3` nonzero. `curve: exp` is a true RC fall whose segment time is
+the −60 dB time — write about 5x what a linear fall would need, since
+brightness follows the index nonlinearly (measured on `fm-tests`); `log` is
+a gentler fast-start fall; `lin` is right for brass and pads; `quad` (x²)
+hangs near the top and then drops.
 
 **Everything else.** `fb[k] > 0` is op *k*'s self-edge (never put a self-edge
-in `route`); it takes a sine toward a saw and past ~0.7 toward noise. `fixed`
+in `route`); 0 is a pure sine, ~0.6 a saw-like 1/n spectrum, ~0.8 the
+brightest clean saw, and only past ~0.9 does it break into noise. It acts on
+the op's own waveform, so the same `fb` gives the same timbre whatever the
+op's `levels` entry (velocity and `lvl` don't touch it; the envelope does). `fixed`
 pins an op to an absolute Hz, decoupled from `v_oct` and `ratio` — clicks and
 body resonances that don't transpose. `waves` swaps the sine for
 `half`/`abs`/`quarter`/`fold`, which alias by design. `vel_sens` scales op
@@ -137,7 +143,7 @@ clock or a held `mel.gate`), or you never hear past `t1`.
 v = fm { algo: free, freq: 220hz,
          ratios: [1, 2.003, 3, 4.005, 6, 8.01],
          levels: [.40, .26, .18, .14, .09, .06],
-         fb: [.12, 0, 0, 0, 0, 0],
+         fb: [.24, 0, 0, 0, 0, 0],
          t1: [1.2, 1.6, 2.1, 2.6, 3.2, 3.8],
          t2: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0],
          t3: [3.0, 3.0, 3.0, 3.0, 3.0, 3.0],
@@ -149,7 +155,7 @@ v = fm { algo: free, freq: 220hz,
 ```
 
 The `.003` and `.005` on ratios 2 and 4 beat slowly against the pure ones;
-the lone `fb: .12` on the fundamental keeps it off "test tone".
+the lone `fb: .24` on the fundamental keeps it off "test tone".
 
 **Brass** — `dual` at ratio 1:1, and the modulator's attack *slower* than the
 carrier's (`t1` 0.11 vs 0.05). Brightness arrives after the note does; that
@@ -188,7 +194,7 @@ v = fm { algo: custom, route: [2, 1], freq: 220hz,
          curve: log }
 ```
 
-**Bass** — `dual`, `fb: .30` on the modulator for saw-like grit, `curve: exp`
+**Bass** — `dual`, `fb: .68` on the modulator for saw-like grit, `curve: exp`
 for a punchy fall, `key_level` negative on the modulators so it doesn't turn
 into a buzzsaw when you play it an octave up.
 
@@ -196,11 +202,11 @@ into a buzzsaw when you play it an octave up.
 v = fm { algo: dual, freq: 220hz,
          ratios: [1, 1, 2, 1, 3.01, 1],
          levels: [.85, .45, .18, .30, .12, 0],
-         fb: [0, .30, 0, 0, 0, 0],
+         fb: [0, .68, 0, 0, 0, 0],
          t1: [.001, .001, .001, .001, .001, 0],
-         t2: [.30, .045, .05, .30, .04, .1],
-         t3: [.8, .12, .1, .8, .1, .4],
-         t4: [.10, .06, .06, .10, .06, .2],
+         t2: [1.5, .23, .25, 1.5, .2, .5],
+         t3: [4, .6, .5, 4, .5, 2],
+         t4: [.5, .3, .3, .5, .3, 1],
          l1: [1, 1, 1, 1, 1, 0],
          l2: [.9, .35, .25, .8, .2, 0],
          l3: [.75, .12, .05, .6, .05, 0],
@@ -216,7 +222,7 @@ the sound.
 v = fm { algo: cascade, freq: 220hz,
          ratios: [1, 1.001, 2.99, 4.02, 1.5, 7.03],
          levels: [.8, .45, .30, .22, .16, .10],
-         fb: [0, .55, .35, 0, .25, 0],
+         fb: [0, .88, .53, 0, .20, 0],
          waves: [sine, fold, abs, sine, quarter, sine],
          t1: [.004, .004, .004, .004, .004, .004],
          t2: [.2, .18, .16, .14, .12, .1],
@@ -228,7 +234,8 @@ v = fm { algo: cascade, freq: 220hz,
          curve: lin }
 ```
 
-Sweep `fbmod` on this one and it goes from vowel to chainsaw across ±0.2.
+Sweep `fbmod` on this one: −0.3 relaxes the stack toward a vowel, and +0.1
+already tips op 2 over its ~0.9 edge into chainsaw noise.
 
 Any of these goes polyphonic unchanged inside a `voice` group bound to an
 `alloc` — patch `poly.voct`/`poly.vel`/`poly.gate` into the stamped instance
@@ -283,8 +290,10 @@ onto their config bases. This is the module's best feature and the reason an
   note does not re-scale until the next gate. Deliberate.
 - `out` is a straight sum of carriers, unnormalised. Six carriers at level
   0.8 clip hard. Stage at the cable or with a `vca`.
-- `sync: on` (the default) resets all phases on every gate — that's why
-  repeated notes are identical. `sync: off` is looser on sustained parts.
+- `sync: on` (the default) resets all phases on a gate that starts from
+  silence (carriers below −60 dB) — that's why repeated notes are
+  identical. A retrigger while the voice still rings keeps its phases, so
+  it does not click. `sync: off` is looser on sustained parts.
 
 ## Where it shows up
 

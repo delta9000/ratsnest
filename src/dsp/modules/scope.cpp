@@ -7,7 +7,7 @@ namespace ms::dsp {
 namespace {
 
 constexpr InputInfo kIns[] = {{"in", 0.f}};
-constexpr ConfigInfo kCfg[] = {{"label", nullptr}};
+constexpr ConfigInfo kCfg[] = {{"label", nullptr, ConfigKind::Text}};
 
 class Scope final : public Module {
  public:

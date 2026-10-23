@@ -38,7 +38,7 @@ TEST_CASE("eq: metadata and default parameters") {
   CHECK(std::string(info->inputs[1].name) == "in_r");
   CHECK(info->inputs[1].def == 0.0f);
   CHECK(std::string(info->inputs[2].name) == "hp_freq");
-  CHECK(info->inputs[2].def == 20.0f);
+  CHECK(info->inputs[2].def == 0.0f);
   CHECK(std::string(info->inputs[3].name) == "low_freq");
   CHECK(info->inputs[3].def == 120.0f);
   CHECK(std::string(info->inputs[4].name) == "low_gain");
@@ -65,22 +65,18 @@ TEST_CASE("eq: metadata and default parameters") {
   CHECK(std::string(info->outputs[1].name) == "out_r");
 }
 
-TEST_CASE("eq: zero-gain identity (bypass)") {
+TEST_CASE("eq: default controls preserve DC and audio exactly") {
+  const auto* info = find_module("eq");
   auto m = make_eq();
-  float ins[13] = {0.5f, -0.3f, 20.0f, 120.0f, 0.0f, 500.0f, 0.0f, 0.707f, 2500.0f, 0.0f, 0.707f, 10000.0f, 0.0f};
-  float outs[2] = {};
-  
-  // High pass at 20 Hz has negligible effect on a 1 kHz sine, but to make sure
-  // we are in absolute identity bypass for shelves/peaks, let's feed a test signal.
-  for (int i = 0; i < 100; ++i) {
-    ins[0] = static_cast<float>(i) * 0.01f;
+  float ins[13];
+  for (size_t i = 0; i < 13; ++i) ins[i] = info->inputs[i].def;
+  float outs[2];
+  for (int i = 0; i < 1000; ++i) {
+    ins[0] = static_cast<float>(i % 31) * 0.01f;
     ins[1] = -ins[0];
     m->process(ins, outs);
-    // Note: HPF is still active at 20Hz, so we might have minor phase/amplitude change at 20Hz.
-    // If we set hp_freq to a very low value (e.g. 1 Hz), it is closer to identity.
-    // Let's verify that the output remains finite and closely follows input.
-    CHECK(std::isfinite(outs[0]));
-    CHECK(std::isfinite(outs[1]));
+    CHECK(outs[0] == ins[0]);
+    CHECK(outs[1] == ins[1]);
   }
 }
 
@@ -182,4 +178,23 @@ TEST_CASE("eq: hostile values and sample rates") {
     CHECK(std::isfinite(outs[0]));
     CHECK(std::isfinite(outs[1]));
   }
+}
+
+TEST_CASE("eq: static settings start settled (no sweep from defaults)") {
+  // Non-default settings throughout; a fresh instance must sound like one
+  // that has sat at those settings for a second.
+  float ins[13] = {0, 0, 40, 200, 6, 800, -9, 2, 4000, 5, 1.5f, 8000, -6};
+  auto fresh = make_eq();
+  auto warm = make_eq();
+  float outs[2], ref[2];
+  for (int i = 0; i < 48000; ++i) warm->process(ins, ref);
+  float worst = 0.0f;
+  for (int i = 0; i < 4800; ++i) {  // first 100 ms
+    ins[0] = std::sin(2.0f * std::numbers::pi_v<float> * 100.0f * static_cast<float>(i) / 48000.0f);
+    ins[1] = (i % 48 < 24) ? 0.5f : -0.5f;
+    fresh->process(ins, outs);
+    warm->process(ins, ref);
+    worst = std::max({worst, std::abs(outs[0] - ref[0]), std::abs(outs[1] - ref[1])});
+  }
+  CHECK(worst < 1e-5f);
 }

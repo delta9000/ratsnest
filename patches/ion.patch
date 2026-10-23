@@ -113,28 +113,28 @@ quarter -> clap_seq.clock
 clap_gate = logic { op: and }
 clap_seq.trig -> clap_gate.a
 arr_kick.cv -> clap_gate.b
-clap_env = func { rise: 0.001, fall: 0.13, curve: exp }
+clap_env = func { rise: 0.001, fall: 0.39, curve: exp }
 clap_gate -> clap_env.trig
 clap_noise = noise { color: white, seed: 5 }
 clap_filter = svf { cutoff: 1800, res: 0.5 }
 clap_noise -> clap_filter.in
 clap_amp = vca { gain: 0 }
 clap_filter.bp -> clap_amp.in
-clap_env -> clap_amp.cv : 0.72
+clap_env -> clap_amp.cv : 1.0
 
 # ---- hats: bright euclid ticks + offbeat open hat ----
 hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
 master -> hat_pattern.clock
 hats_lvl -> hat_pattern.hits : 7
-hat_env = func { rise: 0.0006, fall: 0.035, curve: exp }
+hat_env = func { rise: 0.0006, fall: 0.11, curve: exp }
 hat_pattern.trig -> hat_env.trig
-hats_lvl -> hat_env.fall : 0.03
+hats_lvl -> hat_env.fall : 0.09
 hat_noise = noise { color: white, seed: 19 }
 hat_filter = svf { cutoff: 10000, res: 0.25 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.5
+hat_env -> hat_amp.cv : 0.7
 quarter -> hat_amp.cv : -0.13
 
 beat_not = logic { op: not }
@@ -142,14 +142,14 @@ quarter -> beat_not.a
 offbeat = logic { op: and }
 eighth -> offbeat.a
 beat_not -> offbeat.b
-oh_env = func { rise: 0.001, fall: 0.2, curve: exp }
+oh_env = func { rise: 0.001, fall: 0.6, curve: exp }
 offbeat -> oh_env.trig
 oh_noise = noise { color: white, seed: 37 }
 oh_filter = svf { cutoff: 7000, res: 0.3 }
 oh_noise -> oh_filter.in
 oh_amp = vca { gain: 0 }
 oh_filter.hp -> oh_amp.in
-oh_env -> oh_amp.cv : 0.32
+oh_env -> oh_amp.cv : 0.45
 perc_lvl -> oh_amp.cv : 0.6
 
 # ---- ACID line: 16-step sixteenth riff of intervals (root/5th/oct/b7)
@@ -167,9 +167,9 @@ acid_note = sh { mode: sample }
 acid_pitch -> acid_note.in
 acid_seq.trig -> acid_note.trig
 
-acid_env = func { rise: 0.001, fall: 0.11, curve: exp }
+acid_env = func { rise: 0.001, fall: 0.33, curve: exp }
 acid_seq.trig -> acid_env.trig
-acid_acc_env = func { rise: 0.001, fall: 0.14, curve: exp }
+acid_acc_env = func { rise: 0.001, fall: 0.42, curve: exp }
 acid_acc.trig -> acid_acc_env.trig
 
 acid_osc = vco { freq: 110hz, wave: saw }
@@ -180,9 +180,9 @@ acid_env -> acid_filt.cutoff : 1600
 acid_acc_env -> acid_filt.cutoff : 1100
 acid_lvl -> acid_filt.cutoff : 500
 acid_amp = vca { gain: 0 }
-acid_filt -> acid_amp.in
-acid_env -> acid_amp.cv : 0.8
-acid_acc_env -> acid_amp.cv : 0.15
+acid_filt -> acid_amp.in : 0.42           # ladder passband compensation: -7.6 dB keeps the old level
+acid_env -> acid_amp.cv : 1.12
+acid_acc_env -> acid_amp.cv : 0.21
 acid_post = vca { gain: 0 }
 acid_amp -> acid_post.in
 acid_lvl -> acid_post.cv : 0.85
@@ -224,11 +224,11 @@ gate_lvl -> gp_filt.cutoff : 1800
 gate_seq = stepseq { steps: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
                      gates: [1,0,1,1, 0,1,0,1, 1,0,1,0, 1,1,0,1] }
 master -> gate_seq.clock
-gate_env = func { rise: 0.002, fall: 0.09, curve: exp }
+gate_env = func { rise: 0.002, fall: 0.27, curve: exp }
 gate_seq.trig -> gate_env.trig
 gp_chop = vca { gain: 0 }
 gp_filt.lp -> gp_chop.in
-gate_env -> gp_chop.cv : 0.9
+gate_env -> gp_chop.cv : 1.26
 gp_post = vca { gain: 0 }
 gp_chop -> gp_post.in
 gate_lvl -> gp_post.cv : 0.7
@@ -239,7 +239,7 @@ lead_seq = stepseq { steps: [0,0,.25,.25, .58333,.58333,.41667,.41667,
                              .25,.25,0,0, -0.16667,-0.16667,0,0],
                      gates: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0] }
 eighth -> lead_seq.clock
-lead_env = func { rise: 0.006, fall: 0.4, curve: exp }
+lead_env = func { rise: 0.006, fall: 1.2, curve: exp }
 lead_seq.trig -> lead_env.trig
 lead_a = vco { freq: 440hz, wave: saw }
 lead_b = vco { freq: 440hz, wave: saw }
@@ -257,7 +257,7 @@ lead_env -> lead_filt.cutoff : 2000
 lead_lvl -> lead_filt.cutoff : 1600
 lead_amp = vca { gain: 0 }
 lead_filt.lp -> lead_amp.in
-lead_env -> lead_amp.cv : 0.5
+lead_env -> lead_amp.cv : 0.7
 lead_post = vca { gain: 0 }
 lead_amp -> lead_post.in
 lead_lvl -> lead_post.cv : 0.8
@@ -274,14 +274,14 @@ rise_cv -> riser_amp.cv : 0.6
 roll_pattern = euclid { steps: 16, hits: 4, rot: 0 }
 master -> roll_pattern.clock
 rise_cv -> roll_pattern.hits : 12
-roll_env = func { rise: 0.001, fall: 0.055, curve: exp }
+roll_env = func { rise: 0.001, fall: 0.17, curve: exp }
 roll_pattern.trig -> roll_env.trig
 roll_noise = noise { color: white, seed: 41 }
 roll_filter = svf { cutoff: 2600, res: 0.45 }
 roll_noise -> roll_filter.in
 roll_amp = vca { gain: 0 }
 roll_filter.bp -> roll_amp.in
-roll_env -> roll_amp.cv : 0.24
+roll_env -> roll_amp.cv : 0.34
 rise_cv -> roll_amp.cv : 0.18
 
 # ---- dry band: acid center-right, gate pad wide-ish, hook near center ----
@@ -355,7 +355,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.4,
                            knee: 5, attack: 0.012, release: 0.14,
-                           makeup: 1.5, mix: 0.85 }
+                           makeup: 7.0, mix: 0.85 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.7
@@ -376,4 +376,4 @@ master_clip.out_r -> master_limit.in_r
 master_limit.out_l -> out.left
 master_limit.out_r -> out.right
 -1 -> out.level
-main_out -> out.level : 0.8
+main_out -> out.level : 1.0

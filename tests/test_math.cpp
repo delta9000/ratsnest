@@ -26,6 +26,8 @@ TEST_CASE("math ops compute per-sample results") {
   CHECK(run_op("min", 0.3f, -0.2f) == doctest::Approx(-0.2f));
   CHECK(run_op("max", 0.3f, -0.2f) == doctest::Approx(0.3f));
   CHECK(run_op("abs", -0.7f, 0.0f) == doctest::Approx(0.7f));  // full-wave rectifier
+  CHECK(run_op("exp2", -2.0f, 0.0f) == doctest::Approx(0.25f));
+  CHECK(run_op("exp2", 0.0f, 0.0f) == doctest::Approx(1.0f));
 }
 
 TEST_CASE("math clip clamps to plus-minus b") {
@@ -41,8 +43,8 @@ TEST_CASE("math wrap folds into the plus-minus b range") {
   CHECK(run_op("wrap", 0.2f, 0.0f) == doctest::Approx(0.0f));  // degenerate range
 }
 
-TEST_CASE("math b defaults to one") {
+TEST_CASE("math b defaults to zero so cables supply their actual value") {
   const ModuleInfo* info = find_module("math");
   REQUIRE(info->input_index("b") == 1);
-  CHECK(info->inputs[1].def == doctest::Approx(1.0f));
+  CHECK(info->inputs[1].def == doctest::Approx(0.0f));
 }

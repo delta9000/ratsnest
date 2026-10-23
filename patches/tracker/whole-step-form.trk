@@ -1,0 +1,19 @@
+# whole-step-form.trk -- one row per order step of whole-step.trk (clocked by song.step_trig).
+track drums cva
+track bass  cva
+track pad   cva
+track arp   cva
+track lead  cva
+
+pattern form 8
+#    drums | bass | pad | arp | lead
+00 | 0     | 0    | .7  | .5  | 0      # intro
+01 | .7    | .75  | .6  | .45 | .7     # verse
+02 | 1     | 1    | .8  | .7  | .9     # chorus
+03 | .7    | .75  | .6  | .45 | .7     # verse
+04 | 1     | 1    | .8  | .7  | .9     # chorus
+05 | .3    | .5   | .8  | .3  | .55    # bridge
+06 | 1     | 1.1  | 1   | 1   | 1      # last chorus (B minor)
+07 | 1     | 1    | 1   | 0   | 1      # outro chord
+
+order form

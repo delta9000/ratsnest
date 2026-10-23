@@ -73,7 +73,7 @@ flick -> sheet.cv : 0.07
 drops = clock { bpm: 1800 }
 coin = bern { prob: 0.12, seed: 5 }
 drops -> coin.gate
-denv = func { rise: 0.0004, fall: 0.018, curve: exp }
+denv = func { rise: 0.0004, fall: 0.054, curve: exp }
 coin.a -> denv.trig
 dpitch = random { rate: 30hz, smooth: 0, seed: 41 }
 drop = svf { cutoff: 2600, res: 0.9 }
@@ -104,7 +104,7 @@ body, bandpassed so it is paper and not fizz:
 fast = clock { bpm: 2400 }
 coin = bern { prob: 0.04, seed: 33 }
 fast -> coin.gate
-tick = func { rise: 0.0002, fall: 0.006, curve: exp }
+tick = func { rise: 0.0002, fall: 0.018, curve: exp }
 coin.a -> tick.trig
 n = noise { color: white, seed: 8 }
 cr = vca { gain: 0 }
@@ -184,7 +184,9 @@ breathes with the harmony rather than the drums.
 Filter resonance, and how fast you move the cutoff. `svf.res` under about 0.5
 is a colour; between 0.7 and 0.95 the filter starts to have a pitch, and the
 noise stops being noise and becomes an object with a size. Wind, howls, and
-bottles all live above 0.8. Rain and hiss live below 0.3.
+bottles all live above 0.8. Rain and hiss live below 0.3. Past about 0.97 the
+`svf` self-oscillates — a steady sine at the cutoff that the noise only
+roughens — so keep textures under 0.96.
 
 Then: **cutoff motion rate.** Under 0.05 Hz reads as environment. Around
 1–10 Hz reads as material (rain, fire, gravel). Above that it is modulation

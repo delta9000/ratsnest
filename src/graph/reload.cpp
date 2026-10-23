@@ -4,7 +4,8 @@ namespace ms::graph {
 namespace {
 
 bool same_config_value(const dsp::ConfigValue& a, const dsp::ConfigValue& b) {
-  return a.is_num == b.is_num && a.num == b.num && a.str == b.str && a.arr == b.arr;
+  return a.is_num == b.is_num && a.num == b.num && a.str == b.str &&
+         a.arr == b.arr && a.strs == b.strs;
 }
 
 bool same_config(const dsp::Config& a, const dsp::Config& b) {

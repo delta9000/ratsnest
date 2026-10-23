@@ -136,28 +136,28 @@ quarter -> clap_seq.clock
 clap_gate = logic { op: and }
 clap_seq.trig -> clap_gate.a
 arr_kick.cv -> clap_gate.b
-clap_env = func { rise: 0.001, fall: 0.14, curve: exp }
+clap_env = func { rise: 0.001, fall: 0.42, curve: exp }
 clap_gate -> clap_env.trig
 clap_noise = noise { color: white, seed: 5 }
 clap_filter = svf { cutoff: 1600, res: 0.5 }
 clap_noise -> clap_filter.in
 clap_amp = vca { gain: 0 }
 clap_filter.bp -> clap_amp.in
-clap_env -> clap_amp.cv : 0.7
+clap_env -> clap_amp.cv : 0.98
 
 # ---- hats: euclid sixteenths whose density rides the arrangement ----
 hat_pattern = euclid { steps: 16, hits: 2, rot: 5 }
 master -> hat_pattern.clock
 hats_lvl -> hat_pattern.hits : 6
-hat_env = func { rise: 0.0006, fall: 0.04, curve: exp }
+hat_env = func { rise: 0.0006, fall: 0.12, curve: exp }
 hat_pattern.trig -> hat_env.trig
-hats_lvl -> hat_env.fall : 0.03
+hats_lvl -> hat_env.fall : 0.09
 hat_noise = noise { color: white, seed: 19 }
 hat_filter = svf { cutoff: 9000, res: 0.25 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.5
+hat_env -> hat_amp.cv : 0.7
 quarter -> hat_amp.cv : -0.13
 
 # ---- offbeat open-hat: the classic house "chh" on the and of each beat.
@@ -168,14 +168,14 @@ quarter -> beat_not.a
 offbeat = logic { op: and }
 eighth -> offbeat.a
 beat_not -> offbeat.b
-oh_env = func { rise: 0.001, fall: 0.18, curve: exp }
+oh_env = func { rise: 0.001, fall: 0.54, curve: exp }
 offbeat -> oh_env.trig
 oh_noise = noise { color: white, seed: 37 }
 oh_filter = svf { cutoff: 6000, res: 0.3 }
 oh_noise -> oh_filter.in
 oh_amp = vca { gain: 0 }
 oh_filter.hp -> oh_amp.in
-oh_env -> oh_amp.cv : 0.3
+oh_env -> oh_amp.cv : 0.42
 perc_lvl -> oh_amp.cv : 0.6
 
 # ---- Reese bass: two chorus-drifting detuned saws through a lowpass with
@@ -216,7 +216,7 @@ bass_lvl -> sub_amp.cv : 0.7
 arp_lift = math { op: add }
 ch_fifth.cv -> arp_lift.a
 1 -> arp_lift.b
-arp_switch = switch { mode: seq, n: 8 }
+arp_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> arp_switch.clock
 ch_root.cv  -> arp_switch.in1
 ch_third.cv -> arp_switch.in2
@@ -263,7 +263,7 @@ lead_lift_f = math { op: add }
 ch_fifth.cv -> lead_lift_f.a
 1           -> lead_lift_f.b
 
-lead_switch = switch { mode: seq, n: 8 }
+lead_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> lead_switch.clock
 ch_third.cv  -> lead_switch.in1
 lead_lift_r  -> lead_switch.in2
@@ -291,9 +291,9 @@ lead_filt = svf { cutoff: 1800, res: 0.3 }
 lead_a -> lead_filt.in : 0.3
 lead_b -> lead_filt.in : 0.3
 lead_c -> lead_filt.in : 0.3
-lead_env = func { rise: 0.003, fall: 0.35, curve: exp }
+lead_env = func { rise: 0.003, fall: 1.05, curve: exp }
 lead_euclid.trig -> lead_env.trig
-lead_filt_env = func { rise: 0.002, fall: 0.3, curve: exp }
+lead_filt_env = func { rise: 0.002, fall: 0.9, curve: exp }
 lead_euclid.trig -> lead_filt_env.trig
 lead_filt_env -> lead_filt.cutoff : 2200
 lead_wander = lfo { freq: 0.05hz, wave: tri }
@@ -301,7 +301,7 @@ lead_wander -> lead_filt.cutoff : 350
 lead_lvl -> lead_filt.cutoff : 1200
 lead_amp = vca { gain: 0 }
 lead_filt.lp -> lead_amp.in
-lead_env -> lead_amp.cv : 0.5
+lead_env -> lead_amp.cv : 0.7
 lead_post = vca { gain: 0 }
 lead_amp -> lead_post.in
 lead_lvl -> lead_post.cv : 0.8
@@ -331,7 +331,7 @@ pad_breath -> pad_filt_l.cutoff : 160
 pad_breath -> pad_filt_r.cutoff : -140
 pad_lvl -> pad_filt_l.cutoff : 700
 pad_lvl -> pad_filt_r.cutoff : 700
-pad_env = adsr { attack: 0.5, decay: 0.3, sustain: 0.85, release: 1.2, curve: exp }
+pad_env = adsr { attack: 0.5, decay: 0.3, sustain: 0.85, release: 1.2, curve: quad }
 bar -> pad_env.gate
 pad_amp_l = vca { gain: 0 }
 pad_amp_r = vca { gain: 0 }
@@ -361,14 +361,14 @@ rise_cv -> riser_amp.cv : 0.55
 roll_pattern = euclid { steps: 16, hits: 4, rot: 0 }
 master -> roll_pattern.clock
 rise_cv -> roll_pattern.hits : 12
-roll_env = func { rise: 0.001, fall: 0.06, curve: exp }
+roll_env = func { rise: 0.001, fall: 0.18, curve: exp }
 roll_pattern.trig -> roll_env.trig
 roll_noise = noise { color: white, seed: 41 }
 roll_filter = svf { cutoff: 2400, res: 0.45 }
 roll_noise -> roll_filter.in
 roll_amp = vca { gain: 0 }
 roll_filter.bp -> roll_amp.in
-roll_env -> roll_amp.cv : 0.22
+roll_env -> roll_amp.cv : 0.31
 rise_cv -> roll_amp.cv : 0.18
 
 # ---- dry band: kick center, bass center, clap center, hats right, oh left,
@@ -453,7 +453,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -16, ratio: 2.2,
                            knee: 5, attack: 0.012, release: 0.15,
-                           makeup: 1.4, mix: 0.85 }
+                           makeup: 6.5, mix: 0.85 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.7
@@ -472,9 +472,9 @@ master_clip.out_l -> master_limit.in_l
 master_clip.out_r -> master_limit.in_r
 
 # ---- output: the arrangement's main lane fades the whole track out through
-# out.level. -1 cancels the default base of 1, leaving 0.7 * main_out, which
-# ranges 0.7 at full play to 0 in the silent tail. ----
+# out.level. -1 cancels the default base of 1, leaving main_out, which
+# ranges 1.0 at full play (the limiter owns the ceiling) to 0 in the tail. ----
 master_limit.out_l -> out.left
 master_limit.out_r -> out.right
 -1 -> out.level
-main_out -> out.level : 0.7
+main_out -> out.level : 1.0

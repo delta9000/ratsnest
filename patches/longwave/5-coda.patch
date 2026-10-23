@@ -1,0 +1,178 @@
+# longwave V -- "coda" -- 63 BPM, D dorian, 7:00. The hour closes.
+#
+# The hour's plan lives in `1-dorian.patch`. This movement's place in it:
+#
+# A LITERAL RETURN. The chord lane, the motif contour and the pedal fifth are
+# character-for-character the ones from movement I -- not a variation, not a
+# development. What changed in 53 minutes is the listener, not the notes, and
+# saying it with the same numbers is the only way to make that audible.
+#
+# The orchestration is what is stripped: no drums, no bass saws, no stabs.
+# One bell, the pedal, and the room, at half of movement I's tempo -- the
+# finale's ritardando handed the pulse over already, so nothing decelerates
+# here; it simply arrives at rest.
+#
+# 63 BPM is 126 halved and 84 x 3/4: the coda is the one tempo in the lattice
+# that relates simply to every other movement.
+#
+#   block  0   0:00  the return -- bell, pedal, room
+#   block 11   5:35  the room alone; no new events after this
+#   ends OPEN at 7:00 -- still sounding. assemble.sh applies
+#   `afade=t=out:st=3570:d=30`, so the hour fades over something moving
+#   rather than cutting a phrase (docs/patch-craft.md, "fades belong in post").
+#
+#   ratsnest render patches/longwave/5-coda.patch -d 420s --stats 30s
+#
+# 8-bar blocks of 30.476 s, 15 lane steps (wrap at 457 s; render 420 s).
+
+# === CLOCKS -- nothing ramps here; this is the last tempo in the hour ===
+arr_clk = clock { bpm: 252 }             # 16ths at 63
+blk     = div { by: 128 }                # ARRANGEMENT DIVISOR: 8 bars
+arr_clk -> blk.in
+
+master  = clock { bpm: 252 }
+eighth  = div { by: 2 }
+quarter = div { by: 2 }
+half    = div { by: 2 }
+bar     = div { by: 2 }
+two_bar = div { by: 2 }
+master  -> eighth.in
+eighth  -> quarter.in
+quarter -> half.in
+half    -> bar.in
+bar     -> two_bar.in
+
+# === ARRANGEMENT LANES ===
+arr_room  = stepseq { steps: [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.85, 0.85, 0.85, 0.85] }
+arr_bell  = stepseq { steps: [0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.15, 0.15, 0.15, 0.15] }
+arr_drone = stepseq { steps: [0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.55, 0.3, 0.3, 0.3, 0.3] }
+arr_sub   = stepseq { steps: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.2, 0.2, 0.2, 0.2] }
+arr_brgt  = stepseq { steps: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.14, 0.14, 0.14, 0.14] }
+
+blk -> arr_room.clock
+blk -> arr_bell.clock
+blk -> arr_drone.clock
+blk -> arr_sub.clock
+blk -> arr_brgt.clock
+
+l_room  = func { rise: 20, fall: 24 }
+l_bell  = func { rise: 16, fall: 30 }
+l_drone = func { rise: 22, fall: 28 }
+l_sub   = func { rise: 18, fall: 26 }
+l_brgt  = func { rise: 24, fall: 28 }
+
+arr_room.cv  -> l_room.in
+arr_bell.cv  -> l_bell.in
+arr_drone.cv -> l_drone.in
+arr_sub.cv   -> l_sub.in
+arr_brgt.cv  -> l_brgt.in
+
+# === HARMONY -- character for character, movement I's lane ===
+ch_root  = stepseq { steps: [D3v, G3v, C3v, A2v] }
+ch_third = stepseq { steps: [F3v, B3v, E3v, C3v] }
+ch_fifth = stepseq { steps: [A3v, D4v, G3v, E3v] }
+two_bar -> ch_root.clock
+two_bar -> ch_third.clock
+two_bar -> ch_fifth.clock
+
+# === THE MOTIF -- character for character, movement I's contour and gates ===
+mot_seq = stepseq { steps: [0, 0.5833, 0.25, 0.8333, 0.5833, 0.25, 0, -0.3333],
+                    gates: [1, 0, 1, 1, 0, 1, 1, 0] }
+bar -> mot_seq.clock
+mot_add = math { op: add, b: 0 }
+ch_root.cv -> mot_add.a
+mot_seq.cv -> mot_add.b
+mot_q = quant { scale: [0, 2, 3, 5, 7, 9, 10], root: 5 }   # D dorian, again
+mot_add -> mot_q.in
+
+# === THE ROOM -- the last and largest ===
+room = sub { file: "../lib/tape-echo.sub", verb_decay: 0.93, verb_damp: 0.30,
+             fb_a: 0.68, fb_b: 0.60, verb_send: 0.72 }
+63 -> room.bpm
+l_room -> room.fb_mod : 0.10
+l_room -> room.decay_mod : 0.05
+
+# Lane gates use `threshold: 0.02`, not the default 0.5. An arrangement lane
+# carries a LEVEL, and `logic`'s boolean ops threshold both inputs -- so a
+# section whose lane sits at 0.24 gates its voice off entirely while the
+# mixer happily reports a fader move. The lane's job at this AND is only
+# "is this voice present at all"; how loud it is belongs on `mix.lvlN`.
+# === THE BELL -- one voice, movement I's, given the whole movement ===
+bell = modal { modes: 48, structure: 0.42, brightness: 0.42, damping: 0.80,
+               position: 0.28 }
+mot_q.out -> bell.v_oct
+1         -> bell.v_oct
+bell_on = logic { op: and, threshold: 0.02 }
+mot_seq.gate -> bell_on.a
+arr_bell.cv  -> bell_on.b
+bell_on -> bell.strike
+l_brgt  -> bell.brightness : 0.22
+bell_amp = vca { gain: 0 }
+bell -> bell_amp.in
+l_bell -> bell_amp.cv : 0.8
+
+# === THE PEDAL FIFTH -- movement I's drone, mode-invariant as it always was
+drone_a = vco { freq: 220hz, wave: saw }
+drone_b = vco { freq: 220hz, wave: saw }
+drone_c = vco { freq: 110hz, wave: sine }
+D2v -> drone_a.v_oct
+A2v -> drone_b.v_oct
+D2v -> drone_c.v_oct
+drone_drift = lfo { freq: 0.019hz, wave: tri }
+drone_drift -> drone_b.v_oct : 0.004
+drone_filt = ladder { cutoff: 190, res: 0.2, drive: 0.3 }
+drone_a -> drone_filt.in : 0.34
+drone_b -> drone_filt.in : 0.34
+drone_c -> drone_filt.in : 0.32
+l_brgt      -> drone_filt.cutoff : 520
+drone_drift -> drone_filt.cutoff : 70
+drone_amp = vca { gain: 0 }
+drone_filt -> drone_amp.in
+l_drone -> drone_amp.cv : 0.6
+
+# === SUB -- the same fixed D under everything ===
+sub_osc = vco { freq: 110hz, wave: sine }
+D2v -> sub_osc.v_oct
+sub_lp = ladder { cutoff: 105, res: 0.07 }
+sub_osc -> sub_lp.in
+sub_amp = vca { gain: 0 }
+sub_lp -> sub_amp.in
+l_sub -> sub_amp.cv : 0.5
+
+# === WEATHER -- the bed movement I opened on, closing the hour with it ===
+weather = noise { color: pink, seed: 7 }
+weath_lp = svf { cutoff: 600hz, res: 0.1 }
+weather -> weath_lp.in
+l_brgt  -> weath_lp.cutoff : 1200
+weath_amp = vca { gain: 0 }
+weath_lp.lp -> weath_amp.in
+l_drone -> weath_amp.cv : 0.3
+
+# === MIX ===
+band = mix { levels: [0.5, 0.5, 0.55, 0.3],
+             pans:   [0.2, 0, 0, -0.2] }
+bell_amp  -> band.in1
+drone_amp -> band.in2
+sub_amp   -> band.in3
+weath_amp -> band.in4
+
+bell_amp  -> room.in : 0.8
+drone_amp -> room.in : 0.35
+weath_amp -> room.in : 0.15
+
+master_mix = mix { levels: [1, 1, 0.8, 0.8], pans: [-1, 1, -1, 1] }
+band.out_l -> master_mix.in1
+band.out_r -> master_mix.in2
+room.l     -> master_mix.in3
+room.r     -> master_mix.in4
+
+mast = sub { file: "../lib/master-chain.sub", low_gain: 0.9, mid1_gain: -0.6,
+             high_gain: 0.3, comp_thr: -10, comp_ratio: 1.4,
+             clip_drive: 1.0 }
+1.2 -> mast.width
+0.5 -> mast.makeup
+master_mix.out_l -> mast.in_l
+master_mix.out_r -> mast.in_r
+
+mast.l -> out.left
+mast.r -> out.right

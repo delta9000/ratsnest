@@ -41,7 +41,7 @@ acc = sh {}
 acc_pat.cv -> acc.in
 notes.trig -> acc.trig
 
-env = func { rise: 0.003, fall: 0.16, curve: exp }
+env = func { rise: 0.003, fall: 0.8, curve: exp }
 notes.gate -> env.trig
 # Accent widens the envelope: env * accent is a second, deeper sweep.
 squelch = math { op: mult }
@@ -91,7 +91,7 @@ g_glide = func { rise: 0.08, fall: 0.08 }
 g_seq.cv -> g_glide.in
 g_osc = vco { wave: sine, freq: 220hz }
 g_glide -> g_osc.v_oct
-g_env = func { rise: 0.004, fall: 1.6, curve: exp }
+g_env = func { rise: 0.004, fall: 4.8, curve: exp }
 g_seq.trig -> g_env.trig
 g_amp = vca { gain: 0 }
 g_osc -> g_amp.in
@@ -140,7 +140,8 @@ an automation target; that is what makes it talk.
 ```text
 n_v = fm { algo: dual, freq: 220hz, ratios: [1, 2.01, 7, 1, 1, 1],
            levels: [0.8, 0.35, 0.2, 0, 0, 0],
-           t2: [0.4, 0.1, 0.08, 0, 0, 0], l2: [0.8, 0.5, 0.3, 0, 0, 0],
+           t2: [2, 0.5, 0.4, 0, 0, 0], l2: [0.8, 0.5, 0.3, 0, 0, 0],
+           t3: [2, 2, 2], t4: [1, 1, 1],
            l3: [0.7, 0.4, 0.2, 0, 0, 0], curve: exp }
 g_seq.cv -> n_v.v_oct
 n_gate = func { rise: 0.002, fall: 1.2 }
@@ -169,7 +170,7 @@ d_filt = ladder { cutoff: 180hz, res: 0.22, drive: 0.5 }
 d_a -> d_filt.in : 0.4
 d_b -> d_filt.in : 0.4              # 0.004 v/oct apart
 d_sub = vco { wave: sine, freq: 220hz }
-d_env = func { rise: 0.012, fall: 0.34, curve: exp }
+d_env = func { rise: 0.012, fall: 1.02, curve: exp }
 d_pat.trig -> d_env.trig
 d_env -> d_filt.cutoff : 260
 d_amp = vca { gain: 0 }
@@ -191,8 +192,10 @@ set it to the darkest note you want and scale the env cable up from there.
 130 Hz base + 900 env is an acid squelch; 180 + 260 is dub; 240 + 0 is a
 reese that only moves when the notch does.
 
-Second knob: `res`. Above ~0.9 on `ladder` the resonance eats the
-fundamental — compensate with the sine sub layer, not with more gain.
+Second knob: `res`. `ladder` compensates part of its bass loss (about −7 dB
+at 0.5, −4.5 dB at 0.9), but the resonant peak still dominates above ~0.85,
+and past ~0.93 the filter whistles at the cutoff on its own — back off, or
+lean on the sine sub layer, not more gain.
 
 ## Modulating it
 
@@ -209,10 +212,10 @@ fundamental — compensate with the sine sub layer, not with more gain.
 
 ## Gotchas
 
-- **`math { op: sub }` defaults `b: 1`.** Every subtraction-built notch, every
-  inverted CV: write the zero base or eat the DC.
-- **Note names need a 220/110/440 Hz oscillator base.** `freq: 55hz` with
-  `A1v` is two octaves down.
+- **`math` defaults both inputs to 0.** `op: mult` with nothing on `b` is
+  silence; write `b: 1` (or patch `b`) when you mean "pass through".
+- **Note names land at written pitch on the default 220 Hz base.** `freq: 55hz`
+  with `A1v` is two octaves down.
 - **Mono below ~120 Hz.** `pans: [0, 0]`, no `chorus`, no `stereo` width on
   the bass channel. Width goes on the growl layer above 250 Hz, never on the
   sub. Check with `stereo.corr` if you're unsure.

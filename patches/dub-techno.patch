@@ -32,13 +32,13 @@ harmony -> fifth_osc.v_oct
 0.25 -> third_osc.v_oct
 0.58333 -> fifth_osc.v_oct
 
-stab_env = func { rise: 0.004, fall: 0.34, curve: exp }
+stab_env = func { rise: 0.004, fall: 1.7, curve: exp }
 bar -> stab_env.trig
 stab_amp = vca { gain: 0, response: exp }
 root_osc -> stab_amp.in : 0.34
 third_osc -> stab_amp.in : 0.27
 fifth_osc -> stab_amp.in : 0.3
-stab_env -> stab_amp.cv : 0.86
+stab_env -> stab_amp.cv : 1.03
 
 # The filter envelope supplies the attack; two irrational slow cycles move
 # the darkness and resonance over roughly 19 and 43 seconds.
@@ -52,7 +52,7 @@ filter_wander -> stab_filter.cutoff : 95
 filter_breath -> stab_filter.res : 0.08
 
 warm = drive { amount: 0.28, mode: soft }
-stab_filter -> warm.in
+stab_filter -> warm.in : 0.78           # -2.2 dB: ladder now compensates part of its res loss
 
 # ---- dub space ----
 # 369 ms is a dotted eighth at 122 BPM; 738 ms is three eighth notes.
@@ -96,7 +96,7 @@ kick_env -> kick_amp.cv : 0.9
 kick_drive = drive { amount: 0.2, mode: soft }
 kick_amp -> kick_drive.in
 
-hat_env = func { rise: 0.001, fall: 0.038, curve: exp }
+hat_env = func { rise: 0.001, fall: 0.11, curve: exp }
 # Five hits over sixteen eighth-note steps, rotated away from the downbeat.
 hat_pattern = euclid { steps: 16, hits: 5, rot: 3 }
 master -> hat_pattern.clock
@@ -109,7 +109,7 @@ hat_filter = svf { cutoff: 9200, res: 0.25 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.34
+hat_env -> hat_amp.cv : 0.48
 quarter -> hat_amp.cv : -0.12
 
 # ---- mix: the kick subtly ducks the entire wet field ----

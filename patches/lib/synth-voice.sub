@@ -1,0 +1,146 @@
+# synth-voice.sub -- a complete subtractive voice: two oscillators and a sine
+# sub, a 12/24 dB low-pass with envelope and key tracking, an ADSR, and the
+# velocity and level multiplies already done. One instance plus three or four
+# cables replaces the hand-built osc -> filter -> env -> `math` velocity ->
+# vca -> level vca chain (about nine nodes and twenty lines per voice).
+#
+#   v = sub { file: "lib/synth-voice.sub", cutoff: 900, env_amt: 3500 }
+#   song.voct7 -> v.voct
+#   song.gate7 -> v.gate
+#   song.vel7  -> v.vel
+#   lead_lvl   -> v.level          # optional; unpatched = 1
+#
+# Inputs: `voct` (v/oct, 0 = A3), `gate` (held; a tracker gate or adsr-style
+# gate), `vel` (0..1, default 1: scales level AND the filter envelope --
+# cable velocity into `level` instead for a velocity-blind filter),
+# `level` (0..1, default 1: a post-envelope fader for a form lane), `cut`
+# (Hz summed onto `cutoff`, default 0: cable a 0..1 brightness lane at the
+# sweep depth, `lane -> v.cut : 4000`). Output `main`: mono audio, already
+# env x vel x level.
+#
+# Signal: osc1 (`wave1`) and osc2 (`wave2`, `detune` + `oct2` v/oct above
+# it) crossfade by `blend` (0 = osc1, 1 = osc2) into both filters; `slope`
+# crossfades the 12 dB `svf` (0) with the 24 dB `ladder` (1, its `drive`
+# saturates). The cutoff is `cutoff` + `cut` + env x vel x `env_amt` Hz,
+# tracked by `track` octaves per octave. The sine sub (`sublvl`, `sub_oct`
+# octaves away) bypasses the low-pass so a bass keeps its fundamental at any
+# cutoff; `hp` cleans the bottom after both. `glide` is seconds per octave of
+# portamento (0 = none), `vib` a v/oct vibrato depth at `vib_rate`.
+#
+# Presets by params (all measured in the demo below at unity level):
+#   lead  -- defaults (saw + detuned pulse, ladder, a/d/s/r .01/.4/.7/.2)
+#   pluck -- sustain: 0, decay: 0.7, release: 0.7, cutoff: 600, env_amt: 4000
+#   pad   -- wave2: saw, blend: 0.5, attack: 0.3, decay: 1, sustain: 0.8,
+#            release: 1.5, curve: lin, slope: 0, cutoff: 900, env_amt: 0
+#   bass  -- blend: 0, sublvl: 0.6, sub_oct: 0, cutoff: 200, res: 0.2,
+#            drive: 0.5, env_amt: 1200, sustain: 0, decay: 0.5, release: 0.5
+#
+# `decay`/`release` with `curve: exp` (the default) are -60 dB times: a
+# pluck's heard length is about a third of them (docs/patch-craft.md).
+#
+# Measured, main -> out.in at unity, the demo's 120 BPM eighth-note line
+# (A2-A3, accented): lead (defaults) peak -3.2 dBFS, RMS -18.0; pluck -3.3 /
+# -20.2; pad -2.1 / -12.6 (it sustains); bass -4.4 / -20.3. The oscillators
+# run at full scale (`osc_lvl` 1), so stage a voice like a single oscillator:
+# 0.3-0.6 in a mix, or scale `osc_lvl` to set how hard the ladder is driven.
+#
+# Gotcha avoided here, worth knowing: `xfade.mix` has a 0.5 base, so a cable
+# into it sums onto 0.5 -- both crossfades are declared `mix: 0`.
+
+wave1    = param { default: saw }     # vco wave: sine, tri, saw, pulse
+wave2    = param { default: pulse }
+blend    = param { default: 0.35 }    # 0 = osc1 only, 1 = osc2 only
+osc_lvl  = param { default: 1 }       # oscillators into the filter (drives the ladder)
+detune   = param { default: 0.004 }   # osc2 offset, v/oct (0.004 = ~5 cents)
+oct2     = param { default: 0 }       # osc2 offset, octaves
+pw       = param { default: 0.5 }     # pulse width, both oscillators
+sublvl   = param { default: 0 }       # sine sub level (bypasses the low-pass)
+sub_oct  = param { default: -1 }      # sine sub offset, octaves
+cutoff   = param { default: 1200hz }  # low-pass floor, Hz
+res      = param { default: 0.25 }
+drive    = param { default: 0 }       # ladder input drive 0..4 (0 = clean)
+slope    = param { default: 1 }       # 0 = 12 dB svf, 1 = 24 dB ladder
+track    = param { default: 0.5 }     # cutoff key tracking, oct/oct
+env_amt  = param { default: 2500hz }  # cutoff added at full env x vel, Hz
+attack   = param { default: 0.01 }
+decay    = param { default: 0.4 }
+sustain  = param { default: 0.7 }
+release  = param { default: 0.2 }
+curve    = param { default: exp }     # adsr curve: lin, exp, log, quad
+hp       = param { default: 5hz }     # high-pass after the filter, Hz (5 = off)
+glide    = param { default: 0 }       # portamento, seconds per octave
+vib      = param { default: 0 }       # vibrato depth, v/oct (0.004 = subtle)
+vib_rate = param { default: 5.3hz }
+
+voct  = input {}
+gate  = input {}
+vel   = input { default: 1 }
+level = input { default: 1 }
+cut   = input {}
+main  = output {}
+
+# Pitch, slewed for glide (rise/fall 0 is an instant follow).
+pitch = func { rise: glide, fall: glide }
+voct -> pitch.in
+
+o1 = vco { wave: wave1, pw: pw }
+o2 = vco { wave: wave2, pw: pw }
+so = vco { wave: sine }
+pitch -> o1.v_oct
+pitch -> o2.v_oct
+pitch -> so.v_oct
+detune -> o2.v_oct
+oct2 -> o2.v_oct
+sub_oct -> so.v_oct
+vibr = lfo { freq: vib_rate }
+vibr -> o1.v_oct : vib
+vibr -> o2.v_oct : vib
+osc = xfade { mix: 0 }
+o1 -> osc.a
+o2 -> osc.b
+blend -> osc.mix
+
+# Envelope; env x vel opens the filter and drives the amp.
+env = adsr { attack: attack, decay: decay, sustain: sustain,
+             release: release, curve: curve }
+gate -> env.gate
+ev = vca { gain: 0 }
+env -> ev.in
+vel -> ev.cv
+
+f2 = svf { cutoff: cutoff, res: res }
+f4 = ladder { cutoff: cutoff, res: res, drive: drive }
+osc -> f2.in : osc_lvl
+osc -> f4.in : osc_lvl
+cut -> f2.cutoff
+cut -> f4.cutoff
+ev -> f2.cutoff : env_amt
+ev -> f4.cutoff : env_amt
+pitch -> f2.v_oct : track
+pitch -> f4.v_oct : track
+flt = xfade { mix: 0 }
+f2.lp -> flt.a
+f4 -> flt.b
+slope -> flt.mix
+
+hpf = svf { cutoff: hp }
+flt -> hpf.in
+so -> hpf.in : sublvl
+
+amp = vca { gain: 0 }
+hpf.hp -> amp.in
+ev -> amp.cv
+lvl = vca { gain: 0 }
+amp -> lvl.in
+level -> lvl.cv
+lvl -> main.in
+
+# Audition: `mise run play -- patches/lib/synth-voice.sub`
+demo.clk = clock { bpm: 240 }
+demo.seq = stepseq { steps: [A2v, C3v, E3v, A3v, G3v, E3v, D3v, E3v],
+                     vels:  [1, .6, .8, .6, 1, .6, .8, .6] }
+demo.clk -> demo.seq.clock
+demo.seq.cv -> voct
+demo.seq.gate -> gate
+demo.seq.vel -> vel
+main -> demo.out.in

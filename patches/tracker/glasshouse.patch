@@ -1,0 +1,183 @@
+# glasshouse -- synth-pop, 108 BPM, 72 bars (~2:40 incl. tail). Notes (twelve tracks,
+# crash/open hat/toms included) in glasshouse.trk, levels per bar in glasshouse-form.trk.
+#   intro 4 | verse 8 | pre 4 | chorus 8 | verse2 8 | pre 4 | chorus2 8 (+counter, pad swell)
+#   | bridge 4 (breakdown) + 4 (build) | chorus 8 + chorus^2 8 | outro 4
+#
+# Built from the lib: every pitched voice is one `synth-voice.sub`, every
+# channel a `strip.sub` summed straight into the master (no `mix` slots),
+# the pump a relative `duck.sub` per depth. Sends are post-fader by
+# construction; the reverb's lane rides its return strip.
+
+clk = clock { bpm: 432 }            # sixteenths at 108
+bar = div { by: 16 }
+clk -> bar.in
+song = tracker { file: "glasshouse.trk" }
+form = tracker { file: "glasshouse-form.trk" }
+clk -> song.clock
+bar -> form.clock
+
+drums_lvl = func { rise: 0.3, fall: 0.3 }
+bass_lvl  = func { rise: 0.5, fall: 0.5 }
+pad_lvl   = func { rise: 1.5, fall: 1.5 }
+cut_lvl   = func { rise: 1.5, fall: 1.5 }
+lead_lvl  = func { rise: 0.5, fall: 0.5 }
+pluck_lvl = func { rise: 0.5, fall: 0.5 }
+verb_lvl  = func { rise: 1, fall: 1 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> pad_lvl.in
+form.cva4 -> cut_lvl.in
+form.cva5 -> lead_lvl.in
+form.cva6 -> pluck_lvl.in
+form.cva7 -> verb_lvl.in
+form.cva8 -> main_lvl.in
+
+# ---- drums: a mono kit `mix` (static pans) into one stereo strip ----
+kick = sub { file: "../lib/kick.sub", tune: 50hz, decay: 0.18s, click: 0.4 }
+song.gate1 -> kick.trig
+snare = sub { file: "../lib/kit/snare.sub", tune: 200hz, snap: 0.6 }
+clap  = sub { file: "../lib/kit/clap.sub" }
+song.gate2 -> snare.trig
+song.gate2 -> clap.trig
+song.vel2 -> snare.accent
+song.vel2 -> clap.accent
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.06s }
+song.gate3 -> hat.trig
+song.vel3 -> hat.accent
+ohat = sub { file: "../lib/kit/hat_model.sub", decay: 0.35s }
+song.gate10 -> ohat.trig
+song.vel10 -> ohat.accent
+song.gate3 -> ohat.choke
+tomhi = sub { file: "../lib/kit/tom.sub", tune: 180hz }
+tomlo = sub { file: "../lib/kit/tom.sub", tune: 120hz }
+song.gate11 -> tomhi.trig
+song.vel11 -> tomhi.accent
+song.gate12 -> tomlo.trig
+song.vel12 -> tomlo.accent
+crash = sub { file: "../lib/kit/crash.sub", decay: 0.85s }
+song.gate9 -> crash.trig
+song.vel9 -> crash.accent
+
+dmix = mix { levels: [0.85, 1.1, 0.8, 2.0, 1.5, 0.8, 0.8, 0.25],
+             pans: [0, 0, 0.1, 0.3, 0.3, -0.35, 0.35, -0.2] }
+kick  -> dmix.in1
+snare -> dmix.in2
+clap  -> dmix.in3
+hat   -> dmix.in4
+ohat  -> dmix.in5
+tomhi -> dmix.in6
+tomlo -> dmix.in7
+crash -> dmix.in8
+drums = sub { file: "../lib/strip.sub" }
+dmix.out_l -> drums.in_l
+dmix.out_r -> drums.in_r
+drums_lvl -> drums.level
+
+# ---- the pump: off the kick gate, relative to each part's level ----
+duck_bass = sub { file: "../lib/duck.sub", depth_db: -4.2, curve: exp }
+duck_pad  = sub { file: "../lib/duck.sub", depth_db: -1.7, curve: exp }
+song.gate1 -> duck_bass.trig
+song.gate1 -> duck_pad.trig
+
+# ---- voices ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0, osc_lvl: 0.45, sublvl: 0.55,
+             sub_oct: 0, cutoff: 220, res: 0.2, drive: 0.5, track: 0, env_amt: 1200,
+             attack: 0.002, decay: 0.5, sustain: 0, release: 0.5 }
+song.voct6 -> bass.voct
+song.gate6 -> bass.gate
+song.vel6 -> bass.vel
+bass_s = sub { file: "../lib/strip.sub", gain: 1.3 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+duck_bass -> bass_s.duck
+
+# Pad: one poly-pad.sub -- a `chord` bank stamping one synth-voice per
+# tone -- on the chord + extension, one shared brightness lane.
+pad = sub { file: "../lib/poly-pad.sub", blend: 0, osc_lvl: 0.22, track: 0,
+            res: 0.2, hp: 260 }
+song.gate4 -> pad.gate
+song.voct4 -> pad.p1
+song.cva4  -> pad.p2
+song.cvb4  -> pad.p3
+song.voct5 -> pad.p4
+0.005  -> pad.p2
+-0.005 -> pad.p3
+0.003  -> pad.p4
+cut_lvl -> pad.cut : 4500
+pad_s = sub { file: "../lib/strip.sub", gain: 1.98, send_gain: 0.202 }
+pad -> pad_s.in
+pad_lvl -> pad_s.level
+duck_pad -> pad_s.duck
+p_cho = chorus { voices: 3, depth: 0.6, mix: 0.5 }
+pad_s.l -> p_cho.in_l
+pad_s.r -> p_cho.in_r
+
+lead = sub { file: "../lib/synth-voice.sub", blend: 0.385, osc_lvl: 0.65, slope: 0,
+             track: 0, cutoff: 1400, res: 0.3, env_amt: 3500, vib: 0.004, curve: lin,
+             attack: 0.012, decay: 0.4, sustain: 0.7, release: 0.2 }
+song.voct7 -> lead.voct
+song.gate7 -> lead.gate
+song.vel7 -> lead.vel
+lead_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.833 }
+lead -> lead_s.in
+lead_lvl -> lead_s.level
+
+pluck = sub { file: "../lib/synth-voice.sub", wave2: tri, oct2: 1, detune: 0,
+              blend: 0.4615, osc_lvl: 0.65, slope: 0, track: 0, cutoff: 600,
+              res: 0.3, env_amt: 4000, attack: 0.002, decay: 0.7, sustain: 0,
+              release: 0.7 }
+song.voct8 -> pluck.voct
+song.gate8 -> pluck.gate
+song.vel8 -> pluck.vel
+pluck_s = sub { file: "../lib/strip.sub", gain: 1.2, pos: 0.25, send_gain: 0.417 }
+pluck -> pluck_s.in
+pluck_lvl -> pluck_s.level
+
+# ---- space: post-fader sends; the reverb lane rides the return ----
+de = tempo { bpm: 108, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.35, tone: 3500, mix: 1 }
+de.seconds -> echo.time
+lead_s.fx  -> echo.in : 0.7
+pluck_s.fx -> echo.in : 0.8
+room = reverb { decay: 0.8, damp: 0.35, mix: 1, predelay: 0.03 }
+lead_s.fx  -> room.in_l
+pluck_s.fx -> room.in_l
+pad_s.fx   -> room.in_l
+snare -> room.in_l : 0.3
+clap  -> room.in_l : 0.2
+room_s = sub { file: "../lib/strip.sub", gain: 1.4 }
+room.out_l -> room_s.in_l
+room.out_r -> room_s.in_r
+verb_lvl -> room_s.level
+
+# ---- master: strips sum into it ----
+master = sub { file: "../lib/master-chain.sub", clip_drive: 4, ceiling: -1.5, true_peak: on,
+                mid1_gain: -2.5, high_gain: 2.5, mid2_gain: 1.5 }
+7.5 -> master.makeup
+drums.l   -> master.in_l
+drums.r   -> master.in_r
+bass_s.l  -> master.in_l
+bass_s.r  -> master.in_r
+p_cho.out_l -> master.in_l
+p_cho.out_r -> master.in_r
+lead_s.l  -> master.in_l
+lead_s.r  -> master.in_r
+pluck_s.l -> master.in_l
+pluck_s.r -> master.in_r
+echo      -> master.in_l : 0.426
+echo      -> master.in_r : 0.261
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+kick -> master.side_l : 0.6
+kick -> master.side_r : 0.6
+# Kick-keyed glue: the breakdown has no kick, so it is mixed ~6 dB under the
+# choruses in glasshouse-form.trk rather than left to the compressor.
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

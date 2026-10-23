@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <numbers>
 #include <vector>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 
 namespace ms::dsp {
@@ -32,19 +33,26 @@ class Delay final : public Module {
   }
 
   void process(const float* ins, float* outs) override {
-    const float secs =
-        std::clamp(ins[1], 0.0f, kMaxSeconds) * std::exp2(-ins[2]);
-    double target = static_cast<double>(secs) * static_cast<double>(rate_);
-    // NaN-proof lower clamp: 0 * inf from a hostile pitch input must not
-    // poison delay_ forever. !(x >= 2) catches NaN as well as small values.
-    if (!(target >= 2.0)) target = 2.0;
-    target = std::min(target, static_cast<double>(buf_.size() - 4));
+    // Control-rate coefficients are memoized while their inputs hold still
+    // (dsp/input_key.h): exp2/exp/cos/sin per sample dominated this module.
+    if (time_key_.changed({ins[1], ins[2]})) {
+      const float secs =
+          std::clamp(ins[1], 0.0f, kMaxSeconds) * std::exp2(-ins[2]);
+      double target = static_cast<double>(secs) * static_cast<double>(rate_);
+      // NaN-proof lower clamp: 0 * inf from a hostile pitch input must not
+      // poison delay_ forever. !(x >= 2) catches NaN as well as small values.
+      if (!(target >= 2.0)) target = 2.0;
+      target_ = std::min(target, static_cast<double>(buf_.size() - 4));
+    }
+    const double target = target_;
     if (delay_ < 0.0) delay_ = target;
-    const float slew_samples = std::max(ins[6], 0.0f) * rate_;
-    const double a =
-        slew_samples <= 1.0f
-            ? 1.0
-            : 1.0 - std::exp(-1.0 / static_cast<double>(slew_samples));
+    if (slew_key_.changed({ins[6]})) {
+      const float slew_samples = std::max(sanitize(ins[6]), 0.0f) * rate_;
+      slew_a_ = slew_samples <= 1.0f
+                    ? 1.0
+                    : 1.0 - std::exp(-1.0 / static_cast<double>(slew_samples));
+    }
+    const double a = slew_a_;
     delay_ += (target - delay_) * a;
 
     // 4-point cubic Hermite read: f interpolates tap di toward tap di+1.
@@ -61,9 +69,11 @@ class Delay final : public Module {
     const float wet = ((c3 * f + c2) * f + c1) * f + x1;
 
     // Feedback path: darken, block DC, saturate, write.
-    const float fc = std::clamp(ins[5], 20.0f, 0.45f * rate_);
-    const float g =
-        1.0f - std::exp(-2.0f * std::numbers::pi_v<float> * fc / rate_);
+    if (tone_key_.changed({ins[5]})) {
+      const float fc = std::clamp(sanitize(ins[5]), 20.0f, 0.45f * rate_);
+      tone_g_ = 1.0f - std::exp(-2.0f * std::numbers::pi_v<float> * fc / rate_);
+    }
+    const float g = tone_g_;
     lp_ += g * (wet - lp_);
     const float rpole =
         1.0f - 2.0f * std::numbers::pi_v<float> * 10.0f / rate_;
@@ -79,12 +89,18 @@ class Delay final : public Module {
     if (std::abs(dc_x_) < 1e-20f) dc_x_ = 0.0f;
     if (std::abs(dc_y_) < 1e-20f) dc_y_ = 0.0f;
     const float fb = std::clamp(ins[3], 0.0f, 1.2f);
-    buf_[w] = ins[0] + std::tanh(fb * dc);
+    const float sat = fb * dc;  // tanh(+-0) is +-0: skip it on a silent loop
+    // Never store a non-finite sample: it would replay for up to 10 s.
+    buf_[w] = sanitize(ins[0] + (sat == 0.0f ? sat : std::tanh(sat)));
     write_ = (w + 1) & mask_;
 
-    const float m = std::clamp(ins[4], 0.0f, 1.0f);
-    const float angle = m * (std::numbers::pi_v<float> / 2.0f);
-    outs[0] = ins[0] * std::cos(angle) + wet * std::sin(angle);
+    if (mix_key_.changed({ins[4]})) {
+      const float m = std::clamp(ins[4], 0.0f, 1.0f);
+      const float angle = m * (std::numbers::pi_v<float> / 2.0f);
+      dry_gain_ = std::cos(angle);
+      wet_gain_ = std::sin(angle);
+    }
+    outs[0] = ins[0] * dry_gain_ + wet * wet_gain_;
   }
 
   void copy_state_from(const Module& other) override {
@@ -109,6 +125,10 @@ class Delay final : public Module {
   float lp_ = 0.0f;
   float dc_x_ = 0.0f;
   float dc_y_ = 0.0f;
+  InputKey<2> time_key_;
+  InputKey<1> slew_key_, tone_key_, mix_key_;
+  double target_ = 2.0, slew_a_ = 1.0;
+  float tone_g_ = 0.0f, dry_gain_ = 1.0f, wet_gain_ = 0.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Delay>(); }

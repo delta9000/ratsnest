@@ -24,7 +24,7 @@ static void check_continuity(const char* type, const float* ins, size_t warmup) 
 
 TEST_CASE("vco migrates phase and sync edge state") {
   // vco inputs: freq, v_oct, fm, pw, pwm, sync
-  const float ins[6] = {440.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+  const float ins[7] = {440.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
   check_continuity("vco", ins, 1000);
 }
 
@@ -122,8 +122,8 @@ TEST_CASE("bern migrates decision RNG and gate edge memory") {
   auto b = info->create();
   a->init(48000.0, {});
   b->init(48000.0, {});
-  float ins[2] = {1.0f, 1.0f};
-  float out_a[2] = {}, out_b[2] = {};
+  float ins[5] = {1.0f, 1.0f};
+  float out_a[3] = {}, out_b[3] = {};
   a->process(ins, out_a);  // selected A, input left high
   b->copy_state_from(*a);
   for (int i = 0; i < 40; ++i) {
@@ -177,30 +177,63 @@ TEST_CASE("turing migrates register RNG and clock edge memory") {
   }
 }
 
-TEST_CASE("stepseq migrates position direction RNG gate and edge memories") {
+TEST_CASE("stepseq hot reload can shorten a running note list") {
+  const ModuleInfo* info = find_module("stepseq");
+  REQUIRE(info != nullptr);
+  ConfigValue steps; steps.arr = {0.1, 0.2, 0.3};
+  auto a = info->create();
+  a->init(48000.0, {{"steps", steps}});
+  float ins[4] = {}, out[5] = {};
+  for (int i = 0; i < 3; ++i) {
+    ins[0] = 0; a->process(ins, out);
+    ins[0] = 1; a->process(ins, out);
+  }
+  REQUIRE(out[0] == doctest::Approx(0.3f));
+
+  steps.arr = {0.5};
+  auto b = info->create();
+  b->init(48000.0, {{"steps", steps}});
+  b->copy_state_from(*a);
+  b->process(ins, out);  // same clock level, immediately after the swap
+  CHECK(out[0] == 0.5f);
+  CHECK(out[1] == 0.0f);
+  ins[0] = 0; b->process(ins, out);
+  ins[0] = 1; b->process(ins, out);
+  CHECK(out[0] == 0.5f);
+  CHECK(out[1] == 1.0f);
+}
+
+TEST_CASE("stepseq migrates position tick direction RNG gate and edge memories") {
   const ModuleInfo* info = find_module("stepseq");
   REQUIRE(info != nullptr);
   Config cfg;
   ConfigValue steps; steps.arr = {0.0, 0.2, 0.4, 0.7};
   ConfigValue gates; gates.arr = {1.0, 0.0, 1.0, 1.0};
+  ConfigValue lens; lens.arr = {3.0, 1.0, 2.0, 1.0};
+  ConfigValue ties; ties.arr = {0.0, 0.0, 1.0, 0.0};
   ConfigValue dir; dir.str = "random";
   ConfigValue seed; seed.num = 23.0; seed.is_num = true;
   cfg.push_back({"steps", steps}); cfg.push_back({"gates", gates});
+  cfg.push_back({"lens", lens}); cfg.push_back({"ties", ties});
   cfg.push_back({"dir", dir}); cfg.push_back({"seed", seed});
   auto a = info->create();
   auto b = info->create();
   a->init(48000.0, cfg);
   b->init(48000.0, cfg);
   float ins[4] = {1.0f, 1.0f, 4.0f, 0.1f};
-  float out_a[4] = {}, out_b[4] = {};
+  float out_a[5] = {}, out_b[5] = {};
   a->process(ins, out_a);
+  ins[1] = 0.0f;
+  for (int i = 0; i < 5; ++i) {  // land mid-way through a multi-tick step
+    ins[0] = i % 2 == 0 ? 0.0f : 1.0f;
+    a->process(ins, out_a);
+  }
   b->copy_state_from(*a);
   for (int i = 0; i < 48; ++i) {
-    if (i == 1) ins[1] = 0.0f;
     ins[0] = i % 2 == 0 ? 1.0f : 0.0f;
     a->process(ins, out_a);
     b->process(ins, out_b);
-    for (int j = 0; j < 4; ++j)
+    for (int j = 0; j < 5; ++j)
       CHECK(out_a[j] == doctest::Approx(out_b[j]));
   }
 }
@@ -215,7 +248,7 @@ TEST_CASE("svf migrates both integrator states") {
   auto b = info->create();
   a->init(48000.0, {});
   b->init(48000.0, {});
-  float ins[3] = {0.0f, 1700.0f, 0.65f};
+  float ins[4] = {0.0f, 1700.0f, 0.65f};
   float out_a[3] = {}, out_b[3] = {};
   for (int i = 0; i < 913; ++i) {
     ins[0] = (i / 16) % 2 == 0 ? 0.8f : -0.8f;
@@ -249,12 +282,12 @@ TEST_CASE("vco migrates prev_sync_ so a held sync input does not re-trigger") {
   b->init(48000.0, {});
 
   float out_a[1] = {0}, out_b[1] = {0};
-  const float ins_warm[6] = {440.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
+  const float ins_warm[7] = {440.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f};
   for (int i = 0; i < 100; ++i) a->process(ins_warm, out_a);
 
   // One sample with sync high: a rising edge, so `a` resets phase_ to 0 and
   // its prev_sync_ becomes 1.0.
-  const float ins_sync[6] = {440.0f, 0.0f, 0.0f, 0.5f, 0.0f, 1.0f};
+  const float ins_sync[7] = {440.0f, 0.0f, 0.0f, 0.5f, 0.0f, 1.0f};
   a->process(ins_sync, out_a);
 
   b->copy_state_from(*a);
@@ -428,7 +461,7 @@ TEST_CASE("ladder migrates all four stage states") {
   auto b = info->create();
   a->init(48000.0, {});
   b->init(48000.0, {});
-  float ins[4] = {0.0f, 800.0f, 0.6f, 0.0f};
+  float ins[5] = {0.0f, 800.0f, 0.6f, 0.0f};
   float out_a[1] = {0}, out_b[1] = {0};
   for (int i = 0; i < 1000; ++i) {
     ins[0] = (i / 24) % 2 == 0 ? 0.7f : -0.7f;
@@ -496,7 +529,7 @@ TEST_CASE("quant migrates changed-gate state") {
   auto b = info->create();
   a->init(48000.0, {});
   b->init(48000.0, {});
-  float ins[3] = {0.25f, 0.0f, 0.0f};
+  float ins[6] = {0.25f, 0.0f, 0.0f, 0.0f, 4095.0f, 0.0f};
   float out_a[2], out_b[2];
   a->process(ins, out_a);  // a: first_ consumed, last_q_ = 3
   b->copy_state_from(*a);
@@ -682,7 +715,6 @@ TEST_CASE("limiter migrates lookahead buffer states") {
   const float ins[4] = {0.8f, -0.5f, -6.0f, 0.05f};
   check_continuity("limiter", ins, 1000);
 }
-
 
 
 

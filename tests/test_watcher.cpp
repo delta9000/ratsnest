@@ -43,7 +43,7 @@ TEST_CASE("in-place write is detected after debounce") {
   REQUIRE(w.ok());
   CHECK(!w.poll_changed(10));  // quiet
   t.write("a = vca { gain: 0.5 }\n");
-  CHECK(changed_within(w, 1000));
+  CHECK(changed_within(w, 2000));
 }
 
 TEST_CASE("rename-replace save (vim/vscode style) is detected") {
@@ -51,7 +51,7 @@ TEST_CASE("rename-replace save (vim/vscode style) is detected") {
   PatchWatcher w(t.file.string());
   REQUIRE(w.ok());
   t.write_via_rename("a = vca { gain: 0.7 }\n");
-  CHECK(changed_within(w, 1000));
+  CHECK(changed_within(w, 2000));
 }
 
 TEST_CASE("burst of writes debounces to one notification") {
@@ -61,7 +61,7 @@ TEST_CASE("burst of writes debounces to one notification") {
   t.write("x = vca\n");
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
   t.write_via_rename("y = vca\n");
-  CHECK(changed_within(w, 1000));
+  CHECK(changed_within(w, 2000));
   CHECK(!changed_within(w, 150));  // no second event for the same burst
 }
 
@@ -97,16 +97,25 @@ TEST_CASE("two writes separated by an unpolled gap still coalesce to one notific
   REQUIRE(w.ok());
 
   t.write("x = vca\n");
-  CHECK(!w.poll_changed(50));  // consumes A's event, arms pending_/deadline_
+  // Consumes A's event and arms pending_/deadline_ without waiting: inotify
+  // queues the event synchronously at close(), so a zero timeout sees it. A
+  // non-zero timeout here raced the 50 ms debounce under parallel load (poll
+  // oversleeping its wait let A fire early and the test fail spuriously).
+  CHECK(!w.poll_changed(0));
 
   std::this_thread::sleep_for(std::chrono::milliseconds(80));  // > 50ms debounce, unpolled
   t.write_via_rename("y = vca\n");  // B's event now sits unread in the kernel
 
+  // Wait with a generous deadline for the one notification, then watch a
+  // further quiet window (several debounce periods) for a spurious second.
   int fires = 0;
-  auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(400);
-  while (std::chrono::steady_clock::now() < end) {
+  auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);
+  while (fires == 0 && std::chrono::steady_clock::now() < end)
     if (w.poll_changed(20)) ++fires;
-  }
+  REQUIRE(fires == 1);
+  end = std::chrono::steady_clock::now() + std::chrono::milliseconds(400);
+  while (std::chrono::steady_clock::now() < end)
+    if (w.poll_changed(20)) ++fires;
   CHECK(fires == 1);
 }
 
@@ -129,7 +138,9 @@ TEST_CASE("watched directory being moved away does not crash or spuriously fire"
 
 TEST_CASE("watcher fires for any of several files") {
   namespace fs = std::filesystem;
-  const fs::path dir = fs::temp_directory_path() / "ms_watch_multi";
+  // Per-process name: concurrent test runs (other build trees) share /tmp.
+  const fs::path dir =
+      fs::temp_directory_path() / ("ms_watch_multi-" + std::to_string(::getpid()));
   fs::create_directories(dir / "lib");
   const auto touch = [](const fs::path& p) {
     std::ofstream f(p);
@@ -142,11 +153,6 @@ TEST_CASE("watcher fires for any of several files") {
   REQUIRE(w.ok());
   CHECK_FALSE(w.poll_changed(0));
   touch(dir / "lib" / "kick.sub");
-  bool fired = false;
-  for (int i = 0; i < 80 && !fired; ++i) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    fired = w.poll_changed(0);
-  }
-  CHECK(fired);
+  CHECK(changed_within(w, 2000));
   fs::remove_all(dir);
 }

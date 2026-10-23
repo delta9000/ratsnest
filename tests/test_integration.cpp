@@ -1,6 +1,8 @@
 #include <doctest/doctest.h>
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <memory>
 #include <vector>
 #include "dsl/diag.h"
 #include "dsl/parser.h"
@@ -43,7 +45,7 @@ TEST_CASE("first.patch compiles and renders with sane levels") {
   const double rms = std::sqrt(sum2 / static_cast<double>(n));
   CHECK(rms > 0.05);    // audibly present
   CHECK(rms < 0.7);     // not slammed
-  CHECK(peak <= 1.0f);  // master clip respected
+  CHECK(peak <= 1.0f);  // this patch stays below unity
 }
 
 TEST_CASE("render is deterministic") {
@@ -135,4 +137,61 @@ TEST_CASE("patches/lib/kick.sub compiles standalone and renders a kick") {
   for (float v : l) peak = std::max(peak, std::abs(v));
   CHECK(peak > 0.05f);
   CHECK(peak <= 1.0f);
+}
+
+// poly-pad's `n` reaches `chord` unclamped (1..8), so every voice it can
+// stamp needs a pitch input: p5..p8 must exist, or n > 4 drones on 0 v/oct.
+TEST_CASE("patches/lib/poly-pad.sub takes a pitch per voice up to chord's eight") {
+  namespace fs = std::filesystem;
+  const auto root = fs::path(__FILE__).parent_path().parent_path();
+  const std::string patch = (root / "patches" / "pp.patch").string();
+  std::string src = "pad = sub { file: \"lib/poly-pad.sub\", n: 8 }\n1 -> pad.gate\n";
+  for (int i = 1; i <= 8; ++i)
+    src += "0." + std::to_string(i) + " -> pad.p" + std::to_string(i) + "\n";
+  src += "pad -> out.in : 0.1\n";
+  auto b = graph::build_patch(src, patch, 48000.0);
+  REQUIRE_MESSAGE(b.compiled.ok(), b.compiled.errors[0].msg);
+  // Each voice's pitch reaches its own stamped synth-voice.
+  engine::Engine e(std::move(b.compiled.graph));
+  std::vector<float> l(64), r(64);
+  e.process(l.data(), r.data(), l.size());
+  const graph::Graph& g = e.graph();
+  int voices = 0;
+  for (size_t i = 0; i < g.nodes.size(); ++i)
+    if (g.nodes[i].info->type == std::string("chord"))
+      for (int v = 0; v < 8; ++v)
+        voices += e.output_value(i, static_cast<size_t>(8 + v)) == doctest::Approx(0.1 * (v + 1));
+  CHECK(voices == 8);
+}
+
+// `render --start` runs the graph from zero and throws the skipped samples
+// away -- a stateful graph has no seek. That is only honest if block size
+// cannot change the result, so pin it: a chunked skip followed by a capture
+// must be bit-identical to the tail of one long pass.
+TEST_CASE("chunked skip then capture equals the tail of one pass") {
+  auto build = [] {
+    auto p = dsl::parse(kFirstPatch);
+    REQUIRE(p.ok());
+    auto c = graph::compile(p.ast, 48000.0);
+    REQUIRE(c.ok());
+    return std::make_unique<engine::Engine>(std::move(c.graph));
+  };
+  const size_t skip = 3000, keep = 1024;  // skip is not a chunk multiple
+
+  auto full = build();
+  std::vector<float> fl(skip + keep), fr(skip + keep);
+  full->process(fl.data(), fr.data(), skip + keep);
+
+  auto offset = build();
+  std::vector<float> sl(256), sr(256);
+  for (size_t done = 0; done < skip;) {
+    const size_t n = std::min<size_t>(256, skip - done);
+    offset->process(sl.data(), sr.data(), n);
+    done += n;
+  }
+  std::vector<float> ol(keep), orr(keep);
+  offset->process(ol.data(), orr.data(), keep);
+
+  CHECK(std::vector<float>(fl.begin() + static_cast<long>(skip), fl.end()) == ol);
+  CHECK(std::vector<float>(fr.begin() + static_cast<long>(skip), fr.end()) == orr);
 }

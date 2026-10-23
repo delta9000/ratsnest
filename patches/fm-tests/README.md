@@ -26,13 +26,13 @@ hot-reload; the header comment in each file says what it exercises.
 | 12 | `fixed-click` | `fixed[]` pitch-pinned op, custom route | metallic attack transient |
 | 13 | `custom-exotic` | `custom` route, two converging chains, Kahn topo order | dense two-path timbre |
 | 14 | `sync-off-drift` | `sync: off` vs `on` (repeated strikes) | phase-drift transients |
-| 15 | `fallback-free` | malformed cyclic `route` → graceful `free` fallback | proves rule 6 (never dies) |
+| 15 | `custom-route` | validated custom route, extra carriers | mixed FM/additive voice |
 
 ## Suggested tweak points (hot-reload while playing)
 
 - **Algorithm:** swap `algo:` between `free`/`triad`/`dual`/`cascade`/`crown`/`weave`.
 - **Brightness:** raise a modulator's `levels[]` entry (drives the FM index up).
 - **Inharmonicity:** nudge `ratios[]` off integers (e.g. `1.41`, `3.14`).
-- **Feedback:** raise a `fb[]` entry (0..0.999) — small changes matter near the top.
+- **Feedback:** raise a `fb[]` entry (0..1) — sine → saw by ~0.6–0.8; only past ~0.9 does it turn to noise.
 - **Decay:** lengthen `t3`/`t4`; use `curve: log` for a natural percussive fall.
 - **14/15:** flip `sync: off`→`on` (14) or fix the `route` (15) to hear the contrast.

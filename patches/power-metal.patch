@@ -129,7 +129,7 @@ gallop = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 1] }
 clk -> gallop.clock
 half = stepseq { steps: [0, 0, 0, 0], gates: [1, 0, 1, 0] }
 beat -> half.clock
-strike_src = switch { mode: addr, n: 2 }
+strike_src = switch { mode: addr, n: 2, fade: 0 }
 gallop.trig -> strike_src.in1
 half.trig   -> strike_src.in2
 arr_halftime.cv -> strike_src.addr     # 0 = gallop, 1 = half-time
@@ -194,14 +194,14 @@ renv -> ride.cv : 0.5
 crash_gate = logic { op: and }
 bar -> crash_gate.a
 arr_chorus.cv -> crash_gate.b
-crenv = func { rise: 0.001s, fall: 0.9s, curve: exp }
+crenv = func { rise: 0.001s, fall: 2.7s, curve: exp }
 crash_gate -> crenv.trig
 crz = noise { color: white, seed: 21 }
 crhp = svf { cutoff: 5500hz, res: 0.1 }
 crz -> crhp.in
 crash = vca { gain: 0 }
 crhp.hp -> crash.in
-crenv -> crash.cv : 0.6
+crenv -> crash.cv : 0.84
 
 cyms = mix { levels: [0.9, 0.5, 0.7] }
 hats -> cyms.in1
@@ -277,7 +277,7 @@ pad3 -> pad_tone.in3
 pad_fil = svf { cutoff: 700, res: 0.2 }
 pad_tone -> pad_fil.in
 pad_env = adsr { attack: 0.6, decay: 0.4, sustain: 0.8, release: 1.6,
-                curve: exp }
+                curve: quad }
 bar -> pad_env.gate
 pad_amp = vca { gain: 0, response: exp }
 pad_fil.lp -> pad_amp.in
@@ -304,11 +304,11 @@ bseq = stepseq {
 }
 beat -> aseq.clock
 eighth -> bseq.clock
-lpick = switch { mode: addr, n: 2 }
+lpick = switch { mode: addr, n: 2, fade: 0 }
 aseq.cv  -> lpick.in1
 bseq.cv  -> lpick.in2
 arr_solo.cv -> lpick.addr           # 0 = A phrase, 1 = B phrase
-lgate_src = switch { mode: addr, n: 2 }
+lgate_src = switch { mode: addr, n: 2, fade: 0 }
 aseq.trig -> lgate_src.in1
 bseq.trig -> lgate_src.in2
 arr_solo.cv -> lgate_src.addr
@@ -392,7 +392,7 @@ master_dc = dcblock { cutoff: 12hz }
 master_l -> master_dc.in_l
 master_r -> master_dc.in_r
 master_comp = compressor { threshold: -14, ratio: 2.0, knee: 4,
-                           attack: 0.015, release: 0.12, makeup: 0.5, mix: 0.6 }
+                           attack: 0.015, release: 0.12, makeup: 2.7, mix: 0.6 }
 master_dc.out_l -> master_comp.in_l
 master_dc.out_r -> master_comp.in_r
 

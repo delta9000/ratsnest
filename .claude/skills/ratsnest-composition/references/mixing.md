@@ -52,12 +52,12 @@ kick_env -> master_mix.lvl6 : -0.14  # delay R
 
 # 3. bus glue with an external sidechain
 glue = compressor { sidechain: external, threshold: -16, ratio: 2.4,
-                    knee: 5, attack: 0.012, release: 0.14, makeup: 1.5, mix: 0.85 }
+                    knee: 5, attack: 0.012, release: 0.14, makeup: 7.0, mix: 0.85 }
 kick_drive -> glue.side_l : 0.7
 kick_drive -> glue.side_r : 0.7
 ```
 
-The duck envelope is a `func { rise: 0.004, fall: 0.28, curve: exp }` on the
+The duck envelope is a `func { rise: 0.004, fall: 0.84, curve: exp }` on the
 quarter clock — not the kick audio. That gives you a clean, adjustable shape
 and no bleed. If the arrangement drops the kick, gate the duck envelope with
 the kick's arrangement lane or the breakdown will pump against nothing.

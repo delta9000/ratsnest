@@ -46,4 +46,7 @@ struct CompileResult {
 
 CompileResult compile(const dsl::PatchAst& ast, double sample_rate);
 
+// Every registered module type, in registry order (for "did you mean").
+std::vector<std::string> module_types();
+
 }  // namespace ms::graph

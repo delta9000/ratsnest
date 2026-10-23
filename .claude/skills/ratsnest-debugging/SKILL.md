@@ -15,27 +15,34 @@ how a two-minute bug becomes an hour.
 
 ## The solo probe — the one technique
 
-Comment out the patch's final output cables, append one cable from the element
-you suspect, and render. Nothing else changes, so the element is measured in
-its real context with its real modulation.
+Tap the element you suspect: `render --tap` captures any endpoint in its real
+context, with its real modulation, while the mix renders unchanged. No probe
+copy of the patch, no `rec` sinks, no numpy.
 
 ```bash
-sed 's|^dc.out_l -> out.left|# &|; s|^dc.out_r -> out.right|# &|' x.patch > _probe.patch
-printf '\nbass_amp -> out.in\n' >> _probe.patch
-./build/ratsnest render _probe.patch -d 20s -o /tmp/p.wav --stats
+./build/ratsnest render x.patch -d 20s -o /tmp/p.wav --stats 4s \
+    --tap bass_amp --tap f=bass_f.lp --tap bass --tap strip=bass_s
 ```
 
-Walk it down the chain — `bass_amp`, then `bass_f.lp`, then `bass` — and the
-first stage that reads −240 dBFS is where the signal dies. Two or three probes
-localizes any silence.
+Each tap writes `/tmp/p.<name>.wav` (stereo when the endpoint has `l`/`r` or
+`out_l`/`out_r`, as a strip or a mixer does) and prints its own
+peak/RMS/DC block over the same windows as the mix. `NAME` alone taps the
+node of that name (a sub's first output, a module's default port);
+`NAME=node.port` names the port. Walk the chain in one render — `bass_amp`,
+`bass_f.lp`, `bass` — and the first block that reads −240 dBFS is where the
+signal dies. A tap reads the endpoint itself, before the gain on any cable
+out of it, and a typo fails with a did-you-mean, as a cable would.
 
-Keep probes in the same directory as the patch: `sub { file: }` paths resolve
-relative to the file, so a probe copied to `/tmp` will fail to find its
-subpatches and you will debug the wrong thing.
+**Probe every element once before mixing.** One render with a tap per part
+gives each part's level per section — the table that turns mixing from
+guesswork into arithmetic, and how you discover that one voice is 20 dB down
+before you spend an hour on its send level. On a song, set `--stats` to the
+section length (or a bar multiple) so the windows are the sections.
 
-**Probe every element once before mixing.** A table of each voice's solo peak
-and RMS turns mixing from guesswork into arithmetic, and it is how you discover
-that one voice is 20 dB down before you spend an hour on its send level.
+To hear an element *alone through the master* (its effect on the limiter,
+not just its level), the old probe still works: copy the patch next to
+itself (`sub { file: }` paths resolve relative to the file), comment out the
+final `out` cables and append `bass_amp -> out.in`.
 
 ## Bisect, don't scan
 

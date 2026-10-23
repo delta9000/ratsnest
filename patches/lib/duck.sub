@@ -1,0 +1,56 @@
+# duck.sub -- sidechain pump as a RELATIVE gain: a kick trigger dips the
+# gain to `depth_db` and it recovers over `release`. Feed `gain` to a
+# strip's `duck` (or any vca `cv` with `gain: 0`), so the depth stays
+# `depth_db` whatever level the part's lane sets -- unlike cabling a negative
+# envelope onto `mix.lvlN`, which subtracts an absolute amount and ducks a
+# quiet section deeper than a loud one (or mutes it outright).
+#
+#   pump = sub { file: "lib/duck.sub", depth_db: -9, release: 0.3 }
+#   song.gate1 -> pump.trig
+#   pump -> bass_strip.duck
+#
+# Input `trig` (rising edge; a tracker gate or a kick trigger), `amount`
+# (0..1, default 1, scales the depth -- a form lane can fade the pump in and
+# out). Output `gain`: 1 at rest, 10^(depth_db/20) at the bottom of the dip.
+# With no triggers (a kick-less section) it sits at exactly 1.
+#
+# Shape: an attack/release envelope mapped linearly in dB, gain =
+# 2^(env x amount x depth_db / 6.02). With `curve: lin` (default) the gain
+# climbs back in a straight line in dB and is home at `release`; `curve: exp`
+# snaps back faster (half the depth at release/10, -60 dB of the envelope at
+# `release`), the classic quick-pump shape for long releases.
+#
+# Different parts usually want different depths (bass deep, pad lighter,
+# returns light): one instance per depth -- three nodes each.
+#
+# Measured, demo below: at the default -6 dB a 120 BPM trigger dips the
+# gain to 0.501 (-6.0 dB) and it is back to 0.99 by 0.25 s.
+
+depth_db = param { default: -6 }     # dip at full amount, dB (negative)
+attack   = param { default: 0.004 }  # seconds into the dip
+release  = param { default: 0.25 }   # seconds back to unity
+curve    = param { default: lin }    # func curve: lin, exp, log, quad
+
+trig   = input {}
+amount = input { default: 1 }
+gain   = output {}
+
+env = func { rise: attack, fall: release, curve: curve }
+trig -> env.trig
+# env x depth_db x amount / 6.0206 dB per octave of gain.
+db = math { op: mult }
+env -> db.a : depth_db
+amount -> db.b : 0.166096405
+g = math { op: exp2 }
+db -> g.a
+g -> gain.in
+
+# Audition: `mise run play -- patches/lib/duck.sub` -- a sustained saw
+# pumped by a 120 BPM trigger.
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+demo.saw = vco { freq: 110hz, wave: saw }
+demo.amp = vca { gain: 0 }
+demo.saw -> demo.amp.in : 0.5
+gain -> demo.amp.cv
+demo.amp -> demo.out.in

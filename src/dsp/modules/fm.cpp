@@ -13,7 +13,9 @@
 #include <numbers>
 #include <utility>
 #include <vector>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
@@ -23,9 +25,18 @@ constexpr float kTwoPi = 2.0f * std::numbers::pi_v<float>;
 // Phase deviation carried by a level-1 modulator at envelope peak: ±4π rad
 // (modulation index ≈ 12.6), the classic instruments' ballpark maximum.
 constexpr float kIndex = 4.0f * std::numbers::pi_v<float>;
+// Self-feedback: phase deviation β = kFbIndex * fb * (y[n-1] + y[n-2]) / 2,
+// y = the op's enveloped waveform (before its level, so fb means the same
+// timbre on a quiet modulator as on a loud carrier). Averaging the last two
+// outputs is Tomisawa's anti-hunting fix (US 4,249,447; docs/attribution.md):
+// one previous sample alone flips sign every sample once β passes ~1.2 and
+// collapses to noise. Averaged, the spectrum stays harmonic (sine -> saw,
+// ~1/n) to β ≈ 2; past ~2.25 it turns to noise, so fb 0..1 spends only its
+// top ~10% there.
+constexpr double kFbIndex = 2.5;
 
 constexpr InputInfo kIns[] = {
-    {"gate", 0.f},   {"freq", 440.f}, {"v_oct", 0.f},  {"vel", 1.f},
+    {"gate", 0.f},   {"freq", 220.f}, {"v_oct", 0.f},  {"vel", 1.f},
     {"lvl1", 0.f},   {"lvl2", 0.f},   {"lvl3", 0.f},   {"lvl4", 0.f},
     {"lvl5", 0.f},   {"lvl6", 0.f},   {"ratio1", 0.f}, {"ratio2", 0.f},
     {"ratio3", 0.f}, {"ratio4", 0.f}, {"ratio5", 0.f}, {"ratio6", 0.f},
@@ -35,30 +46,20 @@ constexpr InputInfo kIns[] = {
     {"fbmod", 0.f}};
 constexpr const char* kAlgos[] = {"free",  "triad", "dual", "cascade",
                                   "crown", "weave", "custom", nullptr};
-constexpr const char* kCurves[] = {"lin", "exp", "log", nullptr};
+constexpr const char* kCurves[] = {"lin", "exp", "log", "quad", nullptr};
 constexpr const char* kSyncs[] = {"on", "off", nullptr};
 constexpr const char* kWaves[] = {"sine", "half", "abs", "quarter", "fold", nullptr};
 constexpr ConfigInfo kCfg[] = {
-    {"algo", kAlgos},    {"route", nullptr}, {"ratios", nullptr},
-    {"levels", nullptr}, {"fixed", nullptr}, {"fb", nullptr},
-    {"vel_sens", nullptr},
-    {"t1", nullptr},     {"t2", nullptr},    {"t3", nullptr},
-    {"t4", nullptr},     {"l1", nullptr},    {"l2", nullptr},
-    {"l3", nullptr},     {"curve", kCurves}, {"sync", kSyncs},
-    {"waves", nullptr},  {"key_break", nullptr},
-    {"key_level", nullptr}, {"key_rate", nullptr}};
+    {"algo", kAlgos},    {"route", nullptr, ConfigKind::Numbers}, {"ratios", nullptr, ConfigKind::Numbers},
+    {"levels", nullptr, ConfigKind::Numbers}, {"fixed", nullptr, ConfigKind::Numbers}, {"fb", nullptr, ConfigKind::Numbers},
+    {"vel_sens", nullptr, ConfigKind::Numbers},
+    {"t1", nullptr, ConfigKind::Numbers},     {"t2", nullptr, ConfigKind::Numbers},    {"t3", nullptr, ConfigKind::Numbers},
+    {"t4", nullptr, ConfigKind::Numbers},     {"l1", nullptr, ConfigKind::Numbers},    {"l2", nullptr, ConfigKind::Numbers},
+    {"l3", nullptr, ConfigKind::Numbers},     {"curve", kCurves}, {"sync", kSyncs},
+    {"waves", kWaves, ConfigKind::Enums},  {"key_break", nullptr},
+    {"key_level", nullptr, ConfigKind::Numbers}, {"key_rate", nullptr, ConfigKind::Numbers}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"op1"}, {"op2"}, {"op3"},
                                 {"op4"}, {"op5"}, {"op6"}};
-
-// NaN-proof clamps: NaN collapses to lo.
-float clampn(float x, float lo, float hi) {
-  if (!(x >= lo)) return lo;
-  return x > hi ? hi : x;
-}
-double clampd(double x, double lo, double hi) {
-  if (!(x >= lo)) return lo;
-  return x > hi ? hi : x;
-}
 
 struct OpEnv {
   enum class Stage { Idle, S1, S2, S3, Hold, Rel };
@@ -70,12 +71,6 @@ struct EnvCfg {
   std::array<double, 4> t{};  // segment times, seconds
   std::array<double, 3> l{};  // S1..S3 target levels
 };
-
-double env_shape(int curve, double x) {
-  if (curve == 1) return x * x;
-  if (curve == 2) return std::sqrt(x);
-  return x;
-}
 
 // Operator waveform, θ in [0,1). Each is DC-centered (one-period mean
 // subtracted) so rectified shapes add no DC to carriers and no constant phase
@@ -94,11 +89,12 @@ float op_wave(int w, float th) {
     default: return std::sin(kTwoPi * th);                                 // sine
   }
 }
-// Same contract as adsr: double accumulation — float increments stall past
-// 2^25 samples and the envelope would freeze short of its target.
-double env_increment(double seconds, double rate) {
-  const double samples = std::max(seconds, 0.0) * rate;
-  return samples <= 1.0 ? 1.0 : 1.0 / samples;
+// Operator output for phase angle A (radians, unwrapped).
+float wave_sample(int w, float A) {
+  if (w == 0) return std::sin(A);  // bit-identical to the pre-waveform path
+  float th = A * (0.5f / std::numbers::pi_v<float>);  // A / 2π, in cycles
+  th -= std::floor(th);
+  return op_wave(w, th);
 }
 void env_gate(OpEnv& e, bool rising, bool falling) {
   using S = OpEnv::Stage;
@@ -115,7 +111,7 @@ void env_gate(OpEnv& e, bool rising, bool falling) {
 bool env_segment(OpEnv& e, double target, double seconds, int curve,
                  double rate) {
   e.progress = std::min(1.0, e.progress + env_increment(seconds, rate));
-  e.level = e.start + (target - e.start) * env_shape(curve, e.progress);
+  e.level = e.start + (target - e.start) * env_curve(curve, e.progress, target > e.start);
   if (e.progress < 1.0) return false;
   e.level = target;
   e.start = target;
@@ -179,57 +175,50 @@ std::vector<Edge> parse_route(const std::vector<double>& route) {
   return edges;
 }
 
+std::string validate(const Config& cfg) {
+  for (const auto& [name, value] : cfg) {
+    if (name != "route" && (value.arr.size() > kOps || value.strs.size() > kOps))
+      return "'" + name + "' accepts at most 6 operator entries";
+  }
+  const auto& route = cfg_arr(cfg, "route");
+  if (route.empty()) return {};
+  if (cfg_str(cfg, "algo", "free") != "custom")
+    return "'route' requires algo: custom";
+  const auto edges = parse_route(route);
+  if (edges.size() * 2 != route.size())
+    return "'route' expects distinct operator pairs 1..6, without self-edges (use fb)";
+  std::array<int, kOps> indegree{};
+  for (auto [s, d] : edges) { (void)s; ++indegree[static_cast<size_t>(d)]; }
+  for (int count = 0; count < kOps; ++count) {
+    auto it = std::find(indegree.begin(), indegree.end(), 0);
+    if (it == indegree.end()) return "'route' contains a cycle; use fb for operator self-feedback";
+    const int src = static_cast<int>(it - indegree.begin());
+    *it = -1;
+    for (auto [s, d] : edges)
+      if (s == src) --indegree[static_cast<size_t>(d)];
+  }
+  return {};
+}
+
 class Fm final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = rate;
-    const std::string algo = cfg_str(cfg, "algo", "free");
-    for (int i = 0; kAlgos[i]; ++i)
-      if (algo == kAlgos[i]) algo_ = i;
-    const std::string curve = cfg_str(cfg, "curve", "lin");
-    for (int i = 0; kCurves[i]; ++i)
-      if (curve == kCurves[i]) curve_ = i;
-    sync_ = cfg_str(cfg, "sync", "on") != "off";
+    algo_ = cfg_enum(cfg, "algo", kAlgos);
+    curve_ = cfg_enum(cfg, "curve", kCurves);
+    // Key sync resets phases when the voice is quieter than this; off: never.
+    sync_floor_ = 1e-3 * static_cast<double>(cfg_str(cfg, "sync", "on") != "off");
 
     fill(cfg, "ratios", ratios_, 1.0, 0.0, 1e9);
-    const auto& levels = cfg_arr(cfg, "levels");
-    for (int k = 0; k < kOps; ++k)
-      levels_[static_cast<size_t>(k)] =
-          k < static_cast<int>(levels.size())
-              ? clampd(levels[static_cast<size_t>(k)], 0.0, 1.0)
-              : (k == 0 ? 1.0 : 0.0);
+    fill(cfg, "levels", levels_, 0.0, 0.0, 1.0);
+    if (cfg_arr(cfg, "levels").empty()) levels_[0] = 1.0;  // a lone carrier
     fill(cfg, "fixed", fixed_, 0.0, 0.0, 1e9);
-    fill(cfg, "fb", fb_, 0.0, 0.0, 0.999);
+    fill(cfg, "fb", fb_, 0.0, 0.0, 1.0);
     fill(cfg, "vel_sens", vel_sens_, 0.0, 0.0, 1.0);
-
-    static const double kTDef[4] = {0.002, 0.1, 0.4, 0.2};
-    static const double kLDef[3] = {1.0, 0.75, 0.5};
-    const char* tn[4] = {"t1", "t2", "t3", "t4"};
-    const char* ln[3] = {"l1", "l2", "l3"};
-    for (int k = 0; k < kOps; ++k) {
-      for (int s = 0; s < 4; ++s) {
-        const auto& a = cfg_arr(cfg, tn[s]);
-        env_cfg_[static_cast<size_t>(k)].t[static_cast<size_t>(s)] =
-            k < static_cast<int>(a.size())
-                ? std::max(0.0, a[static_cast<size_t>(k)])
-                : kTDef[s];
-      }
-      for (int s = 0; s < 3; ++s) {
-        const auto& a = cfg_arr(cfg, ln[s]);
-        env_cfg_[static_cast<size_t>(k)].l[static_cast<size_t>(s)] =
-            k < static_cast<int>(a.size())
-                ? clampd(a[static_cast<size_t>(k)], 0.0, 1.0)
-                : kLDef[s];
-      }
-    }
-
+    load_envelopes(cfg);
     const auto& wv = cfg_str_arr(cfg, "waves");
-    for (int k = 0; k < kOps; ++k) {
-      waves_[static_cast<size_t>(k)] = 0;  // sine (also the unknown-name fallback)
-      if (k < static_cast<int>(wv.size()))
-        for (int i = 0; kWaves[i]; ++i)
-          if (wv[static_cast<size_t>(k)] == kWaves[i]) waves_[static_cast<size_t>(k)] = i;
-    }
+    for (size_t k = 0; k < kOps; ++k)  // sine is also the unknown-name fallback
+      waves_[k] = k < wv.size() ? enum_index(kWaves, wv[k]) : 0;
 
     key_break_ = cfg_num(cfg, "key_break", 0.0);
     fill(cfg, "key_level", key_level_, 0.0, -8.0, 8.0);
@@ -242,7 +231,8 @@ class Fm final : public Module {
 
     for (auto& e : envs_) e = OpEnv{};
     phase_.fill(0.0);
-    prev_post_.fill(0.0f);
+    fb1_.fill(0.0f);
+    fb2_.fill(0.0f);
     prev_gate_ = 0.0f;
   }
 
@@ -252,76 +242,23 @@ class Fm final : public Module {
     const bool rising = high && prev_gate_ <= 0.5f;
     const bool falling = !high && prev_gate_ > 0.5f;
     prev_gate_ = gate;
-    if (rising) {
-      if (sync_) phase_.fill(0.0);
-      // Latch keyboard scaling from v_oct for the whole note (DX-style): a
-      // mid-note pitch glide bends pitch without warping level or envelope.
-      const double d =
-          static_cast<double>(clampn(ins[2], -24.f, 24.f)) - key_break_;
-      for (int k = 0; k < kOps; ++k) {
-        level_scale_[static_cast<size_t>(k)] =
-            clampd(std::exp2(key_level_[static_cast<size_t>(k)] * d), 0.0, 16.0);
-        time_scale_[static_cast<size_t>(k)] =
-            clampd(std::exp2(-key_rate_[static_cast<size_t>(k)] * d), 1e-3, 1e3);
-      }
-    }
+    if (rising) note_on(ins[2]);
     for (auto& e : envs_) env_gate(e, rising, falling);
 
-    const double base =
-        static_cast<double>(clampn(ins[1], 0.0f, 0.45f * static_cast<float>(rate_))) *
-        std::exp2(static_cast<double>(clampn(ins[2], -24.f, 24.f)));
-    const float vel = clampn(ins[3], 0.0f, 1.0f);
-    const float fb_cv = ins[16];
+    const double base = base_freq(ins[1], ins[2]);
+    const float vel = clamp_nan(ins[3], 0.0f, 1.0f);
 
     std::array<double, kOps> post{};
-    for (int oi = 0; oi < kOps; ++oi) {
-      const int k = order_[static_cast<size_t>(oi)];
-      const double ratio =
-          fixed_[static_cast<size_t>(k)] > 0.0
-              ? 0.0
-              : static_cast<double>(clampn(
-                    static_cast<float>(ratios_[static_cast<size_t>(k)]) + ins[10 + k],
-                    0.0f, 1e9f));
-      const double f = fixed_[static_cast<size_t>(k)] > 0.0
-                           ? std::min(fixed_[static_cast<size_t>(k)], 0.45 * rate_)
-                           : base * ratio;
-      phase_[static_cast<size_t>(k)] += f / rate_;
-      phase_[static_cast<size_t>(k)] -= std::floor(phase_[static_cast<size_t>(k)]);
-
-      const double lvl =
-          static_cast<double>(clampn(
-              static_cast<float>(levels_[static_cast<size_t>(k)]) + ins[4 + k],
-              0.0f, 1.0f)) *
-          (1.0 - vel_sens_[static_cast<size_t>(k)] +
-           vel_sens_[static_cast<size_t>(k)] * static_cast<double>(vel)) *
-          level_scale_[static_cast<size_t>(k)];
-      env_tick(envs_[static_cast<size_t>(k)], env_cfg_[static_cast<size_t>(k)],
-               curve_, rate_, time_scale_[static_cast<size_t>(k)]);
-      const double fb_amt = static_cast<double>(
-          clampn(static_cast<float>(fb_[static_cast<size_t>(k)]) + fb_cv, 0.0f, 0.999f));
-      double mod = fb_amt > 0.0
-                       ? fb_amt * static_cast<double>(prev_post_[static_cast<size_t>(k)])
-                       : 0.0;
-      for (int p : preds_[static_cast<size_t>(k)]) mod += post[static_cast<size_t>(p)];
-      const float A = kTwoPi * static_cast<float>(phase_[static_cast<size_t>(k)]) +
-                      kIndex * static_cast<float>(mod);
-      float s;
-      if (waves_[static_cast<size_t>(k)] == 0) {
-        s = std::sin(A);  // bit-identical to the pre-waveform path
-      } else {
-        float th = A * (0.5f / std::numbers::pi_v<float>);  // A / 2π, in cycles
-        th -= std::floor(th);
-        s = op_wave(waves_[static_cast<size_t>(k)], th);
-      }
-      post[static_cast<size_t>(k)] =
-          envs_[static_cast<size_t>(k)].level * lvl * static_cast<double>(s);
-      outs[1 + k] = static_cast<float>(post[static_cast<size_t>(k)]);
+    for (const int op : order_) {
+      const auto k = static_cast<size_t>(op);
+      post[k] = operator_sample(k, ins, base, vel, post);
+      outs[1 + k] = static_cast<float>(post[k]);
     }
     float out = 0.0f;
-    for (int k = 0; k < kOps; ++k) {
-      if (carrier_[static_cast<size_t>(k)])
-        out += static_cast<float>(post[static_cast<size_t>(k)]);
-      prev_post_[static_cast<size_t>(k)] = static_cast<float>(post[static_cast<size_t>(k)]);
+    for (size_t k = 0; k < kOps; ++k) {
+      if (carrier_[k]) out += static_cast<float>(post[k]);
+      fb2_[k] = fb1_[k];
+      fb1_[k] = tap_[k];
     }
     outs[0] = out;
   }
@@ -330,13 +267,83 @@ class Fm final : public Module {
     const auto& o = static_cast<const Fm&>(other);
     envs_ = o.envs_;
     phase_ = o.phase_;
-    prev_post_ = o.prev_post_;
+    fb1_ = o.fb1_;
+    fb2_ = o.fb2_;
     prev_gate_ = o.prev_gate_;
     level_scale_ = o.level_scale_;
     time_scale_ = o.time_scale_;
   }
 
  private:
+  // Latch keyboard scaling from v_oct for the whole note (DX-style): a
+  // mid-note pitch glide bends pitch without warping level or envelope.
+  void note_on(float v_oct) {
+    if (loudness() < sync_floor_) phase_.fill(0.0);
+    const double d = static_cast<double>(clamp_nan(v_oct, -24.f, 24.f)) - key_break_;
+    for (size_t k = 0; k < kOps; ++k) {
+      level_scale_[k] = clamp_nan(std::exp2(key_level_[k] * d), 0.0, 16.0);
+      time_scale_[k] = clamp_nan(std::exp2(-key_rate_[k] * d), 1e-3, 1e3);
+    }
+  }
+
+  // Key sync resets phases only from silence (every carrier's envelope times
+  // its configured level below -60 dB): resetting a still-ringing voice steps
+  // its output, a click.
+  double loudness() const {
+    double loud = 0.0;
+    for (size_t k = 0; k < kOps; ++k)
+      loud = std::max(loud, carrier_[k] * envs_[k].level * levels_[k] * level_scale_[k]);
+    return loud;
+  }
+
+  // Operator k's output this sample. `post` holds this sample's outputs of
+  // the operators already run (every modulator of k, by build_order).
+  double operator_sample(size_t k, const float* ins, double base, float vel,
+                         const std::array<double, kOps>& post) {
+    const double ratio =
+        fixed_[k] > 0.0
+            ? 0.0
+            : static_cast<double>(clamp_nan(
+                  static_cast<float>(ratios_[k]) + ins[10 + k], 0.0f, 1e9f));
+    const double f = fixed_[k] > 0.0 ? std::min(fixed_[k], 0.45 * rate_) : base * ratio;
+    phase_[k] += f / rate_;
+    phase_[k] -= std::floor(phase_[k]);
+
+    const double lvl =
+        static_cast<double>(clamp_nan(static_cast<float>(levels_[k]) + ins[4 + k], 0.0f, 1.0f)) *
+        (1.0 - vel_sens_[k] + vel_sens_[k] * static_cast<double>(vel)) * level_scale_[k];
+    env_tick(envs_[k], env_cfg_[k], curve_, rate_, time_scale_[k]);
+    const double fb_amt = static_cast<double>(
+        clamp_nan(static_cast<float>(fb_[k]) + ins[16], 0.0f, 1.0f));
+    double mod = 0.0;
+    for (int p : preds_[k]) mod += post[static_cast<size_t>(p)];
+    float A = kTwoPi * static_cast<float>(phase_[k]) + kIndex * static_cast<float>(mod);
+    if (fb_amt > 0.0)  // fb 0 skips the term entirely: bit-identical to no feedback
+      A += static_cast<float>(kFbIndex * fb_amt * 0.5 *
+                              static_cast<double>(fb1_[k] + fb2_[k]));
+    const auto w = static_cast<double>(wave_sample(waves_[k], A));
+    tap_[k] = static_cast<float>(envs_[k].level * w);
+    return envs_[k].level * lvl * w;
+  }
+
+ private:
+  // t1..t4 segment times and l1..l3 levels, one entry per operator.
+  void load_envelopes(const Config& cfg) {
+    static const double kTDef[4] = {0.002, 0.1, 0.4, 0.2};
+    static const double kLDef[3] = {1.0, 0.75, 0.5};
+    static const char* const kTNames[4] = {"t1", "t2", "t3", "t4"};
+    static const char* const kLNames[3] = {"l1", "l2", "l3"};
+    std::array<double, kOps> v{};
+    for (size_t s = 0; s < 4; ++s) {
+      fill(cfg, kTNames[s], v, kTDef[s], 0.0, HUGE_VAL);
+      for (size_t k = 0; k < kOps; ++k) env_cfg_[k].t[s] = v[k];
+    }
+    for (size_t s = 0; s < 3; ++s) {
+      fill(cfg, kLNames[s], v, kLDef[s], 0.0, 1.0);
+      for (size_t k = 0; k < kOps; ++k) env_cfg_[k].l[s] = v[k];
+    }
+  }
+
   static void fill(const Config& cfg, const char* name,
                    std::array<double, kOps>& dst, double def, double lo,
                    double hi) {
@@ -344,7 +351,7 @@ class Fm final : public Module {
     for (int k = 0; k < kOps; ++k)
       dst[static_cast<size_t>(k)] =
           k < static_cast<int>(a.size())
-              ? clampd(a[static_cast<size_t>(k)], lo, hi)
+              ? clamp_nan(a[static_cast<size_t>(k)], lo, hi)
               : def;
   }
 
@@ -381,10 +388,20 @@ class Fm final : public Module {
       carrier_[static_cast<size_t>(k)] = !has_out[static_cast<size_t>(k)];
   }
 
+  // freq * 2^v_oct, memoized while both hold still (skips exp2 per sample).
+  double base_freq(float freq, float v_oct) {
+    if (pitch_key_.changed({freq, v_oct}))
+      base_ = static_cast<double>(clamp_nan(freq, 0.0f, 0.45f * static_cast<float>(rate_))) *
+              std::exp2(static_cast<double>(clamp_nan(v_oct, -24.f, 24.f)));
+    return base_;
+  }
+
   double rate_ = 48000.0;
+  InputKey<2> pitch_key_;  // freq, v_oct -> base_
+  double base_ = 0.0;
   int algo_ = 0;
   int curve_ = 0;
-  bool sync_ = true;
+  double sync_floor_ = 1e-3;
   std::array<double, kOps> ratios_{}, levels_{}, fixed_{}, fb_{}, vel_sens_{};
   std::array<int, kOps> waves_{};
   double key_break_ = 0.0;
@@ -398,12 +415,13 @@ class Fm final : public Module {
   // runtime state (migrated on hot reload)
   std::array<OpEnv, kOps> envs_{};
   std::array<double, kOps> phase_{};
-  std::array<float, kOps> prev_post_{};
+  std::array<float, kOps> tap_{};            // this sample's feedback tap (scratch)
+  std::array<float, kOps> fb1_{}, fb2_{};    // feedback taps y[n-1], y[n-2]
   float prev_gate_ = 0.0f;
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Fm>(); }
 }  // namespace
 
-const ModuleInfo fm_info{"fm", kIns, kCfg, kOuts, &make};
+const ModuleInfo fm_info{"fm", kIns, kCfg, kOuts, &make, false, false, &validate};
 }  // namespace ms::dsp

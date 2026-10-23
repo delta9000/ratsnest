@@ -171,3 +171,27 @@ TEST_CASE("overdrive state migrates across instances") {
     CHECK(ya == doctest::Approx(yb).epsilon(1e-4));
   }
 }
+
+// Drive is read at block rate (32 samples); a stepped pre-gain into the
+// shaper buzzes at rate/32 under modulation. The per-sample ramp spreads each
+// change across the block, so no block phase carries a larger jump. (Input
+// and LFO rates are chosen incommensurate with the 32-sample block.)
+TEST_CASE("overdrive drive modulation does not zipper at block boundaries") {
+  OdRig rig("tubescreamer");
+  double phase_d1[32] = {};
+  double y1 = 0.0;
+  for (int i = 0; i < 48000; ++i) {
+    const double t = static_cast<double>(i) / 48000.0;
+    rig.ins[0] = static_cast<float>(0.3 * std::sin(2.0 * std::numbers::pi * 110.3 * t));
+    rig.ins[1] = static_cast<float>(0.5 + 0.5 * std::sin(2.0 * std::numbers::pi * 2.9 * t));
+    const double y = rig.tick();
+    if (i > 100) phase_d1[i % 32] += std::abs(y - y1);
+    y1 = y;
+  }
+  double peak = 0.0, mean = 0.0;
+  for (double d : phase_d1) {
+    peak = std::max(peak, d);
+    mean += d / 32.0;
+  }
+  CHECK(peak < 1.2 * mean);  // the stepped gain measured 3.2x
+}

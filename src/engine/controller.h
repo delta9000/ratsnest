@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include "dsl/diag.h"
@@ -18,14 +19,22 @@ class Controller {
   struct LoadResult {
     bool ok = false;
     bool topology = false;
+    bool deferred = false;  // valid topology edit held until a fade finishes
     Diags errors;
     std::vector<std::string> files;
   };
 
   LoadResult load(std::string_view src, const std::string& patch_path = {});
+  // A topology edit that arrives while a reload is still crossfading is kept,
+  // newest only (any later load() supersedes it), and applied here once the
+  // fading engine has been reaped. nullopt: nothing pending, or still fading.
+  std::optional<LoadResult> apply_pending();
+  bool has_pending() const { return pending_; }
   bool set_watch(std::string_view spec);
   void clear_watch();
   void drain_retired();
+  const graph::Graph* graph() const { return shadow_.get(); }
+  uint64_t generation() const { return generation_; }
   int engines_in_flight() const { return pushed_ - reaped_; }
 
  private:
@@ -35,8 +44,11 @@ class Controller {
   double rate_;
   std::unique_ptr<graph::Graph> shadow_;
   std::string watch_spec_;
+  uint64_t generation_ = 0;
   int pushed_ = 0;  // engines handed to the runner
   int reaped_ = 0;  // engines retired back and deleted
+  bool pending_ = false;
+  std::string pending_src_, pending_path_;
 };
 
 }  // namespace ms::engine

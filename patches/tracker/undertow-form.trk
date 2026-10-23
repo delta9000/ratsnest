@@ -1,0 +1,22 @@
+# undertow-form.trk -- one row per bar (128). '>' ramps per bar; patch slews with func.
+track a cva cvb    # 1: bass level   | riff level
+track b cva cvb    # 2: riff cutoff  | pad level
+track c cva cvb    # 3: riser        | verb send
+track d cva cvb    # 4: width        | duck amount (0..1)
+
+pattern form 128
+#     bass riff  | cut  pad  | riser verb | width duck
+000 | 0    0     | 0    0    | 0     .2   | .9    1
+016 | .8   0     | 0    0    | 0     .2   | .9    1
+024 | .    .7    | 0>   0    | 0     .25> | .     .     # riff in, dark; filter opens over 32 bars
+040 | .    .8    | .    .    | .     .    | .     .
+056 | .    .85   | 1    0    | 0     .35  | .     .     # fully open at bar 57
+064 | 0    .55   | .35> .5   | 0     .6   | 1.3   0     # break: kick gone, pad, wide
+072 | .    .     | .    .    | 0>    .    | .     .     # riser + sweep over 8 bars
+079 | .    .     | 1    .    | 1     .    | .     .
+080 | .8   .9    | 1    .55  | 0     .35  | .9    1     # drop
+096 | .8   .8    | .8>  0    | 0     .3   | .     .
+112 | 0    0     | .5   0    | 0     .2   | .     .     # outro: drums only
+127 | .    .     | .    .    | .     .    | .     .
+
+order form

@@ -88,27 +88,27 @@ quarter -> clap_pat.clock
 clap_gate = logic { op: and }
 clap_pat.trig -> clap_gate.a
 arr_kick.cv -> clap_gate.b
-clap_env = func { rise: 0.001s, fall: 0.16s, curve: exp }
+clap_env = func { rise: 0.001s, fall: 0.48s, curve: exp }
 clap_gate -> clap_env.trig
 clap_n = noise { color: white, seed: 5 }
 clap_filt = svf { cutoff: 1500, res: 0.4 }
 clap_n -> clap_filt.in
 clap_amp = vca { gain: 0 }
 clap_filt.bp -> clap_amp.in
-clap_env -> clap_amp.cv : 0.6
+clap_env -> clap_amp.cv : 0.84
 
 # ---- hats ----
 hat_pat = euclid { steps: 16, hits: 2, rot: 3 }
 master -> hat_pat.clock
 hats_lvl -> hat_pat.hits : 5
-hat_env = func { rise: 0.0005s, fall: 0.035s, curve: exp }
+hat_env = func { rise: 0.0005s, fall: 0.11s, curve: exp }
 hat_pat.trig -> hat_env.trig
 hat_n = noise { color: white, seed: 19 }
 hat_filt = svf { cutoff: 8500, res: 0.2 }
 hat_n -> hat_filt.in
 hat_amp = vca { gain: 0 }
 hat_filt.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.4
+hat_env -> hat_amp.cv : 0.56
 quarter -> hat_amp.cv : -0.1
 
 # ---- bass ----
@@ -173,7 +173,7 @@ gtr_lift_t = math { op: add }
 ch_third.cv -> gtr_lift_t.a
 1 -> gtr_lift_t.b
 
-gtr_switch = switch { mode: seq, n: 8 }
+gtr_switch = switch { mode: seq, n: 8, fade: 0 }
 eighth -> gtr_switch.clock
 ch_root.cv  -> gtr_switch.in1
 ch_third.cv -> gtr_switch.in2
@@ -197,7 +197,7 @@ gtr_str = string { seed: 3, damping: 0.72, position: 0.22 }
 gtr_note -> gtr_str.v_oct
 gtr_euclid.trig -> gtr_str.strike
 
-gtr_od = overdrive { model: klon, drive: 2.2, tone: 0.6, level: 0.5, mix: 0.65 }
+gtr_od = overdrive { model: klon, drive: 1, tone: 0.6, level: 0.5, mix: 0.65 }
 gtr_str.out -> gtr_od.in : 0.6
 
 gtr_filt = svf { cutoff: 2200, res: 0.25 }
@@ -206,12 +206,12 @@ gtr_lfo = lfo { freq: 0.06hz, wave: tri }
 gtr_lfo -> gtr_filt.cutoff : 400
 gtr_lvl -> gtr_filt.cutoff : 800
 
-gtr_env = func { rise: 0.008s, fall: 0.35s, curve: exp }
+gtr_env = func { rise: 0.008s, fall: 1.05s, curve: exp }
 gtr_euclid.trig -> gtr_env.trig
 
 gtr_amp = vca { gain: 0 }
 gtr_filt.lp -> gtr_amp.in
-gtr_env -> gtr_amp.cv : 0.55
+gtr_env -> gtr_amp.cv : 0.77
 gtr_lvl -> gtr_amp.cv : 0.6
 
 # ---- granular freeze: records drone+overdrive bed, locks when freeze=1 ----
@@ -337,7 +337,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -18, ratio: 2.4,
                            knee: 6, attack: 0.01, release: 0.18,
-                           makeup: 1.2, mix: 0.8 }
+                           makeup: 7.8, mix: 0.8 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : 0.65
@@ -358,4 +358,4 @@ master_clip.out_r -> master_limit.in_r
 master_limit.out_l -> out.left
 master_limit.out_r -> out.right
 -1 -> out.level
-main_out -> out.level : 0.85
+main_out -> out.level : 1.0

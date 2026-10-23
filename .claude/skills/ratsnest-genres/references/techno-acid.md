@@ -46,7 +46,7 @@ bar -> four_bar.in
 
 Roland called it the gimmick circuit. An accented step is louder *and* the
 filter envelope reaches further — the whole "wow". Do not sum a DC offset onto
-cutoff; multiply the envelope. `math`'s `b` base is 1, so an unaccented note
+cutoff; multiply the envelope. Give `math` a `b: 1` base so an unaccented note
 passes its envelope through untouched and an accented one scales it.
 
 ```text
@@ -65,12 +65,12 @@ master -> acid_seq.clock
 master -> acid_slide.clock
 master -> acid_acc.clock
 
-acid_env = func { rise: 0.001, fall: 0.11, curve: exp }
+acid_env = func { rise: 0.001, fall: 0.33, curve: exp }
 acid_seq.gate -> acid_env.trig
-acc_env = func { rise: 0.001, fall: 0.14, curve: exp }
+acc_env = func { rise: 0.001, fall: 0.42, curve: exp }
 acid_acc.gate -> acc_env.trig
 
-acid_depth = math { op: mult }        # b base 1 -> unaccented = env x 1
+acid_depth = math { op: mult, b: 1 }  # unaccented = env x 1
 acid_env -> acid_depth.a
 acc_env -> acid_depth.b : 0.9         # accented    = env x 1.9
 ```
@@ -118,7 +118,7 @@ click (near-instant) — then saturation, so the peak anchors the mix.
 
 ```text
 # ---- 909 kick ----
-k9_penv = func { rise: 0.0004, fall: 0.035, curve: exp }
+k9_penv = func { rise: 0.0004, fall: 0.11, curve: exp }
 quarter -> k9_penv.trig
 k9_aenv = func { rise: 0.0006, fall: 0.18, curve: log }
 quarter -> k9_aenv.trig
@@ -129,7 +129,7 @@ k9_amp = vca { gain: 0 }
 k9_osc -> k9_amp.in
 k9_aenv -> k9_amp.cv : 0.95
 
-k9_cenv = func { rise: 0.0002, fall: 0.004, curve: exp }
+k9_cenv = func { rise: 0.0002, fall: 0.012, curve: exp }
 quarter -> k9_cenv.trig
 k9_noise = noise { color: white, seed: 3 }
 k9_click = svf { cutoff: 3000, res: 0.2 }
@@ -156,7 +156,7 @@ k8_ping = func { rise: 0.0002, fall: 0.002 }
 quarter -> k8_ping.trig
 k8_body = svf { cutoff: 52, res: 0.97 }
 k8_ping -> k8_body.in : 2
-k8_drop = func { rise: 0.0005, fall: 0.12, curve: exp }
+k8_drop = func { rise: 0.0005, fall: 0.36, curve: exp }
 quarter -> k8_drop.trig
 k8_drop -> k8_body.cutoff : 40
 k8_amp = vca { gain: 0 }
@@ -191,8 +191,8 @@ re_a -> re_sum.in1
 re_b -> re_sum.in2
 re_bp = svf { cutoff: 420, res: 0.75 }
 re_sum.out_l -> re_bp.in
-re_notch = math { op: sub, b: 0 }     # in - bp = notch; b base is 1, zero it
-                                      # or you ship a -1 DC offset
+re_notch = math { op: sub, b: 0 }     # in - bp = notch (b already defaults
+                                      # to 0; explicit for the reader)
 re_sum.out_l -> re_notch.a
 re_bp.bp -> re_notch.b
 re_sweep = lfo { wave: tri, freq: 0.09hz }
@@ -205,7 +205,7 @@ hv_b = vco { freq: 220hz, wave: pulse, pw: 0.5 }
 hv_c = vco { freq: 220hz, wave: saw }
 hv_pwm -> hv_a.pwm : 0.35
 hv_pwm -> hv_b.pwm : -0.3
-hv_dive = func { rise: 0.002, fall: 0.5, curve: exp }
+hv_dive = func { rise: 0.002, fall: 1.5, curve: exp }
 bar -> hv_dive.trig
 hv_dive -> hv_a.v_oct : 0.5
 hv_dive -> hv_b.v_oct : 0.5

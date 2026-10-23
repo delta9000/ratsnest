@@ -1,24 +1,20 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/bandlimited_osc.h"
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
+#include "dsp/util.h"
 
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"freq", 440.f}, {"v_oct", 0.f}, {"fm", 0.f},
-                              {"pw", 0.5f},    {"pwm", 0.f},   {"sync", 0.f}};
+constexpr InputInfo kIns[] = {{"freq", 220.f}, {"v_oct", 0.f}, {"fm", 0.f},
+                              {"pw", 0.5f},    {"pwm", 0.f},   {"sync", 0.f},
+                              {"phase", 0.f}};
 constexpr const char* kWaves[] = {"sine", "tri", "saw", "pulse", nullptr};
 constexpr ConfigInfo kCfg[] = {{"wave", kWaves}};
 constexpr OutputInfo kOuts[] = {{"out"}};
-
-// Two-sample polyBLEP family after Välimäki/Pekonen/Nam; this compact
-// residual formula is locally written. See docs/attribution.md.
-float polyblep(float t, float dt) {
-  if (t < dt) { t /= dt; return t + t - t * t - 1.0f; }
-  if (t > 1.0f - dt) { t = (t - 1.0f) / dt; return t * t + t + t + 1.0f; }
-  return 0.0f;
-}
 
 class Vco final : public Module {
  public:
@@ -27,43 +23,52 @@ class Vco final : public Module {
     const std::string w = cfg_str(cfg, "wave", "sine");
     wave_ = w == "tri" ? 1 : w == "saw" ? 2 : w == "pulse" ? 3 : 0;
     phase_ = 0.0f;
-    prev_sync_ = 0.0f;
+    sync_edge_ = RisingEdge{};
+    bank_ = &BandlimitedOsc::instance();
   }
 
   void process(const float* ins, float* outs) override {
-    double f = static_cast<double>(ins[0]) * std::exp2(static_cast<double>(ins[1])) +
-               static_cast<double>(ins[2]) * static_cast<double>(ins[0]);
-    f = std::clamp(f, 0.0, 0.45 * static_cast<double>(rate_));
-    const double dt = f / static_cast<double>(rate_);
+    if (key_.changed({ins[0], ins[1], ins[2]})) {  // skip exp2 at a held pitch
+      double f = static_cast<double>(ins[0]) * std::exp2(static_cast<double>(ins[1])) +
+                 static_cast<double>(ins[2]) * static_cast<double>(ins[0]);
+      if (!std::isfinite(f)) f = 0.0;
+      f = std::clamp(f, 0.0, 0.45 * static_cast<double>(rate_));
+      dt_ = f / static_cast<double>(rate_);
+      band_ = bank_->band(static_cast<float>(f), rate_);
+    }
+    const double dt = dt_;
 
-    if (ins[5] > 0.5f && prev_sync_ <= 0.5f) phase_ = 0.0;
-    prev_sync_ = ins[5];
+    const float sync = std::isfinite(ins[5]) ? ins[5] : 0.0f;
+    if (sync_edge_(sync)) phase_ = 0.0;
 
     // Advance first (double phase): a k-Hz tone then completes exactly k cycles
     // over rate samples, and a sync reset lands the next sample near -1.
     phase_ += dt;
     phase_ -= std::floor(phase_);
-    const float ph = static_cast<float>(phase_);
-    const float dtf = static_cast<float>(dt);
+    double offset = phase_ + (std::isfinite(ins[6]) ? static_cast<double>(ins[6]) : 0.0);
+    offset -= std::floor(offset);
+    const float ph = static_cast<float>(offset);
 
     float v = 0.0f;
     switch (wave_) {
       case 0:  // sine
         v = std::sin(2.0f * std::numbers::pi_v<float> * ph);
         break;
-      case 1:  // tri (naive; -12 dB/oct spectrum, acceptable aliasing)
-        v = 4.0f * std::abs(ph - 0.5f) - 1.0f;
+      case 1:  // band-limited triangle table
+        v = bank_->triangle(ph, band_);
         break;
-      case 2:  // saw, polyBLEP
-        v = 2.0f * ph - 1.0f - polyblep(ph, dtf);
+      case 2:  // band-limited saw table
+        v = bank_->saw(ph, band_);
         break;
-      case 3: {  // pulse, polyBLEP on both edges
-        const float pw = std::clamp(ins[3] + ins[4], 0.05f, 0.95f);
-        v = (ph < pw ? 1.0f : -1.0f);
-        v += polyblep(ph, dtf);
-        float t2 = ph + 1.0f - pw;
-        t2 -= std::floor(t2);
-        v -= polyblep(t2, dtf);
+      case 3: {  // difference of two band-limited saws, plus exact DC term
+        const float raw_pw = ins[3] + ins[4];
+        const float pw = std::isfinite(raw_pw)
+                             ? std::clamp(raw_pw, 0.05f, 0.95f)
+                             : 0.5f;
+        float shifted = ph - pw;
+        shifted -= std::floor(shifted);
+        v = bank_->saw(shifted, band_) - bank_->saw(ph, band_) +
+            2.0f * pw - 1.0f;
         break;
       }
     }
@@ -73,14 +78,18 @@ class Vco final : public Module {
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Vco&>(other);
     phase_ = o.phase_;
-    prev_sync_ = o.prev_sync_;
+    sync_edge_ = o.sync_edge_;
   }
 
  private:
   float rate_ = 48000.0f;
   int wave_ = 0;
   double phase_ = 0.0;
-  float prev_sync_ = 0.0f;
+  RisingEdge sync_edge_;
+  const BandlimitedOsc* bank_ = nullptr;
+  InputKey<3> key_;  // freq, v_oct, fm -> dt_, band_
+  double dt_ = 0.0;
+  BandlimitedOsc::Band band_{};
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Vco>(); }

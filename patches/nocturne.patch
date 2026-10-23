@@ -65,7 +65,7 @@ pad_fifth -> pad_filt.in : 0.35
 pad_breath = lfo { freq: 0.05hz, wave: sine }
 pad_breath -> pad_filt.cutoff : 350
 
-pad_env = adsr { attack: 0.7, decay: 0.5, sustain: 0.8, release: 1.6, curve: exp }
+pad_env = adsr { attack: 0.7, decay: 0.5, sustain: 0.8, release: 1.6, curve: quad }
 bar -> pad_env.gate
 pad_amp = vca { gain: 0 }
 pad_filt -> pad_amp.in
@@ -74,7 +74,7 @@ pad_env -> pad_amp.cv : 0.5
 # ---- sub bass: a clean sine on the root, anchored an octave below at A2. ----
 bass_osc = vco { freq: A2, wave: sine }
 ch_root.cv -> bass_osc.v_oct
-bass_env = adsr { attack: 0.08, decay: 0.4, sustain: 0.9, release: 0.8, curve: exp }
+bass_env = adsr { attack: 0.08, decay: 0.4, sustain: 0.9, release: 0.8, curve: quad }
 bar -> bass_env.gate
 bass_amp = vca { gain: 0, response: exp }
 bass_osc -> bass_amp.in

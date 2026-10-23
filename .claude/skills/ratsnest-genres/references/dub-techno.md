@@ -59,7 +59,7 @@ C4v -> st_c.v_oct
 0.004 -> st_b.v_oct              # ~7 cents of drift, not a chorus
 -0.003 -> st_c.v_oct
 
-stab_env = func { rise: 0.004, fall: 0.3, curve: exp }
+stab_env = func { rise: 0.004, fall: 1.5, curve: exp }
 bar -> stab_env.trig
 stab_amp = vca { gain: 0, response: exp }
 st_a -> stab_amp.in : 0.3

@@ -1,0 +1,74 @@
+# kit/crash.sub -- crash cymbal: the kit/hat.sub construction at cymbal
+# scale. A 40-mode metal bank (the 808-hash ratio set, docs/attribution.md)
+# tuned low and a band-passed noise wash, both CONTINUOUSLY DRIVEN by
+# two-stage enveloped noise (a driven resonator gives coloured noise, not a
+# clean ring): an 80 ms stick splash on top of a long exponential wash.
+# Kit voice contract: `trig` fires, `accent` (0..1, latched per hit) sets
+# level and brightness, `choke` grabs it (a hand on the cymbal).
+#
+# NOTE: decay is SECONDS (as on clap/hat_model): the time the tail takes to
+# fall 20 dB, i.e. how long you hear it in a mix. The envelope's -60 dB
+# point is 3x that.
+#
+# Measured (main -> out.in at unity, one hit, default accent): peak
+# -5.1 dBFS, RMS over the first second -21.6 dBFS; -20 dB at 0.98 s,
+# -40 dB at 2.1 s; spectral centroid 5.7 kHz with 10 % of the energy below
+# 2 kHz (the body); flatness 0.69 over 2-16 kHz (a wash, not a tone).
+# Stage it like the hats: 0.5-1.0 in a mix.
+tune   = param { default: 250hz }   # metal base: lower = bigger, darker
+decay  = param { default: 1.0s }    # -20 dB time of the tail, seconds
+tone   = param { default: 7khz }    # wash band-pass centre
+trig   = input {}
+accent = input { default: 0.7 }
+choke  = input {}
+main   = output {}
+
+acc = sh {}
+accent -> acc.in
+trig -> acc.trig
+
+# Two-stage driver: the stick splash, then the long wash 9 dB under it.
+nz = noise { color: white, seed: 31 }
+splash = func { rise: 0.0005, fall: 0.08, curve: exp }
+tail = math { op: mult, a: decay, b: 3 }
+tenv = func { rise: 0.002, fall: 0, curve: exp }
+tail -> tenv.fall
+trig -> splash.trig
+trig -> tenv.trig
+drv = vca { gain: 0 }
+nz -> drv.in
+splash -> drv.cv
+tenv -> drv.cv : 0.35
+
+# Effective brightness = 0.6 + acc * 0.3 (0.81 at default accent).
+metal = modal { ratios: [1, 1.483, 1.8, 2.546, 2.63, 3, 3.897, 4.449, 5,
+                         5.4, 7, 7.415, 7.638, 7.89, 9, 10.381, 11, 11.691,
+                         12.6, 12.73, 13, 13.15, 13.347, 16.2, 16.313,
+                         17.822, 18.41, 19.279, 19.485, 19.8, 22.914, 23.4,
+                         23.67, 27.279, 28.006, 28.93, 33.098, 34.19,
+                         35.073, 42.867],
+                freq: tune, brightness: 0.6, damping: 0.6, position: 0.3 }
+acc -> metal.brightness : 0.3
+drv -> metal.in
+
+# Wash: a broad band around `tone`, plus some of the air above it.
+wash = svf { cutoff: tone, res: 0.1 }
+drv -> wash.in
+
+# Choke: slam the level shut (cv sums, gain clamps at 0), recover in 50 ms.
+chk = func { rise: 0.0005, fall: 0.05 }
+choke -> chk.trig
+
+lvl = vca { gain: 0.5 }
+metal -> lvl.in : 0.12
+wash.bp -> lvl.in : 1.0
+wash.hp -> lvl.in : 0.5
+acc -> lvl.cv : 0.5
+chk -> lvl.cv : -8
+lvl -> main.in : 0.8
+
+# Audition: `mise run play -- patches/lib/kit/crash.sub` -- one hit every
+# four seconds.
+demo.clk = clock { bpm: 15 }
+demo.clk -> trig
+main -> demo.out.in

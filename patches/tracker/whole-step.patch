@@ -1,0 +1,161 @@
+# whole-step -- a chord-driven song in A minor that climbs to B minor for the
+# last chorus. 96 BPM, ~2:02. Notes in whole-step.trk, section levels in whole-step-form.trk.
+#   intro 4 | verse 8 | chorus 8 | verse 8 | chorus 8 | bridge 4 | chorus(+2) 8 | end 2
+# Voices: lib kick, kit snare + hat (accent from tracker vel), pluck bass,
+# three-voice voice-led saw pad, mallet arp, saw/pulse lead with echo.
+
+clk      = clock { bpm: 384 }          # sixteenths at 96 BPM
+four_bar = div { by: 64 }
+clk -> four_bar.in
+
+song = tracker { file: "whole-step.trk" }
+form = tracker { file: "whole-step-form.trk" }
+clk      -> song.clock
+song.step_trig -> form.clock
+
+drums_lvl = func { rise: 1.5, fall: 1.5 }
+bass_lvl  = func { rise: 1.5, fall: 1.5 }
+pad_lvl   = func { rise: 2.5, fall: 2.5 }
+arp_lvl   = func { rise: 2, fall: 2 }
+lead_lvl  = func { rise: 1, fall: 1 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> pad_lvl.in
+form.cva4 -> arp_lvl.in
+form.cva5 -> lead_lvl.in
+
+# ---- drums ----
+kick = sub { file: "../lib/kick.sub", tune: 52hz, decay: 0.16s, click: 0.4 }
+song.gate1 -> kick.trig
+snare = sub { file: "../lib/kit/snare.sub" }
+song.gate2 -> snare.trig
+song.vel2  -> snare.accent
+hat = sub { file: "../lib/kit/hat.sub", decay: 0.12 }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+dmix = mix { levels: [0.9, 1.4, 0.9], pans: [0, 0.05, 0.25] }
+kick  -> dmix.in1
+snare -> dmix.in2
+hat   -> dmix.in3
+drums_l = vca { gain: 0 }
+drums_r = vca { gain: 0 }
+dmix.out_l -> drums_l.in
+dmix.out_r -> drums_r.in
+drums_lvl -> drums_l.cv
+drums_lvl -> drums_r.cv
+
+# ---- bass: saw + sub sine, plucked filter, roots from track 4 ----
+b_saw = vco { wave: saw }
+b_sub = vco { wave: sine }
+song.voct5 -> b_saw.v_oct
+song.voct5 -> b_sub.v_oct
+b_env = func { rise: 0.002, fall: 0.35, curve: exp }
+song.gate5 -> b_env.trig
+b_filt = ladder { cutoff: 180, res: 0.25, drive: 0.6 }
+b_saw -> b_filt.in : 0.5
+b_sub -> b_filt.in : 0.6
+b_env -> b_filt.cutoff : 900
+b_amp = vca { gain: 0 }
+b_filt -> b_amp.in
+b_env -> b_amp.cv : 0.5
+bass_lvl -> b_amp.cv : 0.5
+
+# ---- pad: three saws on voct6 / cva6 / cvb6, one adsr on gate6 ----
+p1 = vco { wave: saw }
+p2 = vco { wave: saw }
+p3 = vco { wave: saw }
+song.voct6 -> p1.v_oct
+song.cva6  -> p2.v_oct
+song.cvb6  -> p3.v_oct
+0.004  -> p2.v_oct
+-0.004 -> p3.v_oct
+p_env = adsr { attack: 0.25, decay: 0.8, sustain: 0.75, release: 1.2 }
+song.gate6 -> p_env.gate
+p_filt = svf { cutoff: 700, res: 0.15 }
+p1 -> p_filt.in : 0.3
+p2 -> p_filt.in : 0.3
+p3 -> p_filt.in : 0.3
+pad_lvl -> p_filt.cutoff : 900
+p_amp = vca { gain: 0 }
+p_filt.lp -> p_amp.in
+p_env -> p_amp.cv : 0.6
+p_lvl = vca { gain: 0 }
+p_amp -> p_lvl.in
+pad_lvl -> p_lvl.cv
+p_cho = chorus { voices: 3, depth: 0.5, mix: 0.5 }
+p_lvl -> p_cho.in_l
+p_lvl -> p_cho.in_r
+
+# ---- arp: mallet on track 6; tune A3 so note names land at written pitch ----
+arp = sub { file: "../lib/mallet.sub", tune: A3, decay: 0.3s }
+song.gate7 -> arp.trig
+song.voct7 -> arp.cv
+a_amp = vca { gain: 0 }
+arp -> a_amp.in
+arp_lvl -> a_amp.cv : 0.5
+
+# ---- lead: saw + pulse, enveloped filter, velocity from track 7 ----
+l_saw = vco { wave: saw }
+l_pul = vco { wave: pulse, pw: 0.5 }
+song.voct8 -> l_saw.v_oct
+song.voct8 -> l_pul.v_oct
+0.003 -> l_pul.v_oct
+vib = lfo { freq: 5.2hz, wave: sine }
+vib -> l_saw.v_oct : 0.003
+vib -> l_pul.v_oct : 0.003
+l_env = adsr { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.25 }
+song.gate8 -> l_env.gate
+l_filt = svf { cutoff: 900, res: 0.2 }
+l_saw -> l_filt.in : 0.35
+l_pul -> l_filt.in : 0.3
+l_env -> l_filt.cutoff : 1800
+l_amp = vca { gain: 0 }
+l_filt.lp -> l_amp.in
+l_env -> l_amp.cv
+l_vel = vca { gain: 0 }
+l_amp -> l_vel.in
+song.vel8 -> l_vel.cv
+l_post = vca { gain: 0 }
+l_vel -> l_post.in
+lead_lvl -> l_post.cv : 0.8
+
+# ---- space ----
+sync_de = tempo { bpm: 96, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.35, tone: 3000, mix: 1 }
+sync_de.seconds -> echo.time
+l_post -> echo.in : 0.5
+a_amp  -> echo.in : 0.3
+room = reverb { decay: 0.75, damp: 0.35, mix: 1, predelay: 0.03 }
+p_cho.out_l -> room.in_l : 0.3
+p_cho.out_r -> room.in_r : 0.3
+l_post -> room.in_l : 0.25
+l_post -> room.in_r : 0.25
+a_amp  -> room.in_l : 0.25
+a_amp  -> room.in_r : 0.25
+snare  -> room.in_l : 0.15
+snare  -> room.in_r : 0.15
+
+# ---- mix ----
+band = mix { levels: [1.8, 1.8, 1.5, 1.5, 1.5, 0.9, 0.8, 0.8],
+             pans: [-1, 1, 0, -0.9, 0.9, -0.3, 0.05, 0.3] }
+drums_l     -> band.in1
+drums_r     -> band.in2
+b_amp       -> band.in3
+p_cho.out_l -> band.in4
+p_cho.out_r -> band.in5
+a_amp       -> band.in6
+l_post      -> band.in7
+echo        -> band.in8
+rmix = mix { levels: [0.9, 0.9], pans: [-1, 1] }
+room.out_l -> rmix.in1
+room.out_r -> rmix.in2
+
+master = sub { file: "../lib/master-chain.sub" }
+band.out_l -> master.in_l
+rmix.out_l -> master.in_l
+band.out_r -> master.in_r
+rmix.out_r -> master.in_r
+kick -> master.side_l : 0.6
+kick -> master.side_r : 0.6
+master.l -> out.left
+master.r -> out.right

@@ -3,6 +3,7 @@
 #include <numbers>
 #include <string>
 #include "dsp/modules.h"
+#include "dsp/util.h"
 #include "dsp/biquad.h"
 #include "dsp/mastering.h"
 #include "dsp/oversample.h"
@@ -60,12 +61,6 @@ Voice voice_for(const std::string& m) {
   return {720.f, Curve::Soft, 0.12f, 10.f, 2000.f, 6000.f, 0.f, 0.f, false, 0.f, 0.f};
 }
 
-// NaN-proof clamp for unipolar control inputs.
-float sane01(float x) {
-  if (!(x >= 0.0f)) return 0.0f;
-  return x > 1.0f ? 1.0f : x;
-}
-
 class Overdrive final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
@@ -106,7 +101,8 @@ class Overdrive final : public Module {
         voice_.two_stage ? make_lpf(voice_.inter_lp, os_rate) : make_bypass();
     tone_coeffs_ = make_lpf(voice_.tone_hi, rate_);
 
-    drive_gain_ = 1.0f;
+    drive_gain_ = -1.0f;  // sentinel: the first block snaps, no ramp from it
+    drive_step_ = 0.0f;
     mix_target_ = 1.0f;
     level_target_ = 1.0f;
     countdown_ = 0;
@@ -116,7 +112,12 @@ class Overdrive final : public Module {
     if (countdown_ == 0) update_block(ins);
     --countdown_;
 
-    const float in0 = sanitize(ins[0]);
+    // Bounded far above any audio level so the ADAA antiderivative's x*x
+    // cannot overflow to inf and poison the oversampler and filter states.
+    const float in0 = sanitize_clamp(ins[0], -1e6f, 1e6f);
+    // Drive is read every kBlock samples but ramps per sample: a stepped
+    // pre-gain into the shaper zippers audibly under modulation.
+    drive_gain_ += drive_step_;
     const float x = in0 * drive_gain_;
     const float xf = Biquad::process(x, pre_coeffs_, pre_state_);
 
@@ -183,12 +184,14 @@ class Overdrive final : public Module {
 
   void update_block(const float* ins) {
     countdown_ = kBlock;
-    const float drive = sane01(ins[1]);
-    const float tone = sane01(ins[2]);
-    const float level = sane01(ins[3]);
-    mix_target_ = sane01(ins[4]);
+    const float drive = clamp_nan(ins[1], 0.0f, 1.0f);
+    const float tone = clamp_nan(ins[2], 0.0f, 1.0f);
+    const float level = clamp_nan(ins[3], 0.0f, 1.0f);
+    mix_target_ = clamp_nan(ins[4], 0.0f, 1.0f);
 
-    drive_gain_ = std::exp2(drive * voice_.drive_span);
+    const float drive_target = std::exp2(drive * voice_.drive_span);
+    if (drive_gain_ < 0.0f) drive_gain_ = drive_target;
+    drive_step_ = (drive_target - drive_gain_) * (1.0f / kBlock);
     level_target_ = std::exp2((level - 0.5f) * 4.0f);  // +/-2 octaves makeup
 
     const float lo = std::log2(voice_.tone_lo);
@@ -207,7 +210,8 @@ class Overdrive final : public Module {
   float dc_x1_ = 0.0f, dc_y1_ = 0.0f;
   OnePole post_, mix_, level_;
   float clean_z1_ = 0.0f;
-  float drive_gain_ = 1.0f;
+  float drive_gain_ = -1.0f;
+  float drive_step_ = 0.0f;
   float mix_target_ = 1.0f;
   float level_target_ = 1.0f;
   int countdown_ = 0;

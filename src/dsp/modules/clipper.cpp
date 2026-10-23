@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include "dsp/input_key.h"
 #include "dsp/modules.h"
 #include "dsp/oversample.h"
 #include "dsp/mastering.h"
@@ -65,8 +66,12 @@ class Clipper final : public Module {
     delay_idx_ = (delay_idx_ + 1) % 8;
     
     // 1. Convert DB control parameters to linear
-    const float threshold_linear = std::pow(10.0f, threshold / 20.0f);
-    const float drive_linear = std::pow(10.0f, drive / 20.0f);
+    if (db_key_.changed({threshold, drive})) {  // skip pow while dB controls hold
+      threshold_linear_ = std::pow(10.0f, threshold / 20.0f);
+      drive_linear_ = std::pow(10.0f, drive / 20.0f);
+    }
+    const float threshold_linear = threshold_linear_;
+    const float drive_linear = drive_linear_;
     
     // 2. Upsample to 4x
     float xs_l[4] = {};
@@ -98,10 +103,9 @@ class Clipper final : public Module {
     const float wet_l = decimator_l_.downsample(ys_l);
     const float wet_r = decimator_r_.downsample(ys_r);
     
-    // 5. Equal-power dry/wet mix
-    const float mix_angle = mix * (std::numbers::pi_v<float> / 2.0f);
-    const float gain_dry = std::cos(mix_angle);
-    const float gain_wet = std::sin(mix_angle);
+    // 5. Linear blend of correlated dry/wet signals.
+    const float gain_dry = 1.0f - mix;
+    const float gain_wet = mix;
     
     outs[0] = gain_dry * dry_l + gain_wet * wet_l;
     outs[1] = gain_dry * dry_r + gain_wet * wet_r;
@@ -125,6 +129,8 @@ class Clipper final : public Module {
  private:
   float rate_ = 48000.0f;
   bool is_soft_ = false;
+  InputKey<2> db_key_;  // threshold, drive -> linear gains
+  float threshold_linear_ = 1.0f, drive_linear_ = 1.0f;
   
   // Left oversampler/decimator
   Oversampler4x oversampler_l_;

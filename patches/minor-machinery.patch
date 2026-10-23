@@ -144,11 +144,11 @@ eighth -> b_motif.clock
 two_bar -> a_motif.reset
 two_bar -> b_motif.reset
 
-motif_pitch = switch { mode: addr, n: 2 }
+motif_pitch = switch { mode: addr, n: 2, fade: 0 }
 a_motif.cv -> motif_pitch.in1
 b_motif.cv -> motif_pitch.in2
 arr_b.cv -> motif_pitch.addr
-motif_gate = switch { mode: addr, n: 2 }
+motif_gate = switch { mode: addr, n: 2, fade: 0 }
 a_motif.trig -> motif_gate.in1
 b_motif.trig -> motif_gate.in2
 arr_b.cv -> motif_gate.addr
@@ -200,28 +200,28 @@ quarter -> clap_steps.clock
 clap_gate = logic { op: and }
 clap_steps.trig -> clap_gate.a
 arr_drums.cv -> clap_gate.b
-clap_env = func { rise: .001, fall: .13, curve: exp }
+clap_env = func { rise: .001, fall: .39, curve: exp }
 clap_gate -> clap_env.trig
 clap_noise = noise { color: white, seed: 7 }
 clap_filter = svf { cutoff: 1700, res: .5 }
 clap_noise -> clap_filter.in
 clap_amp = vca { gain: 0 }
 clap_filter.bp -> clap_amp.in
-clap_env -> clap_amp.cv : .6
+clap_env -> clap_amp.cv : .84
 
 hat_pattern = euclid { steps: 16, hits: 3, rot: 3 }
 master -> hat_pattern.clock
 drums_lvl -> hat_pattern.hits : 6
 hat_coin = bern { prob: .86, seed: 29 }
 hat_pattern.trig -> hat_coin.gate
-hat_env = func { rise: .0005, fall: .045, curve: exp }
+hat_env = func { rise: .0005, fall: .14, curve: exp }
 hat_coin.a -> hat_env.trig
 hat_noise = noise { color: white, seed: 31 }
 hat_filter = svf { cutoff: 9200, res: .2 }
 hat_noise -> hat_filter.in
 hat_amp = vca { gain: 0 }
 hat_filter.hp -> hat_amp.in
-hat_env -> hat_amp.cv : .34
+hat_env -> hat_amp.cv : .48
 quarter -> hat_amp.cv : -.08
 
 # ---- offbeat bass follows the progression roots ----
@@ -233,7 +233,7 @@ beat_not -> offbeat.b
 bass_gate = logic { op: and }
 offbeat -> bass_gate.a
 arr_bass.cv -> bass_gate.b
-bass_env = adsr { attack: .002, decay: .11, sustain: .45, release: .12,
+bass_env = adsr { attack: .002, decay: .55, sustain: .45, release: .6,
                   curve: exp }
 bass_gate -> bass_env.gate
 bass_osc = vco { freq: 110hz, wave: saw }
@@ -244,7 +244,7 @@ bass_env -> bass_filter.cutoff : 900
 bass_lvl -> bass_filter.cutoff : 240
 bass_amp = vca { gain: 0, response: exp }
 bass_filter -> bass_amp.in
-bass_env -> bass_amp.cv : .78
+bass_env -> bass_amp.cv : .94
 bass_post = vca { gain: 0 }
 bass_amp -> bass_post.in
 bass_lvl -> bass_post.cv : .72
@@ -260,7 +260,7 @@ motif_alloc.spread -> motif.osc.v_oct : .006
 motif.fold = fold { fold: 1.7, sym: 0 }
 motif.osc -> motif.fold.in
 motif_color = lfo { freq: .037hz, wave: sine }
-motif.color = xfade { mix: .28 }
+motif.color = xfade { mix: .28, law: equal_power }
 motif.osc -> motif.color.a
 motif.fold -> motif.color.b
 arr_b.cv -> motif.color.mix : .38
@@ -310,7 +310,7 @@ pad_osc1 -> pad_tone.in1
 pad_osc2 -> pad_tone.in2
 pad_osc3 -> pad_tone.in3
 pad_air = noise { color: pink, seed: 37 }
-pad_blend = xfade { mix: .12 }
+pad_blend = xfade { mix: .12, law: equal_power }
 pad_tone.out_l -> pad_blend.a
 pad_air -> pad_blend.b : .4
 arr_b.cv -> pad_blend.mix : .12
@@ -322,7 +322,7 @@ pad_blend -> pad_filter.in
 pad_motion -> pad_filter.cutoff : 260
 pad_lvl -> pad_filter.cutoff : 620
 pad_env = adsr { attack: .45, decay: .3, sustain: .82, release: 1.4,
-                 curve: exp }
+                 curve: quad }
 bar -> pad_env.gate
 pad_amp = vca { gain: 0, response: exp }
 pad_filter.lp -> pad_amp.in
@@ -336,7 +336,7 @@ kick_follow.env -> pad_post.cv : -.16
 live_midi = midi { voices: 1, mode: last, cc: [74,1] }
 midi_osc = vco { freq: 220hz, wave: saw }
 live_midi.voct1 -> midi_osc.v_oct
-midi_env = adsr { attack: .01, decay: .18, sustain: .65, release: .5,
+midi_env = adsr { attack: .01, decay: .54, sustain: .65, release: 1.5,
                   curve: exp }
 live_midi.gate1 -> midi_env.gate
 midi_filter = svf { cutoff: 650, res: .25 }
@@ -344,7 +344,7 @@ midi_osc -> midi_filter.in
 live_midi.cc1 -> midi_filter.cutoff : 3200
 midi_amp = vca { gain: 0 }
 midi_filter.lp -> midi_amp.in
-midi_env -> midi_amp.cv : .3
+midi_env -> midi_amp.cv : .42
 
 live_audio = extin
 live_filter = svf { cutoff: 1200, res: .15 }
@@ -441,7 +441,7 @@ master_dc.out_r -> master_eq.in_r
 
 master_comp = compressor { sidechain: external, threshold: -17, ratio: 2.2,
                            knee: 5, attack: .012, release: .15,
-                           makeup: 1.2, mix: .82 }
+                           makeup: 9.4, mix: .82 }
 master_eq.out_l -> master_comp.in_l
 master_eq.out_r -> master_comp.in_r
 kick_drive -> master_comp.side_l : .72

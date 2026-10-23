@@ -109,7 +109,7 @@ p_rim.gate   -> rim.trig
 0.35 -> rim.accent
 
 # Kick envelope for the three-depth duck (channel, FX return, bus glue).
-kduck = func { rise: 0.004, fall: 0.20, curve: exp }
+kduck = func { rise: 0.004, fall: 0.6, curve: exp }
 p_kick.trig -> kduck.trig
 
 # === SUB — sine only, mono, never modulated (card rule) ===
@@ -138,7 +138,7 @@ wsub.cv -> wrate.beats
 wob = lfo { freq: 0hz, wave: tri }          # freq base zeroed: cables SUM
 wrate.hz -> wob.freq
 note.trig -> wob.reset
-wdep = func { rise: 0.42, fall: 0.12, curve: exp }
+wdep = func { rise: 0.42, fall: 0.36, curve: exp }
 note.trig -> wdep.trig
 wdepth = vca { gain: 0 }
 wob  -> wdepth.in
@@ -166,7 +166,7 @@ kduck -> wob_out.cv : -0.18
 growl = fm { algo: dual, freq: 220hz,
              ratios: [1, 1, 3.5, 1, 7, 2],
              levels: [0.9, 0.35, 0.2, 0.6, 0.15, 0.25],
-             fb: [0, 0.3, 0, 0, 0.45, 0], curve: log,
+             fb: [0, 0.55, 0, 0, 0.35, 0], curve: log,
              t4: [0.05, 0.05, 0.05, 0.05, 0.05, 0.05] }
 note.gate -> growl.gate
 note.cv   -> growl.v_oct
@@ -183,11 +183,11 @@ growl -> f1.in
 growl -> f2.in
 growl -> f3.in
 vow = lfo { freq: 0.6hz, wave: tri }
-x1 = xfade { mix: 0.5 }
+x1 = xfade { mix: 0.5, law: equal_power }
 f1.bp -> x1.a
 f2.bp -> x1.b
 vow -> x1.mix : 0.5
-x2 = xfade { mix: 0.35 }
+x2 = xfade { mix: 0.35, law: equal_power }
 x1    -> x2.a
 f3.bp -> x2.b
 vow -> x2.mix : 0.25
@@ -321,7 +321,7 @@ dc.out_l -> eq_m.in_l
 dc.out_r -> eq_m.in_r
 
 glue = compressor { sidechain: external, threshold: -14, ratio: 2.4, knee: 6,
-                    attack: 0.012, release: 0.14, makeup: 1.6, mix: 1 }
+                    attack: 0.012, release: 0.14, makeup: 6.5, mix: 1 }
 eq_m.out_l -> glue.in_l
 eq_m.out_r -> glue.in_r
 kick -> glue.side_l : 0.9                   # depth three: external-sidechain glue

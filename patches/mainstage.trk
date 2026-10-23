@@ -1,0 +1,53 @@
+# mainstage.trk -- the notes of mainstage-trk.patch: Dm | Bb | F | C at
+# 128 BPM, one row per sixteenth (the patch clocks it from a 512 BPM clock).
+# The arrangement levels live in mainstage-form.trk, one row per four bars.
+
+track kick  note len 2      # 1: four on the floor, an eighth long
+track clap  note len 2      # 2: beats 2 and 4
+track chop  note            # 3: the trance-gate rhythm that chops the pad
+track hook  note len 2      # 4: supersaw hook (its level lane gates it)
+track harm  note cva cvb    # 5: chord root, third, fifth (absolute v/oct)
+track fx    note len 1      # 6: crash + sub impact on a drop downbeat
+
+# One chord per bar. Every voice -- bass, pad, arp -- reads these three.
+pattern chords 4x16 harm
+#      root third fifth
+1:00 | D3   F4    A3
+2:00 | Bb2  D4    F3
+3:00 | F3   A4    C4
+4:00 | C3   E4    G3
+
+# The pad's sixteenth gate: 1011 0101 1010 1101, one bar, looped (0 = off).
+pattern chop 16 chop
+lane chop x0xx 0x0x x0x0 xx0x
+
+# Two-bar D-minor-pentatonic hook in straight quarters: A C D C | A G A--.
+pattern hook 32 hook
+00 | A4
+04 | C5
+08 | D5
+12 | C5
+16 | A4
+20 | G4
+24 | A4
+
+# Kick on every quarter, clap on 2 and 4.
+pattern beat 16 kick clap
+lane kick x... x... x... x...
+lane clap .... x... .... x...
+
+# A drop downbeat: one crash + impact, laid over the step once (hit@0).
+pattern hit 1 fx
+| x
+
+# 32 four-bar blocks; levels per block are in mainstage-form.trk.
+section main chords+chop+hook
+order main*6                 # 0-5   intro, arp in, grow: no drums
+order main+beat              # 6     build: kick in
+order main                   # 7     the lift: kick out
+order main+beat+hit@0        # 8     DROP 1
+order main+beat*3            # 9-11
+order main*5                 # 12-16 breathe, break, build 2
+order main+beat+hit@0        # 17    DROP 2
+order main+beat*7            # 18-24 the peak, then the groove
+order main*7                 # 25-31 peel, fade, silence

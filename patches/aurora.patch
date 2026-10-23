@@ -48,14 +48,14 @@ melody -> roots.in
 bar -> roots.trig
 bass_osc = vco { freq: 73.42hz, wave: saw }
 roots -> bass_osc.v_oct
-bass_env = func { rise: 0.005, fall: 0.35, curve: exp }
+bass_env = func { rise: 0.005, fall: 1.75, curve: exp }
 quarter -> bass_env.trig
 bass_vcf = ladder { cutoff: 120, res: 0.35, drive: 0.6 }
 bass_osc -> bass_vcf.in
 bass_env -> bass_vcf.cutoff : 900
 bass_amp = vca { gain: 0, response: exp }
-bass_vcf -> bass_amp.in
-bass_env -> bass_amp.cv : 0.9
+bass_vcf -> bass_amp.in : 0.89          # -1 dB: ladder now compensates part of its res loss
+bass_env -> bass_amp.cv : 1.08
 
 # ---- kick: synced sine with a fast log pitch-drop envelope, soft drive ----
 kick_env = func { rise: 0.001, fall: 0.22, curve: log }
@@ -70,14 +70,14 @@ kick_drv = drive { amount: 0.3, mode: soft }
 kick_amp -> kick_drv.in
 
 # ---- hats: white noise highpassed, sixteenths accented off the eighth grid ----
-hat_env = func { rise: 0.001, fall: 0.05, curve: exp }
+hat_env = func { rise: 0.001, fall: 0.15, curve: exp }
 master -> hat_env.trig
 hiss = noise { color: white, seed: 5 }
 hat_hp = svf { cutoff: 8500, res: 0.2 }
 hiss -> hat_hp.in
 hat_amp = vca { gain: 0 }
 hat_hp.hp -> hat_amp.in
-hat_env -> hat_amp.cv : 0.7
+hat_env -> hat_amp.cv : 0.98
 eighth -> hat_amp.cv : -0.25
 
 # ---- pad: pulse chord tone morphing into pink air, 4-bar filter swell ----
@@ -86,7 +86,7 @@ roots -> pad_osc.v_oct
 pad_pwm = lfo { wave: sine, freq: 0.23hz }
 pad_pwm -> pad_osc.pwm : 0.25
 air = noise { color: pink, seed: 9 }
-pad_mix = xfade { mix: 0.3 }
+pad_mix = xfade { mix: 0.3, law: equal_power }
 pad_osc -> pad_mix.a
 air -> pad_mix.b : 0.7
 morph = lfo { wave: tri, freq: 0.033hz }
@@ -104,13 +104,11 @@ pad_vcf.lp -> pad_amp.in
 swell -> pad_amp.gain : 0.3
 
 # ---- ring bloom: lead x fifth-above sine, opened once a bar ----
-# math.b's neutral base is 1.0 (so unpatched mult passes through); the -1.0
-# constant cancels it, leaving pure oscillator on b -- true ring mod, not AM.
+# Both multiplier inputs have zero bases: pure oscillator multiplication.
 fifth = vco { freq: 440hz, wave: sine }
 melody -> fifth.v_oct
 ring = math { op: mult }
 lead_osc -> ring.a
--1.0 -> ring.b
 fifth -> ring.b
 ring_gate = lpg { damp: 0.6, decay: 0.8 }
 ring -> ring_gate.in
