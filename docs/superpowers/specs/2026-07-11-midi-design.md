@@ -71,11 +71,16 @@ here and not in `alloc` because only midi knows note identity.
   PipeWire and UMP packets on newer; the implementation targets whatever the
   build machine's headers provide and this is verified during
   implementation, not assumed.
-- At each block start the runner drains the ring and hands events to midi
-  modules through a narrow `on_midi(const uint8_t*, size)` hook — RT-safe,
-  no locks, no allocation. v1 quantizes events to block boundaries
-  (≤ ~5 ms at 256/48k); sample-accurate offsets are a later refinement and
-  the hook signature does not preclude them.
+- The producer stamps each event with when it should sound: the MIDI
+  cycle's CLOCK_MONOTONIC start (`spa_io_position` clock.nsec) plus its
+  frame offset plus one cycle. The audio callback passes its own cycle start
+  to the runner, which splits the callback at each due event and hands it to
+  midi modules through `on_midi(const uint8_t*, size)` on that exact frame —
+  RT-safe, no locks, no allocation. The fixed one-cycle delay is what keeps
+  played spacing intact: within a cycle the audio stream may render before or
+  after the MIDI filter, so the next cycle is the earliest every event can
+  make. Unstamped events (no position, or a stamp more than a second off)
+  play at the next frame rendered.
 - Offline `render` has no transport: midi modules output silence/defaults.
   Patches with midi remain renderable and `check`-able everywhere. A midi
   module in a render is not an error; it is a keyboard nobody is playing.
@@ -105,7 +110,6 @@ and it is kept dumb):
 
 ## 6. Deferred
 
-- Sample-accurate event offsets within a block.
 - MIDI clock/transport sync (a future `midiclock` module; `clock` stays
   master otherwise), MPE, NRPN/14-bit CC, program change, MIDI out.
 - MIDI-file input for offline renders.

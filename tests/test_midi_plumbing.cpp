@@ -40,18 +40,21 @@ class MidiStub : public dsp::Module {
   struct Event {
     uint8_t data[4] = {};
     size_t len = 0;
+    size_t frame = 0;  // samples processed before it arrived
   };
 
-  void process(const float*, float*) override {}
+  void process(const float*, float*) override { ++frames; }
 
   void on_midi(const uint8_t* data, size_t len) override {
     Event e;
     e.len = len;
+    e.frame = frames;
     for (size_t i = 0; i < len && i < 4; ++i) e.data[i] = data[i];
     received.push_back(e);
   }
 
   std::vector<Event> received;
+  size_t frames = 0;
 };
 
 const dsp::ModuleInfo kMidiStubInfo{
@@ -150,4 +153,43 @@ TEST_CASE("midi ring overflow drops the newest event, keeps queued order") {
   REQUIRE(stub->received.size() == 255);
   CHECK(stub->received[0].data[1] == 0);       // oldest survives
   CHECK(stub->received[254].data[1] == 254);   // the 256th+ pushes were dropped
+}
+
+TEST_CASE("timed midi events land on the frame they were stamped for") {
+  auto* eng = new engine::Engine(make_stub_graph());
+  auto* stub = dynamic_cast<MidiStub*>(eng->graph().nodes[0].instance.get());
+  REQUIRE(stub != nullptr);
+  engine::RtRunner run(48000.0);
+  engine::Command swap;
+  swap.kind = engine::Command::Kind::Swap;
+  swap.engine = eng;
+  REQUIRE(run.push(swap));
+
+  constexpr uint64_t kT0 = 5'000'000'000;  // any monotonic time
+  auto at = [](uint64_t frame) { return kT0 + frame * 1'000'000'000 / 48000 + 1; };
+  float l[256], r[256];
+  run.render(l, r, 256, kT0 - 256 * 1'000'000'000ull / 48000);  // adopt the engine
+  stub->frames = 0;
+
+  REQUIRE(run.push_midi({{0x90, 60, 100, 0}, 3}, kT0 - 1000));      // late: plays now
+  REQUIRE(run.push_midi({{0x90, 62, 100, 0}, 3}, at(100)));
+  REQUIRE(run.push_midi({{0x90, 64, 100, 0}, 3}, at(100)));          // same frame, in order
+  REQUIRE(run.push_midi({{0x90, 65, 100, 0}, 3}, at(300)));          // next callback
+  run.render(l, r, 256, kT0);
+  REQUIRE(stub->received.size() == 3);
+  CHECK(stub->received[0].frame == 0);
+  CHECK(stub->received[1].frame == 100);
+  CHECK(stub->received[2].frame == 100);
+  CHECK(stub->received[2].data[1] == 64);
+  CHECK(stub->frames == 256);
+
+  run.render(l, r, 256, kT0 + 256 * 1'000'000'000ull / 48000);
+  REQUIRE(stub->received.size() == 4);
+  CHECK(stub->received[3].frame == 300);
+
+  // An event stamped far ahead means the clocks disagree: it plays now.
+  REQUIRE(run.push_midi({{0x80, 60, 0, 0}, 3}, kT0 + 60'000'000'000ull));
+  run.render(l, r, 256, kT0 + 512 * 1'000'000'000ull / 48000);
+  REQUIRE(stub->received.size() == 5);
+  CHECK(stub->received[4].frame == 512);
 }

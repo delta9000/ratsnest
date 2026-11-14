@@ -61,30 +61,45 @@ void RtRunner::drain_commands() {
   }
 }
 
-// Block-start: drain the rings owned by *this* runner (not current_ -- see
-// rt_runner.h) into the live engine, quantizing queued MIDI and captured
-// audio to this block boundary. Each drain is capped; leftovers wait a block.
-void RtRunner::drain_inputs() {
-  dsp::MidiEvent midi_e;
-  drain_bounded(midi_ring_, midi_e, kMidiRing,
-                [this](const dsp::MidiEvent& e) { current_->deliver_midi_event(e); });
+// Block-start: drain captured audio into the live engine (the ring lives on
+// this runner, not current_ -- see rt_runner.h). Capped; leftovers wait.
+void RtRunner::drain_audio_in() {
   AudioChunk audio_c;
   drain_bounded(audio_ring_, audio_c, kAudioRing,
                 [this](const AudioChunk& a) { current_->deliver_audio(a.s, a.len); });
 }
 
-void RtRunner::render(float* l, float* r, size_t frames) {
-  while (frames > kMaxBlock) {
-    render_block(l, r, kMaxBlock);
-    l += kMaxBlock;
-    r += kMaxBlock;
-    frames -= kMaxBlock;
+// Delivers every queued MIDI event due by frame `from` of this callback and
+// returns how many frames can run before the next one is due (at most
+// `frames`). An event more than a second ahead means the clocks disagree
+// (a restarted server, an unstamped block): it plays now rather than never.
+size_t RtRunner::deliver_due_midi(uint64_t now_ns, size_t from, size_t frames) {
+  TimedMidi m;
+  for (size_t n = 0; n < kMidiRing && midi_ring_.try_peek(m); ++n) {
+    const uint64_t ahead = m.at_ns > now_ns ? m.at_ns - now_ns : 0;
+    const auto due = static_cast<size_t>(ahead > 1'000'000'000u ? 0.0
+        : static_cast<double>(ahead) * rate_ * 1e-9 + 0.5);  // nearest frame
+    if (due > from) return std::min(frames, due - from);
+    midi_ring_.try_pop(m);
+    current_->deliver_midi_event(m.e);
   }
-  render_block(l, r, frames);
+  return frames;
+}
+
+// Runs the callback in segments split at kMaxBlock and at each MIDI event's
+// frame, so an event lands exactly where it was stamped.
+void RtRunner::render(float* l, float* r, size_t frames, uint64_t now_ns) {
+  size_t done = 0;
+  do {
+    drain_commands();
+    size_t n = std::min(frames - done, kMaxBlock);
+    if (current_) n = deliver_due_midi(now_ns, done, n);
+    render_block(l + done, r + done, n);
+    done += n;
+  } while (done < frames);
 }
 
 void RtRunner::render_block(float* l, float* r, size_t frames) {
-  drain_commands();
   if (!current_) {
     std::fill(l, l + frames, 0.0f);
     std::fill(r, r + frames, 0.0f);
@@ -93,7 +108,7 @@ void RtRunner::render_block(float* l, float* r, size_t frames) {
     return;
   }
 
-  drain_inputs();  // current_ is non-null here (checked above)
+  drain_audio_in();  // current_ is non-null here (checked above)
   current_->process(l, r, frames);
   if (old_) {
     old_->process(scratch_l_.data(), scratch_r_.data(), frames);

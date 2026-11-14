@@ -63,7 +63,7 @@ struct PipewireOut::Impl {
 
       auto* l = static_cast<float*>(buf->datas[0].data);
       auto* r = static_cast<float*>(buf->datas[1].data);
-      self->fn(self->user, l, r, frames);
+      self->fn(self->user, l, r, frames, position != nullptr ? position->clock.nsec : 0);
       clamp_device_buffer(l, r, frames);
 
       for (uint32_t c = 0; c < 2; ++c) {

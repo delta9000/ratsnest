@@ -77,7 +77,7 @@ struct MidiIn::Impl {
   // the per-message output of spa_ump_to_midi -- neither is guaranteed to
   // already be running-status-free, so this is the single normalization
   // point (module.h: "running status is expanded by the producer").
-  void push_raw(const uint8_t* data, size_t len) {
+  void push_raw(const uint8_t* data, size_t len, uint64_t at_ns) {
     size_t i = 0;
     uint8_t running = 0;
     while (i < len) {
@@ -100,15 +100,27 @@ struct MidiIn::Impl {
       e.data[0] = status;
       for (size_t k = 1; k < msg_len; ++k) e.data[k] = data[data_start + k - 1];
       e.len = static_cast<uint8_t>(msg_len);
-      runner->push_midi(e);  // drop-on-full; never blocks (RT rule 3)
+      runner->push_midi(e, at_ns);  // drop-on-full; never blocks (RT rule 3)
       i = data_start + (msg_len - 1);
     }
   }
 
-  void handle_control(const spa_pod_control* c) {
+  // When an event at frame `offset` of this cycle should sound: one cycle
+  // later, at the same offset. The audio stream has usually rendered this
+  // cycle already, so the next one is the earliest every event can make;
+  // the fixed delay keeps the spacing the notes were played with.
+  static uint64_t at_ns(const spa_io_position* p, uint32_t offset) {
+    if (p == nullptr || p->clock.rate.denom == 0) return 0;  // unknown: next block
+    const double ns_per_frame = 1e9 * p->clock.rate.num / p->clock.rate.denom;
+    return p->clock.nsec +
+           static_cast<uint64_t>(static_cast<double>(offset + p->clock.duration) * ns_per_frame);
+  }
+
+  void handle_control(const spa_pod_control* c, const spa_io_position* p) {
+    const uint64_t at = at_ns(p, c->offset);
     if (c->type == SPA_CONTROL_Midi) {
       const auto* bytes = static_cast<const uint8_t*>(SPA_POD_BODY(&c->value));
-      push_raw(bytes, SPA_POD_BODY_SIZE(&c->value));
+      push_raw(bytes, SPA_POD_BODY_SIZE(&c->value), at);
     } else if (c->type == SPA_CONTROL_UMP) {
       const auto* words = static_cast<const uint32_t*>(SPA_POD_BODY(&c->value));
       size_t remaining = SPA_POD_BODY_SIZE(&c->value);
@@ -116,13 +128,13 @@ struct MidiIn::Impl {
         uint8_t midi_buf[8];
         int n = spa_ump_to_midi(&words, &remaining, midi_buf, sizeof(midi_buf), &ump_state);
         if (n < 0) break;       // malformed/oversized packet: drop the rest
-        if (n > 0) push_raw(midi_buf, static_cast<size_t>(n));
+        if (n > 0) push_raw(midi_buf, static_cast<size_t>(n), at);
       }
     }
     // Other control types (Properties, OSC) are not MIDI: ignored.
   }
 
-  static void on_process(void* userdata, spa_io_position* /*position*/) {
+  static void on_process(void* userdata, spa_io_position* position) {
     auto* self = static_cast<Impl*>(userdata);
     pw_buffer* b = pw_filter_dequeue_buffer(self->port);
     if (b == nullptr) return;
@@ -134,7 +146,7 @@ struct MidiIn::Impl {
       if (pod != nullptr && spa_pod_is_sequence(pod) != 0) {
         const auto* seq = reinterpret_cast<const spa_pod_sequence*>(pod);
         const spa_pod_control* c;
-        SPA_POD_SEQUENCE_FOREACH(seq, c) self->handle_control(c);
+        SPA_POD_SEQUENCE_FOREACH(seq, c) self->handle_control(c, position);
       }
     }
     pw_filter_queue_buffer(self->port, b);
