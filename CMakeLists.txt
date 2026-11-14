@@ -8,6 +8,14 @@ option(RATSNEST_WERROR "Treat warnings as errors" OFF)
 option(RATSNEST_SAN "Enable ASan + UBSan for every target" OFF)
 
 add_compile_options(-Wall -Wextra -Wconversion)
+# Never fuse a*b+c into an FMA: it rounds differently, so the same patch would
+# render different samples depending on the CPU the build targets.
+add_compile_options(-ffp-contract=off)
+# SSE4.1 (any x86-64 CPU since ~2009) turns floor/round into one instruction
+# instead of a branchy sequence; the results are the same bits.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  add_compile_options(-march=x86-64-v2)
+endif()
 if(RATSNEST_WERROR)
   add_compile_options(-Werror)
 endif()
@@ -23,7 +31,9 @@ add_library(mscore STATIC ${MSCORE_SOURCES})
 target_include_directories(mscore PUBLIC src)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
+# 1.6: the MIDI input calls spa_ump_to_midi with conversion state, which
+# older SPA headers do not have (1.4 lacks the state, 1.2 the whole header).
+pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3>=1.6)
 target_link_libraries(mscore PUBLIC PkgConfig::PIPEWIRE)
 
 add_executable(ratsnest src/main.cpp)
@@ -74,6 +84,14 @@ add_test(NAME cli_render_bad_duration
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 5sec -o ${CMAKE_CURRENT_BINARY_DIR}/first-bad.wav)
 set_tests_properties(cli_render_bad_duration PROPERTIES WILL_FAIL TRUE)
+# --rate takes a whole rate a device can run at: 0, negatives and junk are errors.
+foreach(bad_rate 0 -5 1e9 44100.5 48k)
+  add_test(NAME cli_render_bad_rate_${bad_rate}
+    COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+            -d 100ms --rate ${bad_rate} -o ${CMAKE_CURRENT_BINARY_DIR}/first-bad.wav)
+  set_tests_properties(cli_render_bad_rate_${bad_rate} PROPERTIES
+    PASS_REGULAR_EXPRESSION "error: --rate needs a whole sample rate")
+endforeach()
 add_test(NAME cli_render_unknown_option
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch --duration 5)
 set_tests_properties(cli_render_unknown_option PROPERTIES

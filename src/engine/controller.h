@@ -34,7 +34,6 @@ class Controller {
   void clear_watch();
   void drain_retired();
   const graph::Graph* graph() const { return shadow_.get(); }
-  uint64_t generation() const { return generation_; }
   int engines_in_flight() const { return pushed_ - reaped_; }
 
  private:
@@ -44,7 +43,6 @@ class Controller {
   double rate_;
   std::unique_ptr<graph::Graph> shadow_;
   std::string watch_spec_;
-  uint64_t generation_ = 0;
   int pushed_ = 0;  // engines handed to the runner
   int reaped_ = 0;  // engines retired back and deleted
   bool pending_ = false;

@@ -5,6 +5,7 @@
 #include "engine/engine.h"
 #include "engine/pipewire_out.h"
 #include <limits>
+#include <string>
 #include "graph/graph.h"
 
 using namespace ms;
@@ -91,4 +92,16 @@ TEST_CASE("audio device safety clamps and sanitizes its final buffers") {
   CHECK(r[1] == 1.0f);
   CHECK(r[2] == 0.0f);
   CHECK(r[3] == -0.5f);
+}
+
+TEST_CASE("a non-finite module output reads as zero, cabled or not") {
+  // 3e38 * 8 overflows to +inf inside each vca. `loud` feeds out; `spare`
+  // feeds nothing and is only ever looked at through output_value.
+  const std::string big = "3" + std::string(38, '0');
+  auto e = make_engine(("loud = vca { in: " + big + ", gain: 8 }\nspare = vca { in: " + big +
+                        ", gain: 8 }\nloud -> out.in\n").c_str());
+  float l[8], r[8];
+  e.process(l, r, 8);
+  for (float v : l) CHECK(v == 0.0f);
+  for (size_t i = 0; i < e.graph().nodes.size(); ++i) CHECK(e.output_value(i, 0) == 0.0f);
 }

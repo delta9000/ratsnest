@@ -24,7 +24,9 @@ amp  -> out.in
 
 ### Prerequisites
 
-- Linux with PipeWire (`libpipewire-0.3` dev headers, via `pkg-config`)
+- Linux with PipeWire 1.6 or newer (`libpipewire-0.3` dev headers, via
+  `pkg-config`). Ubuntu 26.04 ships it; 24.04's 1.0 is too old to build the
+  MIDI input.
 - A C++20 compiler
 - [mise](https://mise.jdx.dev/) — manages `cmake`/`ninja` versions and wraps
   the build/test/render/play commands below

@@ -42,7 +42,6 @@ void RtRunner::drain_commands() {
         if (current_) current_->set_param(c.node, c.slot, c.value, glide_samples_);
         break;
       case Command::Kind::Swap:
-        ++generation_;
         if (old_) retired_.try_push(old_);  // a save landed mid-fade; room checked
         old_ = nullptr;
         if (!current_) {
@@ -53,9 +52,6 @@ void RtRunner::drain_commands() {
           current_ = c.engine;
           fade_pos_ = 0;
         }
-        break;
-      case Command::Kind::Observe:
-        observing_ = c.value > 0;
         break;
       case Command::Kind::Watch:
         watch_node_ = c.node;
@@ -99,16 +95,6 @@ void RtRunner::render_block(float* l, float* r, size_t frames) {
 
   drain_inputs();  // current_ is non-null here (checked above)
   current_->process(l, r, frames);
-  frame_ += frames;
-  since_observation_ += frames;
-  if (observing_ && since_observation_ >= static_cast<size_t>(rate_ / 30)) {
-    observation_.generation = generation_;
-    observation_.frame = frame_;
-    observation_.size = current_->copy_outputs(observation_.values);
-    observations_.try_push(observation_);
-    since_observation_ = 0;
-  }
-
   if (old_) {
     old_->process(scratch_l_.data(), scratch_r_.data(), frames);
     for (size_t i = 0; i < frames; ++i) {

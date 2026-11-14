@@ -304,9 +304,10 @@ ratsnest describe [module_type]      # JSON interfaces from the runtime registry
 ### 7.5 Error handling
 
 - Parse/validation errors: report, keep last good graph running (§3.3).
-- Runtime: denormal flushing (FTZ/DAZ), NaN guard per module output (replace
-  with 0, count + report). Device output clips to -1..1; use an explicit
-  limiter for dynamics control.
+- Runtime: denormal flushing (FTZ/DAZ), NaN guard per module output that
+  anything reads: cable sources, `out`, taps and watches (replace with 0,
+  count + report). Device output clips to -1..1; use an explicit limiter for
+  dynamics control.
 - PipeWire xruns/disconnects: reconnect with silence fill; never crash the
   session.
 

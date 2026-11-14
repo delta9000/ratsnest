@@ -43,7 +43,7 @@ size_t lines(const std::string& s) { return static_cast<size_t>(std::count(s.beg
 // the whole argument, as is the name.
 Tap parse_tap(std::string_view arg) {
   const size_t eq = arg.find('=');
-  return {std::string(arg.substr(0, eq)), std::string(arg.substr(eq + 1))};
+  return {std::string(arg.substr(0, eq)), std::string(arg.substr(eq + 1)), false, {}};
 }
 
 std::string check_taps(const std::vector<Tap>& taps) {

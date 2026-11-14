@@ -15,9 +15,9 @@ class Engine {
 
   // RT-safe param glide: linear ramp to target over glide_samples (0 = jump).
   void set_param(size_t node, size_t slot, float target, size_t glide_samples);
-  // Last processed sample's value on an output port; 0.0f if out of range.
+  // Last processed sample's value on an output port; 0.0f if out of range
+  // or non-finite.
   float output_value(size_t node, size_t slot) const;
-  size_t copy_outputs(std::span<float> destination) const;
   const graph::Graph& graph() const { return *g_; }
   // Copy migratable module state from the engine being replaced, following
   // graph().migrate_pairs. RT-called at swap adoption, when the RT thread
@@ -64,7 +64,7 @@ class Engine {
     dsp::Module* mod = nullptr;
     const float* ins = nullptr;   // the node's slice of ins_
     float* outs = nullptr;        // the node's slice of outs_
-    size_t n_outs = 0;
+    size_t guard_begin = 0, guard_end = 0;  // range in guarded_
     size_t cable_begin = 0, cable_end = 0;  // range in cables_
   };
   // *dst = *init + *src * depth. The first cable into a slot starts from the
@@ -79,6 +79,7 @@ class Engine {
   void write_base(size_t node, size_t slot, float v);
   std::vector<Step> steps_;        // one per node, in schedule order
   std::vector<FlatCable> cables_;  // grouped by destination node
+  std::vector<float*> guarded_;    // outputs that are read, grouped by node
   size_t out_index_ = 0;           // flat outs_ index of the out node's left
   std::array<Glide, kMaxGlides> glides_{};
   size_t n_glides_ = 0;

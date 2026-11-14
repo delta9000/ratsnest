@@ -63,7 +63,6 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
     return res;
   }
   ++pushed_;
-  ++generation_;
   shadow_ = std::move(c2.graph);
   res.ok = true;
   res.topology = true;
