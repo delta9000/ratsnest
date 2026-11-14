@@ -22,7 +22,7 @@ Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
   outs_.assign(total, 0.0f);
   // Only outputs the graph reads get the per-sample finite guard: cable
   // sources and the out node's pair. An unread output feeds nothing, and
-  // output_value/copy_outputs guard it when someone looks.
+  // output_value guards it when someone looks.
   std::vector<bool> read(total, false);
   for (const auto& into : g_->in_cables)
     for (const graph::Cable& c : into)
@@ -122,13 +122,6 @@ float Engine::output_value(size_t node, size_t slot) const {
   if (node >= g_->nodes.size()) return 0.0f;
   if (slot >= g_->nodes[node].info->outputs.size()) return 0.0f;
   return finite_or_zero(outs_[out_offset_[node] + slot]);
-}
-
-size_t Engine::copy_outputs(std::span<float> destination) const {
-  const size_t n = std::min(destination.size(), outs_.size());
-  std::transform(outs_.begin(), outs_.begin() + static_cast<std::ptrdiff_t>(n),
-                 destination.begin(), finite_or_zero);
-  return n;
 }
 
 void Engine::deliver_midi_event(const dsp::MidiEvent& e) {

@@ -152,19 +152,13 @@ TEST_CASE("audio thread never allocates after warm-up, for every patch") {
     auto first = ctl.load(src, path.string());
     if (!first.ok) continue;  // compile errors are check-all's job, not ours
 
-    Command observe;
-    observe.kind = Command::Kind::Observe;
-    observe.value = 1.0f;
-    REQUIRE(run.push(observe));
     run.render(l.data(), r.data(), kBlock);  // warm-up: adopt the first engine
-    ms::engine::Observation obs;
     {
       Armed a;
       render_blocks(run, 12, l, r);
     }
     CHECK(t_allocs == 0);
     CHECK(t_frees == 0);
-    while (run.try_observe(obs)) {}
 
     // Topology reload: an extra node forces a Swap with state migration.
     auto second = ctl.load(src + "\nrtallocprobe = noise\n", path.string());

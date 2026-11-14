@@ -18,7 +18,6 @@ class Engine {
   // Last processed sample's value on an output port; 0.0f if out of range
   // or non-finite.
   float output_value(size_t node, size_t slot) const;
-  size_t copy_outputs(std::span<float> destination) const;
   const graph::Graph& graph() const { return *g_; }
   // Copy migratable module state from the engine being replaced, following
   // graph().migrate_pairs. RT-called at swap adoption, when the RT thread

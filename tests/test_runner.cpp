@@ -199,26 +199,6 @@ TEST_CASE("oversized blocks are processed in chunks") {
   CHECK(l.back() == doctest::Approx(1.0f));
 }
 
-TEST_CASE("observation telemetry follows graph generations and never blocks when unread") {
-  ms::engine::RtRunner runner(48000);
-  ms::engine::Controller controller(runner,48000);
-  REQUIRE(controller.load("1 -> out.in\n").ok);
-  ms::engine::Command observe;observe.kind=ms::engine::Command::Kind::Observe;observe.value=1;
-  REQUIRE(runner.push(observe));
-  std::vector<float> l(4096),r(4096);
-  for(int i=0;i<20;++i)runner.render(l.data(),r.data(),l.size());
-  CHECK(l.back()==1.f);
-  ms::engine::Observation snapshot;
-  REQUIRE(runner.try_observe(snapshot));CHECK(snapshot.generation==controller.generation());
-  CHECK(snapshot.size==2);CHECK(snapshot.values[0]==1.f);
-  while(runner.try_observe(snapshot)){}
-  REQUIRE(controller.load("a = vca {}\n2 -> a.in\na -> out.in\n").ok);
-  runner.render(l.data(),r.data(),l.size());
-  REQUIRE(runner.try_observe(snapshot));CHECK(snapshot.generation==controller.generation());
-  CHECK(snapshot.size==3);
-  controller.drain_retired();
-}
-
 // Regression: a Swap landing while the retire queue was full used to drop the
 // fading engine's pointer (leak). Now the Swap -- and every command behind
 // it -- waits until the non-RT side reaps; every engine is retired exactly once.

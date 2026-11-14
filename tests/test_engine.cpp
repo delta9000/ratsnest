@@ -103,8 +103,5 @@ TEST_CASE("a non-finite module output reads as zero, cabled or not") {
   float l[8], r[8];
   e.process(l, r, 8);
   for (float v : l) CHECK(v == 0.0f);
-  float all[8];
-  const size_t n = e.copy_outputs(all);
-  for (size_t i = 0; i < n; ++i) CHECK(std::isfinite(all[i]));
   for (size_t i = 0; i < e.graph().nodes.size(); ++i) CHECK(e.output_value(i, 0) == 0.0f);
 }
