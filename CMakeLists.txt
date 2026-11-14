@@ -8,6 +8,14 @@ option(RATSNEST_WERROR "Treat warnings as errors" OFF)
 option(RATSNEST_SAN "Enable ASan + UBSan for every target" OFF)
 
 add_compile_options(-Wall -Wextra -Wconversion)
+# Never fuse a*b+c into an FMA: it rounds differently, so the same patch would
+# render different samples depending on the CPU the build targets.
+add_compile_options(-ffp-contract=off)
+# SSE4.1 (any x86-64 CPU since ~2009) turns floor/round into one instruction
+# instead of a branchy sequence; the results are the same bits.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  add_compile_options(-march=x86-64-v2)
+endif()
 if(RATSNEST_WERROR)
   add_compile_options(-Werror)
 endif()
