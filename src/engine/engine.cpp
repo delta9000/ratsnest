@@ -3,6 +3,9 @@
 #include <cmath>
 
 namespace ms::engine {
+namespace {
+float finite_or_zero(float v) { return std::isfinite(v) ? v : 0.0f; }
+}  // namespace
 
 Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
   size_t total = 0, total_ins = 0, n_cables = 0;
@@ -17,6 +20,13 @@ Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
     if (n.info->wants_audio_in) g_->audio_in_nodes.push_back(static_cast<int>(ni));
   }
   outs_.assign(total, 0.0f);
+  // Only outputs the graph reads get the per-sample finite guard: cable
+  // sources and the out node's pair. An unread output feeds nothing, and
+  // output_value/copy_outputs guard it when someone looks.
+  std::vector<bool> read(total, false);
+  for (const auto& into : g_->in_cables)
+    for (const graph::Cable& c : into)
+      read[out_offset_[static_cast<size_t>(c.src_mod)] + static_cast<size_t>(c.src_out)] = true;
   ins_.assign(std::max<size_t>(total_ins, 1), 0.0f);  // never an empty slice
 
   // Flatten the graph into one contiguous schedule so the per-sample loop
@@ -33,7 +43,11 @@ Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
     st.mod = n.instance.get();
     st.ins = ins;
     st.outs = outs_.data() + out_offset_[ni];
-    st.n_outs = n.info->outputs.size();
+    st.guard_begin = guarded_.size();
+    for (size_t o = 0; o < n.info->outputs.size(); ++o)
+      if (read[out_offset_[ni] + o] || static_cast<int>(ni) == g_->out_node)
+        guarded_.push_back(st.outs + o);
+    st.guard_end = guarded_.size();
     st.cable_begin = cables_.size();
     for (const graph::Cable& c : g_->in_cables[ni]) {
       float* const dst = ins + static_cast<size_t>(c.dst_in);
@@ -54,14 +68,15 @@ Engine::Engine(std::unique_ptr<graph::Graph> g) : g_(std::move(g)) {
 void Engine::process(float* left, float* right, size_t frames) {
   const float* const outs = outs_.data();
   const FlatCable* const cables = cables_.data();
+  float* const* const guarded = guarded_.data();
   for (size_t f = 0; f < frames; ++f) {
     if (n_glides_ != 0) step_glides();
     for (const Step& st : steps_) {
       for (size_t c = st.cable_begin; c < st.cable_end; ++c)
         *cables[c].dst = *cables[c].init + *cables[c].src * cables[c].depth;
       st.mod->process(st.ins, st.outs);
-      for (size_t o = 0; o < st.n_outs; ++o)
-        if (!std::isfinite(st.outs[o])) st.outs[o] = 0.0f;
+      for (size_t o = st.guard_begin; o < st.guard_end; ++o)
+        if (!std::isfinite(*guarded[o])) *guarded[o] = 0.0f;
     }
     left[f]  = outs[out_index_];
     right[f] = outs[out_index_ + 1];
@@ -106,12 +121,13 @@ void Engine::step_glides() {
 float Engine::output_value(size_t node, size_t slot) const {
   if (node >= g_->nodes.size()) return 0.0f;
   if (slot >= g_->nodes[node].info->outputs.size()) return 0.0f;
-  return outs_[out_offset_[node] + slot];
+  return finite_or_zero(outs_[out_offset_[node] + slot]);
 }
 
 size_t Engine::copy_outputs(std::span<float> destination) const {
   const size_t n = std::min(destination.size(), outs_.size());
-  std::copy_n(outs_.begin(), n, destination.begin());
+  std::transform(outs_.begin(), outs_.begin() + static_cast<std::ptrdiff_t>(n),
+                 destination.begin(), finite_or_zero);
   return n;
 }
 
