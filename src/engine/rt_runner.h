@@ -27,6 +27,13 @@ struct AudioChunk {
   uint32_t len;
 };
 
+// A MIDI event and when it should sound: CLOCK_MONOTONIC nanoseconds, the
+// clock PipeWire stamps every cycle with. 0 means as soon as possible.
+struct TimedMidi {
+  dsp::MidiEvent e;
+  uint64_t at_ns;
+};
+
 // RT-side state machine. render() is the only method the audio thread calls;
 // everything it does is allocation-, lock-, and I/O-free. Engines enter via
 // Swap commands and leave via the retire queue (deleted by the non-RT side).
@@ -64,7 +71,12 @@ class RtRunner {
   // hot-reload swaps in a new Engine via a Swap command, and RtRunner is the
   // one object that outlives every such swap, so events queued right at a
   // swap are never silently dropped (midi spec §4).
-  bool push_midi(const dsp::MidiEvent& e) { return midi_ring_.try_push(e); }
+  //
+  // at_ns places the event inside a later block (see render); 0 delivers it
+  // at the start of the next block.
+  bool push_midi(const dsp::MidiEvent& e, uint64_t at_ns = 0) {
+    return midi_ring_.try_push({e, at_ns});
+  }
 
   // Producer side of the audio-capture ring, mirroring push_midi: called from
   // the PipeWire capture thread (a distinct thread from the audio thread that
@@ -73,11 +85,15 @@ class RtRunner {
   bool push_audio(const AudioChunk& c) { return audio_ring_.try_push(c); }
 
   // --- RT side ---
-  void render(float* l, float* r, size_t frames);
+  // now_ns: CLOCK_MONOTONIC time of the block's first frame, 0 if unknown.
+  // A MIDI event lands on the frame its at_ns falls on, so notes keep the
+  // spacing they were played with instead of snapping to block starts.
+  void render(float* l, float* r, size_t frames, uint64_t now_ns = 0);
 
  private:
   void drain_commands();
-  void drain_inputs();
+  void drain_audio_in();
+  size_t deliver_due_midi(uint64_t now_ns, size_t from, size_t frames);
   void render_block(float* l, float* r, size_t frames);
 
   double rate_;
@@ -86,7 +102,7 @@ class RtRunner {
   rt::SpscQueue<Command, kCommandRing> commands_;
   rt::SpscQueue<Engine*, 8> retired_;
   rt::SpscQueue<float, 4096> watch_;
-  rt::SpscQueue<dsp::MidiEvent, kMidiRing> midi_ring_;
+  rt::SpscQueue<TimedMidi, kMidiRing> midi_ring_;
   rt::SpscQueue<AudioChunk, kAudioRing> audio_ring_;
   Engine* current_ = nullptr;
   Engine* old_ = nullptr;  // non-null while crossfading or awaiting retire room

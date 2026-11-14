@@ -381,8 +381,8 @@ int cmd_render(const std::string& patch, int argc, char** argv) {
 std::atomic<bool> g_stop{false};
 void on_sigint(int) { g_stop.store(true); }
 
-void render_trampoline(void* user, float* l, float* r, size_t frames) {
-  static_cast<ms::engine::RtRunner*>(user)->render(l, r, frames);
+void render_trampoline(void* user, float* l, float* r, size_t frames, uint64_t now_ns) {
+  static_cast<ms::engine::RtRunner*>(user)->render(l, r, frames, now_ns);
 }
 
 void print_status(ms::engine::RtRunner& run,

@@ -16,7 +16,9 @@ float device_sample(float sample);
 // diagnostic wrapper stays confined to the .cpp.
 class PipewireOut {
  public:
-  using RenderFn = void (*)(void* user, float* l, float* r, size_t frames);
+  // now_ns: the cycle's CLOCK_MONOTONIC start (spa_io_position clock.nsec),
+  // 0 when PipeWire has not given the stream a position.
+  using RenderFn = void (*)(void* user, float* l, float* r, size_t frames, uint64_t now_ns);
 
   PipewireOut(const char* app_name, RenderFn fn, void* user,
               const char* latency, uint32_t requested_rate);

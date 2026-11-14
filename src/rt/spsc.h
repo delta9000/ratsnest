@@ -44,14 +44,21 @@ class SpscQueue {
     return true;
   }
 
-  bool try_pop(T& out) {
+  // Consumer side: copies the oldest item without removing it.
+  bool try_peek(T& out) {
     const size_t h = head_.load(std::memory_order_relaxed);
     if (h == cached_tail_) {
       cached_tail_ = tail_.load(std::memory_order_acquire);
       if (h == cached_tail_) return false;  // truly empty
     }
     out = buf_[h];
-    head_.store((h + 1) & kMask, std::memory_order_release);
+    return true;
+  }
+
+  bool try_pop(T& out) {
+    if (!try_peek(out)) return false;
+    head_.store((head_.load(std::memory_order_relaxed) + 1) & kMask,
+                std::memory_order_release);
     return true;
   }
 
