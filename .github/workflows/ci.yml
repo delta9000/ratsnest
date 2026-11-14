@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    # Ubuntu 26.04 is the first LTS whose PipeWire headers (1.6) are new enough.
+    container: ubuntu:26.04
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git g++ cmake ninja-build pkg-config python3 \
+            libpipewire-0.3-dev
+      - uses: actions/checkout@v4
+      - name: Complexity budget
+        run: python3 tools/complexity.py --check
+      - name: Warnings-as-errors build and tests
+        run: |
+          cmake --preset ci
+          cmake --build build-ci
+          ctest --test-dir build-ci --output-on-failure
+      - name: ASan + UBSan build and tests
+        run: |
+          cmake --preset san
+          cmake --build build-san
+          ctest --test-dir build-san --output-on-failure

@@ -31,7 +31,9 @@ add_library(mscore STATIC ${MSCORE_SOURCES})
 target_include_directories(mscore PUBLIC src)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
+# 1.6: the MIDI input calls spa_ump_to_midi with conversion state, which
+# older SPA headers do not have (1.4 lacks the state, 1.2 the whole header).
+pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3>=1.6)
 target_link_libraries(mscore PUBLIC PkgConfig::PIPEWIRE)
 
 add_executable(ratsnest src/main.cpp)
