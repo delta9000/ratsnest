@@ -181,6 +181,17 @@ bool bad_option(const char* arg) {
   return false;
 }
 
+// --rate: a whole number of Hz in 8000..384000. Anything else is an error
+// rather than a patch compiled for a rate no device or WAV can carry.
+bool rate_option(const char* s, double& rate) {
+  char* end = nullptr;
+  const long hz = std::strtol(s, &end, 10);  // "" parses as 0: out of range
+  rate = static_cast<double>(hz);
+  if (*end == '\0' && hz == std::clamp(hz, 8000L, 384000L)) return true;
+  std::fprintf(stderr, "error: --rate needs a whole sample rate from 8000 to 384000 Hz, not '%s'\n", s);
+  return false;
+}
+
 // When argv[i] is `name` and a value follows, consumes both and returns the
 // value; otherwise returns nullptr and leaves i alone.
 const char* option(int argc, char** argv, int& i, const char* name) {
@@ -210,7 +221,7 @@ bool parse_render(int argc, char** argv, RenderOpts& o) {
     if (const char* v = option(argc, argv, i, "-d")) o.seconds = parse_duration(v);
     else if (const char* v = option(argc, argv, i, "-o")) o.out_path = v;
     else if (const char* v = option(argc, argv, i, "--start")) o.start_sec = parse_duration(v);
-    else if (const char* v = option(argc, argv, i, "--rate")) o.rate = std::atof(v);
+    else if (const char* v = option(argc, argv, i, "--rate")) { if (!rate_option(v, o.rate)) return false; }
     else if (const char* v = option(argc, argv, i, "--tap")) o.taps.push_back(ms::graph::parse_tap(v));
     else if (!std::strcmp(argv[i], "--stats")) {
       // The window length is optional: take the next word only if it is one.
@@ -554,7 +565,7 @@ struct PlayOpts {
 bool parse_play(int argc, char** argv, PlayOpts& o) {
   for (int i = 3; i < argc; ++i) {
     if (const char* v = option(argc, argv, i, "--latency")) o.latency = v;
-    else if (const char* v = option(argc, argv, i, "--rate")) o.rate = std::atof(v);
+    else if (const char* v = option(argc, argv, i, "--rate")) { if (!rate_option(v, o.rate)) return false; }
     else if (const char* v = option(argc, argv, i, "--watch")) o.watch = v;
     else return bad_option(argv[i]);
   }

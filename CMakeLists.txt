@@ -82,6 +82,14 @@ add_test(NAME cli_render_bad_duration
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 5sec -o ${CMAKE_CURRENT_BINARY_DIR}/first-bad.wav)
 set_tests_properties(cli_render_bad_duration PROPERTIES WILL_FAIL TRUE)
+# --rate takes a whole rate a device can run at: 0, negatives and junk are errors.
+foreach(bad_rate 0 -5 1e9 44100.5 48k)
+  add_test(NAME cli_render_bad_rate_${bad_rate}
+    COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+            -d 100ms --rate ${bad_rate} -o ${CMAKE_CURRENT_BINARY_DIR}/first-bad.wav)
+  set_tests_properties(cli_render_bad_rate_${bad_rate} PROPERTIES
+    PASS_REGULAR_EXPRESSION "error: --rate needs a whole sample rate")
+endforeach()
 add_test(NAME cli_render_unknown_option
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch --duration 5)
 set_tests_properties(cli_render_unknown_option PROPERTIES
