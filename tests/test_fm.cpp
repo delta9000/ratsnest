@@ -880,3 +880,188 @@ TEST_CASE("fm: key scaling defaults are a no-op (bit-identical)") {
     for (int o = 0; o < 7; ++o) CHECK(rz.outs[o] == rb.outs[o]);
   }
 }
+
+// ---- classic-6-op compatibility configs (curve: db, l4, fb_from, keys,
+// vel_curve, pitch env) -------------------------------------------------
+
+namespace {
+double db_of(double a) { return 20.0 * std::log10(std::max(a, 1e-12)); }
+float zero_crossings(FmRig& rig, int n, int out = 1) {
+  int zc = 0;
+  float prev = 0.0f;
+  for (int i = 0; i < n; ++i) {
+    rig.tick(1.0f);
+    if ((prev <= 0.0f) != (rig.outs[out] <= 0.0f)) ++zc;
+    prev = rig.outs[out];
+  }
+  return static_cast<float>(zc);
+}
+}  // namespace
+
+TEST_CASE("fm: db falls at a constant dB/s; t is the 96 dB time") {
+  Config cfg;
+  cfg.push_back({"curve", str("db")});
+  cfg.push_back({"t1", arr({0})});
+  cfg.push_back({"t2", arr({1.0})});                    // 96 dB per second
+  cfg.push_back({"l1", arr({1})});
+  cfg.push_back({"l2", arr({std::pow(10.0, -48.0 / 20.0)})});  // 48 dB down: 0.5 s
+  cfg.push_back({"l3", arr({std::pow(10.0, -48.0 / 20.0)})});
+  FmRig rig(1000.0, cfg);
+  rig.env4(1.0f);                                       // through the jump (t1 0)
+  for (int w = 1; w < 62; ++w) rig.env4(1.0f);          // ~250 ms in
+  CHECK(db_of(rig.env4(1.0f)) == doctest::Approx(-24.0).epsilon(0.05));
+  for (int w = 0; w < 100; ++w) rig.env4(1.0f);         // past 0.5 s: holds l2
+  CHECK(db_of(rig.env4(1.0f)) == doctest::Approx(-48.0).epsilon(0.01));
+}
+
+TEST_CASE("fm: db attack jumps to -50 dB, then rises fastest at the bottom") {
+  Config cfg;
+  cfg.push_back({"curve", str("db")});
+  cfg.push_back({"t1", arr({2.0})});
+  cfg.push_back({"l1", arr({1})}); cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({1})});
+  FmRig rig(1000.0, cfg);
+  std::vector<double> lv;
+  for (int w = 0; w < 400; ++w) lv.push_back(db_of(rig.env4(1.0f)));
+  CHECK(lv[0] > -50.5);                                 // jump-start, not from -90
+  CHECK(lv[0] < -45.0);
+  for (size_t i = 1; i < lv.size(); ++i) CHECK(lv[i] >= lv[i - 1]);
+  CHECK(lv[1] - lv[0] > 2.0 * (lv[60] - lv[59]));       // eases in toward the top
+  CHECK(lv.back() == doctest::Approx(0.0).epsilon(0.01));
+}
+
+TEST_CASE("fm: l4 is the resting level the release returns to") {
+  for (const char* curve : {"lin", "db"}) {
+    CAPTURE(curve);
+    Config cfg;
+    cfg.push_back({"curve", str(curve)});
+    cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})});
+    cfg.push_back({"t3", arr({0})}); cfg.push_back({"t4", arr({0})});
+    cfg.push_back({"l4", arr({0.25})});
+    FmRig rig(1000.0, cfg);
+    for (int w = 0; w < 50; ++w) rig.env4(1.0f);
+    for (int w = 0; w < 50; ++w) rig.env4(0.0f);
+    CHECK(rig.env4(0.0f) == doctest::Approx(0.25).epsilon(0.01));
+  }
+}
+
+TEST_CASE("fm: l4 0 and curve defaults stay bit-identical") {
+  Config base, zeros;
+  zeros.push_back({"l4", arr({0, 0, 0, 0, 0, 0})});
+  zeros.push_back({"fb_from", arr({0, 0, 0, 0, 0, 0})});
+  zeros.push_back({"vel_depth", arr({0, 0, 0, 0, 0, 0})});
+  FmRig rb(48000.0, base), rz(48000.0, zeros);
+  for (int i = 0; i < 4000; ++i) {
+    const float g = (i % 500) < 400 ? 1.0f : 0.0f;
+    rb.tick(g); rz.tick(g);
+    for (int o = 0; o < 7; ++o) CHECK(rz.outs[o] == rb.outs[o]);
+  }
+}
+
+TEST_CASE("fm: fb_from feeds one op's output back into another") {
+  auto run = [](std::initializer_list<double> from, double fb) {
+    Config cfg;
+    cfg.push_back({"levels", arr({1, 0})});
+    cfg.push_back({"ratios", arr({1, 3})});
+    cfg.push_back({"fb", arr({fb})});
+    if (from.size() > 0) cfg.push_back({"fb_from", arr(from)});
+    FmRig rig(48000.0, cfg);
+    std::vector<float> x;
+    for (int i = 0; i < 4800; ++i) { rig.tick(1.0f); x.push_back(rig.outs[0]); }
+    return x;
+  };
+  const auto self = run({}, 0.5), self1 = run({1}, 0.5), cross = run({2}, 0.5), none = run({}, 0.0);
+  CHECK(self == self1);                                 // 0 and own number = self
+  CHECK(cross != self);
+  CHECK(cross != none);
+  // Op 2 (ratio 3) phase-modulates op 1 through the loop: a 3rd-harmonic
+  // family appears that self-feedback (1/n saw series) and no fb lack at 4th.
+  CHECK(dft_mag(cross, 4.0 * 250.0, 48000.0) > 5.0f * dft_mag(none, 4.0 * 250.0, 48000.0));
+}
+
+TEST_CASE("fm: fb past 1 is reachable from config, fbmod sums stay capped at 1") {
+  auto peak3 = [](double fb, float mod) {
+    Config cfg;
+    cfg.push_back({"fb", arr({fb})});
+    FmRig rig(48000.0, cfg);
+    rig.ins[16] = mod;
+    std::vector<float> x;
+    for (int i = 0; i < 4800; ++i) { rig.tick(1.0f); x.push_back(rig.outs[0]); }
+    return x;
+  };
+  CHECK(peak3(1.5, 0.0f) != peak3(1.0, 0.0f));
+  CHECK(peak3(0.5, 0.9f) == peak3(1.0, 0.0f));          // 0.5 + 0.9 clamps to 1
+}
+
+TEST_CASE("fm: keys tables offset an op's level in dB by gate pitch") {
+  Config cfg;
+  cfg.push_back({"keys1", arr({-1, 0, 1, -12})});     // 0 dB at -1 oct -> -12 dB at +1
+  cfg.push_back({"fixed", arr({250})});
+  cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})}); cfg.push_back({"t3", arr({0})});
+  cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({1})});
+  auto lvl = [&](float voct) {
+    FmRig rig(1000.0, cfg);
+    rig.ins[2] = voct;
+    rig.env4(1.0f);
+    return db_of(rig.env4(1.0f));
+  };
+  CHECK(lvl(-2.0f) == doctest::Approx(0.0).epsilon(0.01));  // held past the ends
+  CHECK(lvl(0.0f) == doctest::Approx(-6.0).epsilon(0.01));
+  CHECK(lvl(1.0f) == doctest::Approx(-12.0).epsilon(0.01));
+  CHECK(lvl(3.0f) == doctest::Approx(-12.0).epsilon(0.01));
+}
+
+TEST_CASE("fm: vel_curve x vel_depth is a latched dB offset, in db mode too") {
+  for (const char* curve : {"lin", "db"}) {
+    CAPTURE(curve);
+    Config cfg;
+    cfg.push_back({"curve", str(curve)});
+    cfg.push_back({"vel_curve", arr({0, -40, 1, 0})});
+    cfg.push_back({"vel_depth", arr({0.5})});
+    cfg.push_back({"t1", arr({0})}); cfg.push_back({"t2", arr({0})}); cfg.push_back({"t3", arr({0})});
+    cfg.push_back({"l2", arr({1})}); cfg.push_back({"l3", arr({1})});
+    FmRig rig(1000.0, cfg);
+    rig.ins[3] = 0.5f;                                   // -20 dB on the curve, x 0.5
+    rig.env4(1.0f);
+    CHECK(db_of(rig.env4(1.0f)) == doctest::Approx(-10.0).epsilon(0.01));
+    rig.ins[3] = 1.0f;                                   // mid-note: latched, inert
+    CHECK(db_of(rig.env4(1.0f)) == doctest::Approx(-10.0).epsilon(0.01));
+  }
+}
+
+TEST_CASE("fm: pitch env shifts every op, fixed ones included, at a rate") {
+  auto crossings = [](std::initializer_list<double> t, bool fixed) {
+    Config cfg;
+    cfg.push_back({"pitch_l", arr({1, 1, 1, 0})});     // up an octave while held
+    cfg.push_back({"pitch_t", arr(t)});
+    if (fixed) cfg.push_back({"fixed", arr({250})});
+    FmRig rig(48000.0, cfg);
+    zero_crossings(rig, 48000);                          // settle 1 s
+    return zero_crossings(rig, 4800);
+  };
+  Config plain;
+  FmRig ref(48000.0, plain);
+  zero_crossings(ref, 48000);
+  const float base = zero_crossings(ref, 4800);
+  CHECK(crossings({0, 0, 0, 0}, false) == doctest::Approx(2.0f * base).epsilon(0.02));
+  CHECK(crossings({0, 0, 0, 0}, true) == doctest::Approx(2.0f * base).epsilon(0.02));
+  // 4 s per octave: after 1 s it is a quarter octave up, not there yet.
+  const float slow = crossings({4, 0, 0, 0}, false);
+  CHECK(slow > 1.15f * base);
+  CHECK(slow < 1.30f * base);
+}
+
+TEST_CASE("fm: table configs validate as pairs and may exceed six entries") {
+  const ModuleInfo* info = find_module("fm");
+  REQUIRE(info != nullptr);
+  REQUIRE(info->validate != nullptr);
+  auto err = [&](const char* name, std::initializer_list<double> v) {
+    Config cfg;
+    cfg.push_back({name, arr(v)});
+    return info->validate(cfg);
+  };
+  CHECK(err("keys3", {-2, 0, -1, 0, 0, -3, 1, -6, 2, -9}).empty());
+  CHECK(err("vel_curve", {0, -40, 0.5, -12, 1, 0}).empty());
+  CHECK(!err("keys1", {0, 1, 2}).empty());                // odd count
+  CHECK(!err("keys1", {1, 0, 0, -3}).empty());            // x goes backward
+  CHECK(!err("l4", {0, 0, 0, 0, 0, 0, 0}).empty());       // per-op: still max 6
+}

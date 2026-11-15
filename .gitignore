@@ -4,3 +4,4 @@ compile_commands.json
 .cache/
 .worktrees/
 *.flac
+__pycache__/

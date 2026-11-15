@@ -68,6 +68,12 @@ add_test(NAME cli_check_rejects_bad_patch
   COMMAND ratsnest check ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
 set_tests_properties(cli_check_rejects_bad_patch PROPERTIES WILL_FAIL TRUE)
 
+# SysEx voice converter (tools/syx2patch.py): unit tests plus a synthesized
+# 32-voice bank converted, checked and rendered by this build's binary.
+add_test(NAME syx2patch
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_syx2patch.py
+          $<TARGET_FILE:ratsnest>)
+
 add_test(NAME cli_describe COMMAND ratsnest describe additive)
 set_tests_properties(cli_describe PROPERTIES PASS_REGULAR_EXPRESSION "number_array")
 add_test(NAME cli_describe_unknown COMMAND ratsnest describe nonexistent)
