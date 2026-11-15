@@ -1,7 +1,13 @@
 // 6-operator phase-modulation voice after Chowning's published FM formula
 // (concept-inspired; see docs/attribution.md). Topology, algorithm set,
-// scaling, and envelope design are original to ratsnest — no Yamaha/DX data,
-// layouts, or code are used anywhere in this file.
+// scaling, and envelope design are original to ratsnest — no Yamaha/DX
+// layouts or code are used anywhere in this file.
+//
+// `curve: db` runs the operator envelopes in the log domain at constant dB/s
+// with a jump-start, ceiling-seeking attack, after the classic 6-op
+// instrument's envelope behaviour as documented (reverse-engineered) by
+// Google's Music Synthesizer for Android (Apache-2.0); written locally from
+// that description, no code copied. See docs/attribution.md.
 //
 // Operator waveforms (rectified/windowed/folded sine) are the TX81Z/DX11/FS1R
 // operator-waveform *concept*, implemented locally from the mathematics; no
@@ -34,6 +40,14 @@ constexpr float kIndex = 4.0f * std::numbers::pi_v<float>;
 // ~1/n) to β ≈ 2; past ~2.25 it turns to noise, so fb 0..1 spends only its
 // top ~10% there.
 constexpr double kFbIndex = 2.5;
+// `curve: db` envelope (docs/attribution.md): levels are log2 amplitude, 0 =
+// full scale. kDbSpan octaves = the 96 dB a segment's `t` is quoted for;
+// attacks jump to kDbJump (-50 dB) and rise by step x the whole octaves left
+// below kDbCeil (+12 dB); kDbFloor is silence.
+constexpr double kDbSpan = 96.0 / 6.020599913279624;
+constexpr double kDbJump = -8.296875;
+constexpr double kDbCeil = 2.0;
+constexpr double kDbFloor = -15.0;
 
 constexpr InputInfo kIns[] = {
     {"gate", 0.f},   {"freq", 220.f}, {"v_oct", 0.f},  {"vel", 1.f},
@@ -46,7 +60,8 @@ constexpr InputInfo kIns[] = {
     {"fbmod", 0.f}};
 constexpr const char* kAlgos[] = {"free",  "triad", "dual", "cascade",
                                   "crown", "weave", "custom", nullptr};
-constexpr const char* kCurves[] = {"lin", "exp", "log", "quad", nullptr};
+constexpr const char* kCurves[] = {"lin", "exp", "log", "quad", "db", nullptr};
+constexpr int kCurveDb = 4;
 constexpr const char* kSyncs[] = {"on", "off", nullptr};
 constexpr const char* kWaves[] = {"sine", "half", "abs", "quarter", "fold", nullptr};
 constexpr ConfigInfo kCfg[] = {
@@ -57,7 +72,14 @@ constexpr ConfigInfo kCfg[] = {
     {"t4", nullptr, ConfigKind::Numbers},     {"l1", nullptr, ConfigKind::Numbers},    {"l2", nullptr, ConfigKind::Numbers},
     {"l3", nullptr, ConfigKind::Numbers},     {"curve", kCurves}, {"sync", kSyncs},
     {"waves", kWaves, ConfigKind::Enums},  {"key_break", nullptr},
-    {"key_level", nullptr, ConfigKind::Numbers}, {"key_rate", nullptr, ConfigKind::Numbers}};
+    {"key_level", nullptr, ConfigKind::Numbers}, {"key_rate", nullptr, ConfigKind::Numbers},
+    {"l4", nullptr, ConfigKind::Numbers},     {"fb_from", nullptr, ConfigKind::Numbers},
+    {"keys1", nullptr, ConfigKind::Numbers},  {"keys2", nullptr, ConfigKind::Numbers},
+    {"keys3", nullptr, ConfigKind::Numbers},  {"keys4", nullptr, ConfigKind::Numbers},
+    {"keys5", nullptr, ConfigKind::Numbers},  {"keys6", nullptr, ConfigKind::Numbers},
+    {"vel_curve", nullptr, ConfigKind::Numbers}, {"vel_depth", nullptr, ConfigKind::Numbers},
+    {"pitch_t", nullptr, ConfigKind::Numbers}, {"pitch_l", nullptr, ConfigKind::Numbers}};
+constexpr const char* kKeyNames[kOps] = {"keys1", "keys2", "keys3", "keys4", "keys5", "keys6"};
 constexpr OutputInfo kOuts[] = {{"out"}, {"op1"}, {"op2"}, {"op3"},
                                 {"op4"}, {"op5"}, {"op6"}};
 
@@ -69,8 +91,9 @@ struct OpEnv {
 
 struct EnvCfg {
   std::array<double, 4> t{};  // segment times, seconds
-  std::array<double, 3> l{};  // S1..S3 target levels
+  std::array<double, 4> l{};  // S1..S3 target levels, then the rest level l4
 };
+using Seg4 = std::array<double, 4>;  // one value per envelope segment
 
 // Operator waveform, θ in [0,1). Each is DC-centered (one-period mean
 // subtracted) so rectified shapes add no DC to carriers and no constant phase
@@ -134,15 +157,63 @@ void env_tick(OpEnv& e, const EnvCfg& c, int curve, double rate, double tscale) 
       e.level = c.l[2];
       break;
     case S::Rel:
-      if (env_segment(e, 0.0, c.t[3] * tscale, curve, rate)) {
-        e.stage = S::Idle;
-        e.level = 0.0;
-      }
+      if (env_segment(e, c.l[3], c.t[3] * tscale, curve, rate)) e.stage = S::Idle;
       break;
     case S::Idle:
-      e.level = 0.0;
+      e.level = c.l[3];
       break;
   }
+}
+
+// One segment of a rate envelope: it moves `step` per sample, so its length
+// follows the distance (rate semantics, not a fixed time). `shaped` is the
+// db attack: rises jump to kDbJump and the step is scaled by the whole
+// octaves left below kDbCeil, so they start fast and ease in.
+bool rate_segment(OpEnv& e, double target, double step, bool shaped) {
+  if (target > e.start) {
+    if (shaped) {
+      e.level = std::max(e.level, kDbJump);
+      step *= std::max(1.0, std::floor(kDbCeil - e.level));
+    }
+    e.level += step;
+    if (e.level < target) return false;
+  } else {
+    e.level -= step;
+    if (e.level > target) return false;
+  }
+  e.level = target;
+  e.start = target;
+  return true;
+}
+// Stage machine of the rate envelopes (db operators, pitch). Hold and Idle
+// sit on the level their segment snapped to (l3, l4).
+void rate_tick(OpEnv& e, const Seg4& tgt, const Seg4& step, bool shaped) {
+  using S = OpEnv::Stage;  // Idle, S1, S2, S3, Hold, Rel
+  static constexpr int kSeg[] = {-1, 0, 1, 2, -1, 3};
+  static constexpr S kNext[] = {S::Idle, S::S2, S::S3, S::Hold, S::Hold, S::Idle};
+  const auto st = static_cast<size_t>(e.stage);
+  const int seg = kSeg[st];
+  if (seg >= 0 && rate_segment(e, tgt[static_cast<size_t>(seg)],
+                               step[static_cast<size_t>(seg)], shaped))
+    e.stage = kNext[st];
+}
+// Per-sample step that crosses `span` in `seconds` (0 = one-sample jump).
+double rate_step(double span, double seconds, double rate) {
+  const double samples = seconds * rate;
+  return samples <= 1.0 ? 1e9 : span / samples;
+}
+
+// Piecewise-linear lookup in flat (x, y) pairs, held flat past both ends;
+// no pairs reads 0. Note-on only, never per sample.
+double interp_pairs(const std::vector<double>& p, double x) {
+  if (p.size() < 2) return 0.0;
+  if (x <= p[0]) return p[1];
+  for (size_t i = 2; i + 1 < p.size(); i += 2) {
+    if (x > p[i]) continue;
+    const double x0 = p[i - 2], y0 = p[i - 1];
+    return p[i] > x0 ? y0 + (p[i + 1] - y0) * (x - x0) / (p[i] - x0) : p[i + 1];
+  }
+  return p[p.size() - 1];
 }
 
 using Edge = std::pair<int, int>;  // (src, dst), 0-based; src modulates dst
@@ -175,11 +246,28 @@ std::vector<Edge> parse_route(const std::vector<double>& route) {
   return edges;
 }
 
-std::string validate(const Config& cfg) {
+// Flat (x, y) pairs with x non-decreasing (keys1..6, vel_curve).
+bool is_pairs(const std::vector<double>& p) {
+  if (p.size() % 2 != 0) return false;
+  for (size_t i = 2; i < p.size(); i += 2)
+    if (!(p[i] >= p[i - 2])) return false;  // NaN fails too
+  return true;
+}
+
+// Per-op arrays hold at most six entries; the (x, dB) tables any number.
+std::string validate_tables(const Config& cfg) {
   for (const auto& [name, value] : cfg) {
-    if (name != "route" && (value.arr.size() > kOps || value.strs.size() > kOps))
+    if (name.starts_with("keys") || name == "vel_curve") {
+      if (!is_pairs(value.arr)) return "'" + name + "' expects (x, dB) pairs, x non-decreasing";
+    } else if (name != "route" && std::max(value.arr.size(), value.strs.size()) > kOps) {
       return "'" + name + "' accepts at most 6 operator entries";
+    }
   }
+  return {};
+}
+
+std::string validate(const Config& cfg) {
+  if (auto err = validate_tables(cfg); !err.empty()) return err;
   const auto& route = cfg_arr(cfg, "route");
   if (route.empty()) return {};
   if (cfg_str(cfg, "algo", "free") != "custom")
@@ -206,6 +294,7 @@ class Fm final : public Module {
     rate_ = rate;
     algo_ = cfg_enum(cfg, "algo", kAlgos);
     curve_ = cfg_enum(cfg, "curve", kCurves);
+    db_ = curve_ == kCurveDb;
     // Key sync resets phases when the voice is quieter than this; off: never.
     sync_floor_ = 1e-3 * static_cast<double>(cfg_str(cfg, "sync", "on") != "off");
 
@@ -213,9 +302,18 @@ class Fm final : public Module {
     fill(cfg, "levels", levels_, 0.0, 0.0, 1.0);
     if (cfg_arr(cfg, "levels").empty()) levels_[0] = 1.0;  // a lone carrier
     fill(cfg, "fixed", fixed_, 0.0, 0.0, 1e9);
-    fill(cfg, "fb", fb_, 0.0, 0.0, 1.0);
+    // Past 1 is the noisy top of the range, reachable from config only.
+    fill(cfg, "fb", fb_, 0.0, 0.0, 2.6);
+    std::array<double, kOps> from{};
+    fill(cfg, "fb_from", from, 0.0, 0.0, kOps);
+    for (size_t k = 0; k < kOps; ++k)  // 0 = self; else read that op's taps
+      fb_src_[k] = from[k] >= 1.0 ? static_cast<size_t>(from[k]) - 1 : k;
     fill(cfg, "vel_sens", vel_sens_, 0.0, 0.0, 1.0);
+    fill(cfg, "vel_depth", vel_depth_, 0.0, 0.0, 1.0);
+    vel_curve_ = cfg_arr(cfg, "vel_curve");
+    for (size_t k = 0; k < kOps; ++k) keys_[k] = cfg_arr(cfg, kKeyNames[k]);
     load_envelopes(cfg);
+    load_pitch_env(cfg);
     const auto& wv = cfg_str_arr(cfg, "waves");
     for (size_t k = 0; k < kOps; ++k)  // sine is also the unknown-name fallback
       waves_[k] = k < wv.size() ? enum_index(kWaves, wv[k]) : 0;
@@ -225,11 +323,12 @@ class Fm final : public Module {
     fill(cfg, "key_rate", key_rate_, 0.0, -8.0, 8.0);
     level_scale_.fill(1.0);
     time_scale_.fill(1.0);
+    latch_rates();
 
     edges_ = algo_ == 6 ? parse_route(cfg_arr(cfg, "route")) : named_edges(algo_);
     build_order();
 
-    for (auto& e : envs_) e = OpEnv{};
+    reset_envs();
     phase_.fill(0.0);
     fb1_.fill(0.0f);
     fb2_.fill(0.0f);
@@ -242,16 +341,17 @@ class Fm final : public Module {
     const bool rising = high && prev_gate_ <= 0.5f;
     const bool falling = !high && prev_gate_ > 0.5f;
     prev_gate_ = gate;
-    if (rising) note_on(ins[2]);
+    if (rising) note_on(ins[2], ins[3]);
     for (auto& e : envs_) env_gate(e, rising, falling);
 
-    const double base = base_freq(ins[1], ins[2]);
+    const double pitch = pitch_offset(rising, falling);
+    const double base = base_freq(ins[1], ins[2]) * pitch;
     const float vel = clamp_nan(ins[3], 0.0f, 1.0f);
 
     std::array<double, kOps> post{};
     for (const int op : order_) {
       const auto k = static_cast<size_t>(op);
-      post[k] = operator_sample(k, ins, base, vel, post);
+      post[k] = operator_sample(k, ins, base, pitch, vel, post);
       outs[1 + k] = static_cast<float>(post[k]);
     }
     float out = 0.0f;
@@ -265,25 +365,70 @@ class Fm final : public Module {
 
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Fm&>(other);
+    if (o.db_ != db_) return;  // linear vs log levels: start clean, no blast
     envs_ = o.envs_;
+    penv_ = o.penv_;
     phase_ = o.phase_;
     fb1_ = o.fb1_;
     fb2_ = o.fb2_;
     prev_gate_ = o.prev_gate_;
     level_scale_ = o.level_scale_;
     time_scale_ = o.time_scale_;
+    latch_rates();
   }
 
  private:
   // Latch keyboard scaling from v_oct for the whole note (DX-style): a
   // mid-note pitch glide bends pitch without warping level or envelope.
-  void note_on(float v_oct) {
+  // keys1..6 and vel_curve are dB offsets read once here, at the gate.
+  void note_on(float v_oct, float vel) {
     if (loudness() < sync_floor_) phase_.fill(0.0);
-    const double d = static_cast<double>(clamp_nan(v_oct, -24.f, 24.f)) - key_break_;
+    const double v = static_cast<double>(clamp_nan(v_oct, -24.f, 24.f));
+    const double d = v - key_break_;
+    const double vdb = interp_pairs(vel_curve_, static_cast<double>(clamp_nan(vel, 0.f, 1.f)));
     for (size_t k = 0; k < kOps; ++k) {
-      level_scale_[k] = clamp_nan(std::exp2(key_level_[k] * d), 0.0, 16.0);
+      const double db = interp_pairs(keys_[k], v) + vel_depth_[k] * vdb;
+      level_scale_[k] = clamp_nan(std::exp2(key_level_[k] * d), 0.0, 16.0) *
+                        std::pow(10.0, clamp_nan(db, -200.0, 96.0) / 20.0);
       time_scale_[k] = clamp_nan(std::exp2(-key_rate_[k] * d), 1e-3, 1e3);
     }
+    latch_rates();
+    penv_.level = penv_.start = pitch_l_[3];  // each note's pitch env starts at rest
+  }
+
+  // db mode folds the latched level scale into the log-domain targets (so
+  // the attack's jump and ceiling see the whole level, as on the classic
+  // instrument) and turns t1..t4 into per-sample steps for this note.
+  void latch_rates() {
+    if (!db_) return;
+    for (size_t k = 0; k < kOps; ++k) {
+      const double off = std::log2(std::max(level_scale_[k], 1e-9));
+      for (size_t s = 0; s < 4; ++s) {
+        const double l = env_cfg_[k].l[s];
+        db_tgt_[k][s] = l > 0.0 ? std::max(std::log2(l) + off, kDbFloor) : kDbFloor;
+        db_step_[k][s] = rate_step(kDbSpan, env_cfg_[k].t[s] * time_scale_[k], rate_);
+      }
+    }
+  }
+
+  void reset_envs() {
+    for (size_t k = 0; k < kOps; ++k) {
+      const double rest = db_ ? kDbFloor : env_cfg_[k].l[3];
+      envs_[k] = OpEnv{OpEnv::Stage::Idle, rest, rest, 0.0};
+    }
+    penv_ = OpEnv{OpEnv::Stage::Idle, pitch_l_[3], pitch_l_[3], 0.0};
+  }
+
+  // Pitch envelope multiplier for this sample (1 when unconfigured).
+  double pitch_offset(bool rising, bool falling) {
+    if (!pitch_on_) return 1.0;
+    env_gate(penv_, rising, falling);
+    rate_tick(penv_, pitch_l_, pitch_step_, false);
+    return std::exp2(penv_.level);
+  }
+
+  double env_amp(size_t k) const {
+    return db_ ? std::exp2(envs_[k].level) : envs_[k].level;
   }
 
   // Key sync resets phases only from silence (every carrier's envelope times
@@ -292,55 +437,74 @@ class Fm final : public Module {
   double loudness() const {
     double loud = 0.0;
     for (size_t k = 0; k < kOps; ++k)
-      loud = std::max(loud, carrier_[k] * envs_[k].level * levels_[k] * level_scale_[k]);
+      loud = std::max(loud, carrier_[k] * env_amp(k) * levels_[k] * (db_ ? 1.0 : level_scale_[k]));
     return loud;
   }
 
   // Operator k's output this sample. `post` holds this sample's outputs of
   // the operators already run (every modulator of k, by build_order).
-  double operator_sample(size_t k, const float* ins, double base, float vel,
-                         const std::array<double, kOps>& post) {
+  double operator_sample(size_t k, const float* ins, double base, double pitch,
+                         float vel, const std::array<double, kOps>& post) {
     const double ratio =
         fixed_[k] > 0.0
             ? 0.0
             : static_cast<double>(clamp_nan(
                   static_cast<float>(ratios_[k]) + ins[10 + k], 0.0f, 1e9f));
-    const double f = fixed_[k] > 0.0 ? std::min(fixed_[k], 0.45 * rate_) : base * ratio;
+    const double f =
+        fixed_[k] > 0.0 ? std::min(fixed_[k] * pitch, 0.45 * rate_) : base * ratio;
     phase_[k] += f / rate_;
     phase_[k] -= std::floor(phase_[k]);
 
     const double lvl =
         static_cast<double>(clamp_nan(static_cast<float>(levels_[k]) + ins[4 + k], 0.0f, 1.0f)) *
-        (1.0 - vel_sens_[k] + vel_sens_[k] * static_cast<double>(vel)) * level_scale_[k];
-    env_tick(envs_[k], env_cfg_[k], curve_, rate_, time_scale_[k]);
+        (1.0 - vel_sens_[k] + vel_sens_[k] * static_cast<double>(vel)) *
+        (db_ ? 1.0 : level_scale_[k]);
+    if (db_)
+      rate_tick(envs_[k], db_tgt_[k], db_step_[k], true);
+    else
+      env_tick(envs_[k], env_cfg_[k], curve_, rate_, time_scale_[k]);
+    const double env = env_amp(k);
     const double fb_amt = static_cast<double>(
-        clamp_nan(static_cast<float>(fb_[k]) + ins[16], 0.0f, 1.0f));
+        clamp_nan(static_cast<float>(fb_[k]) + ins[16], 0.0f,
+                  static_cast<float>(std::max(1.0, fb_[k]))));
+    const size_t src = fb_src_[k];
     double mod = 0.0;
     for (int p : preds_[k]) mod += post[static_cast<size_t>(p)];
     float A = kTwoPi * static_cast<float>(phase_[k]) + kIndex * static_cast<float>(mod);
     if (fb_amt > 0.0)  // fb 0 skips the term entirely: bit-identical to no feedback
       A += static_cast<float>(kFbIndex * fb_amt * 0.5 *
-                              static_cast<double>(fb1_[k] + fb2_[k]));
+                              static_cast<double>(fb1_[src] + fb2_[src]));
     const auto w = static_cast<double>(wave_sample(waves_[k], A));
-    tap_[k] = static_cast<float>(envs_[k].level * w);
-    return envs_[k].level * lvl * w;
+    tap_[k] = static_cast<float>(env * w);
+    return env * lvl * w;
   }
 
  private:
-  // t1..t4 segment times and l1..l3 levels, one entry per operator.
+  // t1..t4 segment times and l1..l4 levels, one entry per operator.
   void load_envelopes(const Config& cfg) {
     static const double kTDef[4] = {0.002, 0.1, 0.4, 0.2};
-    static const double kLDef[3] = {1.0, 0.75, 0.5};
+    static const double kLDef[4] = {1.0, 0.75, 0.5, 0.0};
     static const char* const kTNames[4] = {"t1", "t2", "t3", "t4"};
-    static const char* const kLNames[3] = {"l1", "l2", "l3"};
+    static const char* const kLNames[4] = {"l1", "l2", "l3", "l4"};
     std::array<double, kOps> v{};
     for (size_t s = 0; s < 4; ++s) {
       fill(cfg, kTNames[s], v, kTDef[s], 0.0, HUGE_VAL);
       for (size_t k = 0; k < kOps; ++k) env_cfg_[k].t[s] = v[k];
-    }
-    for (size_t s = 0; s < 3; ++s) {
       fill(cfg, kLNames[s], v, kLDef[s], 0.0, 1.0);
       for (size_t k = 0; k < kOps; ++k) env_cfg_[k].l[s] = v[k];
+    }
+  }
+
+  // pitch_l: four octave offsets (L1..L3, rest L4); pitch_t: seconds per
+  // octave of travel for each segment. Off unless pitch_l is given.
+  void load_pitch_env(const Config& cfg) {
+    const auto& l = cfg_arr(cfg, "pitch_l");
+    const auto& t = cfg_arr(cfg, "pitch_t");
+    pitch_on_ = !l.empty();
+    for (size_t s = 0; s < 4; ++s) {
+      pitch_l_[s] = s < l.size() ? clamp_nan(l[s], -8.0, 8.0) : 0.0;
+      const double sec = s < t.size() ? clamp_nan(t[s], 0.0, HUGE_VAL) : 0.0;
+      pitch_step_[s] = rate_step(1.0, sec, rate_);
     }
   }
 
@@ -401,8 +565,15 @@ class Fm final : public Module {
   double base_ = 0.0;
   int algo_ = 0;
   int curve_ = 0;
+  bool db_ = false;
   double sync_floor_ = 1e-3;
-  std::array<double, kOps> ratios_{}, levels_{}, fixed_{}, fb_{}, vel_sens_{};
+  std::array<double, kOps> ratios_{}, levels_{}, fixed_{}, fb_{}, vel_sens_{}, vel_depth_{};
+  std::array<size_t, kOps> fb_src_{};      // whose taps feed op k's feedback
+  std::vector<double> vel_curve_;
+  std::array<std::vector<double>, kOps> keys_;
+  std::array<Seg4, kOps> db_tgt_{}, db_step_{};  // db mode, latched per note
+  bool pitch_on_ = false;
+  Seg4 pitch_l_{}, pitch_step_{};
   std::array<int, kOps> waves_{};
   double key_break_ = 0.0;
   std::array<double, kOps> key_level_{}, key_rate_{};
@@ -414,6 +585,7 @@ class Fm final : public Module {
   std::array<std::vector<int>, kOps> preds_;
   // runtime state (migrated on hot reload)
   std::array<OpEnv, kOps> envs_{};
+  OpEnv penv_{};
   std::array<double, kOps> phase_{};
   std::array<float, kOps> tap_{};            // this sample's feedback tap (scratch)
   std::array<float, kOps> fb1_{}, fb2_{};    // feedback taps y[n-1], y[n-2]

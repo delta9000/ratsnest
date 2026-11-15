@@ -61,6 +61,7 @@ TEST_CASE("license and attribution records cover implementation provenance") {
            "Copyright (c) 2013-2021, Cameron Desrochers",
            "Copyright © 2018 Wim Taymans",
            "Copyright (c) 2016-2023 Viktor Kirilov",
+           "Copyright 2012 Google Inc.",
        }) {
     check_contains(notices, required);
   }
@@ -71,6 +72,7 @@ TEST_CASE("license and attribution records cover implementation provenance") {
            "Giannoulis", "Bristow-Johnson", "Parker", "Vicanek",
            "Fourier series", "Zavalishin", "Simper", "Toussaint",
            "Marsaglia", "readerwriterqueue", "PipeWire", "doctest",
+           "Music Synthesizer for Android",
        }) {
     check_contains(attribution, required);
   }

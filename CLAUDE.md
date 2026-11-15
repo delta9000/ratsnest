@@ -48,6 +48,7 @@ Prefer mise tasks (see `mise tasks`):
     mise run render -- patches/first.patch -d 10s -o take.wav
     mise run play -- patches/first.patch          # live PipeWire + hot-reload
     mise run complexity   # score for src/; fails past docs/complexity.json
+    mise run syx -- bank.syx -o patches/dx/bank   # 6-op SysEx voices -> .sub (docs/fm-syx.md)
 
 ## Complexity budget
 

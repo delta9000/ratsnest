@@ -1200,6 +1200,35 @@ modulators up high), `key_rate` (per-op envelope-time octave-exponent,
 `times ×= 2^(−key_rate·(v_oct−break))` — positive shortens decays up high).
 All default 0 (no scaling).
 
+Classic 6-op compatibility (what `tools/syx2patch.py` writes; see
+`docs/fm-syx.md`). All opt-in; a patch without them is unchanged, sample for
+sample:
+
+- `l4` (per op, default 0): the resting level. The release (`t4`) returns to
+  it and the op stays there between notes — non-zero means the op sounds
+  with no key down.
+- `curve: db`: rate envelopes in the log domain. Levels are still
+  amplitudes, but falls move at a constant dB/s, `t1..t4` become *the time a
+  96 dB move would take* (a shorter move takes proportionally less), and
+  rises jump to −50 dB, then climb toward +12 dB by steps scaled by the whole
+  octaves left — fast off the floor, easing at the top. `keys`/`vel_curve`/
+  `key_level` offsets shift the whole envelope in dB, so the attack shape
+  sees the op's full level. `key_rate` still scales the times.
+- `fb_from` (per op, operator numbers, 0 = itself): read another op's
+  output into this op's feedback — a loop through several operators.
+  `fb` may exceed 1 (up to 2.6, ±6.5 rad) from config; `fbmod` sums stay
+  capped at `max(1, fb)`.
+- `keys1`..`keys6`: per-op keyboard level curves as flat `(v_oct, dB)` pairs,
+  piecewise linear, held flat past the ends, x non-decreasing — any number
+  of pairs. `keys1: [-1, 0, 1, -12]` fades op 1 by 12 dB over two octaves.
+- `vel_curve` (shared `(vel, dB)` pairs) × `vel_depth` (per op, 0..1): a dB
+  offset latched at the gate — velocity response as a curve, not a blend.
+  `vel_sens` still applies live on top.
+- `pitch_l` (four octave offsets: L1, L2, L3, rest L4) and `pitch_t` (four
+  segment speeds in seconds per octave of travel): a pitch envelope for
+  every operator, fixed-frequency ones included. Each note starts it at
+  L4; off unless `pitch_l` is given.
+
 ```text
 ep = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
           t2: [.5, .07, .06, .45, .06, .09], l2: [.55, .25, .2, .5, .2, .25],
