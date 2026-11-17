@@ -46,15 +46,14 @@ class Grains final : public Module {
     const auto seed = static_cast<uint32_t>(cfg_num(cfg, "seed", 1.0));
     rng_ = seed ? seed : 1u;  // xorshift must never hold zero
 
-    const std::string file = cfg_str(cfg, "file", "");
-    file_mode_ = !file.empty();
-    if (file_mode_) {
+    file_ = cfg_str(cfg, "file", "");
+    if (!file_.empty()) {
       // Static sample material: mono mixdown, linear resample to the engine
       // rate, 60 s cap. A missing/unreadable file stays a silent buffer
       // (design rule 6: errors never kill the session).
       std::vector<float> mono;
       io::WavData w;
-      if (io::read_wav_f32(file, w) && w.frames > 0 && w.channels > 0) {
+      if (io::load_sample(file_, w)) {
         const auto ch = static_cast<std::size_t>(w.channels);
         std::vector<float> mixed(w.frames);
         for (std::size_t fr = 0; fr < w.frames; ++fr) {
@@ -144,10 +143,11 @@ class Grains final : public Module {
 
   void copy_state_from(const Module& other) override {
     const auto& o = static_cast<const Grains&>(other);
+    if (file_ != o.file_) return;  // a different source starts fresh
     // RT-called: bounded copy, no allocation (delay precedent; ~1 MB at the
     // default 4 s ring). Sizes match unless a secs edit resized the ring.
     const std::size_t n = std::min(buf_.size(), o.buf_.size());
-    std::copy_n(o.buf_.begin(), n, buf_.begin());
+    if (file_.empty()) std::copy_n(o.buf_.begin(), n, buf_.begin());
     write_abs_ = o.write_abs_;
     trig_edge_ = o.trig_edge_;
     was_frozen_ = o.was_frozen_;
@@ -161,7 +161,7 @@ class Grains final : public Module {
     // A resize may have shrunk the ring: kill grains that no longer fit.
     for (Grain& g : grains_) {
       if (!g.active) continue;
-      if (file_mode_) {
+      if (!file_.empty()) {
         if (g.phase >= static_cast<double>(len_)) g.active = false;
       } else if (static_cast<double>(write_abs_) - g.phase >
                  static_cast<double>(len_) - 8.0) {
@@ -176,7 +176,7 @@ class Grains final : public Module {
   // written stream from that tail into live input — Clouds' click-free
   // WriteFade resume (spec §3 "Freeze").
   void record(float in, bool frozen) {
-    if (file_mode_) return;
+    if (!file_.empty()) return;
     if (frozen) {
       if (!was_frozen_) {
         tail_len_ = 0;
@@ -259,7 +259,7 @@ class Grains final : public Module {
     // Placement (spec §3): margins guarantee the read head never crosses the
     // moving record head nor out-runs the oldest sample.
     double start;
-    if (file_mode_) {
+    if (!file_.empty()) {
       start = 4.0 + static_cast<double>(pos) * std::max(len - span - 8.0, 0.0);
     } else {
       const double available = std::max(len - 2.0 * span - 8.0, 0.0);
@@ -295,7 +295,7 @@ class Grains final : public Module {
   // 4-point cubic Hermite read. Live: masked ring indexing (branch-free
   // wrap). File: clamped so the stencil stays inside [0, len).
   float read(double idx) const {
-    if (file_mode_) {
+    if (!file_.empty()) {
       const double c =
           std::clamp(idx, 1.0, static_cast<double>(len_) - 3.0);
       const auto i1 = static_cast<std::size_t>(c);
@@ -324,7 +324,7 @@ class Grains final : public Module {
   }
 
   float rate_ = 48000.0f;
-  bool file_mode_ = false;
+  std::string file_;
   std::vector<float> buf_;
   std::size_t mask_ = 0;
   std::size_t len_ = 0;

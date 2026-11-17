@@ -667,7 +667,7 @@ step's first pattern), `row` (row within the step), one-sample `step_trig`
 and `row_trig`, and `end`. A bare `song` reads `voct1`.
 
 The `file:` path is quoted and resolves against the directory of the file
-that declares the module (like a `sub`, unlike `sampler`). The loader reads
+that declares the module (like a `sub`). The loader reads
 it at build time, reports `.trk` mistakes as `song.trk:line:col`, embeds the
 song as config `text`, and `play` **watches it**: saving the `.trk`
 hot-reloads, keeping the order step and row (clamped to the edited song).
@@ -1016,10 +1016,10 @@ Config `loop`: `off` stops at the end and emits a one-sample `eos` pulse; `on`
 wraps. Both seams — the loop wrap and the end of a one-shot — slew out their
 step over 5 ms instead of cutting (the output stays continuous; timing and
 `eos` are unchanged), so a file not cut on a loop point bumps rather than
-clicks. A missing or unreadable file yields silence
-(the session never dies). The `file:` string **must be quoted** and resolves
-against the process working directory (mise runs from the repo root); absolute
-paths always work. Reads PCM 16/24/32-bit and 32-bit float WAVs.
+clicks. Quote the WAV path. Relative paths start in the directory of the
+declaring patch or subpatch. If the file is absent there, existing paths from
+the working directory still work. Absolute paths work directly. A missing,
+empty or unreadable WAV reports its path and produces silence. Reads PCM 16/24/32-bit and 32-bit float WAVs.
 
 ```text
 s = sampler { file: "samples/loop.wav", loop: on }
@@ -1037,10 +1037,11 @@ clamped `1..600`), and writes a 32-bit float stereo WAV to `file` when the graph
 is torn down (session end or hot reload). With `gate` unpatched it records
 continuously until the cap. For an offline `render`, this drops one clean take
 alongside the main mix (to measure a part offline, `render --tap` needs no
-`rec` in the patch; see "DSL essentials"). Editing the patch while recording restarts the take
-(the buffer is not migrated across reload — the outgoing take is written, the
-new one overwrites on teardown). The `file:` string must be quoted; paths are
-working-directory-relative.
+`rec` in the patch; see "DSL essentials"). A topology reload starts a new take. The outgoing and
+incoming recorders both capture during the crossfade. Each completed take gets
+the first available filename: `take.wav`, `take.2.wav`, `take.3.wav`, and so on.
+The recorder reports its final path or write error. Quote output paths;
+relative recording destinations start in the working directory.
 
 ```text
 r = rec { file: "take.wav", secs: 20 }
@@ -1082,7 +1083,7 @@ Poisson cloud; the mean rate stays `density`), `shape` 0.5 (window morph:
 center), `reverse` gate (latched per grain; plays the window backward).
 Outputs `out_l`, `out_r`, and a one-sample `onset` pulse per seeded grain.
 Configs: `secs` buffer length 0.25..60 s; `file` (quoted WAV path) preloads
-the buffer, disables the record head, and makes `in`/`freeze` inert (missing
+the buffer (same path rules as `sampler`), disables the record head, and makes `in`/`freeze` inert (missing
 file = silence); `seed` makes every random draw repeatable. All grain
 parameters latch at onset, so `sh`/`random` into `position`/`pitch` with a
 clocked `trig` gives per-grain modulation compositionally. Extra seeds beyond

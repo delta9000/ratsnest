@@ -77,32 +77,55 @@ std::string config_error(const dsp::ConfigInfo& ci, const dsl::Value& v) {
   return finite_num(v) ? "" : "expects a finite number";
 }
 
-// Kahn's algorithm over declaration order: always place the lowest-index
-// node with no unplaced producers; a cycle is broken at the lowest-index
-// node still unplaced. Self-loops never block. Returns the placement order.
+// Remove DFS back edges from the scheduling dependencies only. Their cables
+// still read the previous sample. An edge to a downstream consumer can never
+// be a back edge. Use an explicit stack for deep user patches.
+void mark_feedback(std::vector<std::vector<int>>& consumers) {
+  enum Visit { fresh, active, done };
+  std::vector<Visit> state(consumers.size(), fresh);
+  struct Cursor { size_t node, next; };
+  std::vector<Cursor> stack;
+  for (size_t root = 0; root < consumers.size(); ++root) {
+    if (state[root] != fresh) continue;
+    state[root] = active;
+    stack.push_back({root, 0});
+    while (!stack.empty()) {
+      Cursor& c = stack.back();
+      if (c.next == consumers[c.node].size()) {
+        state[c.node] = done;
+        stack.pop_back();
+        continue;
+      }
+      int& edge = consumers[c.node][c.next++];
+      const auto dst = static_cast<size_t>(edge);
+      if (state[dst] == active) edge = -1;
+      if (state[dst] == fresh) {
+        state[dst] = active;
+        stack.push_back({dst, 0});
+      }
+    }
+  }
+}
+
 std::vector<int> topo_order(size_t n, const std::vector<Cable>& cables) {
-  std::vector<int> indegree(n, 0);
   std::vector<std::vector<int>> consumers(n);
-  for (const auto& c : cables) {
-    if (c.src_mod == c.dst_mod) continue;
-    ++indegree[static_cast<size_t>(c.dst_mod)];
-    consumers[static_cast<size_t>(c.src_mod)].push_back(c.dst_mod);
+  for (const auto& c : cables) consumers[static_cast<size_t>(c.src_mod)].push_back(c.dst_mod);
+  mark_feedback(consumers);
+  std::vector<int> indegree(n, 0);
+  for (auto& edges : consumers) {
+    std::erase(edges, -1);
+    for (int dst : edges) ++indegree[static_cast<size_t>(dst)];
   }
   std::priority_queue<int, std::vector<int>, std::greater<>> ready;
   for (size_t i = 0; i < n; ++i)
     if (indegree[i] == 0) ready.push(static_cast<int>(i));
   std::vector<int> order;
-  std::vector<bool> placed(n, false);
-  size_t lowest_unplaced = 0;
-  while (order.size() < n) {
-    while (placed[lowest_unplaced]) ++lowest_unplaced;
-    int pick = static_cast<int>(lowest_unplaced);  // cycle: force it
-    if (!ready.empty()) { pick = ready.top(); ready.pop(); }
-    placed[static_cast<size_t>(pick)] = true;
+  while (!ready.empty()) {
+    const int pick = ready.top();
+    ready.pop();
     order.push_back(pick);
     for (int dst : consumers[static_cast<size_t>(pick)])
-      if (!placed[static_cast<size_t>(dst)] && --indegree[static_cast<size_t>(dst)] == 0)
-        ready.push(dst);
+      if (--indegree[static_cast<size_t>(dst)] == 0) ready.push(dst);
   }
   return order;
 }

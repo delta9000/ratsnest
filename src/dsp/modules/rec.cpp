@@ -44,11 +44,19 @@ class Rec final : public Module {
   // No copy_state_from override: the capture buffer is deliberately not
   // migrated across hot reload (a large memcpy on the RT thread would xrun).
   // A reload restarts the take; the outgoing instance flushes here.
-  ~Rec() override {
-    if (!file_.empty() && count_ > 0) {
-      io::write_wav_f32(file_, buf_.data(), count_, 2, rate_);
+  bool finish() override {
+    if (file_.empty() || count_ == 0) return true;
+    const size_t frames = count_;
+    count_ = 0;
+    if (!io::write_wav_take(file_, buf_.data(), frames, rate_)) {
+      std::fprintf(stderr, "error: cannot write recording '%s'\n", file_.c_str());
+      return false;
     }
+    std::fprintf(stderr, "recorded %zu frames -> %s\n", frames, file_.c_str());
+    return true;
   }
+
+  ~Rec() override { finish(); }
 
  private:
   int rate_ = 48000;

@@ -133,7 +133,7 @@ locks, or I/O in `process()`; all clamps NaN-proof in the `delay` style
 (`!(x >= lo)` catches NaN). Smoothed states flush below 1e−20 (offline render
 has no FTZ).
 
-**Migration.** `copy_state_from` copies buffer contents (min of sizes), write
+**Migration.** A change of source file or a switch between live and file input starts fresh. For a matching source, the live ring copies its samples (min of sizes); a file source keeps its newly loaded WAV. Both migrate the write
 head, freeze/crossfade state, scheduler phase, RNG state, and the whole grain
 pool (trivially copyable array). Grains whose spans no longer fit (a `secs`
 edit shrank the ring) are killed. Frozen textures and sounding grains ride

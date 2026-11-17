@@ -12,7 +12,7 @@ namespace ms::engine {
 struct Command {
   enum class Kind : uint32_t { SetParam, Swap, Watch };
   Kind kind = Kind::SetParam;
-  uint32_t node = 0, slot = 0;
+  uint32_t node = UINT32_MAX, slot = 0;  // Swap/Watch: UINT32_MAX disables the watch
   float value = 0.0f;
   Engine* engine = nullptr;  // Swap: ownership passes to the runner
 };

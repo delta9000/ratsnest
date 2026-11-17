@@ -683,6 +683,23 @@ void expand_in(Ctx& ctx, dsl::PatchAst& ast, const std::string& dir,
   }
 }
 
+// Sample paths in older patches started at the working directory. Prefer the
+// declaring patch/sub's directory, with the old location as a fallback.
+void resolve_samples(dsl::PatchAst& ast, const std::filesystem::path& patch_dir) {
+  for (auto& m : ast.modules) {
+    if (m.type != "sampler" && m.type != "grains") continue;
+    const auto dir = m.file.empty() ? patch_dir : std::filesystem::path(m.file).parent_path();
+    for (auto& p : m.params) {
+      if (p.name != "file" || p.value.str.empty()) continue;
+      const std::filesystem::path original(p.value.str);
+      const auto local = (dir / original).lexically_normal();
+      std::error_code ec;
+      if (std::filesystem::exists(local, ec) || !std::filesystem::is_regular_file(original, ec))
+        p.value.str = local.string();
+    }
+  }
+}
+
 }  // namespace
 
 SubExpansion expand_subs(dsl::PatchAst& ast, const std::string& patch_dir,
@@ -724,6 +741,7 @@ PatchBuild build_patch(std::string_view src, const std::string& patch_path, doub
   b.sub_outputs = std::move(x.outputs);
   if (b.compiled.ok()) embed_tracker_files(p.ast, dir, read_text_file, b.files, b.compiled.errors);
   if (!b.compiled.ok()) return b;
+  resolve_samples(p.ast, dir);
   b.ast = std::move(p.ast);
   b.compiled = compile(b.ast, rate);
   return b;

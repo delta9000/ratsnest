@@ -62,7 +62,7 @@ rec { file: "take.wav", secs: 30 }
 - **Allocate at `init()`:** an interleaved stereo capture buffer of `secs * engine_rate` frames. Store the path, rate, capacity, and `count_ = 0`.
 - **`process()`:** while `gate > 0.5` and `count_ < capacity`, append `(in_l, in_r)` and increment `count_`. Pure array writes — no alloc, no I/O. `gate` defaults to 1, so an unpatched `rec` records continuously until the cap. Beyond the cap, capture stops (no wrap — a WAV has a finite length; document the cap).
 - **Write at teardown:** the destructor calls `write_wav_f32(file, buffer, count_, 2, rate)` when `count_ > 0` (non-RT). For an offline `render`, the engine is destroyed at the end of the render, producing exactly one clean take alongside the main mix.
-- **Hot reload:** the capture buffer is **not** migrated (memcpy of an 11 MB buffer on the RT thread would xrun — rule 3). Editing the patch while recording therefore restarts the take: the outgoing instance writes its take-so-far, the new instance records afresh and overwrites on its own teardown. Last generation wins. Documented as a known behavior; offline render (no reload) is unaffected.
+- **Hot reload:** a topology change flushes the outgoing capture and starts another on the new graph. Takes claim the first available numbered filename, including across sessions. A write failure reports the path and fails an offline render.
 
 ## `extin` — external audio capture
 
@@ -87,7 +87,7 @@ extin
 
 ## Paths
 
-`file:` strings resolve against the process working directory (mise runs from the repo root), matching how the CLI resolves patch and `-o` paths today. No patch-directory-relative resolution exists and threading one through `compile()`→`init()` is out of scope; absolute paths always work. Documented in `docs/modules.md`.
+Sample inputs resolve relative to the declaring file, with the working directory as a fallback for older patches. Recording output paths remain relative to the working directory. Absolute paths work directly.
 
 ## Testing strategy
 
@@ -98,4 +98,4 @@ extin
 
 ## Non-goals
 
-Sample-accurate capture sync, resampling in `extin`, multi-channel `extin`, `rec` ring/overwrite modes, sample-start/loop-point config on `sampler`, and patch-relative path resolution. All deferred.
+Sample-accurate capture sync, resampling in `extin`, multi-channel `extin`, `rec` ring/overwrite modes, and sample-start/loop-point config on `sampler`. All deferred.

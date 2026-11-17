@@ -208,3 +208,25 @@ TEST_CASE("full control queue rejects a whole parameter edit without partial app
   rig.spin(4000);
   CHECK(rig.l[3999]==doctest::Approx(.8));
 }
+
+TEST_CASE("watch stops when its module disappears and rebinds when it returns") {
+  Rig rig;
+  const char* first = "x = vca { in: 0.25 }\nx -> out.in\n";
+  REQUIRE(rig.ctl.load(first).ok);
+  REQUIRE(rig.ctl.set_watch("x"));
+  rig.spin(64);
+  float value = 0.0f;
+  REQUIRE(rig.run.try_watch_value(value));
+  CHECK(value == 0.25f);
+
+  REQUIRE(rig.ctl.load("y = vca { in: 0.75 }\ny -> out.in\n").ok);
+  rig.spin(4096);
+  CHECK_FALSE(rig.ctl.watch_available());
+  CHECK_FALSE(rig.run.try_watch_value(value));
+
+  REQUIRE(rig.ctl.load(first).ok);
+  rig.spin(4096);
+  CHECK(rig.ctl.watch_available());
+  REQUIRE(rig.run.try_watch_value(value));
+  CHECK(value == 0.25f);
+}
