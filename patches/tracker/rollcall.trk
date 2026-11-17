@@ -1,0 +1,58 @@
+# rollcall.trk -- "Roll Call": a breakbeat etude for sub-row timing.
+# One row per (swung) sixteenth: a bar of drums, then a 10-bar loop.
+#   x@.15   a laid-back snare (lands 15% of a row late)
+#   x*3     a ratchet: three hits inside one row
+#   x?.5    a ghost that plays on about half the passes (seed: picks which)
+#   off@.5  a note cut halfway through the row
+# Everything else is the ordinary tracker.
+
+track kick  note vel
+track snare note vel
+track hat   note vel
+track ohat  note vel
+track bass  note vel
+
+pattern beat 16 kick snare hat ohat
+lane kick  9... .... ..8. ....
+lane hat   7.4. 7.4. 7.4. 7...
+lane ohat  .... .... .... ..6.
+01 | . | .        | x?.5 .3          # ghost hats: a different groove each pass
+04 | . | x@.15 .95                   # backbeat sits behind the grid
+09 | . | .        | x*2 .5
+11 | . | x?.4 .25                    # ghost snare
+12 | . | x@.15 1
+13 | . | .        | x?.5 .3
+
+# the turnaround: hat ratchets, then a snare roll that speeds up into bar 1
+pattern turn 16 kick snare hat ohat
+lane kick  9... .... ..8. ....
+lane hat   7.4. 7... .... ....
+04 | . | x@.15 .95
+06 | . | .           | x*3 .55
+08 | . | x .7
+10 | . | x*2 .6>
+12 | . | x*3 .
+13 | . | x*3 .
+14 | . | x*4 .
+15 | . | x*4 1       | .   | x .7
+
+pattern bass 2x16 bass
+1:00 | E1 .9
+1:03 | off@.5
+1:06 | E1@.5 .7                     # pushed half a row late
+1:08 | G1 .8
+1:10 | off@.5
+1:14 | A1 .8
+2:00 | E1 .9
+2:03 | off@.5
+2:08 | D2 .8
+2:09 | off@.5
+2:10 | B1 .7
+2:12 | A1 .8
+2:15 | off@.5
+
+section main bass+beat
+section tail bass+beat+turn@16
+
+order beat                          # one bar of drums alone
+order |: main*2 tail main^5 tail^5

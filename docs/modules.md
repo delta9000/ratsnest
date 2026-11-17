@@ -655,7 +655,7 @@ mel = stepseq { steps: [D4v, F4v, E4v, 0, A4v], gates: [1, 1, 1, 0, 1],
 
 ## `tracker`
 
-`tracker { file: "song.trk" }` plays a song written as a plain-text pattern
+`tracker { file: "song.trk", seed: 1 }` plays a song written as a plain-text pattern
 file: tracks, named patterns of rows, and an order list. Each rising `clock`
 edge plays one row (rows-per-beat is the clock's business). Inputs (all
 discrete) `clock`, rising-edge `reset`, and `start` (the order step `reset`
@@ -771,6 +771,28 @@ Composing (all resolved when the file loads; the ports never change):
   follow their transposed source, so it skips them (a layer's own `^N`
   still applies). Sections share the pattern namespace and hold patterns,
   not other sections.
+- **Sub-row timing:** suffixes on a note token, in any order with `:L`.
+  `C4@.25` lands the row's change (pitch, gate, values) a quarter of a
+  clock period late (flams, laid-back hits, per-note swing; 0 up to but not
+  1), and `off@.5` cuts a note mid-row. `x*3` ratchets: three hits spread
+  evenly over the rest of the row (1..16). `x?.5` sounds half the time; a
+  miss keeps the gate low until the track's next note or `x`. The draws come
+  from config `seed` (default 1), so renders repeat; rising `reset` rewinds
+  them, while a looping song draws fresh each pass. `*N`/`?P` go on notes
+  and `x`, not slurs or `off`. Fractions are of a row's length as measured
+  off the clock (the row two back, which is the row's own length on a
+  straight grid and under `transport` swing), so they follow tempo; the
+  first two rows after load land on their edge.
+
+  ```text
+  pattern roll 16 snare hat
+  00 | x        | x
+  02 | .        | x?.6         # ghost hats, different every pass
+  04 | x@.15    | x*2          # a laid-back snare; a hat ratchet
+  12 | x*4      | x*3@.5       # a snare roll into the next bar
+  ```
+
+  Worked: `patches/tracker/rollcall.patch`.
 - **Ramps:** a trailing `>` on a `vel`/`cva`/`cvb`/`cvd` value (`.2>`, `A3>`)
   glides linearly, one step per row, to the next value written in that field
   later in the same pattern (an error if none follows). Still stepped per
@@ -782,8 +804,9 @@ sample only, so gates work with any clock duty, one-sample pulses included;
 slurs keep the gate high; `off` drops it on its row. Without `|:` the edge
 after the last row ends the song: gates fall, values hold, `end` stays high
 until `reset`; with it the song wraps (`end` pulses). A coincident reset and
-clock edge plays row 0 of step `start`. No effect column, tempo or polyphony
-per track: patch modules to the CVs. Full design:
+clock edge plays row 0 of step `start`. No pitch or level effects, tempo or
+polyphony per track: patch modules to the CVs (`func` slew for portamento,
+`lfo` for vibrato, a `cvd` column into `clock.bpm` for tempo changes). Full design:
 `docs/superpowers/specs/2026-10-21-tracker-design.md`; a worked port:
 `patches/mainstage-trk.patch`.
 

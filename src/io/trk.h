@@ -11,11 +11,17 @@ namespace ms::io {
 constexpr int kTrkTracks = 16;        // output banks voct1..16, gate1..16, ...
 constexpr int kTrkMaxRows = 65536;    // whole flattened song
 constexpr int kTrkMaxPatternRows = 1024;
+constexpr int kTrkMaxRatchet = 16;    // hits in one row (`x*4`)
 
 // One track's resolved state on one row: the held values, whether a note
-// sounds, and whether this row re-articulates it (new note or `x`).
+// sounds, and whether this row re-articulates it (new note or `x`). The
+// row's change lands `delay` (a fraction of the row) after its clock edge;
+// a re-articulation hits `ratchet` times across the rest of the row and
+// sounds with probability `chance`. Those three are per row, never held.
 struct TrkRow {
   float voct = 0.0f, vel = 1.0f, cva = 0.0f, cvb = 0.0f, cvd = 0.0f;
+  float delay = 0.0f, chance = 1.0f;
+  int ratchet = 1;
   bool on = false, retrig = false;
 };
 

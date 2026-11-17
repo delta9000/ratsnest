@@ -1,0 +1,81 @@
+# etude -- "Roll Call": breakbeat at 132 BPM, 16th swing 58%, 1 + 10 bars (~20 s)
+# then loops. Score in rollcall.trk: laid-back snares (`x@.15`), hat and snare
+# ratchets (`x*3`), ghosts that change every pass (`x?.5`), and a bass whose
+# notes are cut mid-row (`off@.5`). Delays and ratchets scale with the
+# swung row they sit in. Change `seed` to hear another set of ghosts.
+
+clk = transport { bpm: 132, division: 4, swing: 0.16 }
+song = tracker { file: "rollcall.trk", seed: 3 }
+clk.clock -> song.clock
+
+kick = sub { file: "../lib/kit/kick.sub", tune: 50hz }
+song.gate1 -> kick.trig
+song.vel1 -> kick.accent
+kick_v = vca { gain: 0 }
+kick.main -> kick_v.in
+song.vel1 -> kick_v.cv
+
+snare = sub { file: "../lib/kit/snare.sub", tune: 200hz }
+song.gate2 -> snare.trig
+song.vel2 -> snare.accent
+snare_v = vca { gain: 0 }
+snare.main -> snare_v.in
+song.vel2 -> snare_v.cv
+
+hat = sub { file: "../lib/kit/hat.sub", decay: 0.12 }
+song.gate3 -> hat.trig
+song.vel3 -> hat.accent
+hat_v = vca { gain: 0 }
+hat.main -> hat_v.in
+song.vel3 -> hat_v.cv
+
+ohat = sub { file: "../lib/kit/hat.sub", decay: 0.45 }
+song.gate4 -> ohat.trig
+song.gate3 -> ohat.choke
+song.vel4 -> ohat.accent
+ohat_v = vca { gain: 0 }
+ohat.main -> ohat_v.in
+song.vel4 -> ohat_v.cv
+
+# bass: saw + sub through an enveloped ladder; the gate length is the score's
+b_osc = vco { freq: 220hz, wave: saw }
+b_sub = vco { freq: 110hz, wave: sine }
+song.voct5 -> b_osc.v_oct
+song.voct5 -> b_sub.v_oct
+b_env = adsr { attack: 0.002, decay: 0.12, sustain: 0.7, release: 0.03 }
+song.gate5 -> b_env.gate
+b_filt = ladder { cutoff: 160, res: 0.4, drive: 0.6 }
+b_osc -> b_filt.in : 0.6
+b_env -> b_filt.cutoff : 1100
+song.vel5 -> b_filt.cutoff : 400
+b_amp = vca { gain: 0 }
+b_filt -> b_amp.in
+b_sub -> b_amp.in : 0.6
+b_env -> b_amp.cv : 0.9
+
+band = mix { levels: [1.3, 1.1, 0.45, 0.25, 0.8],
+             pans: [0, 0.05, 0.3, 0.35, 0] }
+kick_v  -> band.in1
+snare_v -> band.in2
+hat_v   -> band.in3
+ohat_v  -> band.in4
+b_amp   -> band.in5
+
+room = reverb { decay: 0.5, damp: 0.4, mix: 1 }
+snare_v -> room.in_l : 0.2
+hat_v   -> room.in_r : 0.1
+
+master = mix { levels: [0.8, 0.8, 0.3, 0.3], pans: [-1, 1, -1, 1] }
+band.out_l -> master.in1
+band.out_r -> master.in2
+room.out_l -> master.in3
+room.out_r -> master.in4
+
+dc = dcblock { cutoff: 15 }
+master.out_l -> dc.in_l
+master.out_r -> dc.in_r
+lim = limiter { threshold: -1, release: 0.08 }
+dc.out_l -> lim.in_l
+dc.out_r -> lim.in_r
+lim.out_l -> out.left
+lim.out_r -> out.right

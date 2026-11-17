@@ -301,6 +301,37 @@ TEST_CASE("trk: note length diagnostics") {
   fails("track a note\npattern p 2\n| :3\n", 3, 3, "is not a note");
 }
 
+TEST_CASE("trk: @D delays, *N ratchets and ?P chance are per-row, in any order") {
+  const TrkSong s = ok("track a note vel\npattern p 4\n| C4@.25 .5\n| x*3?.5\n| off@.5\n| ~D4:2@.1\norder p\n");
+  CHECK(at(s, 0, 0).delay == doctest::Approx(0.25f));
+  CHECK(at(s, 0, 0).ratchet == 1);
+  CHECK(at(s, 0, 0).chance == 1.0f);
+  CHECK(at(s, 1, 0).delay == 0.0f);  // not held
+  CHECK(at(s, 1, 0).ratchet == 3);
+  CHECK(at(s, 1, 0).chance == doctest::Approx(0.5f));
+  CHECK(at(s, 1, 0).retrig);
+  CHECK(at(s, 2, 0).delay == doctest::Approx(0.5f));  // a note cut
+  CHECK_FALSE(at(s, 2, 0).on);
+  CHECK(at(s, 3, 0).delay == doctest::Approx(0.1f));
+  CHECK(at(s, 3, 0).voct == doctest::Approx(5.0f / 12));
+  // An overlay carries its timing; an empty row has none.
+  const TrkSong o = ok("track a note\npattern p 2\n| x@.5\npattern f 1\n| x*2\norder p+f@1\n");
+  CHECK(at(o, 0, 0).delay == doctest::Approx(0.5f));
+  CHECK(at(o, 1, 0).ratchet == 2);
+  CHECK(at(o, 1, 0).delay == 0.0f);
+}
+
+TEST_CASE("trk: delay, ratchet and chance diagnostics") {
+  fails("track a note\npattern p 2\n| C4@1\n", 3, 5, "'@D' with D a fraction");
+  fails("track a note\npattern p 2\n| C4@C4\n", 3, 5, "'@D'");
+  fails("track a note\npattern p 2\n| x@\n", 3, 4, "'@D'");
+  fails("track a note\npattern p 2\n| x*17\n", 3, 4, "'*N' with N in 1..16");
+  fails("track a note\npattern p 2\n| x*0\n", 3, 4, "'*N'");
+  fails("track a note\npattern p 2\n| x?1.5\n", 3, 4, "'?P' with P in 0..1");
+  fails("track a note\npattern p 2\n| ~C4*2\n", 3, 3, "not on slurs or off");
+  fails("track a note\npattern p 2\n| off?.5\n", 3, 3, "not on slurs or off");
+}
+
 TEST_CASE("trk: chord tones from a source track follow its chords") {
   const std::string h =
       "track pad note cva cvb\ntrack arp note vel from pad\ntrack lvl cva cvb from pad\n"
@@ -638,9 +669,9 @@ TEST_CASE("trk: mutation fuzz never crashes and always positions its error") {
       "section main chords+arp^-12\n"
       "pattern chords 2x4 harm\n1:00 | D3 F4 A3\n2:0 | Bb2 D4 F3\n"
       "pattern arp 4 arp\n| t1+12:2 .2> t2\n2 | ~t3 .8 C4\n"
-      "pattern fill 2 hat\nlane hat 9x\n"
+      "pattern fill 2 hat\nlane hat 9.\n1 | x*3@.25?.5\n"
       "order main^2+fill@1:2 |: main+fill@3*2\n"};
-  const char alphabet[] = "|#.-~x*+:0129 \nCsbvAoffpatternrackorder=^@>tlnesci";
+  const char alphabet[] = "|#.-~x*+:0129 \nCsbvAoffpatternrackorder=^@>tlnesci?";
   std::uint32_t rng = 0x2545F491u;
   auto next = [&] {
     rng ^= rng << 13;
@@ -666,8 +697,11 @@ TEST_CASE("trk: mutation fuzz never crashes and always positions its error") {
       if (r.ok()) {
         CHECK(r.song.length() > 0);
         CHECK(r.song.rows.size() == static_cast<size_t>(r.song.length() * r.song.tracks));
-        for (const TrkRow& row : r.song.rows)
+        for (const TrkRow& row : r.song.rows) {
           REQUIRE((std::isfinite(row.voct) && std::isfinite(row.cva) && std::isfinite(row.cvb) && std::isfinite(row.cvd)));
+          REQUIRE((row.delay >= 0.0f && row.delay < 1.0f && row.chance >= 0.0f && row.chance <= 1.0f));
+          REQUIRE((row.ratchet >= 1 && row.ratchet <= ms::io::kTrkMaxRatchet));
+        }
       } else {
         REQUIRE(r.errors.size() == 1);
         CHECK(r.errors[0].line >= 1);
