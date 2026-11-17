@@ -43,8 +43,16 @@ mise run build
 mise run render -- patches/first.patch -d 10s -o take.wav
 ```
 
-Renders 10 seconds of `patches/first.patch` to `take.wav`, no audio device
-needed. `--start` captures a window from further in:
+This writes ten seconds of stereo audio to `take.wav` in the current directory.
+Create any parent directory for `-o` first. No audio device is needed.
+
+For a finite tracker score, set `-d` to the length you want to export. The
+tracker's `end` signal marks the end of the score inside the patch. The
+renderer keeps writing until its requested duration (ten seconds by default).
+At a fixed tempo in 4/4, score seconds = bars × 4 × 60 / BPM. Add time for
+any release or reverb you want to keep.
+
+`--start` captures a window from further in:
 
 ```sh
 mise run render -- patches/longwave/4-lydian.patch --start 10m -d 60s --stats 10s
@@ -61,6 +69,16 @@ Offline renders are stereo float32 WAVs and preserve headroom above 0 dBFS;
 they are not silently hard-clipped. Live PipeWire playback is safety-clamped
 only at the audio-device boundary. Put an explicit `clipper` or `limiter` in
 the patch when peak control is part of the sound.
+
+`--stats` reports overall sample peak, RMS and DC, plus peak and RMS for
+each window. Two tracks with the same sample peak can sound quite different
+in level. To compare finished tracks with FFmpeg, run this on each WAV and
+read `I` (integrated loudness in LUFS) and the `Peak` under `True peak` in
+the final summary.
+
+```sh
+ffmpeg -hide_banner -nostats -i take.wav -af ebur128=peak=true:framelog=verbose -f null -
+```
 
 ### Play a patch live
 
@@ -87,6 +105,10 @@ with `--stats`. A successful check establishes syntax/configuration validity;
 listening and signal measurements establish whether a patch does what you want.
 
 ### Musical patterns and live scenes
+
+To write notes by hand, start with [Your first tracker song](docs/first-tracker-song.md).
+It takes two A3 notes from a score to an audible WAV and shows how to hear
+the difference between their velocities.
 
 `patches/keepsake.patch` demonstrates a shared swung transport, a generated motif
 captured into phrase memory, clocked harmony changes, bar-quantized scenes, and

@@ -655,6 +655,8 @@ mel = stepseq { steps: [D4v, F4v, E4v, 0, A4v], gates: [1, 1, 1, 0, 1],
 
 ## `tracker`
 
+For a complete patch, score and render command, see [Your first tracker song](first-tracker-song.md).
+
 `tracker { file: "song.trk", seed: 1 }` plays a song written as a plain-text pattern
 file: tracks, named patterns of rows, and an order list. Each rising `clock`
 edge plays one row (rows-per-beat is the clock's business). Inputs (all
@@ -671,6 +673,11 @@ that declares the module (like a `sub`, unlike `sampler`). The loader reads
 it at build time, reports `.trk` mistakes as `song.trk:line:col`, embeds the
 song as config `text`, and `play` **watches it**: saving the `.trk`
 hot-reloads, keeping the order step and row (clamped to the edited song).
+
+Use `file` when writing a patch. The `text` field listed by
+`ratsnest describe tracker` is for the loader. An empty `tracker {}` or
+malformed inline `text` can pass `check` and play silence. To validate your
+score, run `ratsnest check song.patch` on the patch that references it.
 
 ```text
 # song.trk -- one row per sixteenth
