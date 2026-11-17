@@ -284,16 +284,18 @@ should fade (the arrangement-lane idiom of patch-craft).
 
 ## 6. What it deliberately does not do
 
-- **No effect column.** Portamento, arpeggio, volume slides and retrigger
-  commands are modules (`func` slew, `switch`, `euclid`, `adsr`) patched to
-  the tracker's CVs. The two `cv` columns are the effect columns.
+- **No pitch or level effects.** Portamento, arpeggio and vibrato are
+  modules (`func` slew, `switch`, `lfo`) patched to the tracker's CVs; the
+  `cv` columns are the effect columns, and `>` ramps are the volume slide.
 - **No instruments or samples.** A track is a control stream; what it plays
   is the patch.
 - **No tempo, speed or groove.** Rows advance on the clock; swing lives in
   `transport`.
 - **No polyphony inside a track.** One note per track; a chord is three
   fields (`note cva cvb`) or three tracks.
-- **No sub-row timing** (note delay, cut). Clock faster for finer grids.
+- **No effect column beyond timing.** Sub-row timing (§8.8b) is the one
+  classic effect family built in, because a gate the tracker owns cannot be
+  delayed or ratcheted from outside it.
 - **No recording or editing from the engine.** The file is the source of
   truth; it is written by people (and diffed by git).
 
@@ -431,6 +433,33 @@ when the file is parsed. A ramp with no later value in its pattern (or one
 whose target is a chord tone) is an error at the ramp. The filled values are
 pitches only when both ends are, so `^N` moves a pitch glide and leaves a
 level fade alone. Values stay stepped per row (§4.3); `func` still smooths.
+
+### 8.8b Sub-row timing: `@D`, `*N`, `?P`
+
+Suffixes on a note-field token, in any order and mixed with `:L`, borrow
+three classic tracker effects (concept only: note delay EDx and Renoise's
+delay column, retrigger E9x, Renoise's Yxx maybe-play / Elektron trig
+probability):
+
+- `C4@.25` lands the row's whole change for that track (pitch, gate, vel,
+  cvs) a quarter of a clock period after the edge. `off@.5` is a note cut.
+  D is in 0 up to but not 1.
+- `x*3` hits three times, evenly across the rest of the row (after any
+  delay), each hit a one-sample gate drop like any re-articulation. 1..16.
+- `x?.5` sounds with probability .5: on its first hit a draw from the
+  module's xorshift32 (config `seed`, default 1) decides, and a miss keeps
+  the track's gate low until its next note or `x`. Rising `reset` rewinds
+  the draws, so a reset replays the same pass; a looping song draws fresh
+  each time round. `*N` and `?P` go on notes and `x`, not on slurs or `off`.
+
+A row's length is the module's own measurement: the interval two edges
+back, which equals the row's length on a straight grid and under the
+transport's two-row swing (where the last interval would be the other half
+of the pair, and a short row's ratchet would spill). Timing so follows tempo
+with no tempo input; until three edges have been seen (the first two rows
+after load) everything lands on the edge. These are per row: they never
+hold, and the flattened `TrkRow` carries `delay`, `ratchet` and `chance`.
+A change still owed when the next edge arrives lands on that edge.
 
 ### 8.9 Example
 

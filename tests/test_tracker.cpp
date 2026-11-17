@@ -1,5 +1,6 @@
 // The tracker module: timing against the clock, gates, the order list,
 // reset, hot-reload state, and the file loader's diagnostics and watching.
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <filesystem>
@@ -25,14 +26,25 @@ struct Trk {
   std::unique_ptr<dsp::Module> m;
   std::array<float, 3> in{};  // clock, reset, start
   std::array<float, kOuts> out{};
-  explicit Trk(const std::string& text) {
+  explicit Trk(const std::string& text, double seed = 1.0) {
     const dsp::ModuleInfo* info = dsp::find_module("tracker");
     REQUIRE(info != nullptr);
     REQUIRE(info->outputs.size() == out.size());
     m = info->create();
-    dsp::ConfigValue v;
+    dsp::ConfigValue v, sd;
     v.str = text;
-    m->init(48000.0, {{"text", v}});
+    sd.num = seed;
+    sd.is_num = true;
+    m->init(48000.0, {{"text", v}, {"seed", sd}});
+  }
+  // Output `i` over one 100-sample clock period, edge first.
+  std::vector<float> period(int i) {
+    std::vector<float> v;
+    for (int s = 0; s < 100; ++s) {
+      run(s < 50 ? 1.0f : 0.0f);
+      v.push_back(o(i));
+    }
+    return v;
   }
   float run(float clock) {
     in[0] = clock;
@@ -198,6 +210,96 @@ TEST_CASE("tracker: reset rewinds to step `start`; a coincident clock plays its 
   t.in[1] = 1.0f;
   e = t.tick();
   CHECK(at(e, kStep) == 1.0f);
+}
+
+namespace {
+// Samples of a period where the gate is low.
+std::vector<int> lows(const std::vector<float>& g) {
+  std::vector<int> v;
+  for (size_t i = 0; i < g.size(); ++i)
+    if (g[i] == 0.0f) v.push_back(static_cast<int>(i));
+  return v;
+}
+std::vector<int> range(int from, int to) {
+  std::vector<int> v;
+  for (int i = from; i < to; ++i) v.push_back(i);
+  return v;
+}
+}  // namespace
+
+TEST_CASE("tracker: @D lands a row's change a fraction of the clock period late") {
+  Trk t("track a note cva\npattern p 4\n| C4 1\n|\n| D4@.25 2\n| off@.5\norder p\n");
+  t.period(col(0, kGate));                        // rows 0 and 1: the edges after
+  t.period(col(0, kGate));                        // them measure a 100-sample row
+  t.run(1.0f);
+  CHECK(t.o(col(0, kCva)) == 1.0f);               // row 1's edge: nothing yet
+  CHECK(t.o(kRow) == 2.0f);
+  for (int s = 1; s < 25; ++s) t.run(1.0f);
+  CHECK(t.o(col(0, kCva)) == 1.0f);
+  CHECK(t.o(col(0, kGate)) == 1.0f);
+  t.run(1.0f);                                    // sample 25: the delayed note
+  CHECK(t.o(col(0, kCva)) == 2.0f);
+  CHECK(t.o(col(0, kVoct)) == doctest::Approx(5.0f / 12));
+  CHECK(t.o(col(0, kGate)) == 0.0f);              // re-articulated here
+  t.run(1.0f);
+  CHECK(t.o(col(0, kGate)) == 1.0f);
+  for (int s = 27; s < 100; ++s) t.run(s < 50 ? 1.0f : 0.0f);
+  CHECK(lows(t.period(col(0, kGate))) == range(50, 100));  // off@.5 cuts mid-row
+}
+
+TEST_CASE("tracker: *N ratchets spread N hits over the rest of the row") {
+  Trk t("track a note\npattern p 5\n| x*4\n| x*4\n| x*4\n| x*2@.5\n| C4\norder p\n");
+  CHECK(lows(t.period(col(0, kGate))).empty());   // no row measured yet: one hit
+  CHECK(lows(t.period(col(0, kGate))) == std::vector<int>{0});
+  CHECK(lows(t.period(col(0, kGate))) == std::vector<int>{0, 25, 50, 75});
+  CHECK(lows(t.period(col(0, kGate))) == std::vector<int>{50, 75});
+  CHECK(lows(t.period(col(0, kGate))) == std::vector<int>{0});
+}
+
+TEST_CASE("tracker: under two-row swing each row's hits fit that row") {
+  Trk t("track a note\npattern p 2\n| x*2\n| x*2\norder |: p\n");
+  auto row = [&](int len) {  // one row of `len` samples
+    std::vector<float> g;
+    for (int s = 0; s < len; ++s) {
+      t.run(s < len / 2 ? 1.0f : 0.0f);
+      g.push_back(t.o(col(0, kGate)));
+    }
+    return lows(g);
+  };
+  for (int i = 0; i < 2; ++i) row(120), row(80);
+  CHECK(row(120) == std::vector<int>{0, 60});
+  CHECK(row(80) == std::vector<int>{0, 40});
+}
+
+TEST_CASE("tracker: ?P plays a note with probability P, repeatably per seed") {
+  std::string never = "track a note\npattern p 2\n| x?0\n| x\norder p\n";
+  Trk n(never);
+  CHECK(lows(n.period(col(0, kGate))).size() == 100);  // skipped: silent all row
+  CHECK(lows(n.period(col(0, kGate))) == std::vector<int>{});  // the next note rolls again
+
+  const std::string coin = "track a note\npattern p 1\n| x?.5\norder |: p\n";
+  auto pattern = [&](double seed) {
+    Trk t(coin, seed);
+    std::string heard;
+    for (int i = 0; i < 64; ++i) heard += t.period(col(0, kGate))[10] > 0.0f ? 'x' : '.';
+    return heard;
+  };
+  const std::string a = pattern(1), b = pattern(1), c = pattern(2);
+  CHECK(a == b);
+  CHECK(a != c);
+  const auto hits = std::count(a.begin(), a.end(), 'x');
+  CHECK(hits > 16);
+  CHECK(hits < 48);
+
+  Trk t(coin);  // reset rewinds the dice: the same pass again
+  std::string first, again;
+  for (int i = 0; i < 8; ++i) first += t.period(col(0, kGate))[10] > 0.0f ? 'x' : '.';
+  t.in[1] = 1.0f;
+  for (int i = 0; i < 8; ++i) {
+    again += t.period(col(0, kGate))[10] > 0.0f ? 'x' : '.';
+    t.in[1] = 0.0f;
+  }
+  CHECK(first == again);
 }
 
 TEST_CASE("tracker: hot reload keeps the order step and the row within it") {

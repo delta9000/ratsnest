@@ -381,15 +381,25 @@ counter-line in chord degrees through `quant`):
   instead: one form row per step, whatever each step's length.
   `patches/tracker/lantern.patch` is the whole tree: one transport, two
   trackers.
-- **Swing is the transport's.** The tracker has no groove; `swing` on the
+- **Swing is the transport's.** The tracker has no groove table; `swing` on the
   transport delays every second sixteenth while downbeats and bars stay
   put. Drum-machine swing P% (the first sixteenth of a pair takes P% of it:
   50 % straight, 66 % triplet) is `s = 2P − 1`: 54 % → .08, 58 % → .16,
   66 % → .32, 75 % → .5 (the cap .75 is 87.5 %). A `clock`/`div` tree cannot
   swing at all.
+- **Feel is the cell's.** Whole-grid swing stays on the transport; for
+  single notes, write the timing in the cell: `x@.15`
+  lays a snare back, `x*3` is a ratchet or roll inside one row, `x?.6` a
+  ghost hat that changes every pass. Delays and ratchets are fractions of
+  the row's measured length, so they ride the transport's swing (a swung
+  row is shorter or longer, and `@D` and `*N` scale with it). Keep `@D` under about .5 on a
+  sixteenth grid or it reads as the next row, late. The `seed` config picks
+  which pass of `?P` the render hears. `patches/tracker/rollcall` uses all
+  three.
 - **Div chains are for tricks.** Keep `clock → div` for what a transport
   does not do: polyrhythm off one master (`div { by: 3 }` against
-  `by: 4`), ratchets and bursts faster than the grid, offbeat logic. A
+  `by: 4`), continuous bursts faster than the grid, offbeat logic. A
+  ratchet on one note is `x*N` in the `.trk`. A
   phrase in another meter is a free-running `~` layer in the `.trk`, not a
   second tracker on a least-common-multiple clock.
 - **Layer, don't copy.** `order chords+chop+hook+beat` stacks a four-bar

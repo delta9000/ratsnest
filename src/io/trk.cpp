@@ -2,7 +2,9 @@
 // Layout conventions borrowed from tracker text formats (concept only, see
 // docs/attribution.md): `|`-prefixed cells from the OpenMPT/ModPlug pattern
 // clipboard with dotted empty fields, `---`/`===` (tracker folklore, source
-// unresolved), and the order list with a restart position.
+// unresolved), and the order list with a restart position. The `@D`, `*N`
+// and `?P` note suffixes echo tracker delay/retrigger/maybe effects (concept
+// only, source unresolved).
 #include <algorithm>
 #include <cctype>
 #include <charconv>
@@ -35,12 +37,15 @@ bool is_tone(std::string_view s) { return s.size() >= 2 && s[0] == 't' && s[1] >
 // which an order-list `^N` transposes along with the note. `len` is the
 // note's length in rows (`C4:3`, else the track's); 0 holds. `tone[f]` 1..4
 // makes v[f] an offset from the source track's note, cva, cvb or cvd.
+// `delay`, `ratchet` and `chance` are the note's `@D`, `*N` and `?P`.
 struct Event {
   Kind kind = Kind::None;
   std::uint8_t set = 0, pitch = 0;
   std::int16_t len = 0;
   std::uint8_t tone[5] = {};
   float v[5] = {};
+  float delay = 0.0f, chance = 1.0f;
+  int ratchet = 1;
 };
 struct Pattern {
   std::string name;
@@ -335,8 +340,16 @@ class Parser {
   }
 
   void note(const Tok& t, const Track& tr, Event& e) {
-    std::string_view s = t.s.substr(0, t.s.find(':'));
-    if (s.size() < t.s.size() && !length(t, s.size(), e)) return;
+    std::string_view s = t.s.substr(0, std::min(t.s.find_first_of(":@*?"), t.s.size()));
+    if (!suffixes(t, s.size(), e)) return;
+    head(t, s, tr, e);
+    const bool hits = e.kind == Kind::Note || e.kind == Kind::Hit;
+    if (e.kind != Kind::None && !hits && (e.ratchet > 1 || e.chance < 1.0f))
+      err(t, "'" + std::string(t.s) + "': ratchets '*N' and chance '?P' go on notes and x, not on slurs or off");
+  }
+
+  // The note token before its suffixes.
+  void head(const Tok& t, std::string_view s, const Track& tr, Event& e) {
     if (s == "off" || s == "===") { e.kind = Kind::Off; return; }
     if (s == "x") { e.kind = Kind::Hit; return; }
     const bool slur = !s.empty() && s[0] == '~';
@@ -351,12 +364,33 @@ class Parser {
     err(t, "'" + std::string(t.s) + "' is not a note (uppercase: C4, Cs4, Bb3), number, x, ~note, t1..t4 (with 'from'), off or .");
   }
 
-  // `:L` at `colon` in a note token: the note sounds L rows.
-  bool length(const Tok& t, size_t colon, Event& e) {
-    int len = 0;
-    if (to_int(t.s.substr(colon + 1), 1, kMaxLen, len)) return e.len = static_cast<std::int16_t>(len), true;
-    err(t.col + static_cast<int>(colon), "note length must be ':L' with L in 1..4096 rows (C4:2)");
-    return false;
+  // A note token's suffixes from `cut`, in any order: `:L` length in rows,
+  // `@D` delay (a fraction of the row), `*N` ratchet hits, `?P` chance.
+  bool suffixes(const Tok& t, size_t cut, Event& e) {
+    while (cut < t.s.size()) {
+      const size_t next = std::min(t.s.find_first_of(":@*?", cut + 1), t.s.size());
+      const std::string_view arg = t.s.substr(cut + 1, next - cut - 1);
+      if (!suffix(t.s[cut], arg, e)) return err(t.col + static_cast<int>(cut), bad_suffix(t.s[cut])), false;
+      cut = next;
+    }
+    return true;
+  }
+
+  static bool suffix(char c, std::string_view arg, Event& e) {
+    int n = 0;
+    float v = 0.0f;
+    if (c == ':') return to_int(arg, 1, kMaxLen, n) && (e.len = static_cast<std::int16_t>(n), true);
+    if (c == '*') return to_int(arg, 1, kTrkMaxRatchet, e.ratchet);
+    const bool num = !arg.empty() && !std::isupper(static_cast<unsigned char>(arg[0])) && to_value(arg, v);
+    if (c == '@') return num && v >= 0.0f && v < 1.0f && (e.delay = v, true);
+    return num && v >= 0.0f && v <= 1.0f && (e.chance = v, true);
+  }
+
+  static std::string bad_suffix(char c) {
+    if (c == ':') return "note length must be ':L' with L in 1..4096 rows (C4:2)";
+    if (c == '*') return "ratchet must be '*N' with N in 1..16 hits in the row (x*3)";
+    if (c == '@') return "delay must be '@D' with D a fraction of the row, 0 up to but not 1 (C4@.25)";
+    return "chance must be '?P' with P in 0..1 (x?.5)";
   }
 
   // `t2+7` in field `f`: source tone 2 (its cva) up 7 semitones.
@@ -706,6 +740,9 @@ class Parser {
   void tick(size_t tr, const Cue& c, int row) {
     Voice& v = voice_[tr];
     v.s.retrig = false;
+    v.s.delay = 0.0f;
+    v.s.ratchet = 1;
+    v.s.chance = 1.0f;
     if (v.off_at == row) v.s.on = false;
     if (!c.e) return;
     const int src = tracks_[tr].src;
@@ -725,7 +762,12 @@ class Parser {
     if (e.kind == Kind::Note || e.kind == Kind::Slur) s.voct = val(kNote);
 
     if (e.kind == Kind::Note || e.kind == Kind::Hit) s.retrig = true;
-    if (e.kind != Kind::None) s.on = e.kind != Kind::Off;
+    if (e.kind != Kind::None) {
+      s.on = e.kind != Kind::Off;
+      s.delay = e.delay;
+      s.ratchet = e.ratchet;
+      s.chance = e.chance;
+    }
     if (e.set & (1u << kVel)) s.vel = e.v[kVel];
     float* const cv[] = {&s.cva, &s.cvb, &s.cvd};
     for (int f = kCva; f <= kCvd; ++f)
