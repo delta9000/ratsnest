@@ -1,0 +1,172 @@
+# Coins in the Hopper — Night Ferry
+# A three-note fare-box chime starts the crossing. The bass answers on the last sixteenth.
+time = transport { bpm: 116, division: 4, swing: 0.09 }
+score = tracker { file: "01-coins-in-the-hopper.trk" }
+time.clock -> score.clock
+clean = dcblock {  }
+limit = limiter { threshold: -1.7, release: 0.07 }
+clean.out_l -> limit.in_l
+clean.out_r -> limit.in_r
+
+# Drum machine: swept sine, pitched snare body, filtered noise and a metal rim.
+drop = func { rise: 0.0009, fall: 0.049, curve: exp }
+score.gate1 -> drop.trig
+boom = func { rise: 0.0014, fall: 0.28, curve: exp }
+score.gate1 -> boom.trig
+skin = vco { freq: 48, wave: sine }
+drop -> skin.v_oct : 2.700000
+score.gate1 -> skin.sync
+kicke = vca { gain: 0 }
+skin -> kicke.in
+boom -> kicke.cv
+kick = vca { gain: 0 }
+kicke -> kick.in
+score.vel1 -> kick.cv
+kick -> clean.in_l : 0.700000
+kick -> clean.in_r : 0.700000
+white = noise { seed: 373, color: white }
+snareband = svf { cutoff: 1750, res: 0.27 }
+white -> snareband.in
+shell = vco { freq: 175, wave: tri }
+snmix = vca {  }
+snareband.bp -> snmix.in : 1.150000
+shell -> snmix.in : 0.300000
+snap = func { rise: 0.001, fall: 0.17, curve: exp }
+score.gate2 -> snap.trig
+sne = vca { gain: 0 }
+snmix -> sne.in
+snap -> sne.cv
+sn = vca { gain: 0 }
+sne -> sn.in
+score.vel2 -> sn.cv
+sn -> clean.in_l : 0.490000
+sn -> clean.in_r : 0.510000
+air = svf { cutoff: 5900, res: 0.12 }
+white -> air.in
+tick = func { rise: 0.0005, fall: 0.06, curve: exp }
+score.gate3 -> tick.trig
+hate = vca { gain: 0 }
+air.hp -> hate.in
+tick -> hate.cv
+hat = vca { gain: 0 }
+hate -> hat.in
+score.vel3 -> hat.cv
+hat -> clean.in_l : 0.110000
+hat -> clean.in_r : 0.190000
+tin = vco { wave: sine, freq: 751 }
+rivet = vco { wave: sine, freq: 1220 }
+tin -> rivet.fm : 1.830000
+tap = func { rise: 0.001, fall: 0.16, curve: exp }
+score.gate4 -> tap.trig
+rime = vca { gain: 0 }
+rivet -> rime.in
+tap -> rime.cv
+rim = vca { gain: 0 }
+rime -> rim.in
+score.vel4 -> rim.cv
+rim -> clean.in_l : 0.180000
+rim -> clean.in_r : 0.105000
+
+# Bass oscillator and independent sweep and amplitude envelopes.
+saw = vco { wave: saw, pw: 0.36 }
+score.voct5 -> saw.v_oct
+sub = vco { wave: sine }
+score.voct5 -> sub.v_oct
+throat = svf { cutoff: 230, res: 0.54 }
+saw -> throat.in : 0.700000
+bite = func { rise: 0.002, fall: 0.15, curve: exp }
+score.gate5 -> bite.trig
+bite -> throat.v_oct : 2.400000
+lowmix = vca {  }
+throat.lp -> lowmix.in : 0.740000
+sub -> lowmix.in : 0.480000
+bassenv = adsr { attack: 0.004, decay: 0.12, sustain: 0.68, release: 0.065, curve: exp }
+score.gate5 -> bassenv.gate
+basse = vca { gain: 0 }
+lowmix -> basse.in
+bassenv -> basse.cv
+bass = vca { gain: 0 }
+basse -> bass.in
+score.vel5 -> bass.cv
+bass -> clean.in_l : 0.470000
+bass -> clean.in_r : 0.470000
+
+# Lead and answering voice. Each side has its own envelope and echo send.
+lead = additive { ratios: [1, 2.01, 3.96, 6.17], levels: [0.63, 0.22, 0.11, 0.06] }
+score.voct6 -> lead.v_oct
+phraseenv = adsr { attack: 0.012, decay: 0.14, sustain: 0.56, release: 0.18, curve: lin }
+score.gate6 -> phraseenv.gate
+mele = vca { gain: 0 }
+lead -> mele.in
+phraseenv -> mele.cv
+mel = vca { gain: 0 }
+mele -> mel.in
+score.vel6 -> mel.cv
+mel -> clean.in_l : 0.225000
+mel -> clean.in_r : 0.157500
+answer = additive { levels: [0.65, 0.18, 0.09, 0.09], ratios: [1, 2, 3.005, 5.02] }
+score.voct7 -> answer.v_oct
+ansenv = adsr { attack: 0.018, decay: 0.16, sustain: 0.62, release: 0.19, curve: lin }
+score.gate7 -> ansenv.gate
+anse = vca { gain: 0 }
+answer -> anse.in
+ansenv -> anse.cv
+ans = vca { gain: 0 }
+anse -> ans.in
+score.vel7 -> ans.cv
+ans -> clean.in_l : 0.120000
+ans -> clean.in_r : 0.212000
+
+# Three independently tuned chord tones. The third voice sits above the bass.
+washenv = adsr { attack: 0.045, decay: 0.17, sustain: 0.57, release: 0.27, curve: exp }
+score.gate8 -> washenv.gate
+pad1 = vco { freq: 219.4, wave: tri }
+score.voct8 -> pad1.v_oct
+pad1f = svf { cutoff: 1050, res: 0.12 }
+pad1 -> pad1f.in
+pad1ve = vca { gain: 0 }
+pad1f.lp -> pad1ve.in
+washenv -> pad1ve.cv
+pad1v = vca { gain: 0 }
+pad1ve -> pad1v.in
+score.vel8 -> pad1v.cv
+pad1v -> clean.in_l : 0.160000
+pad1v -> clean.in_r : 0.055000
+pad2 = vco { freq: 220, wave: tri }
+score.cva8 -> pad2.v_oct
+pad2f = svf { cutoff: 1270, res: 0.12 }
+pad2 -> pad2f.in
+pad2ve = vca { gain: 0 }
+pad2f.lp -> pad2ve.in
+washenv -> pad2ve.cv
+pad2v = vca { gain: 0 }
+pad2ve -> pad2v.in
+score.vel8 -> pad2v.cv
+pad2v -> clean.in_l : 0.100000
+pad2v -> clean.in_r : 0.120000
+pad3 = vco { freq: 220.65, wave: tri }
+score.cvb8 -> pad3.v_oct
+pad3f = svf { cutoff: 1490, res: 0.12 }
+pad3 -> pad3f.in
+pad3ve = vca { gain: 0 }
+pad3f.lp -> pad3ve.in
+washenv -> pad3ve.cv
+pad3v = vca { gain: 0 }
+pad3ve -> pad3v.in
+score.vel8 -> pad3v.cv
+pad3v -> clean.in_l : 0.055000
+pad3v -> clean.in_r : 0.160000
+echo = delay { time: 0.387931, feedback: 0.36, tone: 2900, mix: 1 }
+mel -> echo.in : 0.300000
+rim -> echo.in : 0.260000
+echo -> clean.in_l : 0.130000
+echo -> clean.in_r : 0.250000
+plate = reverb { decay: 0.58, damp: 0.48, mix: 1 }
+sn -> plate.in_l : 0.350000
+ans -> plate.in_r : 0.390000
+pad2v -> plate.in_r : 0.400000
+echo -> plate.in_l : 0.230000
+plate.out_l -> clean.in_l : 0.240000
+plate.out_r -> clean.in_r : 0.240000
+limit.out_l -> out.left
+limit.out_r -> out.right
