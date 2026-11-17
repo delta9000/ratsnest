@@ -1,0 +1,30 @@
+# A short, woody front over a slowly opening detuned reed.
+key = input {}
+gate = input {}
+velocity = input {}
+open = input {}
+tuning = param { default: 220.6 }
+wood = additive { levels: [.76, .18, .06], ratios: [1, 2.005, 3.01] }
+key -> wood.v_oct
+attack = adsr { attack: .007, decay: .56, sustain: .20, release: .28, curve: exp }
+gate -> attack.gate
+struck = vca { gain: 0 }
+wood -> struck.in
+attack -> struck.cv
+reed = vco { freq: tuning, wave: saw }
+key -> reed.v_oct
+mellow = svf { cutoff: 625, res: .26 }
+reed -> mellow.in
+key -> mellow.v_oct : .46
+open -> mellow.v_oct : 1.8
+bloom = adsr { attack: .19, decay: .72, sustain: .72, release: .32, curve: lin }
+gate -> bloom.gate
+bowed = vca { gain: 0 }
+mellow.lp -> bowed.in
+bloom -> bowed.cv
+sum = vca { gain: 0 }
+struck -> sum.in : .62
+bowed -> sum.in : .40
+velocity -> sum.cv
+voice = output {}
+sum -> voice.in

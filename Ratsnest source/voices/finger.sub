@@ -1,0 +1,15 @@
+# A fresh attack sets pitch immediately. While the finger is down, bend in octaves per second.
+pitch = input {}
+gate = input {}
+rate = param { default: .17 }
+attack = func { rise: 0, fall: .008 }
+gate -> attack.trig
+speed = vca {}
+rate -> speed.in
+attack -> speed.in : -1
+bend = func { rise: 0, fall: 0 }
+pitch -> bend.in
+speed -> bend.rise
+speed -> bend.fall
+key = output {}
+bend -> key.in

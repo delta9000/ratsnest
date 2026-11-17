@@ -1,0 +1,371 @@
+# Last Word — four minutes at 128, plus room decay.
+# The keys state F-A-E-D before the bass takes the D at bar 65.
+# 1 intro / 9 pocket / 25 open / 41 first lift / 57 strip / 65 steal
+# 81 trade / 97 last lift / 113 peel / 121 ending. One score row is a sixteenth.
+# Run from any directory: ratsnest render path/to/last-word.patch --rate 44100 -d 242s -o last-word.wav
+time = transport { bpm: 128, swing: .12, division: 4 }
+song = tracker { file: "last-word.trk" }
+form = tracker { file: "room.trk" }
+time.clock -> song.clock
+time.bar -> form.clock
+
+
+# Right hand. The felt fundamental rings after the tine has stopped speaking.
+pianofinger = sub { file: "voices/finger.sub", rate: .18 }
+song.voct6 -> pianofinger.pitch
+song.gate6 -> pianofinger.gate
+pianoharp = fm { algo: triad, freq: 220, vel: 0,
+    ratios: [1, 1, 2.004, 5.01, 3.014, 7.13],
+    levels: [.73, .15, .17, .09, .07, .12],
+    vel_sens: [.85, .97, .89, 1, .96, 1],
+    t1: [.004, .003, .002, .002, .003, .001],
+    t2: [.92, .30, .48, .09, .20, .11],
+    t3: [1.1, .70, .80, .40, .55, .50],
+    t4: [.48, .19, .29, .09, .21, .09],
+    l2: [.62, .20, .32, .07, .14, .05],
+    l3: [.32, .06, .04, 0, 0, 0],
+    key_level: [0, -.13, -.12, -.25, -.18, -.32],
+    curve: log }
+pianofinger -> pianoharp.v_oct
+song.gate6 -> pianoharp.gate
+song.vel6 -> pianoharp.vel
+piano = vca { gain: .94 }
+pianoharp -> piano.in
+
+# The bass has a sine foundation and a moving mouth in the first few harmonics.
+bassfinger = sub { file: "voices/finger.sub", rate: .29 }
+song.voct5 -> bassfinger.pitch
+song.gate5 -> bassfinger.gate
+basscore = vco { wave: sine }
+bassedge = vco { wave: saw }
+bassfinger -> basscore.v_oct
+bassfinger -> bassedge.v_oct
+bassbite = func { rise: .006, fall: .37, curve: exp }
+song.gate5 -> bassbite.trig
+bassmouth = svf { cutoff: 525, res: .45 }
+bassedge -> bassmouth.in
+bassfinger -> bassmouth.v_oct : .54
+bassbite -> bassmouth.v_oct : 1.70
+song.vel5 -> bassmouth.v_oct : .78
+bassamp = adsr { attack: .006, decay: .23, sustain: .73, release: .11, curve: exp }
+song.gate5 -> bassamp.gate
+bassbody = vca { gain: 0 }
+basscore -> bassbody.in : .68
+bassmouth.lp -> bassbody.in : .49
+bassamp -> bassbody.cv
+bass = vca { gain: 0 }
+bassbody -> bass.in
+song.vel5 -> bass.cv
+
+# The answer is a little struck alloy, with a quick inharmonic tick over a purer tail.
+pbar = additive { levels: [.68, .19, .10], ratios: [1, 1.998, 3.006] }
+pstrike = additive { levels: [.30, .13], ratios: [2.72, 4.61] }
+song.voct7 -> pbar.v_oct
+song.voct7 -> pstrike.v_oct
+pbodyenv = adsr { attack: .004, decay: .46, sustain: .10, release: .24, curve: exp }
+ptickenv = func { rise: .0015, fall: .12, curve: exp }
+song.gate7 -> pbodyenv.gate
+song.gate7 -> ptickenv.trig
+pbody = vca { gain: 0 }
+pbar -> pbody.in
+pbodyenv -> pbody.cv
+ptick = vca { gain: 0 }
+pstrike -> ptick.in
+ptickenv -> ptick.cv
+pluck = vca { gain: 0 }
+pbody -> pluck.in
+ptick -> pluck.in : .50
+song.vel7 -> pluck.cv
+
+# Doubled right-hand line. A little beating at the front settles into a narrower tone.
+dosc = vco { wave: saw, freq: 220.32 }
+dtri = vco { wave: tri, freq: 219.72 }
+song.voct9 -> dosc.v_oct
+song.voct9 -> dtri.v_oct
+dopen = adsr { attack: .012, decay: .31, sustain: .30, release: .13, curve: exp }
+song.gate9 -> dopen.gate
+dcolour = svf { cutoff: 880, res: .37 }
+dosc -> dcolour.in : .70
+dtri -> dcolour.in : .28
+song.voct9 -> dcolour.v_oct : .37
+dopen -> dcolour.v_oct : 1.7
+song.vel9 -> dcolour.v_oct : .56
+dart = adsr { attack: .010, decay: .24, sustain: .64, release: .16, curve: exp }
+song.gate9 -> dart.gate
+dmono = vca { gain: 0 }
+dcolour.lp -> dmono.in
+dart -> dmono.cv
+doublelead = vca { gain: 0 }
+dmono -> doublelead.in
+song.vel9 -> doublelead.cv
+
+# The left hand strikes four notes. Spread the inner voices and keep the bass nearer center.
+chordopen = func { rise: .42, fall: .62 }
+form.cva1 -> chordopen.in
+croot = sub { file: "voices/chord-key.sub", tuning: 219.63 }
+cthird = sub { file: "voices/chord-key.sub", tuning: 220.72 }
+cfifth = sub { file: "voices/chord-key.sub", tuning: 219.30 }
+ccolor = sub { file: "voices/chord-key.sub", tuning: 220.33 }
+song.voct8 -> croot.key
+song.cva8 -> cthird.key
+song.cvb8 -> cfifth.key
+song.cvd8 -> ccolor.key
+song.gate8 -> croot.gate
+song.gate8 -> cthird.gate
+song.gate8 -> cfifth.gate
+song.gate8 -> ccolor.gate
+song.vel8 -> croot.velocity
+song.vel8 -> cthird.velocity
+song.vel8 -> cfifth.velocity
+song.vel8 -> ccolor.velocity
+chordopen -> croot.open
+chordopen -> cthird.open
+chordopen -> cfifth.open
+chordopen -> ccolor.open
+ch_l = vca {}
+ch_r = vca {}
+croot -> ch_l.in : .42
+croot -> ch_r.in : .36
+cthird -> ch_l.in : .09
+cthird -> ch_r.in : .57
+cfifth -> ch_l.in : .58
+cfifth -> ch_r.in : .07
+ccolor -> ch_l.in : .29
+ccolor -> ch_r.in : .40
+
+
+# The low head settles just below the bass's lowest A. A brief beater
+# gives the downbeat an edge which survives on a small speaker.
+kit_drop = func { rise: .00035, fall: .057, curve: exp }
+kit_air = func { rise: .0018, fall: .37, curve: exp }
+song.gate1 -> kit_drop.trig
+song.gate1 -> kit_air.trig
+kit_head = vco { freq: 51.5, wave: sine }
+kit_drop -> kit_head.v_oct : 2.65
+song.gate1 -> kit_head.sync
+kit_thump = vca { gain: 0 }
+kit_head -> kit_thump.in
+kit_air -> kit_thump.cv
+kit_dust = noise { color: white, seed: 911 }
+kit_skin = svf { cutoff: 1570, res: .27 }
+kit_dust -> kit_skin.in
+kit_tipenv = func { rise: .0003, fall: .020, curve: exp }
+song.gate1 -> kit_tipenv.trig
+kit_tip = vca { gain: 0 }
+kit_skin.bp -> kit_tip.in
+kit_tipenv -> kit_tip.cv
+kick = vca { gain: 0 }
+kit_thump -> kick.in : .95
+kit_tip -> kick.in : .45
+song.vel1 -> kick.cv
+
+# Snare has a woody two-pitch centre. The handclap joins harder strokes.
+kit_snfall = func { rise: .0007, fall: .055, curve: exp }
+kit_sndry = func { rise: .0012, fall: .17, curve: exp }
+kit_snwire = func { rise: .0018, fall: .29, curve: exp }
+song.gate2 -> kit_snfall.trig
+song.gate2 -> kit_sndry.trig
+song.gate2 -> kit_snwire.trig
+kit_snrone = vco { wave: sine, freq: 184 }
+kit_snrtwo = vco { wave: tri, freq: 307 }
+song.gate2 -> kit_snrone.sync
+song.gate2 -> kit_snrtwo.sync
+kit_snfall -> kit_snrone.v_oct : .56
+kit_snfall -> kit_snrtwo.v_oct : .35
+kit_snmeat = vca { gain: 0 }
+kit_snrone -> kit_snmeat.in : .48
+kit_snrtwo -> kit_snmeat.in : .23
+kit_sndry -> kit_snmeat.cv
+kit_wires = svf { cutoff: 2330, res: .38 }
+kit_dust -> kit_wires.in
+kit_snbrush = vca { gain: 0 }
+kit_wires.bp -> kit_snbrush.in : .60
+kit_wires.hp -> kit_snbrush.in : .20
+kit_snwire -> kit_snbrush.cv
+kit_palms = sub { file: "kit/palm.sub", tune: 1380, decay: .098 }
+song.gate2 -> kit_palms.trig
+song.vel2 -> kit_palms.accent
+kit_hard = math { op: sub, b: .48 }
+song.vel2 -> kit_hard.a
+kit_hands = vca { gain: 0 }
+kit_palms -> kit_hands.in
+kit_hard -> kit_hands.cv : 1.75
+snare = vca { gain: 0 }
+kit_snmeat -> snare.in
+kit_snbrush -> snare.in
+kit_hands -> snare.in : .56
+song.vel2 -> snare.cv
+
+# A plated tick above an airy closed-hat wash. Accents open the hat.
+kit_hatnoise = noise { color: white, seed: 119 }
+kit_hatsh = svf { cutoff: 6500, res: .25 }
+kit_hatnoise -> kit_hatsh.in
+kit_coinmod = vco { freq: 1439, wave: sine }
+kit_coin = vco { freq: 6580, wave: sine }
+kit_coinmod -> kit_coin.fm : .38
+kit_hatbody = func { rise: .0012, fall: .055, curve: exp }
+kit_hatedge = func { rise: .00045, fall: .030, curve: exp }
+song.gate3 -> kit_hatbody.trig
+song.gate3 -> kit_hatedge.trig
+song.vel3 -> kit_hatbody.fall : .165
+kit_hatwash = vca { gain: 0 }
+kit_hatsh.hp -> kit_hatwash.in : .61
+kit_hatsh.bp -> kit_hatwash.in : .64
+kit_hatbody -> kit_hatwash.cv
+kit_hattick = vca { gain: 0 }
+kit_coin -> kit_hattick.in
+kit_hatedge -> kit_hattick.cv
+hat = vca { gain: 0 }
+kit_hatwash -> hat.in : .93
+kit_hattick -> hat.in : .16
+song.vel3 -> hat.cv
+
+# Quiet strokes are a shaker. A harder hand finds the rim, then a
+# second longer scrape becomes audible at the highest accents.
+kit_brushnoise = noise { color: white, seed: 257 }
+kit_brushband = svf { cutoff: 3720, res: .36 }
+kit_brushnoise -> kit_brushband.in
+kit_scrape = func { rise: .012, fall: .114, curve: exp }
+song.gate4 -> kit_scrape.trig
+song.vel4 -> kit_scrape.fall : .13
+kit_sand = vca { gain: 0 }
+kit_brushband.bp -> kit_sand.in : .95
+kit_brushband.hp -> kit_sand.in : .21
+kit_scrape -> kit_sand.cv
+kit_stick = modal { freq: 853, ratios: [1, 2.54, 4.34, 6.1], damping: .28, brightness: .62, position: .28 }
+song.gate4 -> kit_stick.strike
+kit_rimacc = math { op: sub, b: .45 }
+song.vel4 -> kit_rimacc.a
+kit_rimv = vca { gain: 0 }
+kit_stick -> kit_rimv.in
+kit_rimacc -> kit_rimv.cv : 3.4
+kit_splashacc = math { op: sub, b: .77 }
+song.vel4 -> kit_splashacc.a
+kit_splashenv = func { rise: .009, fall: .52, curve: exp }
+song.gate4 -> kit_splashenv.trig
+kit_splash = vca { gain: 0 }
+kit_hatsh.hp -> kit_splash.in : .90
+kit_hatsh.bp -> kit_splash.in : .50
+kit_splashenv -> kit_splash.cv
+kit_splashv = vca { gain: 0 }
+kit_splash -> kit_splashv.in
+kit_splashacc -> kit_splashv.cv : 2.8
+metal = vca { gain: 0 }
+kit_sand -> metal.in : .72
+kit_rimv -> metal.in
+kit_splashv -> metal.in
+song.vel4 -> metal.cv
+
+
+# The centre belongs to the current soloist. The low note stays in the middle.
+breath = func { rise: .004, fall: .16, curve: exp }
+song.gate1 -> breath.trig
+lowstrip = vca { gain: 1 }
+bass -> lowstrip.in
+breath -> lowstrip.cv : -.30
+form.cva3 -> bassmouth.v_oct : 1.25
+keysend = func { rise: .10, fall: .06 }
+form.cvb1 -> keysend.in
+touch = vca { gain: 0 }
+piano -> touch.in
+keysend -> touch.cv
+roomlevel = func { rise: .45, fall: .16 }
+form.cva2 -> roomlevel.in
+padlevel = func { rise: .26, fall: .14 }
+form.cvb2 -> padlevel.in
+keybed_l = vca { gain: 0 }
+keybed_r = vca { gain: 0 }
+ch_l -> keybed_l.in
+ch_r -> keybed_r.in
+padlevel -> keybed_l.cv
+padlevel -> keybed_r.cv
+
+# A short reflection on the left answers a dotted eighth on the right.
+shortroom = delay { time: .1171875, feedback: .13, tone: 3250, mix: 1 }
+longroom = delay { time: .3515625, feedback: .26, tone: 2300, mix: 1 }
+touch -> shortroom.in : .65
+pluck -> shortroom.in : .08
+touch -> longroom.in
+pluck -> longroom.in : .22
+shortroom -> longroom.in : .12
+plate = reverb { decay: .64, damp: .53, predelay: .022, mix: 1 }
+snare -> plate.in_l : .32
+metal -> plate.in_r : .14
+keybed_l -> plate.in_l : .31
+keybed_r -> plate.in_r : .31
+piano -> plate.in_l : .23
+pluck -> plate.in_r : .28
+longroom -> plate.in_r : .27
+wl = vca { gain: 0 }
+wr = vca { gain: 0 }
+plate.out_l -> wl.in
+plate.out_r -> wr.in
+roomlevel -> wl.cv
+roomlevel -> wr.cv
+
+# High harmonics answer the piano in the second half of the lift.
+thread = additive { ratios: [1, 2, 3.002, 4.008], levels: [.54, .28, .13, .05] }
+threadshade = lfo { freq: 4.63, wave: sine }
+song.voct10 -> thread.v_oct
+threadshade -> thread.v_oct : .0027
+threadbow = adsr { attack: .078, decay: .29, sustain: .71, release: .34 }
+song.gate10 -> threadbow.gate
+threadbody = vca { gain: 0 }
+thread -> threadbody.in
+threadbow -> threadbody.cv
+highanswer = vca { gain: 0 }
+threadbody -> highanswer.in
+song.vel10 -> highanswer.cv
+highanswer -> plate.in_l : .40
+
+# Add only the difference between the decorrelated chord reflections.
+# The centre image of the four keys survives a mono fold-down.
+diffuse = chorus { voices: 3, delay: 16, swing: 5, rate: .32, depth: .73, mix: 1, shape: sine }
+keybed_l -> diffuse.in_l
+keybed_r -> diffuse.in_r
+diffside = vca {}
+diffuse.out_l -> diffside.in : .5
+diffuse.out_r -> diffside.in : -.5
+halo = vca { gain: 0 }
+diffside -> halo.in
+chordopen -> halo.cv
+
+sum_l = vca {}
+sum_r = vca {}
+highanswer -> sum_l.in : .10
+highanswer -> sum_r.in : .23
+halo -> sum_l.in : .35
+halo -> sum_r.in : -.35
+kick -> sum_l.in : .65
+kick -> sum_r.in : .65
+snare -> sum_l.in : .54
+snare -> sum_r.in : .57
+hat -> sum_l.in : .135
+hat -> sum_r.in : .265
+metal -> sum_l.in : .235
+metal -> sum_r.in : .095
+lowstrip -> sum_l.in : .92
+lowstrip -> sum_r.in : .92
+piano -> sum_l.in : .51
+piano -> sum_r.in : .48
+doublelead -> sum_l.in : .20
+doublelead -> sum_r.in : .24
+keybed_l -> sum_l.in : .45
+keybed_r -> sum_r.in : .45
+pluck -> sum_l.in : .125
+pluck -> sum_r.in : .355
+shortroom -> sum_l.in : .18
+longroom -> sum_r.in : .18
+wl -> sum_l.in : .37
+wr -> sum_r.in : .37
+tonebus = eq { hp_freq: 26, mid1_freq: 325, mid1_gain: -.9, mid1_q: .85, high_freq: 8600, high_gain: .5 }
+sum_l -> tonebus.in_l
+sum_r -> tonebus.in_r
+glue = compressor { threshold: -12, ratio: 1.65, knee: 6, attack: .022, release: .14, mix: .74, makeup: 2.6 }
+tonebus.out_l -> glue.in_l
+tonebus.out_r -> glue.in_r
+ceiling = limiter { threshold: -1.25, release: .10, true_peak: on }
+glue.out_l -> ceiling.in_l
+glue.out_r -> ceiling.in_r
+ceiling.out_l -> out.left
+ceiling.out_r -> out.right

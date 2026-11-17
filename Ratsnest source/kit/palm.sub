@@ -1,0 +1,53 @@
+# kit/clap.sub -- multi-burst noise clap. Not physical modeling; the kit
+# roster needs it. NOTE: decay is SECONDS here (tail envelope), unlike the
+# modal voices' 0..1 ring amount.
+tune   = param { default: 1.1khz }  # bandpass centre
+decay  = param { default: 0.15s }   # tail length, seconds
+trig   = input {}
+accent = input { default: 0.7 }
+main   = output {}
+
+acc = sh {}
+accent -> acc.in
+trig -> acc.trig
+
+# Widen the trig into a 4 ms pulse, then two delayed copies: three bursts
+# at 0/11/23 ms. Cables sum onto benv.trig; each pulse retriggers it.
+pre = func { rise: 0.0001, fall: 0.004 }
+trig -> pre.trig
+d1 = delay { time: 0.011, feedback: 0, mix: 1, slew: 0 }
+d2 = delay { time: 0.023, feedback: 0, mix: 1, slew: 0 }
+pre -> d1.in
+pre -> d2.in
+benv = func { rise: 0.0002, fall: 0.006 }
+pre -> benv.trig
+d1 -> benv.trig
+d2 -> benv.trig
+
+# Tail starts at the last burst.
+# `decay` keeps its meaning (the length of the tail you hear). An `exp` stage
+# time is its -60 dB point, so the fall runs 4x decay: measured at the default
+# 0.15 s, -20 dB at 87 ms (x^2 curve: 129) and -40 dB at 264 ms (172) -- a
+# natural room tail in place of a gated one, energy -1.1 dB.
+tail = math { op: mult, a: decay, b: 4 }
+tenv = func { rise: 0.001, fall: 0, curve: exp }
+tail -> tenv.fall
+d2 -> tenv.trig
+
+cn = noise { color: white, seed: 29 }
+cbp = svf { cutoff: tune, res: 0.35 }
+cn -> cbp.in
+amp = vca { gain: 0 }
+cbp.bp -> amp.in
+benv -> amp.cv
+tenv -> amp.cv : 0.35
+
+lvl = vca { gain: 0.5 }
+amp -> lvl.in
+acc -> lvl.cv : 0.5
+lvl -> main.in : 2.0
+
+# Audition: `mise run play -- patches/lib/kit/clap.sub`
+demo.clk = clock { bpm: 120 }
+demo.clk -> trig
+main -> demo.out.in
