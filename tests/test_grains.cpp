@@ -527,3 +527,25 @@ TEST_CASE("grains: migration into a smaller ring kills only unfit grains") {
     CHECK(std::isfinite(ob[1]));
   }
 }
+
+TEST_CASE("choosing another grain file retains the newly loaded samples") {
+  const auto ramp = write_ramp_wav("ratsnest_grains_replacement.wav", 9600, 48000);
+  const auto silent = std::filesystem::temp_directory_path() / "ratsnest_previous_grains.wav";
+  std::vector<float> zeros(9600);
+  REQUIRE(ms::io::write_wav_f32(silent.string(), zeros.data(), zeros.size(), 1, 48000));
+  auto old = make_grains(48000, 1, 1, silent.c_str());
+  auto edited = make_grains(48000, 1, 1, ramp.c_str());
+  auto fresh = make_grains(48000, 1, 1, ramp.c_str());
+  edited->copy_state_from(*old);
+  Ins ins;
+  float after[3]{}, expected[3]{};
+  for (int frame = 0; frame <= 1200; ++frame) {
+    ins.v[2] = frame == 0 ? 1.f : 0.f;
+    edited->process(ins.v, after);
+    fresh->process(ins.v, expected);
+  }
+  REQUIRE(expected[0] > 0.01f);
+  CHECK(after[0] == expected[0]);
+  std::filesystem::remove(ramp);
+  std::filesystem::remove(silent);
+}

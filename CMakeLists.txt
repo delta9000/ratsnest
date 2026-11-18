@@ -119,3 +119,6 @@ add_test(NAME cli_render_tap_unknown
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first-tap.wav --tap x=osc3)
 set_tests_properties(cli_render_tap_unknown PROPERTIES
   PASS_REGULAR_EXPRESSION "error: --tap x=osc3: .*did you mean")
+
+add_test(NAME cli_render_files
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_render_files.py $<TARGET_FILE:ratsnest>)

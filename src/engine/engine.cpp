@@ -83,6 +83,13 @@ void Engine::process(float* left, float* right, size_t frames) {
   }
 }
 
+bool Engine::finish() {
+  bool ok = true;
+  for (const auto& node : g_->nodes)
+    if (!node.instance->finish()) ok = false;
+  return ok;
+}
+
 void Engine::write_base(size_t node, size_t slot, float v) {
   g_->nodes[node].input_base[slot] = v;
   ins_[in_offset_[node] + slot] = v;  // rebuilt every sample if cabled

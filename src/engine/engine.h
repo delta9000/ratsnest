@@ -11,6 +11,7 @@ class Engine {
  public:
   explicit Engine(std::unique_ptr<graph::Graph> g);
   void process(float* left, float* right, size_t frames);
+  bool finish();  // non-RT: flush every recorded take and report failures
   double sample_rate() const { return g_->sample_rate; }
 
   // RT-safe param glide: linear ramp to target over glide_samples (0 = jump).

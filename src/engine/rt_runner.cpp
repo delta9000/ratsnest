@@ -17,8 +17,8 @@ RtRunner::~RtRunner() {
     if (c.kind == Command::Kind::Swap) delete c.engine;
   Engine* e = nullptr;
   while (retired_.try_pop(e)) delete e;
-  delete current_;
   delete old_;
+  delete current_;
 }
 
 namespace {
@@ -42,6 +42,8 @@ void RtRunner::drain_commands() {
         if (current_) current_->set_param(c.node, c.slot, c.value, glide_samples_);
         break;
       case Command::Kind::Swap:
+        watch_node_ = c.node;
+        watch_slot_ = c.slot;
         if (old_) retired_.try_push(old_);  // a save landed mid-fade; room checked
         old_ = nullptr;
         if (!current_) {

@@ -64,7 +64,7 @@ brk -> chop_hp.in            # read .hp — the break owns nothing below 180
 ```
 
 `.0833` is a semitone, `.1667` a whole tone, `-.0833` down one. The file
-string **must be quoted** and resolves against the process working directory.
+string **must be quoted** and resolves beside the declaring file, with the working directory as a fallback.
 No file = silence, not a crash; `check` still says ok, so confirm the path
 yourself.
 

@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cerrno>
+#include <filesystem>
 
 namespace ms::io {
 namespace {
@@ -22,10 +24,11 @@ bool tag_eq(const uint8_t* p, const char* t) {
 }
 }  // namespace
 
-bool write_wav_f32(const std::string& path, const float* interleaved,
-                   size_t frames, int channels, int sample_rate) {
-  std::FILE* f = std::fopen(path.c_str(), "wb");
-  if (!f) return false;
+bool write_wav_header(std::FILE* f, size_t frames, int channels, int sample_rate) {
+  if (channels < 1 || channels > UINT16_MAX / 4 || sample_rate < 1 ||
+      static_cast<unsigned>(sample_rate) > UINT32_MAX / (4u * static_cast<unsigned>(channels)) ||
+      frames > (UINT32_MAX - 36u) / (4u * static_cast<unsigned>(channels)))
+    return false;
   const uint32_t data_bytes = static_cast<uint32_t>(frames * static_cast<size_t>(channels) * 4);
   const uint16_t ch = static_cast<uint16_t>(channels);
   const uint32_t byte_rate = static_cast<uint32_t>(sample_rate) * ch * 4;
@@ -43,9 +46,37 @@ bool write_wav_f32(const std::string& path, const float* interleaved,
   put_u16(f, 32);
   std::fwrite("data", 1, 4, f);
   put_u32(f, data_bytes);
-  const size_t written = std::fwrite(interleaved, 4, frames * static_cast<size_t>(channels), f);
-  std::fclose(f);
-  return written == frames * static_cast<size_t>(channels);
+  return !std::ferror(f);
+}
+
+namespace {
+bool write_all(std::FILE* f, const float* samples, size_t frames, int channels, int rate) {
+  const auto count = frames * static_cast<size_t>(channels);
+  const bool ok = write_wav_header(f, frames, channels, rate) &&
+                  std::fwrite(samples, sizeof(float), count, f) == count;
+  return std::fclose(f) == 0 && ok;
+}
+}  // namespace
+
+bool write_wav_f32(const std::string& path, const float* samples, size_t frames, int channels, int rate) {
+  auto* file = std::fopen(path.c_str(), "wb");
+  return file && write_all(file, samples, frames, channels, rate);
+}
+
+bool write_wav_take(std::string& path, const float* samples, size_t frames, int rate) {
+  const std::filesystem::path base(path);
+  for (size_t take = 1; ; ++take) {
+    if (take > 1)
+      path = (base.parent_path() / (base.stem().string() + "." + std::to_string(take) + base.extension().string())).string();
+    if (auto* f = std::fopen(path.c_str(), "wbx")) {
+      if (write_all(f, samples, frames, 2, rate)) return true;
+      std::remove(path.c_str());  // exclusively created by this call
+      return false;
+    }
+    if (errno != EEXIST) return false;
+    std::error_code ec;
+    if (std::filesystem::is_directory(path, ec)) return false;
+  }
 }
 
 namespace {
@@ -158,5 +189,10 @@ bool read_wav_f32(const std::string& path, WavData& out) {
   out.frames = s.size() / static_cast<size_t>(w.channels);
   out.samples = std::move(s);
   return true;
+}
+bool load_sample(const std::string& path, WavData& out) {
+  if (read_wav_f32(path, out) && out.frames > 0) return true;
+  std::fprintf(stderr, "warning: cannot load sample '%s'; using silence\n", path.c_str());
+  return false;
 }
 }  // namespace ms::io

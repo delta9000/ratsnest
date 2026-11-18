@@ -32,12 +32,14 @@ class Controller {
   bool has_pending() const { return pending_; }
   bool set_watch(std::string_view spec);
   void clear_watch();
+  bool watch_available() const { return watch_available_; }
   void drain_retired();
   const graph::Graph* graph() const { return shadow_.get(); }
   int engines_in_flight() const { return pushed_ - reaped_; }
 
  private:
-  bool push_watch_for_shadow();  // resolve watch_spec_ against shadow_, push
+  static bool resolve_watch(const graph::Graph& g, std::string_view spec, Command& cmd);
+  bool watch_available_ = false;
 
   RtRunner& runner_;
   double rate_;

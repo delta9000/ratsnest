@@ -56,6 +56,7 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
   auto c2 = graph::compile(b.ast, rate_);
   Command cmd;
   cmd.kind = Command::Kind::Swap;
+  const bool bound = resolve_watch(*c.graph, watch_spec_, cmd);
   cmd.engine = new Engine(std::move(c.graph));
   if (!runner_.push(cmd)) {
     delete cmd.engine;
@@ -66,7 +67,7 @@ Controller::LoadResult Controller::load(std::string_view src, const std::string&
   shadow_ = std::move(c2.graph);
   res.ok = true;
   res.topology = true;
-  push_watch_for_shadow();  // no-op without a watch spec
+  watch_available_ = bound;
   return res;
 }
 
@@ -79,43 +80,42 @@ std::optional<Controller::LoadResult> Controller::apply_pending() {
 }
 
 bool Controller::set_watch(std::string_view spec) {
-  std::string keep = watch_spec_;
-  watch_spec_ = std::string(spec);
-  if (push_watch_for_shadow()) return true;
-  watch_spec_ = std::move(keep);
-  return false;
+  Command cmd;
+  cmd.kind = Command::Kind::Watch;
+  if (!shadow_ || !resolve_watch(*shadow_, spec, cmd) || !runner_.push(cmd)) return false;
+  watch_spec_ = spec;
+  watch_available_ = true;
+  return true;
 }
 
 void Controller::clear_watch() {
   watch_spec_.clear();
+  watch_available_ = false;
   Command cmd;
   cmd.kind = Command::Kind::Watch;
   cmd.node = RtRunner::kWatchOff;
   runner_.push(cmd);
 }
 
-bool Controller::push_watch_for_shadow() {
-  if (!shadow_) return false;
+bool Controller::resolve_watch(const graph::Graph& g, std::string_view spec, Command& cmd) {
   // Node names may themselves contain dots (voice members: `lead.osc`,
   // instanced as `lead.osc#0`), so the watch spec must be split by the same
   // longest-declared-name rule as ordinary endpoint resolution, not by its
   // first dot. A failed split (or empty spec) yields module "", never a node.
   auto node_index = [&](const std::string& n) {
-    for (size_t i = 0; i < shadow_->nodes.size(); ++i)
-      if (shadow_->nodes[i].name == n) return static_cast<int>(i);
+    for (size_t i = 0; i < g.nodes.size(); ++i)
+      if (g.nodes[i].name == n) return static_cast<int>(i);
     return -1;
   };
   const graph::SplitEndpoint s = graph::split_endpoint(
-      [&](const std::string& n) { return node_index(n) >= 0; }, watch_spec_);
+      [&](const std::string& n) { return node_index(n) >= 0; }, std::string(spec));
   const int node = node_index(s.module);
   if (node < 0) return false;
-  const int slot = s.port.empty() ? 0 : shadow_->nodes[node].info->output_index(s.port);
-  if (slot < 0) return false;
-  Command cmd;
-  cmd.kind = Command::Kind::Watch;
+  const int slot = s.port.empty() ? 0 : g.nodes[node].info->output_index(s.port);
+  if (slot < 0 || g.nodes[node].info->outputs.empty()) return false;
   cmd.node = static_cast<uint32_t>(node);
   cmd.slot = static_cast<uint32_t>(slot);
-  return runner_.push(cmd);
+  return true;
 }
 
 void Controller::drain_retired() {

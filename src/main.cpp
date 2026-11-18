@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <array>
+#include <sys/stat.h>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -7,6 +9,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <deque>
+#include <limits>
+#include <unistd.h>
 #include <memory>
 #include <string>
 #include <thread>
@@ -234,42 +239,17 @@ bool parse_render(int argc, char** argv, RenderOpts& o) {
   return true;
 }
 
-// Peak, energy and DC over frames [begin, end) of both channels.
 struct Level {
   double peak = 0.0, sumsq = 0.0, dc = 0.0;
-};
-Level measure(const std::vector<float>& l, const std::vector<float>& r,
-              size_t begin, size_t end) {
-  Level m;
-  for (size_t i = begin; i < end; ++i) {
-    const double a = l[i], b = r[i];
-    m.peak = std::max({m.peak, std::abs(a), std::abs(b)});
-    m.sumsq += a * a + b * b;
-    m.dc += a + b;
+  void add(float left, float right) {
+    const double a = left, b = right;
+    peak = std::max({peak, std::abs(a), std::abs(b)});
+    sumsq += a * a + b * b;
+    dc += a + b;
   }
-  return m;
-}
+};
 
 double db(double v) { return 20.0 * std::log10(std::max(v, 1e-12)); }
-
-void print_stats(const std::vector<float>& l, const std::vector<float>& r,
-                 const RenderOpts& o) {
-  const size_t frames = l.size();
-  const double n = 2.0 * static_cast<double>(frames);
-  const Level all = measure(l, r, 0, frames);
-  std::printf("peak %6.1f dBFS   rms %6.1f dBFS   dc %+.5f\n",
-              db(all.peak), db(std::sqrt(all.sumsq / n)), all.dc / n);
-  const size_t win = static_cast<size_t>(o.stats_window * o.rate);
-  for (size_t start = 0; start < frames; start += win) {
-    const size_t end = std::min(frames, start + win);
-    const Level w = measure(l, r, start, end);
-    const double wrms = db(std::sqrt(w.sumsq / (2.0 * static_cast<double>(end - start))));
-    const int fill = static_cast<int>(std::clamp((wrms + 60.0) / 60.0, 0.0, 1.0) * 20.0);
-    std::printf("%7.1fs  rms %6.1f  peak %6.1f  |%s|\n",
-                o.start_sec + static_cast<double>(start) / o.rate, wrms, db(w.peak),
-                meter(fill).c_str());
-  }
-}
 
 // A stateful graph has no seek: --start runs it from zero and discards the
 // skipped samples. Block size cannot change the result (Engine::process is
@@ -285,56 +265,145 @@ void skip_frames(ms::engine::Engine& engine, size_t skip) {
   }
 }
 
-// A mono take (channels 1) writes `l`; pass it as `r` too.
-bool write_take(const std::string& path, double rate, const std::vector<float>& l,
-                const std::vector<float>& r, size_t channels) {
-  std::vector<float> interleaved(l.size() * channels);
-  for (size_t i = 0; i < l.size(); ++i) {
-    interleaved[channels * i + channels - 1] = r[i];
-    interleaved[channels * i] = l[i];
-  }
-  return ms::io::write_wav_f32(path, interleaved.data(), l.size(), static_cast<int>(channels),
-                               static_cast<int>(rate));
-}
+constexpr size_t kRenderBlock = 4096;
 
-// One tapped endpoint's samples, captured beside the mix: one channel per
-// capture node.
-struct Take {
-  std::vector<std::vector<float>> ch;
+// Stage beside the destination so a failed render leaves an existing mix
+// intact. Each mix/stem holds one block of samples and one level per window.
+class RenderFile {
+ public:
+  RenderFile(std::string path, size_t channels, bool stats)
+      : path_(std::move(path)), channels_(channels), stats_(stats),
+        samples_(kRenderBlock * channels) {}
+  RenderFile(const RenderFile&) = delete;
+  ~RenderFile() {
+    if (file_) std::fclose(file_);
+    if (!temp_.empty()) std::remove(temp_.c_str());
+  }
+
+  bool open(size_t frames, int rate) {
+    struct stat st{};
+    const bool exists = lstat(path_.c_str(), &st) == 0;
+    if (exists && (!S_ISREG(st.st_mode) || st.st_nlink > 1)) {
+      // Preserve links and device outputs such as /dev/null.
+      file_ = std::fopen(path_.c_str(), "wb");
+    } else {
+      if (exists && access(path_.c_str(), W_OK) != 0) return failed();
+      std::string name = path_ + ".XXXXXX";
+      const int fd = mkstemp(name.data());
+      if (fd < 0) return failed();
+      temp_ = std::move(name);
+      if (exists) fchmod(fd, st.st_mode & 0777);
+      file_ = fdopen(fd, "wb");
+      if (!file_) close(fd);
+    }
+    if (!file_) return failed();
+    return ms::io::write_wav_header(file_, frames, static_cast<int>(channels_), rate) || failed();
+  }
+
+  void sample(size_t i, float left, float right) {
+    samples_[i * channels_] = left;
+    samples_[(i + 1) * channels_ - 1] = right;
+    if (stats_) {
+      total_.add(left, right);
+      window_.add(left, right);
+    }
+  }
+
+  bool flush(size_t n, bool window_end) {
+    if (stats_ && window_end) {
+      windows_.push_back(window_);
+      window_ = {};
+    }
+    const size_t count = n * channels_;
+    return std::fwrite(samples_.data(), sizeof(float), count, file_) == count || failed();
+  }
+
+  bool publish() {
+    const int status = std::fclose(file_);
+    file_ = nullptr;
+    if (status != 0 || (!temp_.empty() && std::rename(temp_.c_str(), path_.c_str()) != 0)) return failed();
+    temp_.clear();
+    return true;
+  }
+
+  const char* path() const { return path_.c_str(); }
+  void print_stats(size_t frames, size_t win, const RenderOpts& o) const {
+    if (!stats_) return;
+    const double n = 2.0 * static_cast<double>(frames);
+    std::printf("peak %6.1f dBFS   rms %6.1f dBFS   dc %+.5f\n",
+                db(total_.peak), db(std::sqrt(total_.sumsq / n)), total_.dc / n);
+    size_t start = 0;
+    for (const Level& w : windows_) {
+      const size_t len = std::min(win, frames - start);
+      const double rms = db(std::sqrt(w.sumsq / (2.0 * static_cast<double>(len))));
+      const int fill = static_cast<int>(std::clamp((rms + 60.0) / 60.0, 0.0, 1.0) * 20.0);
+      std::printf("%7.1fs  rms %6.1f  peak %6.1f  |%s|\n",
+                  o.start_sec + static_cast<double>(start) / o.rate, rms, db(w.peak), meter(fill).c_str());
+      start += len;
+    }
+  }
+
+ private:
+  bool failed() const {
+    std::fprintf(stderr, "error: cannot write '%s'\n", path_.c_str());
+    return false;
+  }
+
+  std::string path_, temp_;
+  size_t channels_;
+  bool stats_;
+  std::vector<float> samples_;
+  std::FILE* file_ = nullptr;
+  Level total_, window_;
+  std::vector<Level> windows_;
 };
 
-// Writes each tap's take (`take.wav` -> `take.kick.wav`) and prints its
-// stats block, the table --stats prints for the mix.
-bool finish_taps(const RenderOpts& o, const std::vector<Take>& takes) {
-  for (size_t i = 0; i < takes.size(); ++i) {
-    const ms::graph::Tap& t = o.taps[i];
-    const std::string path =
-        std::filesystem::path(o.out_path).replace_extension("." + t.name + ".wav").string();
-    const auto& ch = takes[i].ch;
-    if (!write_take(path, o.rate, ch.front(), ch.back(), ch.size())) {
-      std::fprintf(stderr, "error: cannot write '%s'\n", path.c_str());
-      return false;
+bool render_blocks(ms::engine::Engine& engine, const RenderOpts& o, size_t frames, size_t win,
+                   std::deque<RenderFile>& files) {
+  std::array<float, kRenderBlock> l{}, r{};
+  for (size_t start = 0; start < frames;) {
+    const size_t n = std::min({kRenderBlock, frames - start, win - start % win});
+    if (o.taps.empty()) engine.process(l.data(), r.data(), n);
+    for (size_t i = 0; i < n; ++i) {
+      if (!o.taps.empty()) engine.process(&l[i], &r[i], 1);
+      files.front().sample(i, l[i], r[i]);
+      for (size_t t = 0; t < o.taps.size(); ++t) {
+        const auto& nodes = o.taps[t].nodes;
+        files[t + 1].sample(i, engine.output_value(static_cast<size_t>(nodes.front()), 0),
+                               engine.output_value(static_cast<size_t>(nodes.back()), 0));
+      }
     }
-    const char* const kind[] = {"mono", "stereo"};
-    std::printf("\ntap %s = %s (%s) -> %s\n", t.name.c_str(), t.endpoint.c_str(),
-                kind[t.stereo], path.c_str());
-    print_stats(ch.front(), ch.back(), o);
+    start += n;
+    for (auto& f : files)
+      if (!f.flush(n, start == frames || start % win == 0)) return false;
   }
   return true;
 }
 
-// Runs the take in one pass; with taps, one sample at a time so each capture
-// node's output can be read (identical either way: Engine::process is
-// per-sample, and the engine exposes only each node's latest output).
-void run_take(ms::engine::Engine& engine, const RenderOpts& o, std::vector<float>& l,
-              std::vector<float>& r, std::vector<Take>& takes) {
-  if (takes.empty()) return engine.process(l.data(), r.data(), l.size());
-  for (size_t f = 0; f < l.size(); ++f) {
-    engine.process(&l[f], &r[f], 1);
-    for (size_t i = 0; i < takes.size(); ++i)
-      for (size_t c = 0; c < takes[i].ch.size(); ++c)
-        takes[i].ch[c][f] = engine.output_value(static_cast<size_t>(o.taps[i].nodes[c]), 0);
+bool render_files(ms::engine::Engine& engine, const RenderOpts& o, size_t frames, size_t win) {
+  std::deque<RenderFile> files;
+  files.emplace_back(o.out_path, 2, o.stats);
+  for (const auto& t : o.taps) {
+    auto path = std::filesystem::path(o.out_path).replace_extension("." + t.name + ".wav");
+    files.emplace_back(path.string(), t.nodes.size(), true);
   }
+  for (auto& f : files)
+    if (!f.open(frames, static_cast<int>(o.rate))) return false;
+
+  if (!render_blocks(engine, o, frames, win, files)) return false;
+  for (auto& f : files)
+    if (!f.publish()) return false;
+  std::printf("rendered %.1fs", o.seconds);
+  if (o.start_sec > 0.0) std::printf(" from %.1fs", o.start_sec);
+  std::printf(" -> %s\n", o.out_path.c_str());
+  files.front().print_stats(frames, win, o);
+  for (size_t t = 0; t < o.taps.size(); ++t) {
+    const auto& tap = o.taps[t];
+    std::printf("\ntap %s = %s (%s) -> %s\n", tap.name.c_str(), tap.endpoint.c_str(),
+                tap.stereo ? "stereo" : "mono", files[t + 1].path());
+    files[t + 1].print_stats(frames, win, o);
+  }
+  return true;
 }
 
 int cmd_render(const std::string& patch, int argc, char** argv) {
@@ -354,26 +423,21 @@ int cmd_render(const std::string& patch, int argc, char** argv) {
   if (!tap_err.empty()) { std::fprintf(stderr, "error: %s\n", tap_err.c_str()); return 1; }
   ms::engine::Engine engine(take_graph(patch, b));
 
-  const size_t frames = static_cast<size_t>(o.seconds * o.rate);
-  const size_t skip = static_cast<size_t>(o.start_sec * o.rate);
-  std::vector<float> l(frames), r(frames);
-  // Decaying filter tails hit denormals; match the PipeWire thread's FTZ.
-  ms::rt::flush_denormals_on_this_thread();
-  skip_frames(engine, skip);
-  std::vector<Take> takes;
-  for (const ms::graph::Tap& t : o.taps)
-    takes.push_back({std::vector<std::vector<float>>(t.nodes.size(), std::vector<float>(frames))});
-  run_take(engine, o, l, r, takes);
-  if (!write_take(o.out_path, o.rate, l, r, 2)) {
-    std::fprintf(stderr, "error: cannot write '%s'\n", o.out_path.c_str());
-    return 1;
+  const double count = o.seconds * o.rate;
+  if (!(count >= 1 && count <= (UINT32_MAX - 36u) / 8u)) {
+    std::fputs("error: duration must fit at least one frame and a stereo RIFF WAV\n", stderr);
+    return 2;
   }
-  if (skip > 0)
-    std::printf("rendered %.1fs from %.1fs -> %s\n", o.seconds, o.start_sec, o.out_path.c_str());
-  else
-    std::printf("rendered %.1fs -> %s\n", o.seconds, o.out_path.c_str());
-  if (o.stats) print_stats(l, r, o);
-  return !finish_taps(o, takes);
+  if (!(o.start_sec * o.rate < static_cast<double>(std::numeric_limits<size_t>::max()))) {
+    std::fputs("error: --start exceeds the supported frame range\n", stderr);
+    return 2;
+  }
+  const size_t frames = static_cast<size_t>(count);
+  const size_t win = static_cast<size_t>(std::clamp(o.stats_window * o.rate, 1.0, count));
+  ms::rt::flush_denormals_on_this_thread();
+  skip_frames(engine, static_cast<size_t>(o.start_sec * o.rate));
+  const bool rendered = render_files(engine, o, frames, win);
+  return !(engine.finish() && rendered);
 }
 
 // ---- play -------------------------------------------------------------------
@@ -387,7 +451,7 @@ void render_trampoline(void* user, float* l, float* r, size_t frames, uint64_t n
 
 void print_status(ms::engine::RtRunner& run,
                   const ms::engine::PipewireOut& pw,
-                  bool watching) {
+                  bool watching, bool available) {
   auto bar = [](float v) {
     return meter(static_cast<int>(std::clamp(v, 0.0f, 1.0f) * 20.0f));
   };
@@ -397,12 +461,14 @@ void print_status(ms::engine::RtRunner& run,
     float v = 0.0f, last = 0.0f;
     bool got = false;
     while (run.try_watch_value(v)) { last = v; got = true; }
-    if (got) {
+    if (!available) line += "  watch=unavailable";
+    else if (got) {
       char buf[32];
       std::snprintf(buf, sizeof(buf), "  watch=% .3f", static_cast<double>(last));
       line += buf;
     }
   }
+  if (isatty(fileno(stderr))) line += "\033[K";
   std::fputs(line.c_str(), stderr);
   std::fflush(stderr);
 }
@@ -621,7 +687,7 @@ int cmd_play(const std::string& patch, int argc, char** argv) {
   while (!g_stop.load()) {
     reload.poll(ctl);
     ctl.drain_retired();
-    print_status(runner, out.pw(), o.watch != nullptr);
+    print_status(runner, out.pw(), o.watch != nullptr, ctl.watch_available());
     if (!out.supervise()) break;
     out.warn_rate_mismatch();
   }

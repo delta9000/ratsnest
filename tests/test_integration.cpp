@@ -195,3 +195,20 @@ TEST_CASE("chunked skip then capture equals the tail of one pass") {
   CHECK(std::vector<float>(fl.begin() + static_cast<long>(skip), fl.end()) == ol);
   CHECK(std::vector<float>(fr.begin() + static_cast<long>(skip), fr.end()) == orr);
 }
+
+TEST_CASE("a unity branch downstream of feedback stays aligned in either declaration order") {
+  const std::string loop = "a = vca { in: 0.25 }\nb = vca {}\n";
+  const std::string branch = "copy = vca {}\n";
+  const std::string cables =
+      "a -> b.in\nb -> a.in : 0.5\na -> copy.in\na -> out.left\ncopy -> out.right\n";
+  for (const auto& declarations : {branch + loop, loop + branch}) {
+    auto build = graph::build_patch(declarations + cables, "feedback.patch", 48000);
+    REQUIRE(build.compiled.ok());
+    engine::Engine engine(std::move(build.compiled.graph));
+    float l[3], r[3];
+    engine.process(l, r, 3);
+    CHECK(l[0] == 0.25f);
+    CHECK(l[1] == 0.375f);
+    for (size_t i = 0; i < 3; ++i) CHECK(l[i] == r[i]);
+  }
+}

@@ -38,7 +38,7 @@ class Sampler final : public Module {
     const std::string file = cfg_str(cfg, "file", "");
     if (!file.empty()) {
       io::WavData w;
-      if (io::read_wav_f32(file, w) && w.frames > 0 && w.channels > 0) {
+      if (io::load_sample(file, w)) {
         // Mix any channel count down to a single mono buffer.
         buf_.resize(w.frames);
         const size_t ch = static_cast<size_t>(w.channels);

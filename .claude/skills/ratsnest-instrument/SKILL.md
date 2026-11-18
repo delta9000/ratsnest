@@ -112,8 +112,8 @@ Consequences worth exploiting:
   gap.
 - **Errors never kill the session.** A bad patch reports `line:col` and the
   last good graph keeps playing. Save freely.
-- **`rec` restarts on reload** — the outgoing take is written, the new one
-  overwrites on teardown. Don't edit mid-take unless you mean it.
+- **A topology edit starts a new recording segment.** The recorder saves both
+  takes under separate filenames. Their audio overlaps during the crossfade.
 - `scope { label: name }` is a passive tap: it captures last/peak for `watch`
   without altering the signal. Put them on anything you're debugging; they cost
   nothing and change nothing.

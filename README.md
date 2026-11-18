@@ -37,6 +37,12 @@ cd ratsnest
 mise run build
 ```
 
+### Three patches to start with
+
+- [First light](patches/first.patch) shows the wiring. Change the second oscillator frequency and listen to the beating between the two saws.
+- [Keepsake](patches/keepsake.patch) turns generated notes into a remembered phrase. During playback, edit `form.request` to hear the arrangement change at the next bar.
+- [Roll Call](patches/tracker/rollcall.patch) plays a [tracker score](patches/tracker/rollcall.trk). Change a snare ratchet in the score and save it while the patch plays.
+
 ### Render a patch offline
 
 ```sh
@@ -56,6 +62,11 @@ arguments for every option and its default (`-d 10s`, `-o out.wav`,
 discards the skipped samples — it costs the same time as rendering the whole
 span, but writes only the window you asked for, and `--stats` still reports
 absolute piece time.
+
+The renderer writes the mix and optional `--tap` stems in blocks. Each file
+uses standard RIFF WAV (under 4 GiB). With `--stats`, it retains one level
+summary per window. Example: `--tap saw=osc2` writes the oscillator beside
+the mix and reports its levels.
 
 Offline renders are stereo float32 WAVs and preserve headroom above 0 dBFS;
 they are not silently hard-clipped. Live PipeWire playback is safety-clamped
