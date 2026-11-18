@@ -1,0 +1,197 @@
+# drain-em-all.trk -- "Drain em all", dark industrial/hypnotic techno, 132 BPM, E phrygian.
+# Form: 1-16 POWER ON (pad+blink), 17-32 QUEUE FILLS (kick/hats, bass at 25),
+# 33-48 DISPATCH (+jobs arp polymeter, clap, ohat at 41), 49-64 FULL LOAD (+lead),
+# 65-72 MAINTENANCE (kick/bass out, roll last bar), 73-88 PEAK (jobs^12 at 81),
+# 89-104 DRAIN (lead, arp/ohat, clap/bass, hats leave), 105-112 DRAINED (pad decays, blinks end).
+# Drafted by DeepSeek-V4.1-Flash from a brief; hand edits: harm moved to track 5
+# (a `from` source must come first), blink_mid added under full/peak.
+
+track kick  note                       # 1
+track hat   note vel len 1             # 2 closed hat
+track ohat  note vel len 1             # 3 open hat
+track clap  note vel len 1             # 4 clap/snare (also the roll)
+track harm  note cva cvb               # 5 pad: root, third, fifth, octave 3
+track blink note vel len 1 from harm   # 6 status-LED blips, chord tones 2-3 octaves up
+track bass  note vel len 1 from harm   # 7 bass: around octave 1-2 (t1-24, t1-12)
+track jobs  note vel len 1 from harm   # 8 arp: chord tones octave 3-5
+track lead  note vel                   # 9 pager motif, note names; use `off` to end notes
+
+# ---- harmony: two 4-bar E phrygian progressions, one chord per bar ----
+pattern harm 4x16 harm
+1:00 | E3 G3 B3
+2:00 | F3 A3 C4
+3:00 | E3 G3 B3
+4:00 | D3 F3 A3
+
+pattern harm_b 4x16 harm
+1:00 | E3 G3 B3
+2:00 | F3 A3 C4
+3:00 | G3 B3 D4
+4:00 | F3 A3 C4
+
+# ---- drums ----
+pattern kick 16 kick
+lane kick  x... x... x... x...
+
+pattern kick_half 16 kick
+lane kick  x... .... x... ....
+
+pattern hat8 16 hat
+lane hat   ..7. ..8. ..7. ..8.
+
+pattern hat16 16 hat
+00 | x .8
+01 | x .5
+02 | x?.6 .4
+03 | x .6
+04 | x .7
+05 | x .5
+06 | x?.6 .4
+07 | x .6
+08 | x .8
+09 | x .5
+10 | x?.6 .4
+11 | x .6
+12 | x .7
+13 | x .5
+14 | x?.6 .4
+15 | x .6
+
+pattern ohat 16 ohat
+lane ohat  ..6. ..6. ..6. ..7.
+
+pattern clap 16 clap
+00 | .
+04 | x@.15 .8
+12 | x@.15 .8
+14 | x .3
+
+pattern roll 16 clap
+00 | x*2 .3
+04 | x*3 .5
+08 | x*4 .7
+12 | x*4 .9
+
+# ---- bass: syncopated, avoids the four-on-the-floor kick rows ----
+pattern bass 16 bass
+01 | t1-24 .55
+02 | x .9
+03 | x .7
+05 | x .55
+06 | x .9
+07 | x .7
+09 | x .55
+10 | x .9
+11 | x .7
+13 | x .55
+14 | x .9
+15 | t1-12 .6
+
+# ---- jobs arp: 7-row free-running polymeter ----
+pattern jobs 7 jobs
+00 | t1 .7
+01 | t2+12 .5
+02 | t3 .6
+03 | t1+12 .8
+04 | t2 .5
+05 | t3+12 .6
+06 | t1+24 .7
+
+# jobs_hi = jobs^12, used for the octave-up peak
+pattern jobs_hi 7 jobs
+00 | t1+12 .7
+01 | t2+24 .5
+02 | t3+12 .6
+03 | t1+24 .8
+04 | t2+12 .5
+05 | t3+24 .6
+06 | t1+36 .7
+
+# ---- lead pager motif: short, insistent, mostly F/E in octaves 4-5 ----
+pattern lead_a 16 lead
+00 | F4 .9
+02 | E4 .8
+04 | off
+08 | F4 .9
+10 | E4 .8
+12 | off
+
+pattern lead_b 16 lead
+00 | F5 .9
+02 | E5 .8
+04 | off
+06 | F5 .7
+08 | E5 .9
+10 | F5 .8
+12 | off
+
+# ---- status LEDs: sparse high blips ----
+pattern blink 64 blink
+00 | t1+24 .5
+14 | t2+24 .4
+30 | t3+36 .5
+46 | t1+36 .4
+
+# under load the LEDs flicker faster: seven-ish blips, some only half the time
+pattern blink_mid 64 blink
+06 | t3+24 .4
+13 | t1+36?.5 .3
+22 | t2+24 .45
+29 | t3+36?.5 .3
+38 | t1+24 .4
+45 | t2+36?.6 .35
+54 | t3+24*2 .4
+61 | t1+36?.5 .3
+
+pattern blink_end 64 blink
+00 | t1+24 .5
+20 | t2+24 .4
+40 | t3+36 .5
+
+pattern blink_last 64 blink
+00 | t1+24 .5
+24 | t2+24 .4
+
+# ---- sections (one step = 4 bars unless repeated) ----
+section power_a harm+blink
+section power_b harm_b+blink
+
+section queue_a harm+kick+hat8
+section queue_b harm_b+kick+hat8
+section queue_c harm+kick+hat16+bass
+section queue_d harm_b+kick+hat16+bass
+
+section dispatch_a harm+kick+hat16+clap+bass+jobs~
+section dispatch_b harm_b+kick+hat16+clap+bass+jobs~
+section dispatch_c harm+kick+hat16+clap+bass+jobs~+ohat
+section dispatch_d harm_b+kick+hat16+clap+bass+jobs~+ohat
+
+section full_a harm+kick+hat16+clap+bass+jobs~+ohat+lead_a+blink_mid
+section full_b harm_b+kick+hat16+clap+bass+jobs~+ohat+lead_a+blink_mid
+section full_c harm+kick+hat16+clap+bass+jobs~+ohat+lead_a+blink_mid
+section full_d harm_b+kick+hat16+clap+bass+jobs~+ohat+lead_a+blink_mid
+
+section maint_a harm+lead_a+blink
+section maint_b harm_b+lead_a+blink+roll@48
+
+section peak_a harm+kick+hat16+clap+bass+jobs~+ohat+lead_b+blink_mid
+section peak_b harm_b+kick+hat16+clap+bass+jobs~+ohat+lead_b+blink_mid
+section peak_c harm+kick+hat16+clap+bass+jobs_hi~+ohat+lead_b+blink_mid
+section peak_d harm_b+kick+hat16+clap+bass+jobs_hi~+ohat+lead_b+blink_mid
+
+section drain_a harm+kick+hat16+clap+bass+jobs~+ohat
+section drain_b harm+kick+hat16+clap+bass
+section drain_c harm+kick+hat16
+section drain_d harm+kick_half
+
+section drained_a harm+blink_end
+section drained_b harm_b+blink_last
+
+order power_a power_b power_a power_b
+order queue_a queue_b queue_c queue_d
+order dispatch_a dispatch_b dispatch_c dispatch_d
+order full_a full_b full_c full_d
+order maint_a maint_b
+order peak_a peak_b peak_c peak_d
+order drain_a drain_b drain_c drain_d
+order drained_a drained_b
