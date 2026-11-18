@@ -1,0 +1,32 @@
+# drain-em-all-form.trk -- one row per bar (112). '>' ramps per bar; patch slews with func.
+# Form: POWER ON 1-16, QUEUE 17-32, DISPATCH 33-48, FULL 49-64, MAINT 65-72,
+# PEAK 73-88, DRAIN 89-104, DRAINED 105-112.
+
+track a cva cvb    # 1: bass level 0..1 | jobs (arp) level 0..1
+track b cva cvb    # 2: jobs filter cutoff 0..1 | pad level 0..1
+track c cva cvb    # 3: hum level 0..1   | fan noise level 0..1
+track d cva cvb    # 4: riser 0..1       | reverb send 0..1
+
+pattern form 112
+#     bass jobs  | cut  pad  | hum  fan  | riser verb
+000 | 0    0     | 0    .5   | 0>   0>   | 0     .2
+003 | .    .     | .    .    | 1    1    | .     .
+024 | .8   0     | .    .    | .    .    | .     .
+032 | .    .7    | .2>  .    | .    .    | .     .
+040 | .    .75   | .5   .    | .    .    | .     .
+048 | .8   .8    | .7   .7   | .    .    | .     .3
+056 | .    .85   | .8   .75  | .    .    | .     .35
+064 | 0    0     | .4>  .4   | .    .    | 0     .3 
+068 | .    .     | .    .    | .    .    | 0>    .
+071 | .    .     | .    .    | .    .    | 1     .
+072 | .8   .9    | 1    .8   | .    .    | 0     .35
+080 | .    .95   | 1    .8   | .    .    | .     .
+088 | .8   .9    | 1    .8   | .    .    | .     .3
+092 | .8   0     | .3>  .8   | .    .    | .     .3
+096 | 0    0     | 0    .8   | .    .    | .     .3
+100 | 0    0     | .    .7   | .    .    | .     .25
+104 | 0    0     | 0    .5   | 1    1>   | 0     .2
+110 | 0    0     | 0    .1   | 1>   0    | 0     .15
+111 | 0    0     | 0    0    | 0    0    | 0     .1
+
+order form
