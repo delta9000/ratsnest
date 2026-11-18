@@ -194,9 +194,9 @@ verb_lvl -> room_s.level
 duck_mid -> room_s.duck
 
 # ---- master ----
-mast = sub { file: "../lib/master-chain.sub", clip_drive: 10, clip_blend: 1,
-             comp_thr: -18, ceiling: -1.5, true_peak: on, key_bus: 0.35 }
-7 -> mast.makeup
+mast = sub { file: "../lib/master-chain.sub", comp_thr: -18, ceiling: -1.5, true_peak: on, key_bus: 0.35 }
+7.5 -> mast.makeup
+
 kit.out_l   -> mast.in_l
 kit.out_r   -> mast.in_r
 hum_s.l     -> mast.in_l
