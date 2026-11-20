@@ -6,6 +6,7 @@
 
 namespace ms::engine {
 
+// Physical device boundary only; graph processing and float WAVs keep headroom.
 inline float clamp_device_sample(float x) {
   if (!std::isfinite(x)) return 0.0f;
   return std::clamp(x, -1.0f, 1.0f);

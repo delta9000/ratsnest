@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(RATSNEST_WERROR "Treat warnings as errors" OFF)
 option(RATSNEST_SAN "Enable ASan + UBSan for every target" OFF)
+# OFF builds a render-only binary (check/render/describe) with no PipeWire
+# dependency at all: no headers, no pkg-config, no libpipewire at run time.
+option(RATSNEST_PIPEWIRE "Build live play, MIDI input and capture via PipeWire" ON)
 
 add_compile_options(-Wall -Wextra -Wconversion)
 # Never fuse a*b+c into an FMA: it rounds differently, so the same patch would
@@ -27,14 +30,23 @@ endif()
 
 file(GLOB_RECURSE MSCORE_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 list(REMOVE_ITEM MSCORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+if(NOT RATSNEST_PIPEWIRE)
+  list(REMOVE_ITEM MSCORE_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/pipewire_out.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/midi_in.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/engine/audio_in.cpp)
+endif()
 add_library(mscore STATIC ${MSCORE_SOURCES})
 target_include_directories(mscore PUBLIC src)
 
-find_package(PkgConfig REQUIRED)
-# 1.6: the MIDI input calls spa_ump_to_midi with conversion state, which
-# older SPA headers do not have (1.4 lacks the state, 1.2 the whole header).
-pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3>=1.6)
-target_link_libraries(mscore PUBLIC PkgConfig::PIPEWIRE)
+if(RATSNEST_PIPEWIRE)
+  find_package(PkgConfig REQUIRED)
+  # 1.6: the MIDI input calls spa_ump_to_midi with conversion state, which
+  # older SPA headers do not have (1.4 lacks the state, 1.2 the whole header).
+  pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3>=1.6)
+  target_link_libraries(mscore PUBLIC PkgConfig::PIPEWIRE)
+  target_compile_definitions(mscore PUBLIC RATSNEST_PIPEWIRE=1)
+endif()
 
 add_executable(ratsnest src/main.cpp)
 target_link_libraries(ratsnest PRIVATE mscore)

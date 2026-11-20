@@ -27,6 +27,15 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "RATSNEST_SAN": "ON"
       }
+    },
+    {
+      "name": "render-only",
+      "binaryDir": "build-render",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "RATSNEST_PIPEWIRE": "OFF"
+      }
     }
   ]
 }

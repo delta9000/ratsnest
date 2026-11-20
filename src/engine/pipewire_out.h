@@ -6,9 +6,6 @@
 
 namespace ms::engine {
 
-// Physical device boundary only; graph processing and float WAVs keep headroom.
-float device_sample(float sample);
-
 // Stereo float32 PipeWire source via pw_stream. The render callback runs on
 // PipeWire's RT data thread: it must be RT-safe (this class guarantees its
 // own process path is; the callback's body is the caller's contract).
