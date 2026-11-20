@@ -3,7 +3,7 @@
 #include "dsl/parser.h"
 #include "engine/audio_safety.h"
 #include "engine/engine.h"
-#include "engine/pipewire_out.h"
+#include "engine/audio_safety.h"
 #include <limits>
 #include <string>
 #include "graph/graph.h"
@@ -73,11 +73,11 @@ TEST_CASE("graph output preserves finite float headroom") {
 }
 
 TEST_CASE("device boundary contains overload and non-finite samples") {
-  CHECK(engine::device_sample(3.0f) == 1.0f);
-  CHECK(engine::device_sample(-3.0f) == -1.0f);
-  CHECK(engine::device_sample(0.25f) == 0.25f);
-  CHECK(engine::device_sample(std::numeric_limits<float>::infinity()) == 0.0f);
-  CHECK(engine::device_sample(std::numeric_limits<float>::quiet_NaN()) == 0.0f);
+  CHECK(engine::clamp_device_sample(3.0f) == 1.0f);
+  CHECK(engine::clamp_device_sample(-3.0f) == -1.0f);
+  CHECK(engine::clamp_device_sample(0.25f) == 0.25f);
+  CHECK(engine::clamp_device_sample(std::numeric_limits<float>::infinity()) == 0.0f);
+  CHECK(engine::clamp_device_sample(std::numeric_limits<float>::quiet_NaN()) == 0.0f);
 }
 
 TEST_CASE("audio device safety clamps and sanitizes its final buffers") {

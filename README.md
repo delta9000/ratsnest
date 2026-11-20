@@ -32,10 +32,20 @@ amp  -> out.in
   the build/test/render/play commands below
 
 ```sh
-git clone git@github.com:delta9000/modsynth.git ratsnest
+git clone https://github.com/delta9000/ratsnest.git
 cd ratsnest
 mise run build
 ```
+
+No PipeWire, or no audio at all (a server, a container, CI)? Build without it:
+
+```sh
+cmake --preset render-only && cmake --build build-render
+./build-render/ratsnest render patches/first.patch -d 10s -o take.wav
+```
+
+That binary has `check`, `render` and `describe` but no `play`, MIDI input
+or `extin` capture, and needs neither the PipeWire headers nor `pkg-config`.
 
 ### Render a patch offline
 

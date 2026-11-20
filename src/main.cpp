@@ -14,9 +14,11 @@
 #include "dsl/suggest.h"
 #include "engine/controller.h"
 #include "engine/engine.h"
+#ifdef RATSNEST_PIPEWIRE
 #include "engine/audio_in.h"
 #include "engine/midi_in.h"
 #include "engine/pipewire_out.h"
+#endif
 #include "engine/rt_runner.h"
 #include "graph/graph.h"
 #include "graph/subs.h"
@@ -39,10 +41,12 @@ int usage() {
       "      --stats [<dur>]   print peak/RMS/DC and a level timeline per window (default 10s)\n"
       "      --tap NAME[=node[.port]]  also write <out>.NAME.wav from that endpoint (stereo\n"
       "                        if it has l/r or out_l/out_r) and print its stats; repeatable\n"
+#ifdef RATSNEST_PIPEWIRE
       "  ratsnest play   <patch> [options]   live PipeWire output; hot-reloads on save\n"
       "      --latency <N/RATE>  e.g. 256/48000\n"
       "      --rate <hz>         sample rate (default 48000)\n"
       "      --watch <mod[.port]>  show that signal's value in the status line\n"
+#endif
       "  ratsnest describe [module_type]     module interfaces as JSON\n"
       "durations: 90, 90s, 500ms, 2m.  Modules and patch syntax: docs/modules.md\n");
   return 2;
@@ -377,6 +381,7 @@ int cmd_render(const std::string& patch, int argc, char** argv) {
 }
 
 // ---- play -------------------------------------------------------------------
+#ifdef RATSNEST_PIPEWIRE
 
 std::atomic<bool> g_stop{false};
 void on_sigint(int) { g_stop.store(true); }
@@ -628,6 +633,13 @@ int cmd_play(const std::string& patch, int argc, char** argv) {
   std::fputs("\n", stderr);
   return 0;
 }
+#else
+int cmd_play(const std::string&, int, char**) {
+  std::fputs("error: this ratsnest was built without PipeWire (RATSNEST_PIPEWIRE=OFF);"
+             " use render\n", stderr);
+  return 2;
+}
+#endif
 
 }  // namespace
 

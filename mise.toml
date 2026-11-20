@@ -27,11 +27,15 @@ ctest --test-dir build-san --output-on-failure
 """
 
 [tasks.ci]
-description = "Full gate: warnings-as-errors build, tests, sanitized tests."
+description = "Full gate: warnings-as-errors build, tests, sanitized tests, PipeWire-free render-only build."
 run = """
 cmake --preset ci
 cmake --build build-ci
 ctest --test-dir build-ci --output-on-failure
+# pkg-config hidden: a PipeWire include or link leaking into shared code fails here.
+PKG_CONFIG_LIBDIR=/nonexistent cmake --preset render-only -DRATSNEST_WERROR=ON
+cmake --build build-render
+ctest --test-dir build-render --output-on-failure
 """
 depends = ["test-san"]
 

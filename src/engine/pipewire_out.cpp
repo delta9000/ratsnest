@@ -21,8 +21,6 @@
 
 namespace ms::engine {
 
-float device_sample(float sample) { return clamp_device_sample(sample); }
-
 struct PipewireOut::Impl {
   RenderFn fn = nullptr;
   void* user = nullptr;
