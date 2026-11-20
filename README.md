@@ -32,7 +32,7 @@ amp  -> out.in
   the build/test/render/play commands below
 
 ```sh
-git clone git@github.com:delta9000/modsynth.git ratsnest
+git clone https://github.com/delta9000/ratsnest.git
 cd ratsnest
 mise run build
 ```
