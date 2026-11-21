@@ -1,0 +1,366 @@
+# 4-escalator -- skylight track 4: closing time. 64 BPM, 56 bars + 2 of
+# silence (~3:38). Notes in 4-escalator.trk, levels and voice cues per bar in
+# 4-escalator-form.trk.
+#   intro 8 (the escalator, rain, the room; "closing in fifteen minutes")
+#   | build 8 (muffled keys, kick and rimshot, bass)
+#   | full 16 (the jingle's first bar at half speed on trumpet, turning minor;
+#     "it goes up forever" at bar 24)
+#   | lights out 16 (every 4 bars a breaker thunks and a part goes dark:
+#     haze, trumpet, drums, bass, keys; "I don't know where they went")
+#   | 4 bars of escalator, rain and room | outro 4 (fade)
+#
+# The minor turn of the album: Em9 | Cmaj7 | Am9 | Bm7, written in G like the
+# rest of skylight; the tape speed (-0.584963 oct, 64/96) on the pitch bus
+# makes it sound a fifth lower, around A minor. The bass is written an octave
+# up so it lands at 55..87 Hz after the speed, not under 40.
+#
+# The signature is the escalator: a Shepard-Risset glissando (six sine
+# partials an octave apart, 4-escalator-shepard.sub) that climbs one octave
+# every 4 bars, forever, its centre never moving. It is the first and last
+# thing in the track, so it is what is left when the lights go out.
+#
+# Wear (README row 4): wow 0.006 + drift 0.008 oct; the rain and the interview
+# voices play 100% through vhs.sub (drive .55, hi 4.5 kHz, a dropout every ~6 s);
+# the music is mixed 55% dry, 45% through a second vhs.sub; master high shelf
+# -7 dB. Sampler and grains paths resolve from the repo root: render with
+# `mise run render` or from there.
+
+t = transport { bpm: 64, division: 4, bars: 24 }
+song = tracker { file: "4-escalator.trk" }
+form = tracker { file: "4-escalator-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+# Rises are slow fades; falls are the lights going out (a quarter second).
+drums_lvl = func { rise: 0.5, fall: 0.25 }
+bass_lvl  = func { rise: 1.5, fall: 0.25 }
+keys_lvl  = func { rise: 3, fall: 0.25 }
+cut_lvl   = func { rise: 3, fall: 3 }
+lead_lvl  = func { rise: 0.3, fall: 0.25 }
+haze_lvl  = func { rise: 4, fall: 0.25 }
+esc_lvl   = func { rise: 3, fall: 3 }
+verb_lvl  = func { rise: 3, fall: 3 }
+rain_lvl  = func { rise: 4, fall: 4 }
+main_lvl  = func { rise: 1, fall: 3 }
+form.cva1  -> drums_lvl.in
+form.cva2  -> bass_lvl.in
+form.cva3  -> keys_lvl.in
+form.cva4  -> cut_lvl.in
+form.cva5  -> lead_lvl.in
+form.cva6  -> haze_lvl.in
+form.cva7  -> esc_lvl.in
+form.cva8  -> verb_lvl.in
+form.cva9  -> rain_lvl.in
+form.cva10 -> main_lvl.in
+
+# ---- tape: one pitch bus for the whole band (speed + wow) ----
+wobble = lfo { freq: 0.43hz }
+drift  = random { rate: 0.11hz, smooth: 1, seed: 61 }
+wow = math { op: add }
+-0.584963 -> wow.a          # tape speed: 64/96
+wobble -> wow.a : 0.006
+drift  -> wow.b : 0.008
+
+# ---- the escalator ----
+esc = sub { file: "4-escalator-shepard.sub" }
+t.phrase_phase -> esc.phase
+wow -> esc.voct
+esc_s = sub { file: "../lib/strip.sub", gain: 0.7, send_gain: 0.6 }
+esc -> esc_s.in
+esc_lvl -> esc_s.level
+
+# ---- e-piano: the FM tine, one tone per chord note ----
+ch = chord { n: 4, strum: 0.02 }
+song.gate4 -> ch.gate
+song.voct4 -> ch.p1
+song.cva4  -> ch.p2
+song.cvb4  -> ch.p3
+song.cvd4  -> ch.p4
+keys = voice { notes: ch }
+keys.ep = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
+               t1: [.004, .004, .002, .004, .002, .004],
+               t2: [1.2, .3, .08, 1.1, .08, .3], l2: [.6, .25, .15, .55, .15, .25],
+               t3: [6, 4, 1, 6, 1, 4], l3: [.25, .06, 0, .2, 0, .06],
+               t4: [.9, .9, .3, .9, .3, .9],
+               fb: [0, 0, 0, 0, .23, 0], curve: log }
+ch.voct -> keys.ep.v_oct
+ch.gate -> keys.ep.gate
+wow -> keys.ep.v_oct
+keys_f = svf { cutoff: 300, res: 0.1 }
+keys.ep -> keys_f.in : 0.5
+cut_lvl -> keys_f.cutoff : 3800
+k_cho = chorus { voices: 3, rate: 0.3, depth: 0.7, mix: 0.6 }
+keys_f.lp -> k_cho.in_l
+keys_f.lp -> k_cho.in_r
+keys_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.7 }
+k_cho.out_l -> keys_s.in_l
+k_cho.out_r -> keys_s.in_r
+keys_lvl -> keys_s.level
+
+# ---- bass ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0, osc_lvl: 0.35, sublvl: 0.7,
+             sub_oct: 0, cutoff: 200, res: 0.15, drive: 0.3, track: 0, env_amt: 350,
+             attack: 0.015, decay: 1.6, sustain: 0.35, release: 0.5 }
+song.voct5 -> bass.voct
+song.gate5 -> bass.gate
+song.vel5  -> bass.vel
+wow -> bass.voct
+bass_s = sub { file: "../lib/strip.sub", gain: 0.9 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+
+# ---- drums: sparse half-time, a rimshot where the snare would be ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 50hz, decay: 0.4, bend: 1.2 }
+song.gate1 -> kick.trig
+0.6 -> kick.accent
+rim = sub { file: "../lib/kit/rim.sub", tune: 420hz, decay: 0.35 }
+song.gate2 -> rim.trig
+song.vel2  -> rim.accent
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.04s, tone: 4500 }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+dmix = mix { levels: [1.3, 0.7, 1.1], pans: [0, -0.1, 0.3] }
+kick -> dmix.in1
+rim  -> dmix.in2
+hat  -> dmix.in3
+d_lp = svf { cutoff: 4000 }
+dmix.out_l -> d_lp.in
+drums = sub { file: "../lib/strip.sub", gain: 1.6, send_gain: 0.8 }
+d_lp.lp -> drums.in
+drums_lvl -> drums.level
+
+# ---- the trumpet: two CC0 notes, each in its own register (as in 3-atrium) ----
+lo_on = logic { op: cmp }
+0.9 -> lo_on.a
+song.voct6 -> lo_on.b
+hi_on = logic { op: cmp }
+song.voct6 -> hi_on.a
+0.9 -> hi_on.b
+g_lo = logic { op: and }
+song.gate6 -> g_lo.a
+lo_on -> g_lo.b
+g_hi = logic { op: and }
+song.gate6 -> g_hi.a
+hi_on -> g_hi.b
+
+p_lo = sh { mode: sample }
+song.voct6 -> p_lo.in
+g_lo -> p_lo.trig
+tp_lo = sampler { file: "patches/samples/cc0/trumpet-f4.wav", loop: off }
+g_lo -> tp_lo.trig
+p_lo -> tp_lo.pitch
+-0.6658 -> tp_lo.pitch
+wow -> tp_lo.pitch
+e_lo = adsr { attack: 0.04, decay: 1.5, sustain: 0.75, release: 0.6, curve: exp }
+g_lo -> e_lo.gate
+v_lo = math { op: mult }
+e_lo -> v_lo.a
+song.vel6 -> v_lo.b
+a_lo = vca { gain: 0 }
+tp_lo -> a_lo.in
+v_lo -> a_lo.cv
+
+p_hi = sh { mode: sample }
+song.voct6 -> p_hi.in
+g_hi -> p_hi.trig
+tp_hi = sampler { file: "patches/samples/cc0/trumpet-d5.wav", loop: off }
+g_hi -> tp_hi.trig
+p_hi -> tp_hi.pitch
+-1.4200 -> tp_hi.pitch
+wow -> tp_hi.pitch
+e_hi = adsr { attack: 0.04, decay: 1.5, sustain: 0.75, release: 0.6, curve: exp }
+g_hi -> e_hi.gate
+v_hi = math { op: mult }
+e_hi -> v_hi.a
+song.vel6 -> v_hi.b
+a_hi = vca { gain: 0 }
+tp_hi -> a_hi.in
+v_hi -> a_hi.cv
+
+lead_f = svf { cutoff: 2000 }
+a_lo -> lead_f.in : 0.4
+a_hi -> lead_f.in : 0.4
+lead_s = sub { file: "../lib/strip.sub", gain: 2.5, pos: -0.15, send_gain: 0.5 }
+lead_f.lp -> lead_s.in
+lead_lvl -> lead_s.level
+
+# ---- haze: the piano (dark, in G) and the voice held on B ----
+pno = grains { file: "patches/samples/cc0/piano-c-progression.wav", seed: 63, position: 0.5,
+               size: 0.7, scatter: 0.3, density: 4, shape: 1, spread: 0.8 }
+-1.4167 -> pno.pitch
+wow -> pno.pitch
+pno_scan = lfo { freq: 0.017hz, wave: tri }
+pno_scan -> pno.position : 0.45
+vox = grains { file: "patches/samples/cc0/vox-vibrato.wav", seed: 64, position: 0.45,
+               size: 0.4, scatter: 0.15, density: 5, jitter: 0.8, shape: 1, spread: 0.9 }
+-0.1517 -> vox.pitch
+wow -> vox.pitch
+vox_scan = random { rate: 0.07hz, smooth: 1, seed: 65 }
+vox_scan -> vox.position : 0.3
+haze_s = sub { file: "../lib/strip.sub", gain: 0.35, send_gain: 0.9 }
+pno.out_l -> haze_s.in_l : 0.5
+pno.out_r -> haze_s.in_r : 0.5
+vox.out_l -> haze_s.in_l : 0.4
+vox.out_r -> haze_s.in_r : 0.4
+haze_lvl -> haze_s.level
+
+# ---- the breaker: a low thunk each time a store goes dark ----
+thunk = sub { file: "../lib/kit/tom.sub", tune: 58hz, decay: 0.5, bend: 0.6 }
+form.gate14 -> thunk.trig
+0.9 -> thunk.accent
+thunk_f = svf { cutoff: 900 }
+thunk -> thunk_f.in
+thunk_s = sub { file: "../lib/strip.sub", gain: 2.2, send_gain: 0.8 }
+thunk_f.lp -> thunk_s.in
+
+# ---- voices (original scripts, local TTS), slowed with the tape ----
+# Each clip sits behind a vca opened by its form gate: a sampler plays once at
+# load even with `trig` patched.
+pa = sampler { file: "patches/samples/skylight/pa-closing.wav", loop: off }
+form.gate11 -> pa.trig
+wow -> pa.pitch
+pa_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate11 -> pa_env.gate
+pa_amp = vca { gain: 0 }
+pa -> pa_amp.in
+pa_env -> pa_amp.cv
+pa_hp = svf { cutoff: 300 }
+pa_amp -> pa_hp.in
+pa_lp = svf { cutoff: 4000, res: 0.2 }
+pa_hp.hp -> pa_lp.in
+pa_s = sub { file: "../lib/strip.sub", gain: 2, pos: 0.1, send_gain: 0.8 }
+pa_lp.lp -> pa_s.in
+
+iv1 = sampler { file: "patches/samples/skylight/iv-escalator.wav", loop: off }
+form.gate12 -> iv1.trig
+wow -> iv1.pitch
+iv1_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate12 -> iv1_env.gate
+iv1_amp = vca { gain: 0 }
+iv1 -> iv1_amp.in
+iv1_env -> iv1_amp.cv
+iv2 = sampler { file: "patches/samples/skylight/iv-owner.wav", loop: off }
+form.gate13 -> iv2.trig
+wow -> iv2.pitch
+iv2_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate13 -> iv2_env.gate
+iv2_amp = vca { gain: 0 }
+iv2 -> iv2_amp.in
+iv2_env -> iv2_amp.cv
+iv_tape = sub { file: "vhs.sub", drive: 0.55, hi: 4500, drop_rate: 0.18hz,
+                wow_s: 0.0024, seed_flut: 71, seed_drop: 72, seed_lvl: 73, seed_hiss: 74 }
+iv1_amp -> iv_tape.in
+iv2_amp -> iv_tape.in
+iv_s = sub { file: "../lib/strip.sub", gain: 0.4, pos: -0.2, send_gain: 0.25 }
+iv_tape -> iv_s.in
+
+# The music ducks ~3 dB under a voice.
+vduck = math { op: add }
+1 -> vduck.a
+pa_env  -> vduck.b : -0.3
+iv1_env -> vduck.b : -0.3
+iv2_env -> vduck.b : -0.3
+vduck -> keys_s.duck
+vduck -> haze_s.duck
+vduck -> lead_s.duck
+vduck -> esc_s.duck
+vduck -> bass_s.duck
+
+# ---- rain, slowed and stretched, on tape ----
+rain_g = grains { file: "patches/samples/cc0/rain-loop.wav", seed: 66, position: 0.5,
+                  size: 0.3, scatter: 0.02, density: 40, jitter: 1, shape: 1, spread: 0 }
+rain_head = lfo { freq: 0.0125hz, wave: saw }
+rain_head -> rain_g.position : 0.5
+-0.584963 -> rain_g.pitch
+rain_wob = lfo { freq: 0.27hz }
+rain_wob -> rain_g.pitch : 0.025
+rain_tape = sub { file: "vhs.sub", drive: 0.55, hi: 4500, drop_rate: 0.18hz,
+                  seed_flut: 75, seed_drop: 76, seed_lvl: 77, seed_hiss: 78 }
+rain_g.out_l -> rain_tape.in : 1.25
+rain_g.out_r -> rain_tape.in : 1.25
+rain_s = sub { file: "../lib/strip.sub", gain: 0.28 }
+rain_tape -> rain_s.in
+rain_lvl -> rain_s.level
+
+# ---- space ----
+de = tempo { bpm: 64, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.5, tone: 1800, mix: 1 }
+de.seconds -> echo.time
+keys_s.fx -> echo.in : 0.3
+lead_s.fx -> echo.in : 0.6
+room = reverb { decay: 0.94, damp: 0.6, mix: 1, predelay: 0.07 }
+keys_s.fx  -> room.in_l
+lead_s.fx  -> room.in_l
+haze_s.fx  -> room.in_l
+esc_s.fx   -> room.in_l
+drums.fx   -> room.in_l : 1.4
+thunk_s.fx -> room.in_l : 1.5
+pa_s.fx    -> room.in_l : 1.5
+iv_s.fx    -> room.in_l
+echo       -> room.in_l : 0.5
+room_s = sub { file: "../lib/strip.sub", gain: 1.1 }
+room.out_l -> room_s.in_l
+room.out_r -> room_s.in_r
+verb_lvl -> room_s.level
+
+# ---- the music on tape: 55% dry, 45% through a second vhs.sub ----
+mus_tape = sub { file: "vhs.sub", drive: 0.55, hi: 4500, drop_rate: 0.18hz, level: 0.3,
+                 seed_flut: 81, seed_drop: 82, seed_lvl: 83, seed_hiss: 84 }
+drums.l  -> mus_tape.in : 0.25
+drums.r  -> mus_tape.in : 0.25
+bass_s.l -> mus_tape.in : 0.25
+bass_s.r -> mus_tape.in : 0.25
+keys_s.l -> mus_tape.in : 0.25
+keys_s.r -> mus_tape.in : 0.25
+lead_s.l -> mus_tape.in : 0.25
+lead_s.r -> mus_tape.in : 0.25
+haze_s.l -> mus_tape.in : 0.25
+haze_s.r -> mus_tape.in : 0.25
+esc_s.l  -> mus_tape.in : 0.25
+esc_s.r  -> mus_tape.in : 0.25
+room_s.l -> mus_tape.in : 0.25
+room_s.r -> mus_tape.in : 0.25
+echo     -> mus_tape.in : 0.15
+
+# ---- master ----
+master = sub { file: "../lib/master-chain.sub", comp_thr: -20, comp_ratio: 2,
+               clip_drive: 1, ceiling: -1, true_peak: on,
+               high_freq: 5000, high_gain: -7, low_gain: 1 }
+1.5 -> master.makeup
+1.0 -> master.width
+drums.l  -> master.in_l : 0.55
+drums.r  -> master.in_r : 0.55
+bass_s.l -> master.in_l : 0.55
+bass_s.r -> master.in_r : 0.55
+keys_s.l -> master.in_l : 0.55
+keys_s.r -> master.in_r : 0.55
+lead_s.l -> master.in_l : 0.55
+lead_s.r -> master.in_r : 0.55
+haze_s.l -> master.in_l : 0.55
+haze_s.r -> master.in_r : 0.55
+esc_s.l  -> master.in_l : 0.55
+esc_s.r  -> master.in_r : 0.55
+room_s.l -> master.in_l : 0.55
+room_s.r -> master.in_r : 0.55
+echo     -> master.in_l : 0.15
+echo     -> master.in_r : 0.2
+mus_tape -> master.in_l : 0.5
+mus_tape -> master.in_r : 0.5
+thunk_s.l -> master.in_l
+thunk_s.r -> master.in_r
+pa_s.l   -> master.in_l
+pa_s.r   -> master.in_r
+iv_s.l   -> master.in_l
+iv_s.r   -> master.in_r
+rain_s.l -> master.in_l
+rain_s.r -> master.in_r
+kick -> master.side_l : 0.5
+kick -> master.side_r : 0.5
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

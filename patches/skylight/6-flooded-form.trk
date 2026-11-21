@@ -1,0 +1,35 @@
+# 6-flooded-form.trk -- one row per bar of a FIXED 56 BPM clock (4.286 s), 56 bars.
+# The song tracker slows during the wind-down; this file does not, so the
+# fade rows arrive on time whatever the dying tape is doing.
+track kick  cva    # 1  heartbeat level
+track bass  cva    # 2
+track keys  cva    # 3  e-piano level
+track lead  cva    # 4  trumpet level
+track verb  cva    # 5  plate return
+track rain  cva    # 6  the rain, loud and close
+track open  cva    # 7  underwater low-pass: 0 = ~500 Hz, 1 = ~1500 Hz
+track wind  cva    # 8  wind-down: 0 = running, 1 = the tape has stopped
+track main  cva    # 9  master fade
+track pa    note   # 10 pa-last (gate held for the slowed clip)
+track mom   note   # 11 iv-mom
+track frz   note   # 12 plate freeze
+
+pattern form 56
+#    kick   bass   keys   lead   verb   rain   open   wind   main   pa     mom    frz
+00 | 0    | 0    | .7   | 0    | .8   | 1    | .2   | 0    | 1    | .    | .    | .      # intro: rain over the drowned loop
+02 | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:5  | .    | .      # the last announcement (~17.5 s slowed)
+08 | .8   | .8   | .75  | .    | .7   | .8   | .35  | .    | .    | .    | .    | .      # the heartbeat and the bass
+12 | .    | .    | .    | 1    | .7   | .7   | .5   | .    | .    | .    | .    | .      # reprise A: the jingle, whole
+20 | .7   | .7   | .7   | 0    | 1    | 1    | 0    | .    | .    | .    | .    | .      # flood: darkest, the room takes over
+21 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:3  | .      # "when it opened, it was like the future"
+24 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:2    # the plate freezes
+27 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:1
+28 | .85  | .85  | .8   | 1    | .7   | .7   | 1    | .    | .    | .    | .    | .      # reprise B: surfacing, the filter opens
+36 | .5   | .6   | .7   | 0    | .8   | .8   | .6   | .    | .    | .    | .    | .      # outro: thinning
+40 | .    | .    | .    | .    | .    | .    | .3   | 1    | .    | .    | .    | .      # wind-down: the tape dies over ~8 bars
+45 | 0    | 0    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+47 | .    | .    | 0    | .    | 0    | 0    | .    | .    | .    | .    | .    | .      # the music is gone; hiss is left
+51 | .    | .    | .    | .    | .    | .    | .    | .    | 0    | .    | .    | .      # then silence
+55 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+
+order form

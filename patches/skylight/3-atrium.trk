@@ -1,0 +1,109 @@
+# 3-atrium.trk -- "Atrium", slushwave, 72 BPM, 16 rows per bar (sixteenths).
+# intro 8 | A 16 (drums, bass) | B 16 (+ trumpet) | break 8 | A' 8 (+ trumpet) | outro 4 = 60 bars
+# One four-bar loop all the way through, the way the genre does it:
+#   Gmaj9 | F#m7 | Em9 | A7sus4
+
+track kick  note              # 1
+track snare note vel          # 2
+track hat   note vel          # 3
+track keys  note cva cvb cvd  # 4  four e-piano tones
+track bass  note vel from keys    # 5
+track lead  note vel          # 6  the trumpet (two CC0 samples)
+
+# ---------------- harmony ----------------
+pattern harm 4x16 keys
+1:00 | G3  B3  Fs4 A4        # Gmaj9 (no 5th)
+2:00 | Fs3 A3  Cs4 E4        # F#m7
+3:00 | E3  G3  D4  Fs4       # Em9
+4:00 | A3  D4  E4  G4        # A7sus4
+4:12 | ~A3 Cs4 E4  G4        # ...leaning on the third at the end
+
+pattern harm_end 4x16 keys
+1:00 | G3  B3  Fs4 A4
+2:00 | Fs3 A3  Cs4 E4
+3:00 | E3  G3  D4  Fs4
+4:00 | G3  B3  D4  Fs4       # rest on Gmaj7 instead of turning round
+4:15 | off
+
+# ---------------- bass (follows the chord root) ----------------
+pattern bass 16 bass
+00 | t1-24:10 .9
+10 | t1-12:2  .55
+12 | t1-24:4  .7
+
+pattern bass_break 16 bass
+00 | t1-24:16 .6
+
+# ---------------- drums: half-time, quiet, mostly room ----------------
+pattern drums 16 kick snare hat
+lane kick  x... .... ..x. ....
+lane snare .... .... 7... ....
+lane hat   4.2. 3.2. 4.2. 3.23
+
+pattern drums_turn 16 kick snare hat     # last bar of a phrase
+lane kick  x... .... ..x. ..x.
+lane snare .... .... 7... ..34
+lane hat   4.2. 3.2. 4.2. 3...
+
+# ---------------- the trumpet ----------------
+pattern lead_a 8x16 lead
+1:08 | Fs4:4 .6
+1:12 | A4:4  .7
+2:00 | B4:10 .8
+2:12 | A4:2  .55
+2:14 | Fs4:2 .5
+3:00 | E4:12 .7
+3:12 | D4:2  .5
+3:14 | E4:2  .55
+4:00 | Fs4:14 .65
+5:08 | A4:2  .6
+5:10 | B4:2  .65
+5:12 | D5:4  .8
+6:00 | E5:8  .9
+6:08 | D5:4  .7
+6:12 | B4:4  .6
+7:00 | A4:4  .7
+7:04 | B4:2  .55
+7:06 | A4:2  .5
+7:08 | Fs4:8 .65
+8:00 | E4:14 .6
+
+pattern lead_b 8x16 lead
+1:04 | D5:2  .6
+1:06 | E5:2  .65
+1:08 | Fs5:8 .85
+2:00 | E5:6  .75
+2:06 | Cs5:2 .55
+2:08 | A4:8  .6
+3:00 | B4:4  .7
+3:04 | D5:4  .7
+3:08 | E5:8  .8
+4:00 | D5:2  .6
+4:02 | ~E5:14 .7
+5:08 | A4:2  .6
+5:10 | B4:2  .65
+5:12 | D5:4  .8
+6:00 | E5:8  .9
+6:08 | Fs5:4 .8
+6:12 | E5:4  .7
+7:00 | D5:4  .7
+7:04 | B4:4  .6
+7:08 | A4:8  .65
+8:00 | Fs4:16 .6
+
+# ---------------- form ----------------
+section intro harm
+section a     harm+bass+drums
+section a_t   harm+bass+drums+drums_turn@48
+section b     lead_a+harm+bass+drums
+section b2    lead_b+harm+bass+drums
+section brk   harm+bass_break
+section a2    lead_a+harm+bass+drums
+section outro harm_end
+
+order intro*2
+order a*3 a_t
+order b b2
+order brk*2
+order a2
+order outro

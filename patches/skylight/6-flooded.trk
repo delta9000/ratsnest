@@ -1,0 +1,113 @@
+# 6-flooded.trk -- "Flooded", the closer of skylight. 56 BPM, 16 rows per bar.
+# Written in G like the rest of the album; the patch's tape-speed constant
+# (-0.777608 oct) makes it sound about a major sixth lower.
+#   intro 8 | heartbeat 4 | reprise A 8 | flood 8 | reprise B 8 | outro 4 | wind-down
+# One four-bar loop, track 1's: Gmaj9 | Em9 | Cmaj9 | D6/9 (rootless keys over
+# the bass), and the mall's jingle, whole, on the trumpet.
+
+track kick  note vel          # 1  the heartbeat
+track keys  note cva cvb cvd  # 2  four e-piano tones
+track bass  note vel          # 3  written an octave up (the speed drops it)
+track lead  note vel          # 4  the trumpet (two CC0 samples)
+
+# ---------------- harmony (rootless voicings; the bass has the roots) ----------------
+pattern harm 4x16 keys
+1:00 | G3  B3  Fs4 A4        # Gmaj9
+2:00 | G3  B3  D4  Fs4       # Em9
+3:00 | E3  G3  B3  D4        # Cmaj9
+4:00 | Fs3 A3  B3  E4        # D6/9
+
+pattern bass 4x16 bass
+1:00 | G2:14 .8
+2:00 | E2:14 .75
+3:00 | C3:14 .8
+4:00 | D3:10 .75
+4:12 | D3:4  .45
+
+# ---------------- the heartbeat: lub on 1, a soft dub on the "and" of 2 every other bar ----------------
+pattern heart 2x16 kick
+lane kick  9... .... .... .... 9... ..5. .... ....
+
+# ---------------- the jingle, whole ----------------
+pattern lead_a1 4x16 lead       # the jingle, then it hangs and settles home
+1:00 | D5:4  .8
+1:04 | B4:2  .7
+1:06 | G4:2  .65
+1:08 | A4:6  .75
+1:14 | B4:2  .6
+2:00 | D5:6  .85
+2:06 | E5:2  .7
+2:08 | D5:8  .75
+3:08 | B4:4  .55
+3:12 | A4:4  .5
+4:00 | G4:12 .6
+
+pattern lead_a2 4x16 lead       # the jingle twice, the answer over Cmaj9 | D6/9
+1:00 | D5:4  .8
+1:04 | B4:2  .7
+1:06 | G4:2  .65
+1:08 | A4:6  .75
+1:14 | B4:2  .6
+2:00 | D5:6  .85
+2:06 | E5:2  .7
+2:08 | D5:8  .75
+3:00 | D5:4  .8
+3:04 | B4:2  .7
+3:06 | G4:2  .65
+3:08 | A4:6  .75
+3:14 | B4:2  .6
+4:00 | D5:6  .85
+4:06 | E5:2  .7
+4:08 | D5:8  .75
+
+pattern lead_b1 4x16 lead       # surfacing: the jingle, then reaching up
+1:00 | D5:4  .85
+1:04 | B4:2  .7
+1:06 | G4:2  .65
+1:08 | A4:6  .8
+1:14 | B4:2  .6
+2:00 | D5:6  .9
+2:06 | E5:2  .75
+2:08 | D5:8  .8
+3:00 | E5:4  .85
+3:04 | D5:2  .7
+3:06 | B4:2  .65
+3:08 | D5:6  .8
+3:14 | E5:2  .7
+4:00 | Fs5:6 .9
+4:06 | E5:2  .7
+4:08 | D5:8  .75
+
+pattern lead_b2 4x16 lead       # the last time: the jingle comes home and stays
+1:00 | D5:4  .8
+1:04 | B4:2  .7
+1:06 | G4:2  .65
+1:08 | A4:6  .75
+1:14 | B4:2  .6
+2:00 | D5:6  .85
+2:06 | E5:2  .7
+2:08 | D5:8  .75
+3:00 | D5:4  .7
+3:04 | B4:2  .6
+3:06 | G4:2  .55
+3:08 | A4:6  .65
+3:14 | B4:2  .5
+4:00 | G4:16 .6
+
+# ---------------- form ----------------
+section intro harm
+section beat  harm+bass+heart
+section rep_a1 lead_a1+harm+bass+heart
+section rep_a2 lead_a2+harm+bass+heart
+section rep_b1 lead_b1+harm+bass+heart
+section rep_b2 lead_b2+harm+bass+heart
+
+order intro*2
+order beat
+order rep_a1 rep_a2
+order beat*2
+order rep_b1 rep_b2
+order beat
+# The wind-down slows this tracker's clock; these steps outlast the form, so
+# the song never runs out while the tape is dying.
+order beat*4

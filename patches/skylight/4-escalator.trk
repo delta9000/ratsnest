@@ -1,0 +1,65 @@
+# 4-escalator.trk -- "Escalator", skylight track 4, 64 BPM, 16 rows per bar.
+# Written in G (the album's notation); the tape speed on the pitch bus drops
+# it ~7 semitones, so it sounds a fifth down (~C / the minor turn on A).
+#   intro 8 | build 8 | full 16 | lights out 20 | outro 4 = 56 bars
+# The minor turn: Em9 | Cmaj7 | Am9 | Bm7, one bar each.
+
+track kick  note              # 1
+track rim   note vel          # 2
+track hat   note vel          # 3
+track keys  note cva cvb cvd  # 4  four e-piano tones (no roots: the bass has them)
+track bass  note vel          # 5  written an octave up (see the album README)
+track lead  note vel          # 6  the trumpet
+
+# ---------------- harmony ----------------
+pattern harm 4x16 keys
+1:00 | G3  B3  D4  Fs4       # Em9 (3 5 7 9)
+2:00 | G3  B3  C4  E4        # Cmaj7
+3:00 | B3  C4  E4  G4        # Am9 (9 3 5 7)
+4:00 | A3  B3  D4  Fs4       # Bm7
+
+# ---------------- bass: roots, long and low ----------------
+pattern bass 4x16 bass
+1:00 | E2:12 .85
+1:12 | E2:4  .6
+2:00 | C3:14 .8
+3:00 | A2:12 .8
+3:12 | A2:4  .55
+4:00 | B2:12 .8
+4:12 | Fs2:4 .6
+
+# ---------------- drums: sparse half-time, a rimshot on 3 ----------------
+pattern d_build 16 kick rim
+lane kick  x... .... .... ....
+lane rim   .... .... 6... ....
+
+pattern d_full 16 kick rim hat
+lane kick  x... .... ..x. ....
+lane rim   .... .... 7... ...2
+lane hat   ..2. ..3. ..2. ..3.
+
+# ---------------- the trumpet: the jingle's first bar at half speed ----------------
+# The jingle (README) bar 1 is D5:4 B4:2 G4:2 A4:6 B4:2; here every length is
+# doubled, so it fills two bars. The second statement does not climb back:
+# it falls to E, the minor tonic -- the turn.
+pattern lead 8x16 lead
+1:00 | D5:8  .8
+1:08 | B4:4  .7
+1:12 | G4:4  .65
+2:00 | A4:12 .75
+2:12 | B4:4  .6
+5:00 | D5:8  .75
+5:08 | B4:4  .65
+5:12 | G4:4  .6
+6:00 | E4:16 .7
+
+# ---------------- form ----------------
+section intro harm
+section build harm+bass+d_build
+section full  lead+harm+bass+d_full
+section out   lead+harm+bass+d_full
+
+order intro*2
+order build*2
+order full*2
+order out*3

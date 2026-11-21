@@ -1,0 +1,78 @@
+# 4-escalator-shepard.sub -- an endless rising Shepard-Risset glissando: six
+# sine partials an octave apart, each climbing one octave every time `phase`
+# advances by 1/6 and fading in and out under a bell over log-pitch, so the
+# top partial vanishes as a new one appears at the bottom and the whole thing
+# seems to rise forever.
+#
+#   esc = sub { file: "4-escalator-shepard.sub" }
+#   t.phrase_phase -> esc.phase      # one full 6-octave cycle per phrase
+#   pitch_bus -> esc.voct            # tape speed, wow
+#   esc -> strip.in
+#
+# Input `phase` (0..1 ramp; each partial sits 1/6 of a cycle after the last),
+# `voct` (centre pitch offset; the bell's peak sounds at 220 Hz x 2^voct).
+# Output `main`: the partials summed, about -12 dB RMS at the default level.
+#
+# Per partial k (offset k/6): position x = frac(phase + k/6); pitch =
+# 2^(6x - 3) x 220 Hz (27.5 Hz .. 1760 Hz); level = (0.5 - 0.5 cos 2 pi x)^2
+# (a squared Hann: zero, with zero slope, where the pitch wraps -- no click).
+# The squared Hann comes from a sine LFO a quarter-cycle ahead of the saw
+# (sin(2 pi (x + 0.75)) = -cos 2 pi x) into a `vca { response: exp }`.
+
+level = param { default: 0.3 }
+
+phase = input {}
+voct  = input {}
+main  = output {}
+
+part = subdef {}
+part.off  = param { default: 0 }
+part.boff = param { default: 0.75 }
+part.phase = input {}
+part.voct  = input {}
+part.main  = output {}
+part.ramp = lfo { freq: 0, wave: saw, phase: part.off }
+part.bell = lfo { freq: 0, wave: sine, phase: part.boff }
+part.phase -> part.ramp.phase
+part.phase -> part.bell.phase
+part.osc = vco { wave: sine }
+part.ramp -> part.osc.v_oct : 3
+part.voct -> part.osc.v_oct
+part.amp = vca { gain: 0.5, response: exp }
+part.osc  -> part.amp.in
+part.bell -> part.amp.cv : 0.5
+part.amp -> part.main.in
+
+p0 = sub { def: part, off: 0,        boff: 0.75 }
+p1 = sub { def: part, off: 0.166667, boff: 0.916667 }
+p2 = sub { def: part, off: 0.333333, boff: 1.083333 }
+p3 = sub { def: part, off: 0.5,      boff: 1.25 }
+p4 = sub { def: part, off: 0.666667, boff: 1.416667 }
+p5 = sub { def: part, off: 0.833333, boff: 1.583333 }
+phase -> p0.phase
+phase -> p1.phase
+phase -> p2.phase
+phase -> p3.phase
+phase -> p4.phase
+phase -> p5.phase
+voct -> p0.voct
+voct -> p1.voct
+voct -> p2.voct
+voct -> p3.voct
+voct -> p4.voct
+voct -> p5.voct
+p0 -> main.in : level
+p1 -> main.in : level
+p2 -> main.in : level
+p3 -> main.in : level
+p4 -> main.in : level
+p5 -> main.in : level
+
+# Audition: `mise run play -- patches/skylight/4-escalator-shepard.sub` --
+# one 6-octave cycle every 60 s (one octave every 10 s).
+demo.ramp = lfo { freq: 0.016667hz, wave: saw }
+demo.half = math { op: add }
+demo.ramp -> demo.half.a : 0.5
+0.5 -> demo.half.b
+demo.half -> phase
+main -> demo.out.in

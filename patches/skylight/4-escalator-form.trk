@@ -1,0 +1,40 @@
+# 4-escalator-form.trk -- one row per bar (56 bars + 2 of silence); '>' ramps to the next value.
+# The lights-out (bars 32..48): every 4 bars a breaker thunks and one part goes
+# dark -- haze, trumpet, drums, bass, keys -- until only the escalator, the
+# rain and the room are left.
+track drums cva   # 1
+track bass  cva   # 2
+track keys  cva   # 3  e-piano level
+track cut   cva   # 4  e-piano brightness 0..1
+track lead  cva   # 5  trumpet
+track haze  cva   # 6  piano + voice grains
+track esc   cva   # 7  the escalator (Shepard tone)
+track verb  cva   # 8  reverb return
+track rain  cva   # 9
+track main  cva   # 10 master fade
+track pa    note  # 11 pa-closing     (8.9 s x1.5 slowed = ~4 bars)
+track iv1   note  # 12 iv-escalator   (3.0 s -> ~2 bars)
+track iv2   note  # 13 iv-owner       (6.0 s -> ~3 bars)
+track thunk note  # 14 the breaker, once per lights-out step
+
+pattern form 58
+#    drums  bass   keys   cut    lead   haze   esc    verb   rain   main   pa     iv1    iv2    thunk
+00 | 0    | 0    | 0    | .1   | 0    | .5   | .5   | .8   | 1    | 1    | .    | .    | .    | .      # intro: escalator, rain, the room
+01 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:4  | .    | .    | .      # "closing in fifteen minutes"
+04 | .    | .    | .5   | .15> | .    | .    | .    | .    | .    | .    | .    | .    | .    | .      # keys, muffled
+07 | .    | .    | .    | .3   | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+08 | .75  | .8   | .75  | .3>  | .    | .4   | .5   | .65  | .7   | .    | .    | .    | .    | .      # build: kick, rim, bass
+15 | .    | .    | .    | .4   | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+16 | .85  | .85  | .75  | .45  | 1    | .45  | .45  | .6   | .5   | .    | .    | .    | .    | .      # full: the jingle, half speed
+24 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:2  | .    | .      # "it goes up forever"
+32 | .    | .    | .    | .    | .    | 0    | .55  | .    | .    | .    | .    | .    | .    | x      # lights out 1: the haze
+36 | .    | .    | .    | .    | 0    | .    | .6   | .    | .    | .    | .    | .    | .    | x      # 2: the trumpet
+40 | 0    | .    | .    | .    | .    | .    | .65  | .7   | .    | .    | .    | .    | .    | x      # 3: the drums
+41 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:3  | .      # "I don't know where they went"
+44 | .    | 0    | .    | .    | .    | .    | .7   | .    | .    | .    | .    | .    | .    | x      # 4: the bass
+48 | .    | .    | 0    | .    | .    | .    | .8   | .85  | .8   | .    | .    | .    | .    | x      # 5: the keys -- escalator, rain, room
+52 | .    | .    | .    | .    | .    | .    | .8>  | .    | .8>  | 1>   | .    | .    | .    | .      # outro
+55 | .    | .    | .    | .    | .    | .    | .3   | .    | .2   | 0    | .    | .    | .    | .
+57 | .    | .    | .    | .    | .    | .    | 0    | .    | 0    | .    | .    | .    | .    | .
+
+order form

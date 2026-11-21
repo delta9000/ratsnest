@@ -1,0 +1,324 @@
+# 6-flooded -- skylight, track 6 (the closer). 56 BPM on a fixed form clock;
+# render 232 s (silent from ~227 s): the atrium floods, the mall's jingle comes back whole and
+# underwater, and the tape winds down to a stop.
+# Notes in 6-flooded.trk, levels per bar in 6-flooded-form.trk.
+#   intro 8 (rain, the drowned loop, pa-last) | heartbeat 4 | reprise A 8
+#   | flood 8 (no trumpet, darkest, iv-mom, plate freezes) | reprise B 8 (the
+#   filter opens: surfacing) | outro 4 | wind-down 7 | hiss 4 | silence
+#
+# The album's tape (README.md): written in G, a speed constant of -0.777608
+# octave on the `wow` bus that every pitch input reads, so it all sounds a
+# major sixth lower than written -- track 1's loop (Gmaj9 | Em9 | Cmaj9 | D6/9)
+# and its jingle, slowed and drowned. Wear row 6: wow 0.010 + drift 0.012
+# octave, the whole music bus through `vhs.sub` (drive 0.6, band 40 Hz..2.8 kHz,
+# dropouts at 0.25 Hz) after an underwater low-pass swept ~500..1500 Hz (the
+# `open` lane plus a slow LFO). The overdrive's mid hump strips the lows, so
+# the bass and heartbeat fundamentals also go round the tape below 140 Hz
+# (`floor`). The rain is loud and close on its own tape; the master is dark
+# (high shelf -9 dB). Settled sections: reprises -14.6/-15.1 dB RMS, flood
+# -16.7, intro -18.9, wind-down -19.3; peaks -3.5..-5.6 dBFS.
+#
+# The wind-down is the tape dying. The `wind` lane slews 0 -> 1 over 34 s;
+# `speed_drop` = wind x -2.807 oct goes onto the pitch bus, and 2^speed_drop
+# x 56 is the transport's BPM, so tempo and pitch fall together exactly as a
+# slowing tape's do (56 -> 8 BPM is -2.807 octaves). The echo's tempo follows
+# it. The form runs on its own fixed `clock`, so its fade rows still arrive
+# while the song crawls; after the music is gone the tape hiss is left, then
+# the master fades to silence.
+#
+# Voices (patches/samples/skylight/, original scripts, local TTS): `pa-last`
+# on a PA in the glass atrium (band-limited, heavy room), `iv-mom` from a TV
+# (through the tape, dry). Each sits behind a vca opened by its form gate:
+# a sampler plays its file at load even with `trig` patched. The music dips
+# ~2.5 dB under them.
+# Paths resolve from the repo root: render with `mise run render` or from there.
+
+t = transport { bpm: 56, division: 4 }
+song = tracker { file: "6-flooded.trk" }
+t.clock -> song.clock
+fclk = clock { bpm: 14 }              # one pulse per 56-BPM bar, never slows
+form = tracker { file: "6-flooded-form.trk" }
+fclk -> form.clock
+
+kick_lvl = func { rise: 0.5, fall: 3 }
+bass_lvl = func { rise: 1, fall: 3 }
+keys_lvl = func { rise: 3, fall: 6 }
+lead_lvl = func { rise: 0.5, fall: 3 }
+verb_lvl = func { rise: 4, fall: 6 }
+rain_lvl = func { rise: 4, fall: 8 }
+open_lvl = func { rise: 12, fall: 6 }
+wind_lvl = func { rise: 34, fall: 1 }
+main_lvl = func { rise: 1, fall: 6 }
+form.cva1 -> kick_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> keys_lvl.in
+form.cva4 -> lead_lvl.in
+form.cva5 -> verb_lvl.in
+form.cva6 -> rain_lvl.in
+form.cva7 -> open_lvl.in
+form.cva8 -> wind_lvl.in
+form.cva9 -> main_lvl.in
+
+# ---- the tape: speed, wear and the dying motor ----
+speed_drop = math { op: mult }
+wind_lvl -> speed_drop.a
+-2.807355 -> speed_drop.b
+motor = math { op: exp2 }             # tape speed ratio, 1 -> 1/7
+speed_drop -> motor.a
+motor_m1 = math { op: add }           # ratio - 1, so the BPM bases stay 56
+motor -> motor_m1.a
+-1 -> motor_m1.b
+motor_m1 -> t.bpm : 56
+
+wobble = lfo { freq: 0.43hz }
+drift  = random { rate: 0.11hz, smooth: 1, seed: 61 }
+wow = math { op: add }
+-0.777608 -> wow.a
+wobble     -> wow.a : 0.010
+drift      -> wow.b : 0.012
+speed_drop -> wow.b
+
+# ---- e-piano: the album's FM tine, rootless voicings, stamped per note ----
+ch = chord { n: 4, strum: 0.02 }
+song.gate2 -> ch.gate
+song.voct2 -> ch.p1
+song.cva2  -> ch.p2
+song.cvb2  -> ch.p3
+song.cvd2  -> ch.p4
+keys = voice { notes: ch }
+keys.ep = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
+               t1: [.006, .006, .002, .006, .002, .006],
+               t2: [1.6, .4, .08, 1.4, .08, .4], l2: [.6, .25, .15, .55, .15, .25],
+               t3: [8, 5, 1, 8, 1, 5], l3: [.3, .06, 0, .25, 0, .06],
+               t4: [1.4, 1.2, .3, 1.4, .3, 1.2],
+               fb: [0, 0, 0, 0, .2, 0], curve: log }
+ch.voct -> keys.ep.v_oct
+ch.gate -> keys.ep.gate
+wow -> keys.ep.v_oct
+k_cho = chorus { voices: 3, rate: 0.22, depth: 0.8, mix: 0.6 }
+keys.ep -> k_cho.in_l : 0.5
+keys.ep -> k_cho.in_r : 0.5
+keys_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.9 }
+k_cho.out_l -> keys_s.in_l
+k_cho.out_r -> keys_s.in_r
+keys_lvl -> keys_s.level
+
+# ---- bass: written an octave up so the slowed tape leaves it audible ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0, osc_lvl: 0.3, sublvl: 0.7,
+             sub_oct: 0, cutoff: 220, res: 0.1, drive: 0.25, track: 0, env_amt: 300,
+             attack: 0.02, decay: 2, sustain: 0.4, release: 0.8 }
+song.voct3 -> bass.voct
+song.gate3 -> bass.gate
+song.vel3  -> bass.vel
+wow -> bass.voct
+bass_s = sub { file: "../lib/strip.sub", gain: 0.9 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+
+# ---- the heartbeat: one muffled kick, lub (and a soft dub) ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 46hz, decay: 0.55, bend: 1 }
+song.gate1 -> kick.trig
+song.vel1  -> kick.accent
+kick_f = svf { cutoff: 260 }
+kick -> kick_f.in
+kick_s = sub { file: "../lib/strip.sub", gain: 2.5, send_gain: 0.3 }
+kick_f.lp -> kick_s.in
+kick_lvl -> kick_s.level
+
+# ---- the trumpet: two CC0 notes split at A4, as in 3-atrium ----
+lo_on = logic { op: cmp }
+0.9 -> lo_on.a
+song.voct4 -> lo_on.b
+hi_on = logic { op: cmp }
+song.voct4 -> hi_on.a
+0.9 -> hi_on.b
+g_lo = logic { op: and }
+song.gate4 -> g_lo.a
+lo_on -> g_lo.b
+g_hi = logic { op: and }
+song.gate4 -> g_hi.a
+hi_on -> g_hi.b
+
+p_lo = sh { mode: sample }
+song.voct4 -> p_lo.in
+g_lo -> p_lo.trig
+tp_lo = sampler { file: "patches/samples/cc0/trumpet-f4.wav", loop: off }
+g_lo -> tp_lo.trig
+p_lo -> tp_lo.pitch
+-0.6658 -> tp_lo.pitch
+wow -> tp_lo.pitch
+e_lo = adsr { attack: 0.05, decay: 2, sustain: 0.75, release: 0.8, curve: exp }
+g_lo -> e_lo.gate
+v_lo = math { op: mult }
+e_lo -> v_lo.a
+song.vel4 -> v_lo.b
+a_lo = vca { gain: 0 }
+tp_lo -> a_lo.in
+v_lo -> a_lo.cv
+
+p_hi = sh { mode: sample }
+song.voct4 -> p_hi.in
+g_hi -> p_hi.trig
+tp_hi = sampler { file: "patches/samples/cc0/trumpet-d5.wav", loop: off }
+g_hi -> tp_hi.trig
+p_hi -> tp_hi.pitch
+-1.4200 -> tp_hi.pitch
+wow -> tp_hi.pitch
+e_hi = adsr { attack: 0.05, decay: 2, sustain: 0.75, release: 0.8, curve: exp }
+g_hi -> e_hi.gate
+v_hi = math { op: mult }
+e_hi -> v_hi.a
+song.vel4 -> v_hi.b
+a_hi = vca { gain: 0 }
+tp_hi -> a_hi.in
+v_hi -> a_hi.cv
+
+lead_s = sub { file: "../lib/strip.sub", gain: 1, pos: -0.1, send_gain: 0.6 }
+a_lo -> lead_s.in : 0.4
+a_hi -> lead_s.in : 0.4
+lead_lvl -> lead_s.level
+
+# ---- space: a huge plate (it freezes in the flood) and a dotted-eighth echo ----
+de = tempo { bpm: 56, beats: 0.75 }
+motor_m1 -> de.bpm : 56
+echo = delay { time: 0ms, feedback: 0.5, tone: 1800, mix: 1 }
+de.seconds -> echo.time
+lead_s.fx -> echo.in : 0.6
+keys_s.fx -> echo.in : 0.3
+room = reverb { decay: 0.95, damp: 0.6, mix: 1, predelay: 0.08 }
+form.gate12 -> room.freeze
+keys_s.fx -> room.in_l
+lead_s.fx -> room.in_l
+kick_s.fx -> room.in_l
+echo      -> room.in_l : 0.5
+room_s = sub { file: "../lib/strip.sub", gain: 1.1 }
+room.out_l -> room_s.in_l
+room.out_r -> room_s.in_r
+verb_lvl -> room_s.level
+
+# ---- voices ----
+pa = sampler { file: "patches/samples/skylight/pa-last.wav", loop: off }
+form.gate10 -> pa.trig
+wow -> pa.pitch
+pa_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate10 -> pa_env.gate
+pa_amp = vca { gain: 0 }
+pa -> pa_amp.in
+pa_env -> pa_amp.cv
+pa_hp = svf { cutoff: 300 }
+pa_amp -> pa_hp.in
+pa_lp = svf { cutoff: 4000 }
+pa_hp.hp -> pa_lp.in
+mom = sampler { file: "patches/samples/skylight/iv-mom.wav", loop: off }
+form.gate11 -> mom.trig
+wow -> mom.pitch
+mom_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate11 -> mom_env.gate
+mom_amp = vca { gain: 0 }
+mom -> mom_amp.in
+mom_env -> mom_amp.cv
+mom_lp = svf { cutoff: 3000 }
+mom_amp -> mom_lp.in
+v_tape = sub { file: "vhs.sub", drive: 0.6, hi: 2800, drop_rate: 0.25hz, wow_s: 0.0025 }
+pa_lp.lp  -> v_tape.in : 0.8
+mom_lp.lp -> v_tape.in : 0.9
+voice_s = sub { file: "../lib/strip.sub", gain: 0.25 }
+v_tape -> voice_s.in
+pa_lp.lp -> room.in_l : 1.5           # a PA in a glass atrium
+
+# ---- the music bus: underwater, then onto the tape (L and R on one tape:
+# both instances share every seed, so they wow, drop out and hiss together) ----
+sweep = lfo { freq: 0.031hz }
+under_l = svf { cutoff: 500, res: 0.2 }
+under_r = svf { cutoff: 500, res: 0.2 }
+open_lvl -> under_l.cutoff : 1000
+open_lvl -> under_r.cutoff : 1000
+sweep    -> under_l.cutoff : 180
+sweep    -> under_r.cutoff : 180
+keys_s.l -> under_l.in
+keys_s.r -> under_r.in
+bass_s.l -> under_l.in
+bass_s.r -> under_r.in
+kick_s.l -> under_l.in
+kick_s.r -> under_r.in
+lead_s.l -> under_l.in
+lead_s.r -> under_r.in
+echo     -> under_l.in : 0.3
+echo     -> under_r.in : 0.35
+room_s.l -> under_l.in
+room_s.r -> under_r.in
+duck_l = vca { gain: 1 }
+duck_r = vca { gain: 1 }
+under_l.lp -> duck_l.in
+under_r.lp -> duck_r.in
+pa_env  -> duck_l.cv : -0.25
+pa_env  -> duck_r.cv : -0.25
+mom_env -> duck_l.cv : -0.25
+mom_env -> duck_r.cv : -0.25
+tape_l = sub { file: "vhs.sub", drive: 0.6, hi: 2800, lo: 40, drop_rate: 0.25hz, wow_s: 0.0025 }
+tape_r = sub { file: "vhs.sub", drive: 0.6, hi: 2800, lo: 40, drop_rate: 0.25hz, wow_s: 0.0025 }
+duck_l -> tape_l.in : 0.5
+duck_r -> tape_r.in : 0.5
+music_s = sub { file: "../lib/strip.sub", gain: 0.3 }
+tape_l -> music_s.in_l
+tape_r -> music_s.in_r
+# The tubescreamer's mid hump strips the low end off the tape, so the bass and
+# the heartbeat's fundamentals (~57 and ~46 Hz) also go round it, low-passed:
+# the floor under the water.
+floor_f = svf { cutoff: 140 }
+bass_s.l -> floor_f.in : 0.7
+bass_s.r -> floor_f.in : 0.7
+kick_s.l -> floor_f.in : 0.7
+kick_s.r -> floor_f.in : 0.7
+floor_s = sub { file: "../lib/strip.sub", gain: 1 }
+floor_f.lp -> floor_s.in
+
+# ---- the rain: loud and close, on the same tape, and it dies with it ----
+rain_smp = grains { file: "patches/samples/cc0/rain-loop.wav", seed: 62, position: 0.5,
+                    size: 0.3, scatter: 0.02, density: 40, jitter: 1, shape: 1, spread: 0 }
+rain_head = lfo { freq: 0.0125hz, wave: saw }
+rain_head -> rain_smp.position : 0.5
+-0.45 -> rain_smp.pitch
+rain_wob = lfo { freq: 0.27hz }
+rain_wob -> rain_smp.pitch : 0.025
+speed_drop -> rain_smp.pitch
+r_tape = sub { file: "vhs.sub", drive: 0.6, hi: 2800, drop_rate: 0.25hz, wow_s: 0.0025 }
+rain_smp.out_l -> r_tape.in : 1.25
+rain_smp.out_r -> r_tape.in : 1.25
+rain_s = sub { file: "../lib/strip.sub", gain: 0.5 }
+r_tape -> rain_s.in
+rain_lvl -> rain_s.level
+
+# ---- tape hiss: what is left when the music has gone ----
+hiss = noise { color: pink, seed: 63 }
+hiss_f = svf { cutoff: 5000 }
+hiss -> hiss_f.in
+hiss_s = sub { file: "../lib/strip.sub", gain: 0.07 }
+hiss_f.lp -> hiss_s.in
+
+# ---- master: dark (wear row 6); strips sum into it ----
+master = sub { file: "../lib/master-chain.sub", comp_thr: -20, comp_ratio: 2,
+               clip_drive: 1, ceiling: -1, true_peak: on,
+               high_freq: 5000, high_gain: -9, low_gain: 1 }
+0.7 -> master.makeup
+1.05 -> master.width
+music_s.l -> master.in_l
+music_s.r -> master.in_r
+voice_s.l -> master.in_l
+voice_s.r -> master.in_r
+rain_s.l  -> master.in_l
+rain_s.r  -> master.in_r
+floor_s.l -> master.in_l
+floor_s.r -> master.in_r
+hiss_s.l  -> master.in_l
+hiss_s.r  -> master.in_r
+kick -> master.side_l : 0.5
+kick -> master.side_r : 0.5
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

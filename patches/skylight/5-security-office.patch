@@ -1,0 +1,304 @@
+# 5-security-office -- skylight, track 5: the beatless interlude, ~2:00.
+# Night. The guard's office: rain outside, a TV on, a walkie-talkie, and the
+# mall's own tape in the VCR. No beat; a fixed 60 BPM transport only clocks
+# the scene (one form row per 4 s bar, in 5-security-office-form.trk) and the
+# found tape (5-security-office.trk).
+#
+#   0 s   rain outside (the CC0 rain loop slowed with the tape, low-passed
+#         ~800 Hz), tape hiss and hum
+#   4 s   pa-security on the walkie-talkie: band 400 Hz..3 kHz, a little
+#         drive, a squelch burst on key-up and key-down
+#  12 s   the drone: an Em9 struck into a plate, frozen at 20 s
+#  24 s   iv-guard on the TV (through its own hard VHS)
+#  36 s   rewind: the piano tape scrubbed backwards, +2 octaves
+#  44 s   the found tape: the jingle, twice, through a hard VHS; at 56 s the
+#         tape stops (pitch falls 1.5 octaves) mid-phrase
+#  60 s   fast-forward
+#  64 s   the drone thaws to Cmaj9 and freezes again at 72 s
+#  68 s   wx-flood on the TV
+#  84 s   pa-closed over the empty mall: PA band, a big room
+# 100 s   the drone and the rain fade; silence by 120 s
+#
+# Album DNA (patches/skylight/README.md): written in G; one `wow` bus carries
+# the tape speed (-0.678072 oct, ~Bb) plus wear-5 wow (0.008) and drift
+# (0.010) into every pitched input, the voices included, so they slow with
+# the tape. Everything recorded runs through `vhs.sub` at wear 5 (drive .7,
+# hi 3500, dropouts 0.3/s): one instance for the found tape and its scrubs,
+# one for the TV voices, one for the bed (drone + rain). Voices sit behind
+# adsr-gated VCAs: a `sampler` plays its file at load even with `trig` patched.
+# Paths: samples from the repo root; subs and trackers from this folder.
+
+t = transport { bpm: 60, division: 4 }
+song = tracker { file: "5-security-office.trk" }
+form = tracker { file: "5-security-office-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+rain_lvl = func { rise: 4, fall: 5 }
+dlvl     = func { rise: 3, fall: 6 }
+main_lvl = func { rise: 1, fall: 4 }
+duck     = func { rise: 1.5, fall: 0.4 }
+tstop    = func { rise: 1.6, fall: 0.5, curve: quad }
+form.cva10 -> rain_lvl.in
+form.cva11 -> dlvl.in
+form.cva12 -> main_lvl.in
+form.cva13 -> duck.in
+form.cva9  -> tstop.in
+
+# ---- the tape: speed, wow and drift on one bus ----
+wobble = lfo { freq: 0.43hz }
+drift  = random { rate: 0.11hz, smooth: 1, seed: 71 }
+wow = math { op: add }
+-0.678072 -> wow.a
+wobble -> wow.a : 0.008
+drift  -> wow.b : 0.010
+# the VCR's own speed: the wow bus plus the tape-stop lane
+vcr = math { op: add }
+wow -> vcr.a
+tstop -> vcr.b : -1.5
+
+# ---- the found tape: the jingle on trumpet, split at A4 as in 3-atrium ----
+lo_on = logic { op: cmp }
+0.9 -> lo_on.a
+song.voct1 -> lo_on.b
+hi_on = logic { op: cmp }
+song.voct1 -> hi_on.a
+0.9 -> hi_on.b
+g_lo = logic { op: and }
+song.gate1 -> g_lo.a
+lo_on -> g_lo.b
+g_hi = logic { op: and }
+song.gate1 -> g_hi.a
+hi_on -> g_hi.b
+
+p_lo = sh { mode: sample }
+song.voct1 -> p_lo.in
+g_lo -> p_lo.trig
+tp_lo = sampler { file: "patches/samples/cc0/trumpet-f4.wav", loop: off }
+g_lo -> tp_lo.trig
+p_lo -> tp_lo.pitch
+-0.6658 -> tp_lo.pitch
+vcr -> tp_lo.pitch
+e_lo = adsr { attack: 0.03, decay: 1.5, sustain: 0.75, release: 0.5, curve: exp }
+g_lo -> e_lo.gate
+v_lo = math { op: mult }
+e_lo -> v_lo.a
+song.vel1 -> v_lo.b
+a_lo = vca { gain: 0 }
+tp_lo -> a_lo.in
+v_lo -> a_lo.cv
+
+p_hi = sh { mode: sample }
+song.voct1 -> p_hi.in
+g_hi -> p_hi.trig
+tp_hi = sampler { file: "patches/samples/cc0/trumpet-d5.wav", loop: off }
+g_hi -> tp_hi.trig
+p_hi -> tp_hi.pitch
+-1.4200 -> tp_hi.pitch
+vcr -> tp_hi.pitch
+e_hi = adsr { attack: 0.03, decay: 1.5, sustain: 0.75, release: 0.5, curve: exp }
+g_hi -> e_hi.gate
+v_hi = math { op: mult }
+e_hi -> v_hi.a
+song.vel1 -> v_hi.b
+a_hi = vca { gain: 0 }
+tp_hi -> a_hi.in
+v_hi -> a_hi.cv
+
+# ---- rewind and fast-forward: the piano tape scrubbed at +2 octaves ----
+# Dense Poisson grains (jitter 1) so the scrub has no grain buzz; the read
+# head sweeps the file twice a second, backwards (reversed grains) for
+# rewind, forwards for fast-forward.
+sweep = lfo { freq: 1.7hz, wave: saw }
+rew_g = grains { file: "patches/samples/cc0/piano-c-progression.wav", seed: 72, position: 0.5,
+                 size: 0.05, scatter: 0.02, density: 60, jitter: 1, shape: 1, spread: 0 }
+sweep -> rew_g.position : -0.5
+1 -> rew_g.reverse
+2 -> rew_g.pitch
+vcr -> rew_g.pitch
+ff_g = grains { file: "patches/samples/cc0/piano-c-progression.wav", seed: 73, position: 0.5,
+                size: 0.05, scatter: 0.02, density: 60, jitter: 1, shape: 1, spread: 0 }
+sweep -> ff_g.position : 0.5
+2.2 -> ff_g.pitch
+vcr -> ff_g.pitch
+e_rew = adsr { attack: 0.08, decay: 0, sustain: 1, release: 0.25 }
+form.gate7 -> e_rew.gate
+e_ff = adsr { attack: 0.08, decay: 0, sustain: 1, release: 0.25 }
+form.gate8 -> e_ff.gate
+a_rew = vca { gain: 0 }
+rew_g.out_l -> a_rew.in
+e_rew -> a_rew.cv
+a_ff = vca { gain: 0 }
+ff_g.out_l -> a_ff.in
+e_ff -> a_ff.cv
+
+# the VCR: jingle and scrubs through one hard tape
+lead_f = svf { cutoff: 2400 }
+a_lo -> lead_f.in : 0.4
+a_hi -> lead_f.in : 0.4
+vcr_tape = sub { file: "vhs.sub", drive: 0.7, hi: 3500, drop_rate: 0.3hz, seed_flut: 61, seed_drop: 62 }
+lead_f.lp -> vcr_tape.in : 0.5
+a_rew -> vcr_tape.in : 0.35
+a_ff  -> vcr_tape.in : 0.35
+vcr_s = sub { file: "../lib/strip.sub", gain: 0.3, pos: -0.15, send_gain: 0.3 }
+vcr_tape -> vcr_s.in
+
+# ---- voices ----
+# pa-security: a walkie-talkie, key-up and key-down squelch
+pasec = sampler { file: "patches/samples/skylight/pa-security.wav", loop: off }
+form.gate3 -> pasec.trig
+-0.678072 -> pasec.pitch
+e_pasec = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.4 }
+form.gate3 -> e_pasec.gate
+a_pasec = vca { gain: 0 }
+pasec -> a_pasec.in
+e_pasec -> a_pasec.cv
+key_up = func { rise: 0.004, fall: 0.14 }
+form.gate3 -> key_up.trig
+# key-down only after a key-up: `keyed` latches 1 on the first transmission,
+# so the not-gate's rising edge at load does not squelch.
+key_off = logic { op: not }
+form.gate3 -> key_off.a
+keyed = sh { mode: sample }
+1 -> keyed.in
+form.gate3 -> keyed.trig
+key_rel = logic { op: and }
+key_off -> key_rel.a
+keyed   -> key_rel.b
+key_dn = func { rise: 0.004, fall: 0.2 }
+key_rel -> key_dn.trig
+sq_src = noise { color: white, seed: 74 }
+sq = vca { gain: 0 }
+sq_src -> sq.in
+key_up -> sq.cv : 0.25
+key_dn -> sq.cv : 0.25
+wk_hp = svf { cutoff: 400 }
+a_pasec -> wk_hp.in
+sq      -> wk_hp.in
+wk_lp = svf { cutoff: 3000, res: 0.2 }
+wk_hp.hp -> wk_lp.in
+wk_drv = drive { amount: 0.25 }
+wk_lp.lp -> wk_drv.in : 3
+walkie_s = sub { file: "../lib/strip.sub", gain: 0.75, pos: 0.2, send_gain: 0.2 }
+wk_drv -> walkie_s.in
+
+# iv-guard and wx-flood: the TV, through its own hard tape
+guard = sampler { file: "patches/samples/skylight/iv-guard.wav", loop: off }
+form.gate4 -> guard.trig
+-0.678072 -> guard.pitch
+e_guard = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate4 -> e_guard.gate
+a_guard = vca { gain: 0 }
+guard -> a_guard.in
+e_guard -> a_guard.cv
+flood = sampler { file: "patches/samples/skylight/wx-flood.wav", loop: off }
+form.gate5 -> flood.trig
+-0.678072 -> flood.pitch
+e_flood = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate5 -> e_flood.gate
+a_flood = vca { gain: 0 }
+flood -> a_flood.in
+e_flood -> a_flood.cv
+tv_tape = sub { file: "vhs.sub", drive: 0.7, hi: 3500, drop_rate: 0.3hz, seed_flut: 63, seed_drop: 64 }
+a_guard -> tv_tape.in
+a_flood -> tv_tape.in
+tv_s = sub { file: "../lib/strip.sub", gain: 0.35, pos: -0.3, send_gain: 0.25 }
+tv_tape -> tv_s.in
+
+# pa-closed: the PA, far away over the empty mall
+closed = sampler { file: "patches/samples/skylight/pa-closed.wav", loop: off }
+form.gate6 -> closed.trig
+-0.678072 -> closed.pitch
+e_closed = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.8 }
+form.gate6 -> e_closed.gate
+a_closed = vca { gain: 0 }
+closed -> a_closed.in
+e_closed -> a_closed.cv
+pa_hp = svf { cutoff: 300 }
+a_closed -> pa_hp.in
+pa_lp = svf { cutoff: 4000 }
+pa_hp.hp -> pa_lp.in
+# a PA compressor and limiter: hold the slowed speech's crest down so the
+# words carry over the bed
+pa_cmp = compressor { threshold: -34, ratio: 4, knee: 6, attack: 0.005, release: 0.15, makeup: 12 }
+pa_lp.lp -> pa_cmp.in_l
+pa_lp.lp -> pa_cmp.in_r
+pa_lim = limiter { threshold: -20, release: 0.08 }
+pa_cmp.out_l -> pa_lim.in_l
+pa_cmp.out_r -> pa_lim.in_r
+pa_s = sub { file: "../lib/strip.sub", gain: 6, send_gain: 0.12 }
+pa_lim.out_l -> pa_s.in
+
+# ---- the bed: a frozen-plate drone and the rain outside, on one tape ----
+drone = sub { file: "../lib/poly-pad.sub", n: 4, cutoff: 700, attack: 1.5, release: 3, osc_lvl: 0.25 }
+form.gate1 -> drone.gate
+form.voct1 -> drone.p1
+form.cva1  -> drone.p2
+form.cvb1  -> drone.p3
+form.cvd1  -> drone.p4
+wow -> drone.p1
+wow -> drone.p2
+wow -> drone.p3
+wow -> drone.p4
+0.004 -> drone.p2
+-0.004 -> drone.p3
+plate = reverb { decay: 0.9, damp: 0.45, mix: 1, predelay: 0.03 }
+drone -> plate.in_l
+drone -> plate.in_r
+form.cva2 -> plate.freeze
+d_amp = vca { gain: 0 }
+plate.out_l -> d_amp.in : 0.5
+plate.out_r -> d_amp.in : 0.5
+dlvl -> d_amp.cv
+
+rain = sampler { file: "patches/samples/cc0/rain-loop.wav", loop: on }
+-0.678072 -> rain.pitch
+rain_f = svf { cutoff: 800 }
+rain -> rain_f.in
+r_amp = vca { gain: 0 }
+rain_f.lp -> r_amp.in : 3
+rain_lvl -> r_amp.cv
+
+bed_tape = sub { file: "vhs.sub", drive: 0.7, hi: 3500, drop_rate: 0.3hz, seed_flut: 65, seed_drop: 66 }
+d_amp -> bed_tape.in
+r_amp -> bed_tape.in
+bed_s = sub { file: "../lib/strip.sub", gain: 0.15 }
+bed_tape -> bed_s.in
+duck -> bed_s.level
+
+# ---- the room: the voices' space ----
+room = reverb { decay: 0.85, damp: 0.5, mix: 1, predelay: 0.05 }
+pa_s.fx     -> room.in_l
+walkie_s.fx -> room.in_l
+tv_s.fx     -> room.in_l
+vcr_s.fx    -> room.in_l
+room_s = sub { file: "../lib/strip.sub", gain: 0.8 }
+room.out_l -> room_s.in_l
+room.out_r -> room_s.in_r
+
+# ---- master: dark, soft ----
+master = sub { file: "../lib/master-chain.sub", comp_thr: -24, comp_ratio: 1.6,
+               clip_drive: 1, ceiling: -1, true_peak: on,
+               high_freq: 5000, high_gain: -8 }
+1.6 -> master.makeup
+1.0 -> master.width
+bed_s.l    -> master.in_l
+bed_s.r    -> master.in_r
+vcr_s.l    -> master.in_l
+vcr_s.r    -> master.in_r
+walkie_s.l -> master.in_l
+walkie_s.r -> master.in_r
+tv_s.l     -> master.in_l
+tv_s.r     -> master.in_r
+pa_s.l     -> master.in_l
+pa_s.r     -> master.in_r
+room_s.l   -> master.in_l
+room_s.r   -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right
