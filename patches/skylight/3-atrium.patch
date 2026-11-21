@@ -1,0 +1,357 @@
+# atrium -- slushwave, 72 BPM, 60 bars + a 4-bar tail (~3:33).
+# Notes in 3-atrium.trk, levels per bar in 3-atrium-form.trk.
+#   intro 8 (rain, muffled e-piano) | A 16 (half-time kit, bass)
+#   | B 16 (+ trumpet) | break 8 (no drums, room up) | A' 8 | outro 4 (tape stop)
+#   | tail 4 (rain and the reverb)
+#
+# Samples (all CC0, provenance in patches/samples/cc0/README.md): the lead is
+# two trumpet notes (F4, D5) repitched per note; a sung vibrato and a piano
+# I-IV-V-I are smeared by `grains` into the `haze` bed. The rain is synthesized
+# and played back off a worn VHS tape (wow, flutter, hum, overdrive, dropouts).
+# A TV in another room gives the forecast: `wx-local` in bar 2, `wx-current`
+# in the break (bar 42), both slowed with the tape.
+#
+# Slushwave is a memory of a song rather than a song: one four-bar maj9 loop,
+# everything slowed, muffled and drowned in room. The devices:
+#   - one shared `wow` signal (a 0.5 Hz wobble + a slow random drift, up to ~12 cents)
+#     on every pitch input, so the whole band sags together like worn tape;
+#   - the `stop` lane on the same bus drops every pitch an octave across the
+#     last bar (a tape stop); the rain is the room, so it does not stop;
+#   - the e-piano's brightness is a form lane through a low-pass (`cut`);
+#   - a long plate that takes most of the drums and half of everything else;
+#   - tape hiss and crackle under everything, and a dark master.
+# Paths resolve from the repo root: render with `mise run render` or from there.
+
+t = transport { bpm: 72, division: 4 }
+song = tracker { file: "3-atrium.trk" }
+form = tracker { file: "3-atrium-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drums_lvl = func { rise: 0.4, fall: 1.5 }
+bass_lvl  = func { rise: 1, fall: 2 }
+keys_lvl  = func { rise: 2, fall: 3 }
+cut_lvl   = func { rise: 3, fall: 3 }
+lead_lvl  = func { rise: 0.3, fall: 2 }
+verb_lvl  = func { rise: 3, fall: 3 }
+rain_lvl  = func { rise: 4, fall: 4 }
+main_lvl  = func { rise: 1, fall: 6 }
+stop_lvl  = func { rise: 3, fall: 0.1, curve: quad }
+haze_lvl  = func { rise: 4, fall: 4 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> keys_lvl.in
+form.cva4 -> cut_lvl.in
+form.cva5 -> lead_lvl.in
+form.cva6 -> verb_lvl.in
+form.cva7 -> rain_lvl.in
+form.cva8 -> main_lvl.in
+form.cva9 -> stop_lvl.in
+form.cva10 -> haze_lvl.in
+
+# ---- tape: one pitch bus for the whole band ----
+wobble = lfo { freq: 0.47hz }
+drift  = random { rate: 0.13hz, smooth: 1, seed: 3 }
+wow = math { op: add }
+wobble   -> wow.a : 0.004
+drift    -> wow.b : 0.006
+stop_lvl -> wow.a : -1
+
+# ---- e-piano: a dual-stack FM tine, one tone stamped per chord note ----
+ch = chord { n: 4, strum: 0.012 }
+song.gate4 -> ch.gate
+song.voct4 -> ch.p1
+song.cva4  -> ch.p2
+song.cvb4  -> ch.p3
+song.cvd4  -> ch.p4
+keys = voice { notes: ch }
+keys.ep = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
+               t1: [.004, .004, .002, .004, .002, .004],
+               t2: [1.2, .3, .08, 1.1, .08, .3], l2: [.6, .25, .15, .55, .15, .25],
+               t3: [6, 4, 1, 6, 1, 4], l3: [.25, .06, 0, .2, 0, .06],
+               t4: [.9, .9, .3, .9, .3, .9],
+               fb: [0, 0, 0, 0, .23, 0], curve: log }
+ch.voct -> keys.ep.v_oct
+ch.gate -> keys.ep.gate
+wow -> keys.ep.v_oct
+keys_f = svf { cutoff: 350, res: 0.1 }
+keys.ep -> keys_f.in : 0.5
+cut_lvl -> keys_f.cutoff : 4200
+k_cho = chorus { voices: 3, rate: 0.35, depth: 0.7, mix: 0.6 }
+keys_f.lp -> k_cho.in_l
+keys_f.lp -> k_cho.in_r
+keys_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.7 }
+k_cho.out_l -> keys_s.in_l
+k_cho.out_r -> keys_s.in_r
+keys_lvl -> keys_s.level
+
+# ---- bass: round, short, under the kick ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0, osc_lvl: 0.3, sublvl: 0.7,
+             sub_oct: 0, cutoff: 180, res: 0.15, drive: 0.3, track: 0, env_amt: 400,
+             attack: 0.01, decay: 1.2, sustain: 0.3, release: 0.4 }
+song.voct5 -> bass.voct
+song.gate5 -> bass.gate
+song.vel5  -> bass.vel
+wow -> bass.voct
+bass_s = sub { file: "../lib/strip.sub", gain: 0.9 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+
+# ---- drums: half-time and soft; the room is the drum sound ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 52hz, decay: 0.35, bend: 1.5 }
+song.gate1 -> kick.trig
+0.6 -> kick.accent
+snare = sub { file: "../lib/kit/snare.sub", tune: 180hz, decay: 0.5, snap: 0.35 }
+song.gate2 -> snare.trig
+song.vel2  -> snare.accent
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.05s, tone: 5khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+dmix = mix { levels: [1.3, 1.1, 1.1], pans: [0, 0, 0.25] }
+kick  -> dmix.in1
+snare -> dmix.in2
+hat   -> dmix.in3
+d_lp = svf { cutoff: 4500 }
+dmix.out_l -> d_lp.in
+drums = sub { file: "../lib/strip.sub", gain: 4, send_gain: 0.3 }
+d_lp.lp -> drums.in
+drums_lvl -> drums.level
+
+pump = sub { file: "../lib/duck.sub", depth_db: -3, release: 0.35, curve: exp }
+song.gate1 -> pump.trig
+pump -> bass_s.duck
+pump -> keys_s.duck
+
+# ---- the trumpet: two CC0 notes, each played in its own register ----
+# Below A4 the F4 sample sounds (shifts -3..+1 semitones), from A4 up the D5
+# one (-5..+4): neither strays far enough to chipmunk. Each register holds
+# its own pitch (`sh`) so a release never retunes when the other one plays.
+lo_on = logic { op: cmp }
+0.9 -> lo_on.a
+song.voct6 -> lo_on.b
+hi_on = logic { op: cmp }
+song.voct6 -> hi_on.a
+0.9 -> hi_on.b
+g_lo = logic { op: and }
+song.gate6 -> g_lo.a
+lo_on -> g_lo.b
+g_hi = logic { op: and }
+song.gate6 -> g_hi.a
+hi_on -> g_hi.b
+
+p_lo = sh { mode: sample }
+song.voct6 -> p_lo.in
+g_lo -> p_lo.trig
+tp_lo = sampler { file: "patches/samples/cc0/trumpet-f4.wav", loop: off }
+g_lo -> tp_lo.trig
+p_lo -> tp_lo.pitch
+-0.6658 -> tp_lo.pitch
+wow -> tp_lo.pitch
+e_lo = adsr { attack: 0.03, decay: 1.5, sustain: 0.75, release: 0.5, curve: exp }
+g_lo -> e_lo.gate
+v_lo = math { op: mult }
+e_lo -> v_lo.a
+song.vel6 -> v_lo.b
+a_lo = vca { gain: 0 }
+tp_lo -> a_lo.in
+v_lo -> a_lo.cv
+
+p_hi = sh { mode: sample }
+song.voct6 -> p_hi.in
+g_hi -> p_hi.trig
+tp_hi = sampler { file: "patches/samples/cc0/trumpet-d5.wav", loop: off }
+g_hi -> tp_hi.trig
+p_hi -> tp_hi.pitch
+-1.4200 -> tp_hi.pitch
+wow -> tp_hi.pitch
+e_hi = adsr { attack: 0.03, decay: 1.5, sustain: 0.75, release: 0.5, curve: exp }
+g_hi -> e_hi.gate
+v_hi = math { op: mult }
+e_hi -> v_hi.a
+song.vel6 -> v_hi.b
+a_hi = vca { gain: 0 }
+tp_hi -> a_hi.in
+v_hi -> a_hi.cv
+
+lead_f = svf { cutoff: 2400 }
+a_lo -> lead_f.in : 0.4
+a_hi -> lead_f.in : 0.4
+lead_s = sub { file: "../lib/strip.sub", gain: 2.5, pos: -0.1, send_gain: 0.45 }
+lead_f.lp -> lead_s.in
+lead_lvl -> lead_s.level
+
+# ---- haze: the voice and the piano, smeared into grains ----
+# The voice (C#4 -18c) is tuned to A3, a tone of all four chords but Em9's
+# eleventh; the piano's C-major progression goes down to D, the home key.
+# Grain settings are the input bases, declared here: a cable would sum onto them.
+vox = grains { file: "patches/samples/cc0/vox-vibrato.wav", seed: 21, position: 0.45,
+               size: 0.35, scatter: 0.15, density: 6, jitter: 0.8, shape: 1, spread: 0.9 }
+-0.3183 -> vox.pitch
+wow -> vox.pitch
+stop_lvl -> vox.pitch : -1
+vox_scan = random { rate: 0.08hz, smooth: 1, seed: 8 }
+vox_scan -> vox.position : 0.3
+pno = grains { file: "patches/samples/cc0/piano-c-progression.wav", seed: 33, position: 0.5,
+               size: 0.6, scatter: 0.3, density: 5, shape: 1, spread: 0.8 }
+-0.8333 -> pno.pitch
+wow -> pno.pitch
+stop_lvl -> pno.pitch : -1
+pno_scan = lfo { freq: 0.021hz, wave: tri }
+pno_scan -> pno.position : 0.45
+haze_s = sub { file: "../lib/strip.sub", gain: 0.35, send_gain: 0.9 }
+vox.out_l -> haze_s.in_l : 0.5
+vox.out_r -> haze_s.in_r : 0.5
+pno.out_l -> haze_s.in_l : 0.5
+pno.out_r -> haze_s.in_r : 0.5
+haze_lvl -> haze_s.level
+
+# ---- rain on a worn VHS tape ----
+# The rain is a real recording: a 20 s seamless loop cut from a CC0 field
+# recording of light rain in an Illinois forest (patches/samples/cc0/README.md).
+# Mono -- a linear-track VHS has one channel. `grains` slows and stretches
+# it: the read head crawls through the 20 s loop in 80 s (4x longer), every
+# grain is pitched 0.4 octave down (tape at ~3/4 speed), and a slow wobble of
+# about +-35 cents rides on the pitch. Dense Poisson grains (jitter 1) so the
+# stretch has no audible grain rate.
+rain_smp = grains { file: "patches/samples/cc0/rain-loop.wav", seed: 52, position: 0.5,
+                    size: 0.3, scatter: 0.02, density: 40, jitter: 1, shape: 1, spread: 0 }
+rain_head = lfo { freq: 0.0125hz, wave: saw }
+rain_head -> rain_smp.position : 0.5
+-0.4 -> rain_smp.pitch
+rain_wob = lfo { freq: 0.3hz }
+rain_wob -> rain_smp.pitch : 0.025
+rain_drift = random { rate: 0.2hz, smooth: 1, seed: 53 }
+rain_drift -> rain_smp.pitch : 0.012
+
+# The tape, in signal order: wow and flutter (a short delay whose time
+# wobbles), a faint mains hum recorded with it, a mid-hump overdrive, the
+# VHS band (~150 Hz..5.5 kHz with a head bump), random dropouts that sag
+# in over 0.5 s and recover over 1.8 s, then hiss.
+vhs_wow = lfo { freq: 0.55hz }
+vhs_flut = random { rate: 9hz, smooth: 1, seed: 48 }
+vhs_tm = delay { time: 9ms, feedback: 0, mix: 1, slew: 0.002, tone: 12000 }
+vhs_wow  -> vhs_tm.time : 0.0018
+vhs_flut -> vhs_tm.time : 0.0004
+rain_smp.out_l -> vhs_tm.in : 1.25
+rain_smp.out_r -> vhs_tm.in : 1.25
+hum = vco { freq: 60hz }
+vhs_od = overdrive { model: tubescreamer, drive: 0.45, tone: 0.3, level: 0.45 }
+vhs_tm      -> vhs_od.in
+hum         -> vhs_od.in : 0.006
+vhs_hp = svf { cutoff: 150 }
+vhs_od -> vhs_hp.in
+vhs_lp = svf { cutoff: 5500, res: 0.3 }
+vhs_hp.hp -> vhs_lp.in
+vhs_lp2 = svf { cutoff: 7000 }
+vhs_lp.lp -> vhs_lp2.in
+dropout = dust { rate: 0.12hz, seed: 49 }
+drop_env = func { rise: 0.5, fall: 1.8, curve: quad }
+dropout.trig -> drop_env.trig
+vhs_lvl = random { rate: 2hz, smooth: 1, seed: 50 }
+vhs_amp = vca { gain: 1 }
+vhs_lp2.lp -> vhs_amp.in
+drop_env -> vhs_amp.cv : -0.75
+vhs_lvl  -> vhs_amp.cv : 0.07
+vhs_hiss = noise { color: white, seed: 51 }
+vhs_hiss_f = svf { cutoff: 6000, res: 0.1 }
+vhs_hiss -> vhs_hiss_f.in
+rain_s = sub { file: "../lib/strip.sub", gain: 0.28 }
+vhs_amp      -> rain_s.in
+vhs_hiss_f.bp -> rain_s.in : 0.01
+rain_lvl -> rain_s.level
+
+# ---- the TV in another room: weather, slowed with the tape ----
+# Two forecast clips (original scripts, local TTS; patches/samples/skylight/),
+# pitched by the tape speed like everything else (-0.415 oct, so ~1.33x long)
+# and played through the album's tape. A sampler plays at load even with trig
+# patched, so each one sits behind a vca opened by its form gate.
+wx_a = sampler { file: "patches/samples/skylight/wx-local.wav", loop: off }
+form.gate11 -> wx_a.trig
+-0.415037 -> wx_a.pitch
+wow -> wx_a.pitch
+wx_a_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate11 -> wx_a_env.gate
+wx_a_amp = vca { gain: 0 }
+wx_a -> wx_a_amp.in
+wx_a_env -> wx_a_amp.cv
+wx_b = sampler { file: "patches/samples/skylight/wx-current.wav", loop: off }
+form.gate12 -> wx_b.trig
+-0.415037 -> wx_b.pitch
+wow -> wx_b.pitch
+wx_b_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate12 -> wx_b_env.gate
+wx_b_amp = vca { gain: 0 }
+wx_b -> wx_b_amp.in
+wx_b_env -> wx_b_amp.cv
+tv = sub { file: "vhs.sub", drive: 0.3, hi: 4500, lo: 250, drop_rate: 0.05hz,
+           seed_drop: 61, seed_flut: 62, seed_lvl: 63, seed_hiss: 64 }
+wx_a_amp -> tv.in : 1.5
+wx_b_amp -> tv.in : 1.5
+tv_s = sub { file: "../lib/strip.sub", gain: 0.5, pos: 0.3, send_gain: 0.25 }
+tv -> tv_s.in
+
+# ---- tape hiss and crackle ----
+hiss = noise { color: pink, seed: 5 }
+hiss_f = svf { cutoff: 7000 }
+hiss -> hiss_f.in
+crackle = dust { rate: 9hz, seed: 11 }
+crk_f = svf { cutoff: 2500, res: 0.3 }
+crackle -> crk_f.in
+tape_s = sub { file: "../lib/strip.sub", gain: 0.012 }
+hiss_f.lp -> tape_s.in
+crk_f.bp  -> tape_s.in : 6
+
+# ---- space: a long plate and a dotted-eighth echo ----
+de = tempo { bpm: 72, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.45, tone: 2200, mix: 1 }
+de.seconds -> echo.time
+keys_s.fx -> echo.in : 0.35
+lead_s.fx -> echo.in : 0.6
+room = reverb { decay: 0.93, damp: 0.55, mix: 1, predelay: 0.06 }
+keys_s.fx  -> room.in_l
+drums.fx   -> room.in_l : 1.4
+echo       -> room.in_l : 0.5
+lead_s.fx  -> room.in_l
+haze_s.fx  -> room.in_l
+tv_s.fx    -> room.in_l
+room_s = sub { file: "../lib/strip.sub", gain: 1.2 }
+room.out_l -> room_s.in_l
+room.out_r -> room_s.in_r
+verb_lvl -> room_s.level
+
+# ---- master: dark and soft; strips sum into it ----
+master = sub { file: "../lib/master-chain.sub", comp_thr: -20, comp_ratio: 2,
+               clip_drive: 1, ceiling: -1, true_peak: on,
+               high_freq: 6000, high_gain: -5, low_gain: 1 }
+1.5 -> master.makeup
+1.05 -> master.width
+drums.l   -> master.in_l
+drums.r   -> master.in_r
+bass_s.l  -> master.in_l
+bass_s.r  -> master.in_r
+keys_s.l  -> master.in_l
+keys_s.r  -> master.in_r
+lead_s.l  -> master.in_l
+lead_s.r  -> master.in_r
+haze_s.l  -> master.in_l
+haze_s.r  -> master.in_r
+tv_s.l    -> master.in_l
+tv_s.r    -> master.in_r
+rain_s.l  -> master.in_l
+rain_s.r  -> master.in_r
+tape_s.l  -> master.in_l
+tape_s.r  -> master.in_r
+echo      -> master.in_l : 0.3
+echo      -> master.in_r : 0.4
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+kick -> master.side_l : 0.5
+kick -> master.side_r : 0.5
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

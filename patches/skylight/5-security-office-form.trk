@@ -1,0 +1,54 @@
+# 5-security-office-form.trk -- one row per bar (4 s at the fixed 60 BPM form
+# clock); 30 bars of scene + a silent bar. Written in G; the tape speed in the
+# patch moves everything down to ~Bb. '>' ramps to the next value.
+#
+# bar  s    event
+#  0    0   rain outside, tape hiss and hum
+#  1    4   pa-security on the walkie-talkie
+#  3   12   the drone: Em9 struck, frozen at bar 5
+#  6   24   iv-guard on the TV
+#  9   36   rewind (scrub backwards)
+# 11   44   the found tape: the jingle, twice; stops at bar 14
+# 15   60   fast-forward
+# 16   64   the drone thaws and moves to Cmaj9, frozen again at bar 18
+# 17   68   wx-flood on the TV
+# 21   84   pa-closed, far away over the empty mall
+# 25  100   everything fades; rain last; silence by bar 30
+
+track drone  note cva cvb cvd   # 1  chord struck into the freezing plate
+track freeze cva                # 2  plate freeze gate (0/1)
+track pasec  note               # 3  pa-security (walkie)
+track guard  note               # 4  iv-guard (TV)
+track flood  note               # 5  wx-flood (TV)
+track closed note               # 6  pa-closed (PA)
+track rew    note               # 7  rewind scrub
+track ff     note               # 8  fast-forward scrub
+track tstop  cva                # 9  tape stop on the found tape: 0 run, 1 stopped
+track rain   cva                # 10 rain outside
+track dlvl   cva                # 11 drone level
+track main   cva                # 12 master fade
+track duck   cva                # 13 bed level under voices (1 = none)
+
+pattern scene 31
+#    drone              frz  pasec  guard  flood  closed rew   ff    tstop  rain   dlvl   main  duck
+00 | .                | 0  | .    | .    | .    | .    | .   | .   | 0    | .8   | 0    | 1   | 1
+01 | .                | .  | x:3  | .    | .    | .    | .   | .   | .    | .    | .    | .   | .5
+03 | E3:2 G3 B3 Fs4   | .  | .    | .    | .    | .    | .   | .   | .    | .    | .8   | .   | .
+04 | .                | .  | .    | .    | .    | .    | .   | .   | .    | .    | .    | .   | 1
+05 | .                | 1  | .    | .    | .    | .    | .   | .   | .    | .    | .    | .   | .
+06 | .                | .  | .    | x:3  | .    | .    | .   | .   | .    | .    | .    | .   | .5
+09 | .                | .  | .    | .    | .    | .    | x:2 | .   | .    | .    | .    | .   | 1
+11 | .                | .  | .    | .    | .    | .    | .   | .   | .    | .    | .    | .   | .8
+14 | .                | .  | .    | .    | .    | .    | .   | .   | 1    | .    | .    | .   | .
+15 | .                | .  | .    | .    | .    | .    | .   | x:1 | 0    | .    | .    | .   | 1
+16 | C3:2 E3 B3 D4    | 0  | .    | .    | .    | .    | .   | .   | .    | .    | .    | .   | .
+17 | .                | .  | .    | .    | x:2  | .    | .   | .   | .    | .    | .    | .   | .5
+18 | .                | 1  | .    | .    | .    | .    | .   | .   | .    | .    | .    | .   | .
+19 | .                | .  | .    | .    | .    | .    | .   | .   | .    | .    | .    | .   | 1
+21 | .                | .  | .    | .    | .    | x:4  | .   | .   | .    | .    | .    | .   | .35
+25 | .                | 0  | .    | .    | .    | .    | .   | .   | .    | .8>  | .8>  | .   | 1
+28 | .                | .  | .    | .    | .    | .    | .   | .   | .    | .5   | 0    | .   | .
+29 | .                | .  | .    | .    | .    | .    | .   | .   | .    | 0    | .    | 1>  | .
+30 | .                | .  | .    | .    | .    | .    | .   | .   | .    | .    | .    | 0   | .
+
+order scene

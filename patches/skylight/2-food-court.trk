@@ -1,0 +1,161 @@
+# 2-food-court.trk -- "Food Court", skylight track 2. 88 BPM, swung sixteenths
+# (the transport swings), 16 rows per bar. Written in G; the tape speed
+# (-0.125531 oct) in the patch puts it ~1.5 semitones down.
+# intro 4 | A 16 | B 16 (+ chops, bass quotes the jingle) | breakdown 8 (chops)
+# | A' 16 | outro 8 = 68 bars
+# Loop: Am9 | D9 | Gmaj7 | Em7 (ii-V-I-vi), rootless e-piano voicings.
+
+track kick  note              # 1
+track clap  note vel          # 2  clap + rim layered on 2 and 4
+track hat   note vel          # 3
+track keys  note cva cvb cvd  # 4  e-piano, rootless
+track clav  note cva cvb from keys  # 5  offbeat stabs on three chord tones
+track bass  note vel          # 6
+track chop  note vel cva      # 7  vocal chops: pitch, level, grain position
+
+# ---------------- harmony ----------------
+pattern harm 4x16 keys
+1:00 | C4  E4  G4  B4        # Am9  (3 5 7 9)
+2:00 | C4  E4  Fs4 A4        # D9   (7 9 3 5)
+3:00 | B3  D4  Fs4 A4        # Gmaj9 (3 5 7 9)
+4:00 | B3  D4  E4  G4        # Em7  (5 7 1 3)
+
+# ---------------- clav: offbeat stabs, the chord's upper three tones ----------------
+pattern clav 16 clav
+02 | t2:1 t3 t4
+06 | t2:1 t3 t4
+07 | t2:1 t3 t4
+10 | t2:1 t3 t4
+13 | t2:1 t3 t4
+14 | t2:1 t3 t4
+
+# ---------------- bass: driven, slap-ish, octave pops ----------------
+pattern bass 4x16 bass
+1:00 | A1:2  .95
+1:03 | A2:1  .6
+1:06 | A1:1  .7
+1:08 | E2:2  .85
+1:10 | G2:1  .6
+1:11 | A2:1  .75
+1:14 | G1:2  .7
+2:00 | D2:2  .95
+2:03 | D3:1  .6
+2:06 | D2:1  .7
+2:08 | A1:2  .85
+2:10 | C2:1  .6
+2:11 | D2:1  .75
+2:14 | Fs1:2 .7
+3:00 | G1:2  .95
+3:03 | G2:1  .6
+3:06 | G1:1  .7
+3:08 | D2:2  .85
+3:10 | Fs2:1 .6
+3:11 | G2:1  .75
+3:14 | B1:2  .7
+4:00 | E2:2  .95
+4:03 | E3:1  .6
+4:06 | E2:1  .7
+4:08 | B1:2  .85
+4:10 | D2:1  .6
+4:11 | E2:1  .75
+4:14 | G1:2  .7
+
+# The jingle's D-B-G, two octaves down, in its own rhythm, over Em7.
+pattern bass_q 4x16 bass
+1:00 | A1:2  .95
+1:03 | A2:1  .6
+1:06 | A1:1  .7
+1:08 | E2:2  .85
+1:10 | G2:1  .6
+1:11 | A2:1  .75
+1:14 | G1:2  .7
+2:00 | D2:2  .95
+2:03 | D3:1  .6
+2:06 | D2:1  .7
+2:08 | A1:2  .85
+2:10 | C2:1  .6
+2:11 | D2:1  .75
+2:14 | Fs1:2 .7
+3:00 | G1:2  .95
+3:03 | G2:1  .6
+3:06 | G1:1  .7
+3:08 | D2:2  .85
+3:10 | Fs2:1 .6
+3:11 | G2:1  .75
+3:14 | B1:2  .7
+4:00 | E2:2  .95
+4:03 | E3:1  .6
+4:08 | D3:4  .9               # D
+4:12 | B2:2  .8               # B
+4:14 | G2:2  .8               # G
+
+pattern bass_brk 4x16 bass
+1:00 | A1:6  .8
+2:00 | D2:6  .8
+3:00 | G1:6  .8
+4:00 | E2:6  .8
+
+# ---------------- drums ----------------
+pattern drums 16 kick clap hat
+lane kick  x... ..x. ..x. .x..
+lane clap  .... 8... .... 8..3
+lane hat   6352 6352 6352 6353
+
+pattern drums_fill 16 kick clap hat   # last bar of a phrase
+lane kick  x... ..x. ..x. ....
+lane clap  .... 8... ..4. 8686
+lane hat   6352 6352 6352 0...
+
+pattern hats 16 hat
+lane hat   5.3. 5.3. 5.3. 5.32
+
+# ---------------- the vocal chops (one grain per row with a note) ----------------
+# Pitches from G major pentatonic: consonant over all four chords. cva is the
+# grain position: .15/.17/.19 all sit in the held C#4 at the start of the
+# sung phrase (it slides down to ~F#3 after 0.25 of the file).
+pattern chops 2x16 chop
+1:00 | E4 .9  .15
+1:03 | E4 .55 .15
+1:06 | D4 .8  .17
+1:08 | B3 .9  .15
+1:11 | D4 .6  .19
+1:14 | E4 .75 .15
+2:00 | G4 .9  .15
+2:03 | E4 .55 .17
+2:06 | D4 .75 .15
+2:08 | B3 .85 .19
+2:10 | A3 .6  .15
+2:12 | B3 .7  .17
+2:14 | D4 .65 .15
+
+pattern chops_b 2x16 chop
+1:00 | E4 .9  .15
+1:02 | E4 .5  .15
+1:03 | G4 .7  .17
+1:06 | A4 .85 .15
+1:08 | G4 .8  .19
+1:10 | E4 .6  .15
+1:12 | D4 .75 .17
+1:14 | E4 .6  .15
+2:00 | D4 .9  .15
+2:03 | B3 .6  .17
+2:06 | A3 .8  .15
+2:08 | B3 .85 .19
+2:11 | D4 .6  .15
+2:14 | B3 .7  .17
+
+# ---------------- form ----------------
+section intro harm+chops
+section a     harm+clav+bass+drums
+section a_t   harm+clav+bass+drums+drums_fill@48
+section b     harm+clav+bass_q+drums+chops
+section b_t   harm+clav+bass_q+drums+chops_b+drums_fill@48
+section brk   harm+bass_brk+chops_b+hats
+section out   harm+clav+bass+drums
+
+order intro
+order a*3 a_t
+order b b_t b b_t
+order brk*2
+order b b_t b b_t
+order out*2

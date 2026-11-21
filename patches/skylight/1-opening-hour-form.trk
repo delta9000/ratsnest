@@ -1,0 +1,31 @@
+# 1-opening-hour-form.trk -- one row per bar (66 bars + 4 of tail); '>' ramps to the next value.
+track drums cva    # 1
+track bass  cva    # 2
+track keys  cva    # 3  e-piano level
+track cut   cva    # 4  e-piano brightness 0..1
+track lead  cva    # 5  trumpet level
+track bells cva    # 6
+track fount cva    # 7  the fountain (rain loop, pitched up)
+track verb  cva    # 8  room return
+track main  cva    # 9  master fade
+track pa    note   # 10 gate: pa-open
+track walk  note   # 11 gate: iv-walker
+
+pattern form 70
+#    drums  bass   keys   cut    lead   bells  fount  verb   main   pa     walk
+00 | 0    | 0    | .5   | .45  | 0    | 1    | .9   | .7   | 1    | .    | .       # intro: chime, fountain
+01 | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:4  | .       # "Good morning, and welcome..."
+04 | .85  | .85  | .7   | .6   | 0    | .5   | .35  | .45  | .    | .    | .       # A: doors open
+12 | .    | .    | .65  | .7   | .8   | .45  | .3   | .45  | .    | .    | .       # B: the jingle
+20 | .    | .    | .7   | .6   | 0    | .8   | .35  | .45  | .    | .    | .       # A2: bells
+22 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:3     # "I walk the mall every morning..."
+28 | .4   | .55  | .55  | .45  | 0    | .7   | .7   | .5   | .    | .    | .       # break: the fountain court
+36 | .85  | .85  | .7   | .6   | 0    | .6   | .35  | .45  | .    | .    | .       # A3
+44 | .    | .    | .65  | .7   | .8   | .4   | .3   | .45  | .    | .    | .       # B2
+52 | .85  | .85  | .7   | .75  | .85  | .7   | .3   | .5   | .    | .    | .       # B3: the answer climbs
+60 | 0    | .6>  | .6>  | .55> | 0    | 1    | .8>  | .7   | .    | .    | .       # outro: chime again
+65 | .    | 0    | .35  | .4   | .    | .    | .5   | .    | .    | .    | .
+66 | .    | .    | 0    | .    | .    | .6>  | .4>  | .8   | 1>   | .    | .       # tail: bells ring out
+69 | .    | .    | .    | .    | .    | 0    | 0    | .    | 0    | .    | .
+
+order form

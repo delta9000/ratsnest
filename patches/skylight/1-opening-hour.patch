@@ -1,0 +1,305 @@
+# 1-opening-hour -- skylight, track 1. Slushwave, 96 BPM, G major, 66 bars + a
+# 4-bar tail (~2:55). Notes in 1-opening-hour.trk, levels per bar in
+# 1-opening-hour-form.trk.
+#   intro 4 (the PA chime D5-B4 on bells, "Good morning, and welcome to
+#   Skylight Galleria" over the fountain) | A 8 (light boogie: kick on every
+#   beat, snare+clap on 2 and 4, bright e-piano, bass) | B 8 (the jingle,
+#   trumpet) | A2 8 (+ bell arps; "I walk the mall every morning") | break 8
+#   (no kick: the fountain court, bells, room up) | A3 8 | B2 8 (jingle)
+#   | B3 8 (the jingle's answer climbs) | outro 6 (the chime again)
+#   | tail 4 (bells and fountain ring out)
+#
+# 10 a.m., the doors open. This is the tape almost new: speed 0 (written
+# and sounding in G), the faintest wow on the pitch bus, the music clean and
+# bright; only the voices go through `vhs.sub`, lightly (album wear row 1).
+# The fountain is the CC0 rain loop through `grains`, pitched up 0.6 octave
+# and high-passed, so the album's water is there from the first minute.
+# The music ducks ~3 dB under a voice. Samples: patches/samples/cc0/ (trumpet,
+# rain) and patches/samples/skylight/ (voices), paths from the repo root.
+
+t = transport { bpm: 96, division: 4 }
+song = tracker { file: "1-opening-hour.trk" }
+form = tracker { file: "1-opening-hour-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drums_lvl = func { rise: 0.3, fall: 1.5 }
+bass_lvl  = func { rise: 0.5, fall: 2 }
+keys_lvl  = func { rise: 1.5, fall: 3 }
+cut_lvl   = func { rise: 2, fall: 2 }
+lead_lvl  = func { rise: 0.3, fall: 1.5 }
+bells_lvl = func { rise: 1, fall: 2 }
+fount_lvl = func { rise: 3, fall: 3 }
+verb_lvl  = func { rise: 2, fall: 2 }
+main_lvl  = func { rise: 1, fall: 2.5 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> keys_lvl.in
+form.cva4 -> cut_lvl.in
+form.cva5 -> lead_lvl.in
+form.cva6 -> bells_lvl.in
+form.cva7 -> fount_lvl.in
+form.cva8 -> verb_lvl.in
+form.cva9 -> main_lvl.in
+
+# ---- tape: the pitch bus (speed 0 on track 1: the tape is new) ----
+wobble = lfo { freq: 0.5hz }
+drift  = random { rate: 0.13hz, smooth: 1, seed: 101 }
+wow = math { op: add }
+wobble -> wow.a : 0.0015
+drift  -> wow.b : 0.002
+
+# ---- e-piano: the dual-stack FM tine, bright ----
+ch = chord { n: 4, strum: 0.008 }
+song.gate4 -> ch.gate
+song.voct4 -> ch.p1
+song.cva4  -> ch.p2
+song.cvb4  -> ch.p3
+song.cvd4  -> ch.p4
+keys = voice { notes: ch }
+keys.ep = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .32, .12, .45, .12, .15],
+               t1: [.004, .004, .002, .004, .002, .004],
+               t2: [1.2, .3, .08, 1.1, .08, .3], l2: [.6, .3, .18, .55, .18, .25],
+               t3: [5, 3, 1, 5, 1, 3], l3: [.25, .08, 0, .2, 0, .06],
+               t4: [.6, .6, .2, .6, .2, .6],
+               fb: [0, 0, 0, 0, .25, 0], curve: log }
+ch.voct -> keys.ep.v_oct
+ch.gate -> keys.ep.gate
+wow -> keys.ep.v_oct
+keys_f = svf { cutoff: 1500, res: 0.1 }
+keys.ep -> keys_f.in : 0.5
+cut_lvl -> keys_f.cutoff : 7000
+k_cho = chorus { voices: 3, rate: 0.5, depth: 0.5, mix: 0.5 }
+keys_f.lp -> k_cho.in_l
+keys_f.lp -> k_cho.in_r
+keys_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.5 }
+k_cho.out_l -> keys_s.in_l
+k_cho.out_r -> keys_s.in_r
+keys_lvl -> keys_s.level
+
+# ---- bass: a light boogie, round and short ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0.2, osc_lvl: 0.35, sublvl: 0.65,
+             sub_oct: 0, cutoff: 260, res: 0.2, drive: 0.3, track: 0, env_amt: 900,
+             attack: 0.003, decay: 0.35, sustain: 0.4, release: 0.15 }
+song.voct6 -> bass.voct
+song.gate6 -> bass.gate
+song.vel6  -> bass.vel
+wow -> bass.voct
+bass_s = sub { file: "../lib/strip.sub", gain: 0.9 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+
+# ---- drums: tight and bright ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 55hz, decay: 0.3, bend: 2 }
+song.gate1 -> kick.trig
+0.7 -> kick.accent
+snare = sub { file: "../lib/kit/snare.sub", tune: 200hz, decay: 0.35, snap: 0.55 }
+clap  = sub { file: "../lib/kit/clap.sub" }
+song.gate2 -> snare.trig
+song.vel2  -> snare.accent
+song.gate2 -> clap.trig
+song.vel2  -> clap.accent
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.04s, tone: 8khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+dmix = mix { levels: [1.3, 1, 0.8, 1.3], pans: [0, 0, 0.1, 0.2] }
+kick  -> dmix.in1
+snare -> dmix.in2
+clap  -> dmix.in3
+hat   -> dmix.in4
+# A soft clipper takes the kit's ~26 dB crest down so the groove can sit up front.
+dclip = clipper { mode: soft, threshold: -8 }
+dmix.out_l -> dclip.in_l
+dmix.out_r -> dclip.in_r
+drums = sub { file: "../lib/strip.sub", gain: 2.2, send_gain: 0.15 }
+dclip.out_l -> drums.in_l
+dclip.out_r -> drums.in_r
+drums_lvl -> drums.level
+
+# ---- the trumpet: two CC0 notes, each in its own register (as 3-atrium) ----
+lo_on = logic { op: cmp }
+0.9 -> lo_on.a
+song.voct7 -> lo_on.b
+hi_on = logic { op: cmp }
+song.voct7 -> hi_on.a
+0.9 -> hi_on.b
+g_lo = logic { op: and }
+song.gate7 -> g_lo.a
+lo_on -> g_lo.b
+g_hi = logic { op: and }
+song.gate7 -> g_hi.a
+hi_on -> g_hi.b
+
+p_lo = sh { mode: sample }
+song.voct7 -> p_lo.in
+g_lo -> p_lo.trig
+tp_lo = sampler { file: "patches/samples/cc0/trumpet-f4.wav", loop: off }
+g_lo -> tp_lo.trig
+p_lo -> tp_lo.pitch
+-0.6658 -> tp_lo.pitch
+wow -> tp_lo.pitch
+e_lo = adsr { attack: 0.025, decay: 1.5, sustain: 0.75, release: 0.35, curve: exp }
+g_lo -> e_lo.gate
+v_lo = math { op: mult }
+e_lo -> v_lo.a
+song.vel7 -> v_lo.b
+a_lo = vca { gain: 0 }
+tp_lo -> a_lo.in
+v_lo -> a_lo.cv
+
+p_hi = sh { mode: sample }
+song.voct7 -> p_hi.in
+g_hi -> p_hi.trig
+tp_hi = sampler { file: "patches/samples/cc0/trumpet-d5.wav", loop: off }
+g_hi -> tp_hi.trig
+p_hi -> tp_hi.pitch
+-1.4200 -> tp_hi.pitch
+wow -> tp_hi.pitch
+e_hi = adsr { attack: 0.025, decay: 1.5, sustain: 0.75, release: 0.35, curve: exp }
+g_hi -> e_hi.gate
+v_hi = math { op: mult }
+e_hi -> v_hi.a
+song.vel7 -> v_hi.b
+a_hi = vca { gain: 0 }
+tp_hi -> a_hi.in
+v_hi -> a_hi.cv
+
+lead_f = svf { cutoff: 4200 }
+a_lo -> lead_f.in : 0.4
+a_hi -> lead_f.in : 0.4
+lead_s = sub { file: "../lib/strip.sub", gain: 2, pos: -0.1, send_gain: 0.5 }
+lead_f.lp -> lead_s.in
+lead_lvl -> lead_s.level
+
+# ---- bells: FM, four voices, for the PA chime and the arps ----
+bal = alloc { n: 4, vel: 0 }
+song.gate8 -> bal.gate
+song.voct8 -> bal.voct
+song.vel8  -> bal.vel
+bells = voice { notes: bal }
+bells.b = fm { algo: triad, ratios: [1, 3.5, 2, 7.1, 1, 1], levels: [.5, .3, .25, .18, 0, 0],
+               vel: 0, t1: [.002, .002, .002, .002, .002, .002],
+               t2: [2.8, .9, 1.8, .5, .1, .1], l2: [0, 0, 0, 0, 0, 0],
+               t4: [1.2, .6, 1, .4, .1, .1], curve: exp }
+bal.voct -> bells.b.v_oct
+bal.gate -> bells.b.gate
+bal.vel  -> bells.b.vel
+wow -> bells.b.v_oct
+bells_s = sub { file: "../lib/strip.sub", gain: 0.5, pos: 0.25, send_gain: 0.7 }
+bells.b -> bells_s.in
+bells_lvl -> bells_s.level
+
+# ---- the fountain: the rain loop, pitched up and bright ----
+fount = grains { file: "patches/samples/cc0/rain-loop.wav", seed: 102, position: 0.5,
+                 size: 0.15, scatter: 0.05, density: 30, jitter: 1, shape: 1, spread: 0.9 }
+0.6 -> fount.pitch
+f_head = lfo { freq: 0.03hz, wave: saw }
+f_head -> fount.position : 0.5
+f_hl = svf { cutoff: 1200 }
+f_hr = svf { cutoff: 1200 }
+fount.out_l -> f_hl.in
+fount.out_r -> f_hr.in
+fount_s = sub { file: "../lib/strip.sub", gain: 6, send_gain: 0.1 }
+f_hl.hp -> fount_s.in_l
+f_hr.hp -> fount_s.in_r
+fount_lvl -> fount_s.level
+
+# ---- voices: the PA (band-limited, a glass atrium) and an interview ----
+pa = sampler { file: "patches/samples/skylight/pa-open.wav", loop: off }
+form.gate10 -> pa.trig
+pa_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate10 -> pa_env.gate
+pa_amp = vca { gain: 0 }
+pa -> pa_amp.in
+pa_env -> pa_amp.cv
+pa_hp = svf { cutoff: 300 }
+pa_amp -> pa_hp.in
+pa_lp = svf { cutoff: 4000 }
+pa_hp.hp -> pa_lp.in
+pa_tape = sub { file: "vhs.sub", drive: 0.2, hi: 7500, drop_rate: 0.02hz, seed_drop: 103 }
+pa_lp.lp -> pa_tape.in : 4
+pa_s = sub { file: "../lib/strip.sub", gain: 1, send_gain: 1 }
+pa_tape -> pa_s.in
+
+walk = sampler { file: "patches/samples/skylight/iv-walker.wav", loop: off }
+form.gate11 -> walk.trig
+walk_env = adsr { attack: 0.01, decay: 0, sustain: 1, release: 0.5 }
+form.gate11 -> walk_env.gate
+walk_amp = vca { gain: 0 }
+walk -> walk_amp.in
+walk_env -> walk_amp.cv
+walk_tape = sub { file: "vhs.sub", drive: 0.2, hi: 7500, drop_rate: 0.02hz, seed_drop: 104 }
+walk_amp -> walk_tape.in : 4
+walk_s = sub { file: "../lib/strip.sub", gain: 0.47, pos: 0.15, send_gain: 0.5 }
+walk_tape -> walk_s.in
+
+# Music ducks ~3 dB while a voice speaks: gain = 2^(-0.498 x env).
+v_env = func { rise: 0.3, fall: 1 }
+form.gate10 -> v_env.in
+form.gate11 -> v_env.in
+v_db = math { op: add }
+v_env -> v_db.a : -0.498
+v_gain = math { op: exp2 }
+v_db -> v_gain.a
+v_gain -> keys_s.duck
+v_gain -> bass_s.duck
+v_gain -> drums.duck
+v_gain -> lead_s.duck
+v_gain -> bells_s.duck
+v_gain -> fount_s.duck
+
+# ---- space: a plate and a dotted-eighth echo ----
+de = tempo { bpm: 96, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.35, tone: 3500, mix: 1 }
+de.seconds -> echo.time
+lead_s.fx  -> echo.in : 0.5
+bells_s.fx -> echo.in : 0.4
+room = reverb { decay: 0.85, damp: 0.4, mix: 1, predelay: 0.04 }
+keys_s.fx  -> room.in_l
+lead_s.fx  -> room.in_l
+bells_s.fx -> room.in_l
+fount_s.fx -> room.in_l
+drums.fx   -> room.in_l
+pa_s.fx    -> room.in_l
+walk_s.fx  -> room.in_l
+echo       -> room.in_l : 0.4
+room_s = sub { file: "../lib/strip.sub", gain: 1 }
+room.out_l -> room_s.in_l
+room.out_r -> room_s.in_r
+verb_lvl -> room_s.level
+
+# ---- master: bright (wear row 1: no high shelf) ----
+master = sub { file: "../lib/master-chain.sub", comp_thr: -20, comp_ratio: 2,
+               clip_drive: 1, ceiling: -1, true_peak: on }
+3.5 -> master.makeup
+1.1 -> master.width
+drums.l   -> master.in_l
+drums.r   -> master.in_r
+bass_s.l  -> master.in_l
+bass_s.r  -> master.in_r
+keys_s.l  -> master.in_l
+keys_s.r  -> master.in_r
+lead_s.l  -> master.in_l
+lead_s.r  -> master.in_r
+bells_s.l -> master.in_l
+bells_s.r -> master.in_r
+fount_s.l -> master.in_l
+fount_s.r -> master.in_r
+pa_s.l    -> master.in_l
+pa_s.r    -> master.in_r
+walk_s.l  -> master.in_l
+walk_s.r  -> master.in_r
+echo      -> master.in_l : 0.3
+echo      -> master.in_r : 0.4
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+kick -> master.side_l : 0.5
+kick -> master.side_r : 0.5
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

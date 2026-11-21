@@ -1,0 +1,29 @@
+# 2-food-court-form.trk -- one row per bar (68 bars + 4 of tail); '>' ramps to the next value.
+track drums cva    # 1  kick + clap/rim
+track hats  cva    # 2
+track bass  cva    # 3
+track keys  cva    # 4  e-piano
+track clav  cva    # 5
+track chops cva    # 6  vocal chops
+track verb  cva    # 7  room return
+track main  cva    # 8  master fade
+track tape  cva    # 9  share of the music sent through the tape (0..1)
+track pa    note   # 10 gate: pa-foodcourt (slowed ~9.7 s = 3.6 bars)
+track teen  note   # 11 gate: iv-teen (slowed ~6.5 s = 2.4 bars)
+
+pattern form 72
+#    drums  hats   bass   keys   clav   chops  verb   main   tape   pa     teen
+00 | 0    | 0    | 0    | .55  | 0    | .6   | .7   | 1    | .2   | x:4  | .      # intro: PA over keys + chops
+04 | .9   | .9   | .9   | .6   | .85  | 0    | .45  | .    | .    | .    | .      # A: the groove
+20 | .    | .    | .    | .5   | .8   | 1    | .5   | .    | .    | .    | .      # B: chops lead, bass quotes the jingle
+36 | 0    | .7   | .55  | .45  | 0    | .8   | .7   | .    | .3   | .    | .      # breakdown on the chops
+37 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | x:3    # ...a kid on the TV
+43 | .    | .    | .65  | .55  | .    | .    | .    | .    | .2   | .    | .
+44 | .9   | .9   | .9   | .55  | .85  | 1    | .5   | .    | .    | .    | .      # A': everything
+60 | .    | .    | .    | .5>  | .8   | 0    | .55  | .    | .    | .    | .      # outro
+64 | 0    | .5>  | .6>  | .4   | .5>  | .    | .6   | .    | .    | .    | .
+67 | .    | 0    | 0    | .2   | 0    | .    | .7   | 1>   | .    | .    | .
+68 | .    | .    | .    | 0    | .    | .    | .7>  | .6>  | .    | .    | .      # tail: the room
+71 | .    | .    | .    | .    | .    | .    | 0    | 0    | .    | .    | .
+
+order form

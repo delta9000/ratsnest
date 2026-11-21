@@ -1,0 +1,82 @@
+# vhs.sub -- a worn linear-track VHS playback, mono in, mono out. The album's
+# one tape: every track of "skylight" plays through some amount of it, and
+# its wear rises from track to track (see README.md, "Wear").
+#
+#   tape = sub { file: "vhs.sub", drive: 0.6, hi: 4000 }
+#   src -> tape.in
+#   tape -> strip.in
+#
+# Signal order: wow and flutter (a short delay whose time wobbles), a faint
+# mains hum recorded with the signal, a mid-hump overdrive, the VHS band
+# (`lo`..`hi` with a resonant head bump), random dropouts that sag in over
+# `drop_in` and recover over `drop_out`, then hiss on top. Defaults are the
+# settings `3-atrium` was tuned with.
+#
+# Input `in` (mono audio), `drop_amt` (0..1, default 1, scales the dropout
+# depth -- a form lane can make the tape fail harder). Output `main`.
+# The overdrive's `level: 0.45` with `drive: 0.45` comes out about +15 dB
+# over a -25 dB RMS input: stage it at the cable.
+
+wow_hz    = param { default: 0.55hz }   # slow speed wobble
+wow_s     = param { default: 0.0018 }   # wow depth, seconds of delay swing
+flut_s    = param { default: 0.0004 }   # flutter depth, seconds
+hum       = param { default: 0.006 }    # 60 Hz into the overdrive
+drive     = param { default: 0.45 }     # tubescreamer drive
+tone      = param { default: 0.3 }
+level     = param { default: 0.45 }
+lo        = param { default: 150 }      # band high-pass, Hz
+hi        = param { default: 5500 }     # band low-pass, Hz (head bump here)
+hi_res    = param { default: 0.3 }
+drop_rate = param { default: 0.12hz }   # mean dropouts per second
+drop_dep  = param { default: 0.75 }     # level lost at the bottom of a dropout
+drop_in   = param { default: 0.5 }      # seconds to sag in
+drop_out  = param { default: 1.8 }      # seconds to recover
+hiss      = param { default: 0.01 }     # hiss level
+seed_flut = param { default: 48 }
+seed_drop = param { default: 49 }
+seed_lvl  = param { default: 50 }
+seed_hiss = param { default: 51 }
+
+in       = input {}
+drop_amt = input { default: 1 }
+main     = output {}
+
+wow = lfo { freq: wow_hz }
+flut = random { rate: 9hz, smooth: 1, seed: seed_flut }
+tm = delay { time: 9ms, feedback: 0, mix: 1, slew: 0.002, tone: 12000 }
+wow  -> tm.time : wow_s
+flut -> tm.time : flut_s
+in -> tm.in
+mains = vco { freq: 60hz }
+od = overdrive { model: tubescreamer, drive: drive, tone: tone, level: level }
+tm    -> od.in
+mains -> od.in : hum
+band_hp = svf { cutoff: lo }
+od -> band_hp.in
+band_lp = svf { cutoff: hi, res: hi_res }
+band_hp.hp -> band_lp.in
+band_lp2 = svf { cutoff: 7000 }
+band_lp.lp -> band_lp2.in
+dropout = dust { rate: drop_rate, seed: seed_drop }
+drop_env = func { rise: drop_in, fall: drop_out, curve: quad }
+dropout.trig -> drop_env.trig
+drop_depth = math { op: mult }
+drop_env -> drop_depth.a
+drop_amt -> drop_depth.b : drop_dep
+lvl = random { rate: 2hz, smooth: 1, seed: seed_lvl }
+amp = vca { gain: 1 }
+band_lp2.lp -> amp.in
+drop_depth -> amp.cv : -1
+lvl        -> amp.cv : 0.07
+noise_src = noise { color: white, seed: seed_hiss }
+noise_f = svf { cutoff: 6000, res: 0.1 }
+noise_src -> noise_f.in
+amp -> main.in
+noise_f.bp -> main.in : hiss
+
+# Audition: `mise run play -- patches/skylight/vhs.sub` -- a sawtooth chord on tape.
+demo.a = vco { freq: 220hz, wave: saw }
+demo.b = vco { freq: 277.18hz, wave: saw }
+demo.a -> in : 0.05
+demo.b -> in : 0.05
+main -> demo.out.in : 0.3

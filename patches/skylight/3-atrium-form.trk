@@ -1,0 +1,31 @@
+# 3-atrium-form.trk -- one row per bar (60 bars + 4 of tail); '>' ramps to the next value.
+track drums cva   # 1
+track bass  cva   # 2
+track keys  cva   # 3  e-piano level
+track cut   cva   # 4  e-piano brightness 0..1 (the "muffle")
+track lead  cva   # 5  trumpet level
+track verb  cva   # 6  reverb return
+track rain  cva   # 7  rain (synthesized)
+track main  cva   # 8  master fade
+track stop  cva   # 9  tape stop: 0 = speed, 1 = an octave down
+track haze  cva   # 10 granular sample beds (voice + piano)
+track wxa   note  # 11 TV weather: wx-local (gate held for the slowed clip)
+track wxb   note  # 12 TV weather: wx-current
+
+pattern form 64
+#    drums  bass   keys   cut    lead   verb   rain   main   stop   haze   wxa    wxb
+00 | 0    | 0    | .55  | .1>  | 0    | .8   | 1    | 1    | 0 | .8   # intro: rain, muffled keys
+01 | .    | .    | .    | .    | .    | .    | .    | .    | . | .    | x:4  | .
+07 | .    | .    | .    | .3   | .    | .    | .    | .    | . | .
+08 | .8   | .8   | .7   | .35  | .    | .6   | .55  | .    | . | .35  # A: half-time drums, bass
+24 | .    | .    | .65  | .45  | 1    | .65  | .45  | .    | . | .2   # B: the trumpet
+40 | 0    | .45  | .6   | .3>  | 0    | 1    | .8   | .    | . | 1    # break: no drums, room up
+41 | .    | .    | .    | .    | .    | .    | .    | .    | . | .    | .    | x:3
+47 | .    | .55  | .    | .5   | .    | .    | .    | .    | . | .6
+48 | .85  | .85  | .75  | .55  | 1    | .65  | .45  | .    | . | .25  # A': everything
+56 | 0    | .5>  | .6>  | .4>  | 0    | .9   | .8>  | .    | . | .7>  # outro
+59 | .    | 0    | .3   | .2   | .    | .    | 1    | .    | 1 | .9   # last bar: tape stop (func slews it)
+60 | .    | .    | 0    | .    | .    | .    | .6>  | .    | . | .6>  # tail: rain and the room
+63 | .    | .    | .    | .    | .    | .    | 0    | 0    | . | 0
+
+order form
