@@ -49,16 +49,19 @@ FetchContent_Declare(doctest
   URL https://github.com/doctest/doctest/archive/refs/tags/v2.4.11.tar.gz)
 FetchContent_MakeAvailable(doctest)
 
-# ratsnest.clap: each .patch in the plugin folder becomes a CLAP instrument or
-# effect (docs/plugin.md). CLAP is header-only (MIT); SOURCE_SUBDIR points at
-# nothing so only the headers are fetched, none of CLAP's own targets.
+# CLAP (docs/plugin.md) is header-only (MIT); SOURCE_SUBDIR points at nothing
+# so only the headers are fetched, none of CLAP's own targets. The `plugin`
+# module loads CLAP plugins (dlopen); ratsnest.clap below is the other way
+# round, each .patch in the plugin folder as a CLAP instrument or effect.
+FetchContent_Declare(clap
+  URL https://github.com/free-audio/clap/archive/refs/tags/1.2.9.tar.gz
+  SOURCE_SUBDIR headers-only)
+FetchContent_MakeAvailable(clap)
+target_include_directories(mscore SYSTEM PUBLIC ${clap_SOURCE_DIR}/include)
+target_link_libraries(mscore PUBLIC ${CMAKE_DL_LIBS})
+
 if(RATSNEST_CLAP)
-  FetchContent_Declare(clap
-    URL https://github.com/free-audio/clap/archive/refs/tags/1.2.9.tar.gz
-    SOURCE_SUBDIR headers-only)
-  FetchContent_MakeAvailable(clap)
   add_library(ratsnest_clap MODULE src/plugin/clap_plugin.cpp)
-  target_include_directories(ratsnest_clap SYSTEM PRIVATE ${clap_SOURCE_DIR}/include)
   target_link_libraries(ratsnest_clap PRIVATE mscore)
   # Only clap_entry is exported; the engine stays private to the plugin so two
   # builds loaded in one host cannot bind each other's symbols.
@@ -76,6 +79,14 @@ file(GLOB MSTEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 add_executable(mstests ${MSTEST_SOURCES})
 target_link_libraries(mstests PRIVATE mscore doctest::doctest)
 add_test(NAME unit COMMAND mstests)
+
+# A tiny CLAP plugin for the `plugin` module's tests (tests/test_plugin.cpp).
+add_library(rn_test_tone MODULE tests/plugin/test_tone.cpp)
+target_include_directories(rn_test_tone SYSTEM PRIVATE ${clap_SOURCE_DIR}/include)
+set_target_properties(rn_test_tone PROPERTIES PREFIX "" SUFFIX ".clap")
+add_dependencies(mstests rn_test_tone)
+target_compile_definitions(mstests PRIVATE
+  RATSNEST_TEST_CLAP="$<TARGET_FILE:rn_test_tone>")
 
 # A minimal CLAP host that dlopens the built plugin and drives it the way a
 # DAW does: scan, instantiate, play notes, hot-reload, survive a bad save.
@@ -112,6 +123,11 @@ add_test(NAME syx2patch
   COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_syx2patch.py
           $<TARGET_FILE:ratsnest>)
 
+add_test(NAME cli_plugins COMMAND ratsnest plugins $<TARGET_FILE:rn_test_tone>)
+set_tests_properties(cli_plugins PROPERTIES PASS_REGULAR_EXPRESSION
+  "id: \"org.ratsnest.test.tone\".*\n +3 +\"Gain\"  0\\.\\.2  default 1 \\(p base 0\\.500\\)")
+add_test(NAME cli_plugins_missing COMMAND ratsnest plugins "No Such Plugin")
+set_tests_properties(cli_plugins_missing PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli_describe COMMAND ratsnest describe additive)
 set_tests_properties(cli_describe PROPERTIES PASS_REGULAR_EXPRESSION "number_array")
 add_test(NAME cli_describe_unknown COMMAND ratsnest describe nonexistent)

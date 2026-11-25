@@ -51,6 +51,7 @@ extern const ModuleInfo clipper_info;
 extern const ModuleInfo limiter_info;
 extern const ModuleInfo follow_info;
 extern const ModuleInfo sampler_info;
+extern const ModuleInfo plugin_info;
 extern const ModuleInfo rec_info;
 extern const ModuleInfo extin_info;
 extern const ModuleInfo grains_info;

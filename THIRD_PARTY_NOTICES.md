@@ -382,7 +382,7 @@ SOFTWARE.
 
 ## CLAP — MIT
 
-Applies to `ratsnest.clap`, built from `src/plugin/clap_plugin.cpp` against
+Applies to `ratsnest`, `ratsnest.clap` and the `plugin` module, built against
 the CLAP 1.2.9 headers (fetched at build time, not vendored).
 
 MIT License

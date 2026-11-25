@@ -162,7 +162,7 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tracker`, `tempo`, `alloc`, `chord`, `midi` |
-| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `out` |
+| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `plugin`, `out` |
 
 ## `vca`
 
@@ -1057,6 +1057,40 @@ working-directory-relative.
 r = rec { file: "take.wav", secs: 20 }
 mix.out_l -> r.in_l
 mix.out_r -> r.in_r
+```
+
+## `plugin`
+
+`plugin { file: "Surge XT", id: "", params: [], midi: off }` hosts a
+third-party CLAP plugin, headless. Inputs `in_l`, `in_r`, `gate`, `voct`,
+`vel` (0.8), `p1..p8`; outputs `out_l`, `out_r`. Details and limits:
+[docs/plugin.md](plugin.md#loading-plugins).
+
+- `file` is a bare name looked up as `<name>.clap` in `$CLAP_PATH`, `~/.clap`,
+  `/usr/lib/clap`, `/usr/local/lib/clap`, or a path (`~/` allowed). `id`
+  picks one plugin from a multi-plugin file (default: the first).
+  `ratsnest plugins` lists what is installed; `ratsnest plugins <file>` lists
+  ids and params.
+- `params` names (quoted; or numeric ids) the params `p1..p8` drive, in
+  order. Each is normalized `0..1` across the param's range (stepped params
+  round) and sent when it changes. A listed param is always driven, so set
+  its base (`p1: 0.4`); `ratsnest plugins <file>` prints each default as a
+  p base. Unlisted params keep the plugin's defaults.
+- `gate` rising through 0.5 plays `voct`'s note (`0` = A3, MIDI 57; nearest
+  semitone) at velocity `vel`; falling releases it. Mono. With `midi: on`,
+  keyboard MIDI goes straight to the plugin too, for polyphony.
+- Blocks of 64 samples: everything into the plugin (audio, notes, params)
+  comes out 64 samples later (1.3 ms at 48 kHz).
+- A plugin that is missing, will not load, or lacks a listed param prints a
+  warning and runs silent; the patch still checks and plays. A topology
+  reload starts the plugin fresh; param edits glide.
+
+```text
+synth = plugin { file: "Surge XT", midi: on, voct: -2 }
+seq.gate -> synth.gate
+seq.cv -> synth.voct
+synth.out_l -> out.left
+synth.out_r -> out.right
 ```
 
 ## `extin`

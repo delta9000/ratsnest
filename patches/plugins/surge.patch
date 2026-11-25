@@ -1,0 +1,31 @@
+# surge -- Surge XT played by a ratsnest sequencer, then shaped by ratsnest.
+#
+# Needs Surge XT's CLAP (surge-synthesizer.github.io); without it the patch
+# still checks and plays, just silent from `synth` (a warning says so).
+# `ratsnest plugins "Surge XT"` lists its params: put names in `params:` and
+# drive them from p1..p8 (normalized 0..1; the listing gives each default as
+# a p base). Surge plays its init patch: the plugin keeps no state of its own.
+#
+# A keyboard plays it too (`midi: on`) under `ratsnest play`.
+
+master = clock { bpm: 480 }
+seq = stepseq { steps: [0, 0, .58333, 0, .25, 0, .83333, .5],
+                gates: [1, 0, 1, 1, 0, 1, 1, 0], vels: [1, .5, .8, .6, 1, .5, .9, .7] }
+master -> seq.clock
+
+# voct base -2: the line sits two octaves under A3, a bass.
+synth = plugin { file: "Surge XT", midi: on, voct: -2 }
+seq.gate -> synth.gate
+seq.cv -> synth.voct
+seq.vel -> synth.vel
+
+# ratsnest's own ladder sweeps over Surge's output; then a dotted echo.
+sweep = lfo { freq: 0.07hz }
+filt = ladder { cutoff: 900, res: 0.35 }
+synth.out_l -> filt.in : 0.5
+synth.out_r -> filt.in : 0.5
+sweep -> filt.cutoff : 700
+
+echo = delay { time: 375ms, feedback: 0.4, tone: 2500, mix: 0.3 }
+filt -> echo.in
+echo -> out.in : 0.7
