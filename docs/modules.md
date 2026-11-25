@@ -1012,9 +1012,13 @@ f.env -> m.lvl2 : -0.4
 
 `sampler { file: "kick.wav", loop: off }` — WAV file playback. Inputs `trig` 0,
 `pitch` 0 (v/oct, clamped ±24), linear `level` 1; outputs `out`, `eos`. Loads the file at graph
-build (mixing any channel count to mono) and plays it back with linear
-interpolation. Playback rate is `(file_rate / engine_rate) * 2^pitch`, so a file
-recorded at any rate plays at correct pitch and `+1 v/oct` doubles it. A rising
+build (mixing any channel count to mono) and plays it back with 4-point
+Hermite interpolation. Playback rate is `(file_rate / engine_rate) * 2^pitch`, so a file
+recorded at any rate plays at correct pitch and `+1 v/oct` doubles it. Faster
+than unity (pitched up, or a file recorded above the engine rate) it reads
+pre-filtered half-rate copies built at load (clean up to five octaves up), crossfading
+between neighbours, so partials pushed past Nyquist fade out instead of
+folding back as inharmonic tones; at or below unity it reads the file itself. A rising
 edge on `trig` restarts from the beginning at full level while a voice still
 sounding fades out over a fixed 5 ms (a second read head, no allocation), so a
 retrigger does not click; with nothing patched to `trig` it plays once at load.
