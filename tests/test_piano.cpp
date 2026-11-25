@@ -11,10 +11,10 @@ using namespace ms::dsp;
 namespace {
 constexpr double kFs = 48000.0;
 
-// gate, voct, vel, hardness, detune, decay, stretch, pedal
+// gate, voct, vel, hardness, detune, decay, stretch, pedal, noise
 struct PianoRig {
   std::unique_ptr<Module> m;
-  float ins[8] = {0.f, 0.f, 0.5f, 0.5f, 1.f, 1.f, 1.f, 0.f};
+  float ins[9] = {0.f, 0.f, 0.5f, 0.5f, 1.f, 1.f, 1.f, 0.f, 1.f};
   float out[1] = {};
   PianoRig() {
     const ModuleInfo* info = find_module("piano");
@@ -250,4 +250,48 @@ TEST_CASE("soundboard: the pedal frees the sympathetic strings") {
     return e;
   };
   CHECK(db(std::sqrt(tail(1.f) / tail(0.f))) > 20.0);
+}
+
+namespace {
+// The action noises alone: the same performance with `noise` on minus off.
+std::vector<float> action_noise(int midi, float vel, float pedal, int hold) {
+  PianoRig on, off;
+  off.ins[8] = 0.f;
+  for (PianoRig* r : {&on, &off}) {
+    r->ins[7] = pedal;
+    r->note(midi, vel);
+  }
+  const auto a = on.run(24000, hold), b = off.run(24000, hold);
+  std::vector<float> d(a.size());
+  for (std::size_t i = 0; i < a.size(); ++i) d[i] = a[i] - b[i];
+  return d;
+}
+double peak(const std::vector<float>& x, double t0, double t1) {
+  double p = 0.0;
+  for (auto i = static_cast<std::size_t>(t0 * kFs); i < static_cast<std::size_t>(t1 * kFs); ++i)
+    p = std::max(p, static_cast<double>(std::abs(x[i])));
+  return p;
+}
+}  // namespace
+
+TEST_CASE("piano: the action knocks and thumps under the tone, harder when struck harder") {
+  PianoRig tone;
+  tone.ins[8] = 0.f;
+  tone.note(60, 0.9f);
+  const double tone_pk = peak(tone.run(4800), 0.0, 0.1);
+  const auto soft = action_noise(60, 0.3f, 0.f, 1 << 30), hard = action_noise(60, 0.9f, 0.f, 1 << 30);
+  CHECK(peak(hard, 0.0, 0.05) > 2.0 * peak(soft, 0.0, 0.05));
+  const double rel = db(peak(hard, 0.0, 0.05) / tone_pk);
+  CHECK(rel < -15.0);  // heard, not dominating
+  CHECK(rel > -40.0);
+}
+
+TEST_CASE("piano: a damper landing on a ringing string makes a sound; a lifted one doesn't") {
+  const int hold = 9600;
+  const auto damped = action_noise(60, 0.7f, 0.f, hold);
+  const auto pedal = action_noise(60, 0.7f, 1.f, hold);
+  const auto free_top = action_noise(96, 0.7f, 0.f, hold);
+  CHECK(peak(damped, 0.2, 0.26) > 1e-4);
+  CHECK(peak(pedal, 0.2, 0.26) < 1e-6);
+  CHECK(peak(free_top, 0.2, 0.26) < 1e-6);
 }

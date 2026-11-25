@@ -199,6 +199,13 @@ TEST_CASE("sustain pedal defers note-off until pedal release") {
   CHECK(m.out("gate1") == doctest::Approx(0.f));
 }
 
+TEST_CASE("sixteen voices hold sixteen notes at once") {
+  MidiRig m({{"voices", number(16)}});
+  for (int k = 0; k < 16; ++k) m.noteon(0, static_cast<uint8_t>(48 + k), 100);
+  m.step();
+  for (int i = 1; i <= 16; ++i) CHECK(m.out("gate" + std::to_string(i)) == doctest::Approx(1.f));
+}
+
 TEST_CASE("sustain pedal is also readable as a mapped cc slot") {
   MidiRig m({{"voices", number(2)}, {"cc", array({64})}});
   m.noteon(0, 60, 100);

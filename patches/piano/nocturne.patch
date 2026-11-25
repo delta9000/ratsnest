@@ -21,8 +21,8 @@ mel_a.voct -> mel.p.voct
 mel_a.vel -> mel.p.vel
 song.cva5 -> mel.p.pedal
 
-# ---- left hand: broken chords, 8 voices so a pedalled bar rings whole ----
-lh_a = alloc { n: 8, vel: 0 }   # vel base 0: the tracker owns it
+# ---- left hand: broken chords, 16 voices so pedalled bars ring whole ----
+lh_a = alloc { n: 16, vel: 0 }   # vel base 0: the tracker owns it
 song.gate2 -> lh_a.gate
 song.voct2 -> lh_a.voct
 song.vel2 -> lh_a.vel

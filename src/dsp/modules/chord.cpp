@@ -45,9 +45,9 @@ class Chord final : public Module {
       on_[i] = active && high && (on_[i] || elapsed >= static_cast<float>(rank) * step);
       if (on_[i]) voct_[i] = ins[kPitch + i];
       outs[i] = as_gate(on_[i]);
-      outs[8 + i] = active ? voct_[i] : 0.f;
-      outs[16 + i] = active ? vel_ : 0.f;
-      outs[24 + i] = active ? voice_spread(i, n_) : 0.f;
+      outs[kBankWidth + i] = active ? voct_[i] : 0.f;
+      outs[2 * kBankWidth + i] = active ? vel_ : 0.f;
+      outs[3 * kBankWidth + i] = active ? voice_spread(i, n_) : 0.f;
     }
     if (high && count_ < kCountCap) ++count_;
   }

@@ -167,11 +167,11 @@ Build order note: `svf` before `ladder` (much easier; instant gratification),
 
 | Module | Role | Notes |
 |---|---|---|
-| `midi` | note/CC → CV | cfg `channel`(0=omni) `voices`(1..8) `mode`(last\|lowest) `bend`(semitones) `cc`(≤4 controller numbers); outs banks `gate1..8` `voct1..8` `vel1..8`, plus `bend` `at` `cc1..cc4`. No mono `gate`/`voct`/`vel` outs — those bare names are reserved by the voice-group bank-resolution rule (§6); a mono synth is `voices: 1` and `mid.gate1`. PipeWire MIDI |
+| `midi` | note/CC → CV | cfg `channel`(0=omni) `voices`(1..16) `mode`(last\|lowest) `bend`(semitones) `cc`(≤4 controller numbers); outs banks `gate1..16` `voct1..16` `vel1..16`, plus `bend` `at` `cc1..cc4`. No mono `gate`/`voct`/`vel` outs — those bare names are reserved by the voice-group bank-resolution rule (§6); a mono synth is `voices: 1` and `mid.gate1`. PipeWire MIDI |
 | `adsr` | keyboard envelope | ins `gate` `attack` `decay` `sustain`(0..1, live) `release` · out (0..1); `curve` (lin\|exp\|log\|quad; exp is a true RC, stage time = T60); release from current level, retrigger from current level |
 | `delay` | tape-style feedback delay, 10 s max | ins `in` `time`(s) `pitch`(v_oct: t·2^−p) `feedback`(0..1.2, tanh loop) `mix` `tone`(Hz) `slew`(s) · out. Clock-sync stays patchable (clock→seconds module later) |
 | `reverb` | Dattorro 1997 plate | ins `in_l` `in_r` `decay` `damp` `mix` `freeze`(gate) · outs `out_l` `out_r`; cfg `predelay`(s) `bandwidth` `mod_rate` `mod_depth`. FDN variant is a Phase 5+ sibling |
-| `alloc` | voice allocator | cfg `n`(1..8, default 4) `mode`(rr\|unison); ins `gate` `voct` `vel`; outs `gate1..8` `voct1..8` `vel1..8` `spread1..8`. Distributes a mono note stream across indexed banks for `voice` groups; see `2026-07-11-voice-alloc-design.md` |
+| `alloc` | voice allocator | cfg `n`(1..16, default 4) `mode`(rr\|unison); ins `gate` `voct` `vel`; outs `gate1..16` `voct1..16` `vel1..16` `spread1..16`. Distributes a mono note stream across indexed banks for `voice` groups; see `2026-07-11-voice-alloc-design.md` |
 
 ### Phase 3 — the sequencer wing (+9)
 

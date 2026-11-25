@@ -9,9 +9,9 @@ against the same conformance suite). Fulfills Phase 2's `midi` entry.
 
 | | |
 |---|---|
-| configs | `channel` 0 = omni (default) \| 1..16; `voices` 1..8 (default 1); `mode` (`last` \| `lowest`); `bend` semitones (default 2); `cc` array of up to 4 controller numbers (default `[]`) |
+| configs | `channel` 0 = omni (default) \| 1..16; `voices` 1..16 (default 1); `mode` (`last` \| `lowest`); `bend` semitones (default 2); `cc` array of up to 4 controller numbers (default `[]`) |
 | inputs | none |
-| outputs | banks `gate1..8`, `voct1..8`, `vel1..8`; `bend` (bipolar, post-range, also folded into every voct); `at` (channel pressure, 0..1); `cc1..cc4` (0..1) |
+| outputs | banks `gate1..16`, `voct1..16`, `vel1..16`; `bend` (bipolar, post-range, also folded into every voct); `at` (channel pressure, 0..1); `cc1..cc4` (0..1) |
 
 There are deliberately **no** mono convenience outputs named `gate`/`voct`/
 `vel`: those bare spellings are reserved by the voice-group bank-resolution
@@ -31,7 +31,7 @@ explicit, per design rule 4.
 - Out-of-range config values clamp in `init` (house pattern; compile-time
   range diagnostics for numeric configs are a possible later `check`
   warning, not part of this design): `cc` entries clamp to 0..127 and only
-  the first 4 are read; `voices` 1..8; `channel` 0..16; `bend` 0..24.
+  the first 4 are read; `voices` 1..16; `channel` 0..16; `bend` 0..24.
 
 ## 2. Voice handling (real note identity)
 

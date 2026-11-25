@@ -110,7 +110,8 @@ Cable resolution depends on where each endpoint lives:
    `poly.spread`): resolves to `<bank><i>` per instance, for every output
    family the bound module exposes. This shadows nothing — `alloc` has no
    mono output named `voct`, so that spelling is an error everywhere else.
-   Bank families are 8-wide (`<stem>1..<stem>8`); a narrower run such as
+   Bank families are 16-wide (`<stem>1..<stem>16`, widened from 8 for
+   piano polyphony); a narrower run such as
    midi's `cc1..cc4` does not qualify, so bare `mid.cc` is an ordinary
    unknown-output error rather than a bank read.
 3. **outside -> inside**: broadcast; the same source feeds every instance.
@@ -819,7 +820,7 @@ Beat values: quarter 1, eighth .5, dotted eighth .75, sixteenth .25. Example:
 ## `alloc`
 
 `alloc { n: 4, mode: rr }` — inputs `gate`, `voct`, `vel` 1; output banks
-`gate1..8`, `voct1..8`, `vel1..8`, `spread1..8` (bipolar constants spread
+`gate1..16`, `voct1..16`, `vel1..16`, `spread1..16` (`n` `1..16`; bipolar constants spread
 over -1..+1; 0 when n = 1). Each rising gate claims the next voice (`rr`)
 or all voices (`unison`); a voice tracks `voct` while it is the newest
 claim and holds it after, so release tails keep pitch. Reclaims insert a
@@ -830,8 +831,8 @@ exercises it). Strum polyphony from any mono sequencer; see `voice`.
 ## `chord`
 
 `chord { n: 4, strum: 0 }` — inputs `gate`, `vel` 1, `strum` 0 (seconds),
-`p1..p8` 0 (v/oct); the same output banks as `alloc` (`gate1..8`, `voct1..8`,
-`vel1..8`, `spread1..8`), so `voice { notes: ch }` stamps one voice per chord
+`p1..p8` 0 (v/oct); the same output banks as `alloc` (`gate1..16`, `voct1..16`,
+`vel1..16`, `spread1..16`; only the first `n` are used), so `voice { notes: ch }` stamps one voice per chord
 tone (`n` 1..8, inherited by the group; default 4). Voice i sounds `p<i>`
 while `gate` is high. Each rising gate latches `vel` for every voice and
 restarts the strum: voice i's gate rises `(i − 1) × strum` seconds late
@@ -847,7 +848,7 @@ voice (`0.005 -> ch.p2`). See Voice groups and `lib/poly-pad.sub`.
 ## `midi`
 
 `midi { channel: 0, voices: 1, mode: last, bend: 2, cc: [] }` — no inputs;
-output banks `gate1..8`, `voct1..8`, `vel1..8`, plus `bend`, `at`, `cc1..cc4`.
+output banks `gate1..16`, `voct1..16`, `vel1..16`, plus `bend`, `at`, `cc1..cc4`.
 Pure event -> CV: it consumes raw MIDI (via the engine's `midi-in` port; see
 `docs/superpowers/specs/2026-07-11-midi-design.md`) and never touches the
 audio graph's inputs. Offline `render` has no transport, so a midi module
@@ -865,7 +866,7 @@ rule (`alloc`/`midi` expose only banks so `poly.voct` can resolve to
 - Pitch bend (scaled by `bend` semitones, default 2, clamp `0..24`) is added
   into every `voct` output; the `bend` output carries that same bipolar value
   in v/oct units (`bend / 12` at full deflection) for routing elsewhere.
-- `voices` `1..8`: each note-on claims a free voice round-robin; at capacity
+- `voices` `1..16`: each note-on claims a free voice round-robin; at capacity
   it steals the **oldest** sounding voice, inserting a one-sample gate gap so
   envelopes retrigger. A note-on that reuses a voice released on the same
   frame (a sequencer's note-off + note-on pair) gets the same gap. Note
@@ -1165,7 +1166,7 @@ exact pitch sets the tuning), `vel` 0 (`0..1` -> hammer speed 0.25..6 m/s;
 `decay` 1 (string sustain multiplier, `0.05..8`), `stretch` 1 (Railsback
 octave stretch, 0 = equal temperament; full stretch is about -20 cents at A0
 and +30 at C8), `pedal` 0 (`0..1`: lifts this note's damper, continuously,
-so half-pedal works). Output `out` (the strings' force on the bridge: patch
+so half-pedal works), `noise` 1 (action noises, `0..4`; 0 = strings only). Output `out` (the strings' force on the bridge: patch
 it into a `soundboard`). `voct`, `vel`, `hardness`, `detune`, `decay` and
 `stretch` are read at the strike only; there is no pitch bend.
 
@@ -1186,16 +1187,23 @@ What it models, per key (designs are computed once at init):
   aftersound, with beating between them.
 - **Dampers:** felt drops in ~8 ms on note-off unless `pedal` holds it;
   F6 and above have no dampers and always ring out.
+- **Action noises** (`noise`): the key bottoming on the keybed 3 ms after
+  the strike (a ~95 Hz thud, growing with vel²), the hammer's wooden knock
+  (~1.1 kHz, strongest in the treble), and on release the damper felt
+  landing on the ringing string (a short hiss scaled by the string's level)
+  plus the key's return thud. Together they sit ~20-28 dB under the tone's
+  peak at forte; nothing sounds on release when the pedal or the undamped
+  top octaves leave the string free.
 
 Levels: mezzo-forte (`vel` 0.5) C4 peaks near -26 dBFS, fortissimo near -11,
 pianissimo (0.1) near -41; early loudness is voiced even across the keys.
 Silent voices idle (no CPU) after ~100 ms below -100 dBFS. A voice stolen
 for a different key is cut with a 4 ms fade. One voice per note, so use a
 `voice` group: `alloc`/`chord` (with `vel: 0`, so the cable owns it) or
-`midi`. Patches: `patches/piano/` (`grand.patch` for a MIDI keyboard).
+`midi` (up to 16 voices). Patches: `patches/piano/` (`grand.patch` for a MIDI keyboard).
 
 ```text
-mid = midi { voices: 8, cc: [64] }
+mid = midi { voices: 16, cc: [64] }
 keys = voice { notes: mid }
 keys.p = piano {}
 mid.gate -> keys.p.gate
