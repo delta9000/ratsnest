@@ -85,6 +85,24 @@ TEST_CASE("plugin: a gate plays voct's note on its sample, one block late") {
   CHECK(r.r[2 * kLatency + 10] == doctest::Approx(60.0f / 127.0f));
 }
 
+TEST_CASE("plugin: a new semitone under a held gate is a slur, not a release") {
+  std::vector<float> ins(kIns, 0.0f);
+  ins[2] = 1.0f;
+  ins[3] = 0.25f;  // MIDI 60
+  ins[4] = 0.5f;
+  ins[5] = 0.5f;
+  auto m = make(tone());
+  run(*m, ins, 2 * kLatency);
+  ins[3] = 0.25f + 0.02f;  // under half a semitone: same note
+  CHECK(run(*m, ins, 2 * kLatency).r.back() == doctest::Approx(60.0f / 127.0f));
+  ins[3] = 0.25f + 2.0f / 12.0f;  // MIDI 62, gate still high
+  const Run r = run(*m, ins, 2 * kLatency);
+  CHECK(r.r.back() == doctest::Approx(62.0f / 127.0f));  // new note on, old one off
+  CHECK(r.l.back() == doctest::Approx(0.5f));
+  ins[2] = 0.0f;
+  CHECK(run(*m, ins, 2 * kLatency).r.back() == 0.0f);  // the gate releases the new note
+}
+
 TEST_CASE("plugin: keyboard MIDI reaches it only with midi: on") {
   std::vector<float> ins(kIns, 0.0f);
   ins[5] = 0.5f;
@@ -108,6 +126,28 @@ TEST_CASE("plugin: a missing plugin or unknown param is silent, not fatal") {
   for (float v : run(*bad, ins, 3 * kLatency).l) CHECK(v == 0.0f);
 }
 
+TEST_CASE("plugin: set fixes unlisted params at load, by display text or number") {
+  std::vector<float> ins(kIns, 0.0f);
+  ins[0] = 0.4f;
+  for (const auto& [set, want] : std::vector<std::pair<std::string, float>>{
+           {"Gain=unity", 0.4f}, {"Gain=0.5", 0.2f}, {"3=2", 0.8f}}) {
+    Config cfg = tone({});
+    ConfigValue sets;
+    sets.strs = {set};
+    cfg.emplace_back("set", sets);
+    auto m = make(cfg);
+    CHECK(run(*m, ins, 3 * kLatency).l.back() == doctest::Approx(want));
+  }
+  for (const char* bad : {"Gain=loud", "Gain=3", "Cutoff=1", "Gain"}) {
+    Config cfg = tone({});
+    ConfigValue sets;
+    sets.strs = {bad};
+    cfg.emplace_back("set", sets);
+    auto m = make(cfg);
+    CHECK(run(*m, ins, 3 * kLatency).l.back() == 0.0f);
+  }
+}
+
 TEST_CASE("plugin: params by name or id, through a parsed patch") {
   const std::string src = std::string("p = plugin { file: \"") + RATSNEST_TEST_CLAP +
                           "\", params: [\"Gain\", \"3\"], p1: 0.5 }\np -> out.in\n";
@@ -126,5 +166,11 @@ TEST_CASE("plugin: the library's params read back with ranges") {
   REQUIRE(ps.size() == 1);
   CHECK(ps[0].name == "Gain");
   CHECK(ps[0].max == 2.0);
+  CHECK(ps[0].value == 1.0);
+  CHECK(clap::text(p, ps[0].id, 1.0).empty());
+  double v = 0.0;
+  CHECK(clap::parse(p, ps[0], "unity", v));
+  CHECK(v == 1.0);
+  CHECK_FALSE(clap::parse(p, ps[0], "2.5", v));
   p->destroy(p);
 }

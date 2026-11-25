@@ -1,5 +1,6 @@
 // A tiny CLAP plugin for testing the `plugin` module: out = in * Gain, plus,
-// while a note is held, its velocity on the left and key/127 on the right.
+// while a note is held, its velocity on the left and key/127 on the right
+// (the last note on; releasing an older key changes nothing).
 // Deterministic DC so tests can check exact timing and values.
 #include <clap/clap.h>
 
@@ -28,7 +29,9 @@ void on_event(Tone& t, const clap_event_header_t* h) {
     t.vel = static_cast<float>(e->velocity);
     t.key = static_cast<float>(e->key) / 127.0f;
   } else if (h->type == CLAP_EVENT_NOTE_OFF) {
-    t.vel = t.key = 0.0f;
+    // Only the held key's release silences it, as in a mono synth.
+    const auto* e = reinterpret_cast<const clap_event_note_t*>(h);
+    if (static_cast<float>(e->key) / 127.0f == t.key) t.vel = t.key = 0.0f;
   } else if (h->type == CLAP_EVENT_MIDI) {
     const auto* e = reinterpret_cast<const clap_event_midi_t*>(h);
     const bool on = (e->data[0] & 0xf0) == 0x90 && e->data[2] > 0;
@@ -89,8 +92,15 @@ bool params_value(const clap_plugin_t* p, clap_id id, double* v) {
   return true;
 }
 bool params_text(const clap_plugin_t*, clap_id, double, char*, uint32_t) { return false; }
-bool params_parse(const clap_plugin_t*, clap_id, const char*, double*) { return false; }
-void params_flush(const clap_plugin_t*, const clap_input_events_t*, const clap_output_events_t*) {}
+// Display text: "unity" parses as 1; anything else is left to the host.
+bool params_parse(const clap_plugin_t*, clap_id id, const char* s, double* v) {
+  if (id != kGainId || std::strcmp(s, "unity") != 0) return false;
+  *v = 1.0;
+  return true;
+}
+void params_flush(const clap_plugin_t* p, const clap_input_events_t* in, const clap_output_events_t*) {
+  for (uint32_t i = 0; i < in->size(in); ++i) on_event(*self(p), in->get(in, i));
+}
 const clap_plugin_params_t kParams{params_count, params_info, params_value, params_text,
                                    params_parse, params_flush};
 

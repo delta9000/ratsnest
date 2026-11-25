@@ -37,6 +37,7 @@ constexpr ConfigInfo kCfg[] = {
     {"file", nullptr, ConfigKind::Text},    // "Surge XT" or a path to a .clap
     {"id", nullptr, ConfigKind::Text},      // which plugin in the file; "" = first
     {"params", nullptr, ConfigKind::Texts}, // names (or ids) driven by p1..p8
+    {"set", nullptr, ConfigKind::Texts},    // "Name=value" fixed once at load
     {"midi", kOnOff},                       // forward keyboard MIDI
 };
 constexpr OutputInfo kOuts[] = {{"out_l"}, {"out_r"}};
@@ -65,7 +66,8 @@ class Plugin final : public Module {
     midi_ = cfg_str(cfg, "midi", "off") == "on";
     const std::string file = cfg_str(cfg, "file", "");
     if (file.empty()) return;  // a `plugin {}` with nothing loaded: silence
-    std::string err = load(rate, file, cfg_str(cfg, "id", ""), cfg_str_arr(cfg, "params"));
+    std::string err = load(rate, file, cfg_str(cfg, "id", ""), cfg_str_arr(cfg, "params"),
+                           cfg_str_arr(cfg, "set"));
     if (!err.empty()) {
       std::fprintf(stderr, "warning: plugin '%s': %s; it will be silent\n", file.c_str(), err.c_str());
       unload();
@@ -94,7 +96,7 @@ class Plugin final : public Module {
 
  private:
   std::string load(double rate, const std::string& file, const std::string& id,
-                   const std::vector<std::string>& names) {
+                   const std::vector<std::string>& names, const std::vector<std::string>& sets) {
     const std::string path = clap::resolve(file);
     if (path.empty()) return "not found (see `ratsnest plugins`)";
     std::string err;
@@ -104,7 +106,8 @@ class Plugin final : public Module {
     if (want.empty() && f->get_plugin_count(f) > 0) want = f->get_plugin_descriptor(f, 0)->id;
     p_ = f->create_plugin(f, clap::host(), want.c_str());
     if (!p_ || !p_->init(p_)) return "cannot create '" + want + "'";
-    if (std::string bad = bind_params(names); !bad.empty()) return bad;
+    if (std::string bad = clap::apply(p_, sets); !bad.empty()) return bad;
+    if (std::string bad = bind_params(clap::params(p_), names); !bad.empty()) return bad;
     ports(true);
     ports(false);
     if (!p_->activate(p_, rate, 1, kBlock)) return "cannot activate '" + want + "'";
@@ -113,18 +116,25 @@ class Plugin final : public Module {
   }
 
   // Each listed name (or numeric id) to the param it drives.
-  std::string bind_params(const std::vector<std::string>& names) {
-    const auto all = clap::params(p_);
+  std::string bind_params(const std::vector<clap::Param>& all, const std::vector<std::string>& names) {
     n_params_ = std::min(names.size(), kParams);
     for (size_t i = 0; i < n_params_; ++i) {
-      const auto it = std::find_if(all.begin(), all.end(), [&](const clap::Param& p) {
-        return p.name == names[i] || std::to_string(p.id) == names[i];
-      });
-      if (it == all.end()) return "no param named '" + names[i] + "'";
-      bound_[i] = *it;
+      const clap::Param* q = clap::find(all, names[i]);
+      if (!q) return "no param named '" + names[i] + "'";
+      bound_[i] = *q;
       sent_[i] = -1.0;
     }
     return {};
+  }
+
+  static void fill_param(Event& e, clap_id id, double v) {
+    e.param.param_id = id;
+    e.param.cookie = nullptr;
+    e.param.note_id = -1;
+    e.param.port_index = -1;
+    e.param.channel = -1;
+    e.param.key = -1;
+    e.param.value = v;
   }
 
   // Buffers for every port; main in/out are the module's in_l/r and out_l/r.
@@ -166,18 +176,23 @@ class Plugin final : public Module {
   }
 
   // Gate rising through 0.5 plays voct's note (0 = A3, MIDI 57); falling
-  // releases the note it started.
+  // releases the note it started. A new semitone while the gate is high is a
+  // slur: the new note starts before the old one ends, which a mono/legato
+  // plugin patch glides.
   void notes(const float* ins) {
     const bool high = ins[kGate] > 0.5f;
-    if (high == gate_) return;
-    gate_ = high;
     if (!high) {
-      note(CLAP_EVENT_NOTE_OFF, key_, 0.0);
+      if (gate_) note(CLAP_EVENT_NOTE_OFF, key_, 0.0);
+      gate_ = false;
       return;
     }
     const float k = std::round(57.0f + 12.0f * (std::isfinite(ins[kVoct]) ? ins[kVoct] : 0.0f));
-    key_ = static_cast<int16_t>(std::clamp(k, 0.0f, 127.0f));
-    note(CLAP_EVENT_NOTE_ON, key_, std::clamp(static_cast<double>(ins[kVel]), 0.0, 1.0));
+    const auto key = static_cast<int16_t>(std::clamp(k, 0.0f, 127.0f));
+    if (gate_ && key == key_) return;
+    note(CLAP_EVENT_NOTE_ON, key, std::clamp(static_cast<double>(ins[kVel]), 0.0, 1.0));
+    if (gate_) note(CLAP_EVENT_NOTE_OFF, key_, 0.0);
+    gate_ = true;
+    key_ = key;
   }
 
   // Block boundary: params that moved, then the plugin itself.
@@ -210,14 +225,7 @@ class Plugin final : public Module {
     if (b.stepped) x = std::round(x);
     if (x == sent_[i]) return;
     sent_[i] = x;
-    Event& e = push(sizeof(clap_event_param_value_t), CLAP_EVENT_PARAM_VALUE, kBlock - 1);
-    e.param.param_id = b.id;
-    e.param.cookie = nullptr;
-    e.param.note_id = -1;
-    e.param.port_index = -1;
-    e.param.channel = -1;
-    e.param.key = -1;
-    e.param.value = x;
+    fill_param(push(sizeof(clap_event_param_value_t), CLAP_EVENT_PARAM_VALUE, kBlock - 1), b.id, x);
   }
 
   void copy_in() {

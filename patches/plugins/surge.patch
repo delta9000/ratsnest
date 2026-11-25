@@ -2,9 +2,10 @@
 #
 # Needs Surge XT's CLAP (surge-synthesizer.github.io); without it the patch
 # still checks and plays, just silent from `synth` (a warning says so).
-# `ratsnest plugins "Surge XT"` lists its params: put names in `params:` and
-# drive them from p1..p8 (normalized 0..1; the listing gives each default as
-# a p base). Surge plays its init patch: the plugin keeps no state of its own.
+# `ratsnest plugins "Surge XT"` lists its params. `set:` is the preset, fixed
+# at load and written as Surge displays the values; `params:` names the ones
+# p1..p8 drive (normalized 0..1; the listing gives each value as a p base).
+# The plugin keeps no state of its own: the patch is the whole sound.
 #
 # A keyboard plays it too (`midi: on`) under `ratsnest play`.
 
@@ -14,7 +15,10 @@ seq = stepseq { steps: [0, 0, .58333, 0, .25, 0, .83333, .5],
 master -> seq.clock
 
 # voct base -2: the line sits two octaves under A3, a bass.
-synth = plugin { file: "Surge XT", midi: on, voct: -2 }
+synth = plugin { file: "Surge XT", midi: on, voct: -2,
+                 set: ["A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=18 cents",
+                       "A Osc 1 Sub Mix=40 %", "A Amp EG Decay=300 ms",
+                       "A Amp EG Sustain=40 %", "A Amp EG Release=120 ms"] }
 seq.gate -> synth.gate
 seq.cv -> synth.voct
 seq.vel -> synth.vel

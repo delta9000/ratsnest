@@ -26,12 +26,33 @@ const clap_plugin_factory_t* factory(const std::string& path, std::string& error
 const clap_host_t* host();
 
 // A plugin's params, read from an initialised (not yet activated) instance.
+// `value` is what the fresh instance holds (get_value), which is what an
+// unlisted param plays at; some plugins (Surge XT) report every
+// `def` as 0, so `value` is the number to trust.
 struct Param {
   clap_id id;
   std::string name, module;
-  double min, max, def;
+  double min, max, def, value;
   bool stepped;
 };
 std::vector<Param> params(const clap_plugin_t* p);
+
+// The plugin's display text for `v` ("800.00 Hz", "Wavetable"); "" if it
+// has none.
+std::string text(const clap_plugin_t* p, clap_id id, double v);
+
+// The param named `name` (or with that numeric id); nullptr if none.
+const Param* find(const std::vector<Param>& all, const std::string& name);
+
+// A `set:` value as a plain param value: the plugin's own parse of the text
+// (as its display writes it), else a number in the param's range.
+bool parse(const clap_plugin_t* p, const Param& q, const std::string& s, double& v);
+
+// `set: ["A Osc 1 Type=Wavetable"]` on an initialised, inactive instance:
+// each entry parsed and flushed in order, re-reading the params after each,
+// since a plugin may rename params when another changes (Surge's "FX A1
+// Param 3" reads "FX A1 Reverb - Decay Time" once "FX A1 FX Type" is
+// Reverb 2). "" on success, else what was wrong.
+std::string apply(const clap_plugin_t* p, const std::vector<std::string>& sets);
 
 }  // namespace ms::dsp::clap

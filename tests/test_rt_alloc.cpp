@@ -11,6 +11,7 @@
 #include <new>
 #include <string>
 #include <vector>
+#include "dsp/clap_host.h"
 #include "engine/controller.h"
 #include "engine/rt_runner.h"
 
@@ -143,10 +144,15 @@ TEST_CASE("audio thread never allocates after warm-up, for every patch") {
   std::sort(patches.begin(), patches.end());
   REQUIRE(patches.size() > 10);
 
+  const bool plugins_installed = !ms::dsp::clap::installed().empty();
   std::vector<float> l(kBlock), r(kBlock);
   for (const auto& path : patches) {
     CAPTURE(path.lexically_relative(kRoot).string());
     const std::string src = read_file(path);
+    // A third-party plugin's process() is outside ratsnest's control (Surge
+    // XT allocates there; docs/plugin.md). Where none is installed, as in
+    // CI, `plugin` modules run silent and these patches are checked as usual.
+    if (plugins_installed && src.find("plugin {") != std::string::npos) continue;
     RtRunner run(kRate);
     Controller ctl(run, kRate);
     auto first = ctl.load(src, path.string());

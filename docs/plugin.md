@@ -35,16 +35,43 @@ A worked patch: `patches/plugins/surge.patch`.
 **Finding plugins.** `ratsnest plugins` lists every `.clap` on the search
 path (`$CLAP_PATH`, `~/.clap`, `/usr/lib/clap`, `/usr/local/lib/clap`) with
 the plugin ids inside. `ratsnest plugins "Surge XT"` adds each plugin's
-params: id, quoted name, range, default, and that default as a `p` base, so
-you can copy a name into `params:` and its base into `p1:`.
+params: id, quoted name, range, the value a fresh instance holds with the
+plugin's own text for it, and that value as a `p` base, so you can copy a
+name into `params:` and its base into `p1:`. (The value, not the declared
+default: Surge XT declares every default as 0.) Extra `"Name=value"`
+arguments are applied first, as `set:` would, and the listing shows what
+they lead to, renamed params included:
+
+```sh
+ratsnest plugins "Surge XT" "FX A1 FX Type=Reverb 2" | grep 'FX A1'
+#   "FX A1 Reverb - Decay Time"  0..1  = 0.475 [1.68 s] (p base 0.475)
+```
 
 **The patch stays the source of truth.** There are no plugin GUIs and no
-saved plugin state. Everything the plugin does comes from the patch: the
-params it lists (each driven by a `p` input, so cables modulate them like any
+saved plugin state. Everything the plugin does comes from the patch: `set:`
+(params fixed at load, written as the plugin displays them), the params in
+`params:` (each driven by a `p` input, so cables modulate them like any
 other base), notes from `gate`/`voct`/`vel`, and, with `midi: on`, the
-keyboard. Unlisted params sit at the plugin's own defaults, so a synth plays
-its init sound until the patch says otherwise. A preset or plugin state file
-is a possible next step.
+keyboard. Unset params sit at the plugin's own defaults, so a synth plays
+its init sound until the patch says otherwise. `set:` is the preset:
+
+```text
+bass = plugin { file: "Surge XT", voct: -2,
+  set: ["A Osc 1 Type=Twist", "A Filter 1 Type=LP Vintage Ladder",
+        "A Filter 1 Resonance=55 %", "A Amp EG Release=80 ms",
+        "FX A1 FX Type=Distortion"],
+  params: ["A Filter 1 Cutoff"], p1: 0.35 }
+```
+
+`set:` entries apply in order, one flush each, and the param list is
+re-read after each: Surge renames an effect slot's params to fit its type,
+so `"FX A1 Reverb - Decay Time=6 s"` must follow `"FX A1 FX Type=Reverb
+2"`. Routings, wavetable choices and anything else a plugin keeps outside
+its params are out of reach; a plugin state file is a possible next step.
+
+**Notes.** One note at a time from `gate`/`voct`/`vel`. A pitch change of a
+semitone or more while the gate is high sends the new note before releasing
+the old, which a mono or legato patch hears as a slur (a tracker `~`).
 
 **Timing.** Plugins process blocks; the graph runs per sample. The module
 collects 64 samples, runs the plugin once, and plays the result during the

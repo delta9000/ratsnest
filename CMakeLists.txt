@@ -125,7 +125,10 @@ add_test(NAME syx2patch
 
 add_test(NAME cli_plugins COMMAND ratsnest plugins $<TARGET_FILE:rn_test_tone>)
 set_tests_properties(cli_plugins PROPERTIES PASS_REGULAR_EXPRESSION
-  "id: \"org.ratsnest.test.tone\".*\n +3 +\"Gain\"  0\\.\\.2  default 1 \\(p base 0\\.500\\)")
+  "id: \"org.ratsnest.test.tone\".*\n +3 +\"Gain\"  0\\.\\.2  = 1 \\(p base 0\\.500\\)")
+add_test(NAME cli_plugins_set COMMAND ratsnest plugins $<TARGET_FILE:rn_test_tone> Gain=0.5)
+set_tests_properties(cli_plugins_set PROPERTIES PASS_REGULAR_EXPRESSION
+  "\"Gain\"  0\\.\\.2  = 0\\.5 \\(p base 0\\.250\\)")
 add_test(NAME cli_plugins_missing COMMAND ratsnest plugins "No Such Plugin")
 set_tests_properties(cli_plugins_missing PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli_describe COMMAND ratsnest describe additive)
