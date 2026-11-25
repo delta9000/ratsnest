@@ -1,0 +1,63 @@
+# keyboard.trk -- every C from C1 to C8 at pp, mf and ff (1.5 s each, then
+# the damper drops), then the pedal: a low A0 + C8 left ringing. 1 row = 1/4 s.
+track keys note vel
+track ped cva
+
+pattern sweep 192 keys
+000 | C1 0.15
+006 | off
+008 | C1 0.5
+014 | off
+016 | C1 0.95
+022 | off
+024 | C2 0.15
+030 | off
+032 | C2 0.5
+038 | off
+040 | C2 0.95
+046 | off
+048 | C3 0.15
+054 | off
+056 | C3 0.5
+062 | off
+064 | C3 0.95
+070 | off
+072 | C4 0.15
+078 | off
+080 | C4 0.5
+086 | off
+088 | C4 0.95
+094 | off
+096 | C5 0.15
+102 | off
+104 | C5 0.5
+110 | off
+112 | C5 0.95
+118 | off
+120 | C6 0.15
+126 | off
+128 | C6 0.5
+134 | off
+136 | C6 0.95
+142 | off
+144 | C7 0.15
+150 | off
+152 | C7 0.5
+158 | off
+160 | C7 0.95
+166 | off
+168 | C8 0.15
+174 | off
+176 | C8 0.5
+182 | off
+184 | C8 0.95
+190 | off
+
+pattern pedal 48 keys ped
+000 | A0 0.8     | 1
+016 | E1 0.5
+024 | C8 0.6
+032 | off
+046 | .         | 0
+
+order sweep pedal

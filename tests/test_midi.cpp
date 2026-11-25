@@ -199,6 +199,17 @@ TEST_CASE("sustain pedal defers note-off until pedal release") {
   CHECK(m.out("gate1") == doctest::Approx(0.f));
 }
 
+TEST_CASE("sustain pedal is also readable as a mapped cc slot") {
+  MidiRig m({{"voices", number(2)}, {"cc", array({64})}});
+  m.noteon(0, 60, 100);
+  m.cc(0, 64, 127);
+  for (int i = 0; i < 2400; ++i) m.step();
+  CHECK(m.out("cc1") > 0.99f);                    // pedal level for a soundboard
+  m.noteoff(0, 60);
+  m.step();
+  CHECK(m.out("gate1") == doctest::Approx(1.f));  // and still defers note-off
+}
+
 TEST_CASE("poly re-strike of a sustained note reclaims its voice") {
   // Repro (voices:2): noteon 60 -> voice1; pedal down; noteoff 60 -> voice1
   // sustained; noteon 60 again must RECLAIM voice1 (one-sample gap, fresh

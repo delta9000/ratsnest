@@ -157,11 +157,11 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 
 | Area | Modules |
 |---|---|
-| Sources | `vco`, `additive`, `lfo`, `noise`, `dust`, `random`, `sampler`, `modal`, `string`, `fm` |
+| Sources | `vco`, `additive`, `lfo`, `noise`, `dust`, `random`, `sampler`, `modal`, `string`, `piano`, `fm` |
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tracker`, `tempo`, `alloc`, `chord`, `midi` |
-| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `scope`, `stereo`, `rec`, `extin`, `out` |
+| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `out` |
 
 ## `vca`
 
@@ -876,7 +876,8 @@ rule (`alloc`/`midi` expose only banks so `poly.voct` can resolve to
   (≤ 4 entries, each clamped `0..127`, only the first four read); each `cc<k>`
   is `0..1`, smoothed by a fixed ~3 ms one-pole. Unmapped slots output 0.
 - `at` is channel pressure `0..1`. Sustain (CC 64) defers note-offs until the
-  pedal releases. `channel` `0` = omni (default), else `1..16`; velocity-0
+  pedal releases; it can also be mapped like any controller (`cc: [64]`) to
+  drive a `piano`'s or `soundboard`'s `pedal`. `channel` `0` = omni (default), else `1..16`; velocity-0
   note-ons are note-offs. All tracker state survives hot reload.
 
 ## `dcblock`
@@ -1141,6 +1142,79 @@ Config `seed`: equal seeds repeat plucks exactly. Reaches ~5.9 Hz at 48 kHz
 and clamps at a quarter of the sample rate. Like Rings, controls are read every
 32 samples and the loop delay, pickup position, dispersion and phase
 compensation are ramped per sample; `strike` and `in` are sample-exact.
+
+## `piano`
+
+`piano { seed: 1 }` — one physically modelled piano note: a felt hammer
+striking one to three stiff, slightly detuned strings. Inputs `gate` (rising
+edge = strike; held = damper up; falling = damper down), `voct` (A3 = 0, so
+keys A0..C8 are -2.75..+3.25; the nearest key picks the string design and the
+exact pitch sets the tuning), `vel` 0 (`0..1` -> hammer speed 0.25..6 m/s;
+**base 0, so cable velocity in**, or write `vel: 0.6` for a fixed dynamic),
+`hardness` 0.5 (felt stiffness, ×0.25..×4: voicing, mellow to bright),
+`detune` 1 (unison spread multiplier; 0 = perfectly in tune, dead-sounding),
+`decay` 1 (string sustain multiplier, `0.05..8`), `stretch` 1 (Railsback
+octave stretch, 0 = equal temperament; full stretch is about -20 cents at A0
+and +30 at C8), `pedal` 0 (`0..1`: lifts this note's damper, continuously,
+so half-pedal works). Output `out` (the strings' force on the bridge: patch
+it into a `soundboard`). `voct`, `vel`, `hardness`, `detune`, `decay` and
+`stretch` are read at the strike only; there is no pitch bend.
+
+What it models, per key (designs are computed once at init):
+
+- **Hammer:** a mass on a power-law felt spring, F = K·c^p (p 2.3 bass to
+  3.0 treble), solved implicitly against the strings each sample. Harder hits
+  compress the felt further, so the spectrum brightens with velocity on its
+  own; contact lasts ~4 ms in the bass to ~0.3 ms at the top.
+- **Strings:** a digital waveguide per string, split at the strike point
+  (1/8 of the length, nearer the end in the treble), with frequency-dependent
+  loss and an allpass dispersion cascade fitted to the stiff-string partial
+  law f_k = k·f0·√(1 + B·k²) (B ~5e-5 in the low tenor to ~2e-2 at C8; fitted
+  to ~4.5 kHz, within a few cents in the middle and ~10 in the deep bass).
+- **Unisons:** one string A0..F#1, two to C3, three above, detuned by under
+  two cents (seeded). A shared bridge term makes the in-phase motion decay
+  2–4× faster than the out-of-phase motion: the prompt sound then the long
+  aftersound, with beating between them.
+- **Dampers:** felt drops in ~8 ms on note-off unless `pedal` holds it;
+  F6 and above have no dampers and always ring out.
+
+Levels: mezzo-forte (`vel` 0.5) C4 peaks near -26 dBFS, fortissimo near -11,
+pianissimo (0.1) near -41; early loudness is voiced even across the keys.
+Silent voices idle (no CPU) after ~100 ms below -100 dBFS. A voice stolen
+for a different key is cut with a 4 ms fade. One voice per note, so use a
+`voice` group: `alloc`/`chord` (with `vel: 0`, so the cable owns it) or
+`midi`. Patches: `patches/piano/` (`grand.patch` for a MIDI keyboard).
+
+```text
+mid = midi { voices: 8, cc: [64] }
+keys = voice { notes: mid }
+keys.p = piano {}
+mid.gate -> keys.p.gate
+mid.voct -> keys.p.voct
+mid.vel -> keys.p.vel
+board = soundboard {}
+keys.p -> board.in
+mid.cc1 -> board.pedal
+board.l -> out.left
+board.r -> out.right
+```
+
+## `soundboard`
+
+`soundboard` — the shared body for `piano` voices; patch their summed `out`
+into it, once per instrument. Inputs `in` 0, `pedal` 0 (`0..1`), `body` 0.4,
+`resonance` 0.5 (`0..2`); outputs `l`, `r`. Three parallel parts:
+
+- the bridge signal itself through a 70 Hz radiation high-pass (a
+  soundboard barely radiates the lowest fundamentals);
+- `body`: an eight-line feedback delay network (2.9–18.3 ms paths, ~0.3 s
+  low-frequency decay, darker as it decays), spread to stereo;
+- `resonance`: 88 sympathetic strings tuned to the keys, panned bass-left,
+  excited by everything that sounds. `pedal` lifts their dampers (a ~17 ms
+  glide; half-pedal is continuous); F6 and above are always free, so even
+  dry playing has a faint halo.
+
+Controls are read every 32 samples.
 
 ## `overdrive`
 

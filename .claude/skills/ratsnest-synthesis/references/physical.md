@@ -9,6 +9,12 @@ sample. Reach for `string` for anything plucked, bowed, or droning; `modal`
 for anything struck that has a body — bells, bars, drums, plates, bowls, and
 the whole `patches/lib/kit/` drum family.
 
+For an actual piano, don't build one from `string`: use `piano` (one voice per
+note, in a `voice` group) into one shared `soundboard`. It models the hammer,
+unisons, dampers and pedal itself; `patches/piano/` has a MIDI patch, a
+keyboard sweep and a pedalled nocturne. Its `vel` base is 0, and `alloc`'s and
+`chord`'s is 1, so declare those `vel: 0` when a tracker owns velocity.
+
 Excitation → resonance → shaping, with the shaping *inside* the resonance:
 `damping` is the envelope. That is the whole reason these voices sound alive.
 
