@@ -1,0 +1,34 @@
+# keyboard -- the physical `piano` voice across its range: every C from C1 to
+# C8 at pp, mf and ff, each held 1.5 s and then damped, then an A0 and a C8
+# rung out under the sustain pedal. 108 s at one row per 1/4 s.
+#
+# Signal path: tracker -> alloc (8 voices) -> 8 x piano -> soundboard
+# (radiation, body FDN, sympathetic strings following the pedal) -> room.
+clk = transport { bpm: 60, division: 4 }
+song = tracker { file: "keyboard.trk" }
+clk.clock -> song.clock
+
+poly = alloc { n: 8, vel: 0 }   # vel base 0: the tracker owns it
+song.gate1 -> poly.gate
+song.voct1 -> poly.voct
+song.vel1 -> poly.vel
+
+keys = voice { notes: poly }
+keys.p = piano {}
+poly.gate -> keys.p.gate
+poly.voct -> keys.p.voct
+poly.vel -> keys.p.vel
+song.cva2 -> keys.p.pedal
+
+board = soundboard {}
+keys.p -> board.in
+song.cva2 -> board.pedal
+
+room = reverb { decay: 0.45, damp: 0.5, mix: 1 }
+board.l -> room.in_l : 0.25
+board.r -> room.in_r : 0.25
+
+board.l -> out.left
+board.r -> out.right
+room.out_l -> out.left
+room.out_r -> out.right

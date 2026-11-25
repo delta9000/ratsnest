@@ -1,0 +1,29 @@
+# grand -- the physical piano on a MIDI keyboard. Eight voices (the voice-bank
+# width), velocity to the hammer, the sustain pedal to every damper and to the
+# soundboard's sympathetic strings. `cc: [64]` reads the same pedal the midi
+# module already uses to defer note-offs, so a half-pressed pedal (on keyboards
+# that send it) half-lifts the dampers.
+#
+# Offline `render` has no MIDI, so this renders silence; play it with
+#   mise run play -- patches/piano/grand.patch
+mid = midi { voices: 8, cc: [64] }
+
+keys = voice { notes: mid }
+keys.p = piano {}
+mid.gate -> keys.p.gate
+mid.voct -> keys.p.voct
+mid.vel -> keys.p.vel
+mid.cc1 -> keys.p.pedal
+
+board = soundboard {}
+keys.p -> board.in
+mid.cc1 -> board.pedal
+
+room = reverb { decay: 0.45, damp: 0.5, mix: 1 }
+board.l -> room.in_l : 0.22
+board.r -> room.in_r : 0.22
+
+board.l -> out.left
+board.r -> out.right
+room.out_l -> out.left
+room.out_r -> out.right

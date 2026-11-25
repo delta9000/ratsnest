@@ -193,7 +193,7 @@ class Midi final : public Module {
       } else {
         pedal_ = down;
       }
-      return;
+      // Also readable as a cc slot (`cc: [64]`), e.g. for a soundboard's dampers.
     }
     for (int k = 0; k < kCcSlots; ++k)
       if (cc_ctrl_[k] == static_cast<int>(num))

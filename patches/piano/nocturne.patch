@@ -1,0 +1,78 @@
+# nocturne -- an original 16-bar nocturne in Db, written to show the physical
+# piano: a singing pedalled melody, a dry staccato passage where only the
+# dampers shape the notes, a fortissimo climax, and a ringing ending.
+# Score in nocturne.trk (72 BPM, one row per sixteenth). ~58 s.
+#
+# Five tracker tracks feed four voice groups; every voice reads the pedal
+# track, and so does the shared soundboard (its 88 sympathetic strings).
+clk = transport { bpm: 72, division: 4 }
+song = tracker { file: "nocturne.trk" }
+clk.clock -> song.clock
+
+# ---- right-hand melody: legato, round-robin over 4 voices ----
+mel_a = alloc { n: 4, vel: 0 }   # vel base 0: the tracker owns it
+song.gate1 -> mel_a.gate
+song.voct1 -> mel_a.voct
+song.vel1 -> mel_a.vel
+mel = voice { notes: mel_a }
+mel.p = piano {}
+mel_a.gate -> mel.p.gate
+mel_a.voct -> mel.p.voct
+mel_a.vel -> mel.p.vel
+song.cva5 -> mel.p.pedal
+
+# ---- left hand: broken chords, 8 voices so a pedalled bar rings whole ----
+lh_a = alloc { n: 8, vel: 0 }   # vel base 0: the tracker owns it
+song.gate2 -> lh_a.gate
+song.voct2 -> lh_a.voct
+song.vel2 -> lh_a.vel
+lh = voice { notes: lh_a }
+lh.p = piano {}
+lh_a.gate -> lh.p.gate
+lh_a.voct -> lh.p.voct
+lh_a.vel -> lh.p.vel
+song.cva5 -> lh.p.pedal
+
+# ---- right-hand chords: two alternating chord tracks, lightly rolled ----
+c1 = chord { n: 3, strum: 0.012, vel: 0 }
+song.gate3 -> c1.gate
+song.vel3 -> c1.vel
+song.voct3 -> c1.p1
+song.cva3 -> c1.p2
+song.cvb3 -> c1.p3
+ch1 = voice { notes: c1 }
+ch1.p = piano {}
+c1.gate -> ch1.p.gate
+c1.voct -> ch1.p.voct
+c1.vel -> ch1.p.vel
+song.cva5 -> ch1.p.pedal
+
+c2 = chord { n: 3, strum: 0.03, vel: 0 }
+song.gate4 -> c2.gate
+song.vel4 -> c2.vel
+song.voct4 -> c2.p1
+song.cva4 -> c2.p2
+song.cvb4 -> c2.p3
+ch2 = voice { notes: c2 }
+ch2.p = piano {}
+c2.gate -> ch2.p.gate
+c2.voct -> ch2.p.voct
+c2.vel -> ch2.p.vel
+song.cva5 -> ch2.p.pedal
+
+# ---- one instrument body: every string drives the same soundboard ----
+board = soundboard {}
+mel.p -> board.in
+lh.p -> board.in
+ch1.p -> board.in
+ch2.p -> board.in
+song.cva5 -> board.pedal
+
+room = reverb { decay: 0.5, damp: 0.45, mix: 1 }
+board.l -> room.in_l : 0.22
+board.r -> room.in_r : 0.22
+
+board.l -> out.left
+board.r -> out.right
+room.out_l -> out.left
+room.out_r -> out.right
