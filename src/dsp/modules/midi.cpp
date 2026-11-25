@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdint>
 #include "dsp/modules.h"
+#include "dsp/voice_bank.h"
 
 // midi: pure event -> CV with real note identity. No I/O — events arrive via
 // on_midi (raw channel-voice bytes), outputs are computed in process() from
@@ -15,23 +16,17 @@ constexpr ConfigInfo kCfg[] = {{"channel", nullptr}, {"voices", nullptr, ConfigK
                                {"mode", kModes},       {"bend", nullptr},
                                {"cc", nullptr, ConfigKind::Numbers}};
 constexpr OutputInfo kOuts[] = {
-    {"gate1"}, {"gate2"}, {"gate3"}, {"gate4"},
-    {"gate5"}, {"gate6"}, {"gate7"}, {"gate8"},
-    {"voct1"}, {"voct2"}, {"voct3"}, {"voct4"},
-    {"voct5"}, {"voct6"}, {"voct7"}, {"voct8"},
-    {"vel1"},  {"vel2"},  {"vel3"},  {"vel4"},
-    {"vel5"},  {"vel6"},  {"vel7"},  {"vel8"},
-    {"bend"},  {"at"},
-    {"cc1"},   {"cc2"},   {"cc3"},   {"cc4"}};
+    MS_BANK_FAMILY(gate), MS_BANK_FAMILY(voct), MS_BANK_FAMILY(vel),
+    {"bend"}, {"at"}, {"cc1"}, {"cc2"}, {"cc3"}, {"cc4"}};
 
-constexpr int kMaxVoices = 8;
+constexpr int kMaxVoices = kBankWidth;
 constexpr int kStackDepth = 16;  // mono held-key stack
 constexpr int kCcSlots = 4;
 
 class Midi final : public Module {
  public:
   void init(double sample_rate, const Config& cfg) override {
-    voices_ = static_cast<int>(std::clamp(cfg_num(cfg, "voices", kCfg[1].def), 1.0, 8.0));
+    voices_ = static_cast<int>(std::clamp(cfg_num(cfg, "voices", kCfg[1].def), 1.0, static_cast<double>(kMaxVoices)));
     channel_ = static_cast<int>(std::clamp(cfg_num(cfg, "channel", 0.0), 0.0, 16.0));
     bend_semis_ = static_cast<float>(std::clamp(cfg_num(cfg, "bend", 2.0), 0.0, 24.0));
     lowest_ = cfg_str(cfg, "mode", "last") == "lowest";
@@ -54,15 +49,15 @@ class Midi final : public Module {
       const bool gate = active && gate_[i] && !gap_[i];
       outs[i] = gate ? 1.f : 0.f;
       was_high_[i] = gate;
-      outs[8 + i] = active ? voct_[i] + bend_voct : 0.f;
-      outs[16 + i] = active ? vel_[i] : 0.f;
+      outs[kMaxVoices + i] = active ? voct_[i] + bend_voct : 0.f;
+      outs[2 * kMaxVoices + i] = active ? vel_[i] : 0.f;
       gap_[i] = false;  // one-sample gap consumed
     }
-    outs[24] = bend_voct;
-    outs[25] = at_;
+    outs[3 * kMaxVoices] = bend_voct;
+    outs[3 * kMaxVoices + 1] = at_;
     for (int k = 0; k < kCcSlots; ++k) {
       cc_val_[k] += (cc_target_[k] - cc_val_[k]) * cc_coeff_;
-      outs[26 + k] = cc_val_[k];
+      outs[3 * kMaxVoices + 2 + k] = cc_val_[k];
     }
   }
 

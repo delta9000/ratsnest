@@ -60,7 +60,7 @@ TEST_CASE("a stray control byte is escaped so the diagnostic stays one line") {
 }
 
 TEST_CASE("an out-of-range voice count saturates instead of overflowing int") {
-  // static_cast<int>(1e11) is undefined behaviour; the count must clamp to 8.
+  // static_cast<int>(1e11) is undefined behaviour; the count must clamp to the bank width (16).
   auto p = dsl::parse(
       "keys = alloc { n: 99999999999 }\n"
       "lead = voice { notes: keys }\n"
@@ -70,7 +70,7 @@ TEST_CASE("an out-of-range voice count saturates instead of overflowing int") {
   Diags d;
   graph::expand_voices(p.ast, d);
   REQUIRE(d.empty());
-  CHECK(p.ast.modules.size() == 1 + 8);
+  CHECK(p.ast.modules.size() == 1 + 16);
 
   auto q = dsl::parse(
       "keys = alloc { n: 3 }\n"

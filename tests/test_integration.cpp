@@ -160,7 +160,7 @@ TEST_CASE("patches/lib/poly-pad.sub takes a pitch per voice up to chord's eight"
   for (size_t i = 0; i < g.nodes.size(); ++i)
     if (g.nodes[i].info->type == std::string("chord"))
       for (int v = 0; v < 8; ++v)
-        voices += e.output_value(i, static_cast<size_t>(8 + v)) == doctest::Approx(0.1 * (v + 1));
+        voices += e.output_value(i, static_cast<size_t>(16 + v)) == doctest::Approx(0.1 * (v + 1));
   CHECK(voices == 8);
 }
 

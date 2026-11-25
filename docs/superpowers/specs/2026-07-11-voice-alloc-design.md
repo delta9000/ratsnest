@@ -27,7 +27,7 @@ names. Nothing else in the grammar changes.
 
 | | |
 |---|---|
-| configs | `n` 1..8 (default 4), `mode` (`rr` \| `unison`) |
+| configs | `n` 1..16 (default 4), `mode` (`rr` \| `unison`) |
 | inputs | `gate` 0, `voct` 0, `vel` 1 |
 | outputs | `gate1..gate8`, `voct1..voct8`, `vel1..vel8`, `spread1..spread8` |
 
@@ -93,7 +93,8 @@ lead.amp -> mix.in1 : 0.4     # inside -> outside: straight sum of voices
      family `<bank>1..<bank>N` the bound module exposes. This shadows
      nothing — `alloc` has no mono *output* named `voct`, so that spelling
      is an error everywhere else, today and after this change. Bank
-     families are 8-wide (`<stem>1..<stem>8`) — a stem qualifies only if the
+     families are 16-wide (`<stem>1..<stem>16`; 8 until 2026-11-25, widened
+     for piano polyphony) — a stem qualifies only if the
      full family exists, so midi's 4-wide `cc1..cc4` does not qualify and
      bare `mid.cc` is a normal unknown-output compile error, not a
      silently-fanned bank read.
@@ -129,7 +130,7 @@ directly: `keys = voice { notes: midi1 }`. Deliberately banks only — no mono
 "shadows nothing" rule in §3 case 2 (see `2026-07-11-midi-design.md` §1).
 Because it has real note identity it can implement `lowest` and oldest-steal
 properly. `alloc` stays the sequencer-side allocator; the `voice` mechanism
-is indifferent to which feeds it. Anything exposing a full 8-wide bank family
+is indifferent to which feeds it. Anything exposing a full 16-wide bank family
 qualifies as a `notes:` binding target — but binding validation keys on
 `gate1` (§3), so a module with banks that don't include `gate1..8` (e.g.
 `turing.bit1..8`) cannot bind via `notes:`; its bit bank is usable only via

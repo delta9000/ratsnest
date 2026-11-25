@@ -327,4 +327,63 @@ struct Hammer {
   }
 };
 
+// Two-pole resonator rung by impulses: the action's own little bodies.
+struct Ring {
+  float a1 = 0.0f, a2 = 0.0f, norm = 1.0f, y1 = 0.0f, y2 = 0.0f;
+  void tune(float hz, float bandwidth, float fs) {
+    const float r = std::exp(-std::numbers::pi_v<float> * bandwidth / fs);
+    const float w = 2.0f * std::numbers::pi_v<float> * hz / fs;
+    a1 = 2.0f * r * std::cos(w);
+    a2 = r * r;
+    norm = std::sin(w);
+  }
+  float tick(float x) {
+    float y = a1 * y1 - a2 * y2 + x * norm;
+    if (std::abs(y) < 1e-20f) y = 0.0f;
+    y2 = y1;
+    y1 = y;
+    return y;
+  }
+};
+
+// Action noises, which a piano makes besides its strings: the key bottoming
+// on the keybed a few ms after the hammer leaves (a low thud, ~vel^2), the
+// hammer's wooden knock (brief, mid-band, strongest in the treble), the
+// damper felt landing on a still-vibrating string (a short band-limited
+// hiss, proportional to the string's level) and the key's return thud.
+// Hand-voiced; levels are in output units, below the tone by 25-40 dB.
+struct Mechanics {
+  Ring thump, knock;
+  float hiss = 0.0f, hiss_decay = 0.99f, lp = 0.0f, hp = 0.0f, lp_c = 0.2f;
+  float pending = 0.0f;
+  int delay = -1;
+  std::uint32_t rng = 0x2545F491u;
+
+  void init(float fs) {
+    thump.tune(95.0f, 60.0f, fs);
+    knock.tune(1100.0f, 700.0f, fs);
+    hiss_decay = std::exp(-1.0f / (0.018f * fs));
+    lp_c = std::exp(-2.0f * std::numbers::pi_v<float> * 2500.0f / fs);
+  }
+  void strike(float vel, float treble, float amount, float fs) {
+    pending = amount * 0.012f * vel * vel;
+    delay = static_cast<int>(0.003f * fs);
+    knock.tick(amount * 0.03f * vel * std::sqrt(vel) * (0.3f + treble));
+  }
+  void release(float level, float amount) {
+    hiss += amount * 0.15f * level;
+    thump.tick(amount * 0.002f);
+  }
+  float tick() {
+    float x = 0.0f;
+    if (delay >= 0 && delay-- == 0) x = pending;
+    const float n = hiss * unit_float(xorshift32(rng)) - 0.5f * hiss;
+    hiss *= hiss_decay;
+    if (hiss < 1e-9f) hiss = 0.0f;
+    lp = (1.0f - lp_c) * n + lp_c * lp;  // ~2.5 kHz lowpass ...
+    hp += 0.05f * (lp - hp);             // ... minus its low end
+    return thump.tick(x) + knock.tick(0.0f) + (lp - hp);
+  }
+};
+
 }  // namespace ms::dsp::piano

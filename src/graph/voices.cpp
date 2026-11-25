@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "dsp/module.h"
+#include "dsp/voice_bank.h"
 
 namespace ms::graph {
 namespace {
@@ -61,7 +62,7 @@ int inherited_count(const dsl::ModuleDecl& bound, const dsp::ModuleInfo& info) {
   return 1;
 }
 
-// Bank stems: the full 8-wide family <stem>1..<stem>8, matching the bank
+// Bank stems: the full family <stem>1..<stem>16 (kBankWidth), matching the bank
 // convention gate/voct/vel/spread satisfy (voice-alloc-design §3 case 2). A
 // <stem>1/<stem>2 pair alone is not enough: midi's cc is only 4-wide
 // (cc1..cc4), and requiring just a pair let bare `mid.cc` silently qualify as
@@ -74,9 +75,10 @@ std::unordered_set<std::string> bank_stems(const dsp::ModuleInfo& info) {
     const std::string& on = o.name;
     if (on.empty() || on.back() != '1') continue;
     const std::string stem = on.substr(0, on.size() - 1);
-    bool full8 = true;
-    for (int k = 2; k <= 8 && full8; ++k) full8 = out_names.count(stem + std::to_string(k)) > 0;
-    if (full8) stems.insert(stem);
+    bool full = true;
+    for (int k = 2; k <= dsp::kBankWidth && full; ++k)
+      full = out_names.count(stem + std::to_string(k)) > 0;
+    if (full) stems.insert(stem);
   }
   return stems;
 }
@@ -145,7 +147,7 @@ class Expander {
       return;
     }
     const int n = inherited_count(b, *info);
-    g.n = std::clamp(n, 1, 8);
+    g.n = std::clamp(n, 1, dsp::kBankWidth);
     g.stems = bank_stems(*info);
     // An explicit n: on the voice decl must match the inherited count.
     if (const dsl::ParamDecl* vn = find_param(voice, "n")) {

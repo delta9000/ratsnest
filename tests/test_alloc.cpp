@@ -53,22 +53,19 @@ struct AllocRig {
 };
 }  // namespace
 
-TEST_CASE("alloc registers gate/voct/vel inputs and 32 banked outputs in order") {
+TEST_CASE("alloc registers gate/voct/vel inputs and 64 banked outputs in order") {
   const ModuleInfo* info = find_module("alloc");
   REQUIRE(info != nullptr);
   REQUIRE(info->inputs.size() == 3);
   CHECK(std::string(info->inputs[0].name) == "gate");
   CHECK(std::string(info->inputs[1].name) == "voct");
   CHECK(std::string(info->inputs[2].name) == "vel");
-  REQUIRE(info->outputs.size() == 32);
-  const char* expected[32] = {
-      "gate1", "gate2", "gate3", "gate4", "gate5", "gate6", "gate7", "gate8",
-      "voct1", "voct2", "voct3", "voct4", "voct5", "voct6", "voct7", "voct8",
-      "vel1",  "vel2",  "vel3",  "vel4",  "vel5",  "vel6",  "vel7",  "vel8",
-      "spread1", "spread2", "spread3", "spread4",
-      "spread5", "spread6", "spread7", "spread8"};
-  for (int i = 0; i < 32; ++i)
-    CHECK(std::string(info->outputs[static_cast<size_t>(i)].name) == expected[i]);
+  REQUIRE(info->outputs.size() == 64);
+  const char* stems[4] = {"gate", "voct", "vel", "spread"};
+  for (int f = 0; f < 4; ++f)
+    for (int i = 0; i < 16; ++i)
+      CHECK(std::string(info->outputs[static_cast<size_t>(16 * f + i)].name) ==
+            std::string(stems[f]) + std::to_string(i + 1));
 }
 
 TEST_CASE("rr claims voices in order and older voices hold pitch") {
@@ -200,7 +197,7 @@ TEST_CASE("alloc migrates claim state") {
   a->init(48000.0, cfg);
   b->init(48000.0, cfg);
   float ins[3] = {0.0f, 0.0f, 1.0f};
-  float out_a[32] = {}, out_b[32] = {};
+  float out_a[64] = {}, out_b[64] = {};
   auto step = [&](Module* m, float* out, float gate, float voct, float vel) {
     ins[0] = gate;
     ins[1] = voct;
@@ -219,7 +216,7 @@ TEST_CASE("alloc migrates claim state") {
     ins[2] = 0.9f;
     a->process(ins, out_a);
     b->process(ins, out_b);
-    for (int j = 0; j < 32; ++j)
+    for (int j = 0; j < 64; ++j)
       CHECK(out_a[j] == doctest::Approx(out_b[j]));
   }
 }
