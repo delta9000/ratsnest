@@ -85,6 +85,26 @@ TEST_CASE("plugin: a gate plays voct's note on its sample, one block late") {
   CHECK(r.r[2 * kLatency + 10] == doctest::Approx(60.0f / 127.0f));
 }
 
+TEST_CASE("plugin: a param's move lands on its sample, so it can lock a note's step") {
+  std::vector<float> ins(kIns, 0.0f);
+  ins[0] = 0.4f;
+  ins[5] = 0.5f;  // unity
+  auto m = make(tone());
+  run(*m, ins, 2 * kLatency);
+  std::vector<float> l;
+  float o[2];
+  for (size_t i = 0; i < 2 * kLatency; ++i) {
+    if (i == 10) ins[5] = 0.25f;  // Gain 0.5, mid-block
+    if (i == 30) ins[5] = 0.375f;  // a second move in the block waits for its end
+    m->process(ins.data(), o);
+    l.push_back(o[0]);
+  }
+  CHECK(l[kLatency + 9] == doctest::Approx(0.4f));
+  CHECK(l[kLatency + 10] == doctest::Approx(0.2f));
+  CHECK(l[kLatency + 62] == doctest::Approx(0.2f));
+  CHECK(l[kLatency + 63] == doctest::Approx(0.3f));
+}
+
 TEST_CASE("plugin: a new semitone under a held gate is a slur, not a release") {
   std::vector<float> ins(kIns, 0.0f);
   ins[2] = 1.0f;
