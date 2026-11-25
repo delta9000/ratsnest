@@ -1,0 +1,2 @@
+/* ratsnest.clap exports one symbol; everything else stays private. */
+{ global: clap_entry; local: *; };

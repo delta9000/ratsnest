@@ -301,6 +301,12 @@ ratsnest check  drone.patch          # parse/validate — editor lint
 ratsnest describe [module_type]      # JSON interfaces from the runtime registry
 ```
 
+`ratsnest.clap` (docs/plugin.md) is the same RtRunner + Controller inside a
+DAW: each `.patch` in the plugin folder is a CLAP instrument (or effect, if it
+reads `extin`), with host notes as sample-accurate MIDI and hot-reload driven
+by the host's timer. It is a plugin, not a host: ratsnest still loads no
+third-party plugins.
+
 ### 7.5 Error handling
 
 - Parse/validation errors: report, keep last good graph running (§3.3).
@@ -325,7 +331,8 @@ ratsnest describe [module_type]      # JSON interfaces from the runtime registry
 
 ## 9. Tooling & layout
 
-C++20 · CMake · doctest · deps: PipeWire + doctest only · mise tasks wrapping
+C++20 · CMake · doctest · deps: PipeWire + doctest, plus the header-only CLAP
+ABI for the optional plugin (docs/plugin.md) · mise tasks wrapping
 configure/build/test/run.
 
 ```

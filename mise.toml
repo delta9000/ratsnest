@@ -70,6 +70,15 @@ run = "./build/ratsnest play"
 description = "Convert 6-op FM SysEx voices to .sub files. Usage: mise run syx -- bank.syx -o patches/dx/bank (docs/fm-syx.md)"
 run = "python3 tools/syx2patch.py"
 
+[tasks.plugin-install]
+description = "Build ratsnest.clap and copy it to ~/.clap; list patches by linking them into ~/.config/ratsnest/plugins (docs/plugin.md)"
+depends = ["build"]
+run = """
+mkdir -p ~/.clap "${RATSNEST_PLUGIN_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/ratsnest/plugins}"
+cp build/ratsnest.clap ~/.clap/
+echo "installed ~/.clap/ratsnest.clap; patches: ${RATSNEST_PLUGIN_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/ratsnest/plugins}"
+"""
+
 [tasks.complexity]
 description = "Complexity score for src/; fails if it grows past docs/complexity.json. --hotspots lists the worst functions."
 run = "python3 tools/complexity.py --check"
