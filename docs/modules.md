@@ -1061,7 +1061,7 @@ mix.out_r -> r.in_r
 
 ## `plugin`
 
-`plugin { file: "Surge XT", id: "", params: [], midi: off }` hosts a
+`plugin { file: "Surge XT", id: "", params: [], set: [], midi: off }` hosts a
 third-party CLAP plugin, headless. Inputs `in_l`, `in_r`, `gate`, `voct`,
 `vel` (0.8), `p1..p8`; outputs `out_l`, `out_r`. Details and limits:
 [docs/plugin.md](plugin.md#loading-plugins).
@@ -1076,13 +1076,23 @@ third-party CLAP plugin, headless. Inputs `in_l`, `in_r`, `gate`, `voct`,
   round) and sent when it changes. A listed param is always driven, so set
   its base (`p1: 0.4`); `ratsnest plugins <file>` prints each default as a
   p base. Unlisted params keep the plugin's defaults.
+- `set` fixes any number of params once, at load: `"Name=value"` strings,
+  the value written as the plugin displays it (`"A Osc 1 Type=Wavetable"`,
+  `"A Filter 1 Cutoff=800 Hz"`) or as a number in the param's own range.
+  Applied in order, so a type can come before the params it renames;
+  `params:` binds afterwards and may name those. This is the patch's
+  preset: `ratsnest plugins <file> "Name=value"...` lists the params as the
+  sets leave them.
 - `gate` rising through 0.5 plays `voct`'s note (`0` = A3, MIDI 57; nearest
-  semitone) at velocity `vel`; falling releases it. Mono. With `midi: on`,
-  keyboard MIDI goes straight to the plugin too, for polyphony.
+  semitone) at velocity `vel`; falling releases it. A new semitone while the
+  gate is high is a slur (new note on, then the old one off), so a tracker
+  `~` glides a mono/legato plugin patch; keep vibrato off `voct` (drive a
+  pitch param instead). Mono. With `midi: on`, keyboard MIDI goes straight to
+  the plugin too, for polyphony.
 - Blocks of 64 samples: everything into the plugin (audio, notes, params)
   comes out 64 samples later (1.3 ms at 48 kHz).
-- A plugin that is missing, will not load, or lacks a listed param prints a
-  warning and runs silent; the patch still checks and plays. A topology
+- A plugin that is missing, will not load, lacks a listed param, or cannot
+  take a `set` value prints a warning and runs silent; the patch still checks and plays. A topology
   reload starts the plugin fresh; param edits glide.
 
 ```text

@@ -45,8 +45,9 @@ int usage() {
       "      --rate <hz>         sample rate (default 48000)\n"
       "      --watch <mod[.port]>  show that signal's value in the status line\n"
       "  ratsnest describe [module_type]     module interfaces as JSON\n"
-      "  ratsnest plugins [file]             installed CLAP plugins; with a file, its\n"
-      "                                      plugin ids and params (for `plugin`)\n"
+      "  ratsnest plugins [file [Name=v...]] installed CLAP plugins; with a file, its\n"
+      "                                      plugin ids and params (for `plugin`),\n"
+      "                                      after applying any `set:`-style values\n"
       "durations: 90, 90s, 500ms, 2m.  Modules and patch syntax: docs/modules.md\n");
   return 2;
 }
@@ -127,25 +128,32 @@ int cmd_describe(int argc, char** argv) {
 
 // One plugin's params, as a `plugin { params: [...] }` author needs them: the
 // name to list and the default as a normalized p-input base.
-void list_params(const clap_plugin_factory_t* f, const clap_plugin_descriptor_t* d) {
+// Any `Name=value` arguments are applied first, as `set:` would, so the
+// listing shows the names and values they lead to.
+void list_params(const clap_plugin_factory_t* f, const clap_plugin_descriptor_t* d,
+                 const std::vector<std::string>& sets) {
   const clap_plugin_t* p = f->create_plugin(f, ms::dsp::clap::host(), d->id);
   if (!p || !p->init(p)) {
     std::printf("    (cannot create)\n");
     if (p) p->destroy(p);
     return;
   }
+  if (const std::string err = ms::dsp::clap::apply(p, sets); !err.empty())
+    std::printf("    %s\n", err.c_str());
   for (const auto& q : ms::dsp::clap::params(p)) {
     const double span = q.max - q.min;
-    std::printf("    %-8u \"%s\"  %g..%g  default %g (p base %.3f)%s\n", q.id, q.name.c_str(),
-                q.min, q.max, q.def, span > 0 ? (q.def - q.min) / span : 0.0,
+    const std::string shown = ms::dsp::clap::text(p, q.id, q.value);
+    std::printf("    %-8u \"%s\"  %g..%g  = %g%s%s%s (p base %.3f)%s\n", q.id, q.name.c_str(),
+                q.min, q.max, q.value, shown.empty() ? "" : " [", shown.c_str(),
+                shown.empty() ? "" : "]", span > 0 ? (q.value - q.min) / span : 0.0,
                 q.stepped ? "  stepped" : "");
   }
   p->destroy(p);
 }
 
 int cmd_plugins(int argc, char** argv) {
-  if (argc > 3) return usage();
-  const bool one = argc == 3;
+  const bool one = argc >= 3;
+  const std::vector<std::string> sets(argv + std::min(argc, 3), argv + argc);
   std::vector<std::string> files;
   if (one) files.push_back(ms::dsp::clap::resolve(argv[2]));
   else files = ms::dsp::clap::installed();
@@ -160,7 +168,7 @@ int cmd_plugins(int argc, char** argv) {
     for (uint32_t i = 0, n = f ? f->get_plugin_count(f) : 0; i < n; ++i) {
       const auto* d = f->get_plugin_descriptor(f, i);
       std::printf("  id: \"%s\"  (%s)\n", d->id, d->name);
-      if (one) list_params(f, d);
+      if (one) list_params(f, d, sets);
     }
   }
   return 0;
