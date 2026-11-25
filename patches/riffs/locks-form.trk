@@ -1,0 +1,31 @@
+# locks-form.trk -- one row per bar (72).
+track bcut  cva   # 1  bass cutoff, added to the tracker's lock
+track bass  cva   # 2
+track pad   cva   # 3
+track pcut  cva   # 4  pad filter
+track pluck cva   # 5
+track kick  cva   # 6
+track top   cva   # 7  clap, hats
+track perc  cva   # 8  rim, shaker
+track dust  cva   # 9
+track verb  cva   # 10
+track main  cva   # 11
+
+pattern form 72
+#    bcut   bass   pad    pcut   pluck  kick   top    perc   dust   verb   main
+00 | 0    | 0    | .7>  | .38> | 0    | 0    | .45  | .6   | .9   | .55  | 1     # intro
+07 | .    | .    | .85  | .52  | .    | .    | .    | .    | .    | .    | .
+08 | 0>   | .85  | .65  | .50  | 0    | .9   | .8   | .8   | .55  | .4   | .     # A
+16 | .    | .    | .    | .    | .5   | .    | .    | .    | .    | .    | .
+23 | .06  | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+24 | .05> | .9   | .6   | .55  | .8   | 1    | 1    | .85  | .35  | .4   | .     # B
+39 | .12  | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+40 | 0>   | .8   | .85  | .68  | .65  | 0    | .35  | .9   | .8   | .7   | .     # break
+47 | .20  | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+48 | .10> | .95  | .6   | .58  | .8   | 1    | 1    | .9   | .4   | .45  | .     # C
+63 | .16  | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+64 | .06> | .8>  | .7   | .50> | 0    | 1>   | .8>  | .8   | .7   | .55  | .     # outro
+68 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | 1>
+71 | 0    | 0    | .    | .36  | .    | .2   | .3   | .    | .    | .    | 0
+
+order form

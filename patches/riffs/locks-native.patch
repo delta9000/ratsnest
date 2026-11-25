@@ -1,0 +1,268 @@
+# locks-native -- "Locks" with no plugin. 124 BPM, F# minor,
+# 72 bars (~2:19).
+#
+# The A/B partner of locks.patch: the same locks.trk and locks-form.trk,
+# the same drums, space and master, and every Surge voice replaced by
+# ratsnest modules that read the tracker's columns in Surge's own units
+# (cutoff locks, chord-quality locks, echo throws). Render both and compare.
+#
+# Notes and locks in locks.trk, levels in locks-form.trk.
+
+t    = transport { bpm: 124, division: 4, bars: 2 }
+song = tracker { file: "locks.trk", seed: 3 }
+form = tracker { file: "locks-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+bcut_lvl  = func { rise: 1, fall: 1 }
+bass_lvl  = func { rise: 0.3, fall: 0.6 }
+pad_lvl   = func { rise: 2, fall: 2 }
+pcut_lvl  = func { rise: 3, fall: 3 }
+pluck_lvl = func { rise: 1, fall: 1 }
+kick_lvl  = func { rise: 0.05, fall: 0.3 }
+top_lvl   = func { rise: 0.5, fall: 0.5 }
+perc_lvl  = func { rise: 1, fall: 1 }
+dust_lvl  = func { rise: 3, fall: 3 }
+verb_lvl  = func { rise: 2, fall: 2 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1  -> bcut_lvl.in
+form.cva2  -> bass_lvl.in
+form.cva3  -> pad_lvl.in
+form.cva4  -> pcut_lvl.in
+form.cva5  -> pluck_lvl.in
+form.cva6  -> kick_lvl.in
+form.cva7  -> top_lvl.in
+form.cva8  -> perc_lvl.in
+form.cva9  -> dust_lvl.in
+form.cva10 -> verb_lvl.in
+form.cva11 -> main_lvl.in
+
+# ---- bass: saw pair + sine sub into a ladder, cutoff in Surge's units ----
+# Surge's cutoff knob x is 440 * 2^((130x - 60)/12) Hz: 13.75 Hz * 2^(10.83x).
+bo1 = vco { freq: 220hz, wave: saw }
+bo2 = vco { freq: 220hz, wave: saw }
+bsub = vco { freq: 110hz, wave: sine }
+song.voct8 -> bo1.v_oct
+song.voct8 -> bo2.v_oct
+song.voct8 -> bsub.v_oct
+0.006 -> bo2.v_oct
+bmix = mix { levels: [0.5, 0.5, 0.35] }
+bo1  -> bmix.in1
+bo2  -> bmix.in2
+bf = ladder { cutoff: 13.75, res: 0, drive: 0.6 }
+bmix.out_l -> bf.in
+breath = lfo { freq: 0hz }
+t.phrase_phase -> breath.phase
+song.cva8 -> bf.v_oct : 10.83
+bcut_lvl  -> bf.v_oct : 10.83
+breath    -> bf.v_oct : 0.38
+song.cvb8 -> bf.res : 0.85
+fenv = adsr { attack: 0, decay: 0.17, sustain: 0.1, release: 0.09 }
+song.gate8 -> fenv.gate
+fenv -> bf.v_oct : 2.17                 # Surge's 26-semitone filter envelope
+bsum = math { op: add }
+bf -> bsum.a
+bsub -> bsum.b : 0.35
+aenv = adsr { attack: 0.002, decay: 0.35, sustain: 0.75, release: 0.05 }
+song.gate8 -> aenv.gate
+bamp = vca { gain: 0 }
+bsum -> bamp.in
+aenv -> bamp.cv
+bacc = vca { gain: 0.6 }                # velocity: about the same 8 dB as Surge
+bamp -> bacc.in
+song.vel8 -> bacc.cv : 0.4
+bdrv = drive { amount: 0.15 }
+bacc -> bdrv.in
+duck_bass = sub { file: "../lib/duck.sub", depth_db: -7, release: 0.16, curve: exp }
+song.gate1 -> duck_bass.trig
+bass_s = sub { file: "../lib/strip.sub", gain: 0.27, send_gain: 0.1 }
+bdrv -> bass_s.in
+bass_lvl  -> bass_s.level
+duck_bass -> bass_s.duck
+
+# ---- pad: three voices; the tracker's cva/cvb are Osc 2/3 pitch in Surge's units ----
+# (x - 0.5) * 14 semitones = (x - 0.5) * 1.1667 v/oct
+m1 = lfo { freq: 0.143hz }
+m2 = lfo { freq: 0.091hz, phase: 0.3 }
+m3 = lfo { freq: 0.077hz, phase: 0.6 }
+penv = adsr { attack: 0.45, decay: 1.2, sustain: 0.8, release: 0.6, curve: lin }
+song.gate7 -> penv.gate
+pa1 = vco { freq: 220hz, wave: saw }
+pb1 = vco { freq: 220hz, wave: pulse }
+pa2 = vco { freq: 220hz, wave: saw }
+pb2 = vco { freq: 220hz, wave: pulse }
+pa3 = vco { freq: 220hz, wave: saw }
+pb3 = vco { freq: 220hz, wave: pulse }
+song.voct7 -> pa1.v_oct
+song.voct7 -> pb1.v_oct
+0.008 -> pb1.v_oct
+song.voct7 -> pa2.v_oct
+song.voct7 -> pb2.v_oct
+song.cva7 -> pa2.v_oct : 1.1667
+song.cva7 -> pb2.v_oct : 1.1667
+-0.5833 -> pa2.v_oct
+-0.5750 -> pb2.v_oct
+song.voct7 -> pa3.v_oct
+song.voct7 -> pb3.v_oct
+song.cvb7 -> pa3.v_oct : 1.1667
+song.cvb7 -> pb3.v_oct : 1.1667
+-0.5833 -> pa3.v_oct
+-0.5900 -> pb3.v_oct
+m1 -> pb1.pwm : 0.35
+m2 -> pb2.pwm : 0.35
+m3 -> pb3.pwm : 0.35
+pmix = mix { levels: [0.45, 0.35, 0.4, 0.3, 0.35, 0.3] }
+pa1 -> pmix.in1
+pb1 -> pmix.in2
+pa2 -> pmix.in3
+pb2 -> pmix.in4
+pa3 -> pmix.in5
+pb3 -> pmix.in6
+pf = svf { cutoff: 13.75, res: 0.2 }
+pmix.out_l -> pf.in
+pcut_lvl -> pf.v_oct : 10.83
+m2 -> pf.v_oct : 0.43
+pamp = vca { gain: 0 }
+pf.lp -> pamp.in
+penv -> pamp.cv
+pch = chorus { voices: 3 }
+pamp -> pch.in_l
+pamp -> pch.in_r
+duck_pad = sub { file: "../lib/duck.sub", depth_db: -5, release: 0.3, curve: exp }
+song.gate1 -> duck_pad.trig
+pad_s = sub { file: "../lib/strip.sub", gain: 0.245, send_gain: 0.5 }
+pch.out_l -> pad_s.in_l
+pch.out_r -> pad_s.in_r
+pad_lvl  -> pad_s.level
+duck_pad -> pad_s.duck
+
+# ---- pluck: 2-op FM into a ping-pong echo, thrown per note ----
+pluck = fm { algo: dual, ratios: [1, 1], levels: [0.8, 0.35], l1: [1, 1], l2: [0, 0], l3: [0, 0],
+             t1: [0, 0], t2: [0.8, 0.3], t3: [0, 0], t4: [0.6, 0.3], vel_sens: [0.6, 0.6], curve: exp }
+song.gate9 -> pluck.gate
+song.voct9 -> pluck.v_oct
+song.vel9  -> pluck.vel
+idx = lfo { freq: 0.053hz }
+idx -> pluck.lvl2 : 0.15
+plp = svf { cutoff: 3000, res: 0 }
+pluck -> plp.in
+pluck_s = sub { file: "../lib/strip.sub", gain: 0.355, send_gain: 0.9, pos: 0.2 }
+plp.lp -> pluck_s.in
+pluck_lvl -> pluck_s.level
+song.cvd9 -> pluck_s.send
+0.15 -> pluck_s.send
+dl = tempo { bpm: 124, beats: 0.75 }
+dr = tempo { bpm: 124, beats: 1 }
+echo_l = delay { time: 0ms, feedback: 0.5, tone: 2800, mix: 1 }
+echo_r = delay { time: 0ms, feedback: 0.45, tone: 2400, mix: 1 }
+dl.seconds -> echo_l.time
+dr.seconds -> echo_r.time
+pluck_s.fx -> echo_l.in
+echo_l -> echo_r.in : 0.6
+
+# ---- dust: impulses through a band-pass into their own long plate ----
+d1 = lfo { freq: 0.031hz }
+d3 = lfo { freq: 0.023hz, phase: 0.25 }
+grit = dust { rate: 40hz, seed: 7 }
+d1 -> grit.rate : 30
+gbp = svf { cutoff: 2500, res: 0.6 }
+grit -> gbp.in
+d3 -> gbp.v_oct : 1.3
+gverb = reverb { decay: 0.9, damp: 0.3, mix: 0.55, predelay: 0.04 }
+gbp.bp -> gverb.in_l
+gbp.bp -> gverb.in_r
+dust_s = sub { file: "../lib/strip.sub", gain: 1.25, send_gain: 0 }
+gverb.out_l -> dust_s.in_l
+gverb.out_r -> dust_s.in_r
+dust_lvl -> dust_s.level
+
+# ---- drums: ratsnest ----
+kick = sub { file: "../lib/kick.sub", tune: 46hz, decay: 0.22s, click: 0.4 }
+song.gate1 -> kick.trig
+kick_s = sub { file: "../lib/strip.sub", gain: 0.75 }
+kick -> kick_s.in
+kick_lvl -> kick_s.level
+
+clap = sub { file: "../lib/kit/clap.sub", decay: 0.2s }
+song.gate2 -> clap.trig
+song.vel2  -> clap.accent
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.04s, tone: 11khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+ohat = sub { file: "../lib/kit/hat_model.sub", decay: 0.3s, tone: 9khz }
+song.gate4 -> ohat.trig
+song.vel4  -> ohat.accent
+song.gate3 -> ohat.choke
+top = mix { levels: [1.5, 1.3, 1.0], pans: [0.05, 0.3, -0.3] }
+clap -> top.in1
+hat  -> top.in2
+ohat -> top.in3
+top_s = sub { file: "../lib/strip.sub", gain: 0.8, send_gain: 0.25 }
+top.out_l -> top_s.in_l
+top.out_r -> top_s.in_r
+top_lvl -> top_s.level
+
+rim = sub { file: "../lib/kit/rim.sub", tune: 620hz, decay: 0.35 }
+song.gate5 -> rim.trig
+song.vel5  -> rim.accent
+shaker = sub { file: "../lib/kit/hat_model.sub", tune: -0.6, decay: 0.07s, tone: 7khz }
+song.gate6 -> shaker.trig
+song.vel6  -> shaker.accent
+rim_s = sub { file: "../lib/strip.sub", gain: 0.9, send_gain: 0.6, pos: -0.45 }
+rim -> rim_s.in
+perc_lvl -> rim_s.level
+sway = lfo { freq: 0.11hz }
+shk_s = sub { file: "../lib/strip.sub", gain: 1.1, send_gain: 0.3 }
+shaker -> shk_s.in
+sway -> shk_s.pan : 0.7
+perc_lvl -> shk_s.level
+
+# ---- space ----
+room = reverb { decay: 0.78, damp: 0.45, mix: 1, predelay: 0.025 }
+pad_s.fx  -> room.in_l
+top_s.fx  -> room.in_r
+rim_s.fx  -> room.in_l
+shk_s.fx  -> room.in_r
+echo_r    -> room.in_r : 0.3
+bass_s.fx -> room.in_l
+room_hl = svf { cutoff: 250, res: 0 }
+room_hr = svf { cutoff: 250, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.0 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+verb_lvl -> room_s.level
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.3, true_peak: on, key_bus: 0.3 }
+7 -> master.makeup
+kick_s.l -> master.in_l
+kick_s.r -> master.in_r
+bass_s.l -> master.in_l
+bass_s.r -> master.in_r
+pad_s.l  -> master.in_l
+pad_s.r  -> master.in_r
+pluck_s.l -> master.in_l
+pluck_s.r -> master.in_r
+dust_s.l -> master.in_l
+dust_s.r -> master.in_r
+top_s.l  -> master.in_l
+top_s.r  -> master.in_r
+rim_s.l  -> master.in_l
+rim_s.r  -> master.in_r
+shk_s.l  -> master.in_l
+shk_s.r  -> master.in_r
+echo_l   -> master.in_l : 0.5
+echo_r   -> master.in_r : 0.5
+room_s.l -> master.in_l
+room_s.r -> master.in_r
+kick -> master.side_l : 0.6
+kick -> master.side_r : 0.6
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

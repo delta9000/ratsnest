@@ -1,0 +1,260 @@
+# locks -- Surge XT driven per step by the tracker. 124 BPM, F# minor,
+# 72 bars (~2:19).
+#
+# Three Surge instances, every one of them moved by ratsnest:
+#   bass   Classic saw + sub through Surge's vintage ladder, mono with
+#          fingered portamento. The tracker locks cutoff and resonance per
+#          step (cva, cvb), the form lane opens it per section, and a
+#          2-bar sine breathes on top. Slides are `~`.
+#   pad    three wavetable oscillators with 3-voice unison. One note plays
+#          the chord: Osc 2 and Osc 3 pitch are tracker columns, so the
+#          quality (minor, major, sus4, an inversion) is locked per chord.
+#          Each oscillator's Morph moves on its own LFO (7, 11 and 13 s).
+#   pluck  FM2, thrown into a ping-pong echo per note (cvd).
+#   dust   Twist's Particle Noise engine through Surge's Reverb 2, held
+#          for the whole piece; density and filter wander.
+# Drums are ratsnest, with chance and late hits from the tracker.
+#
+# Notes and locks in locks.trk, levels in locks-form.trk.
+#
+# Velocity: Surge's VCA ignores velocity above about 0.2 (measured: flat
+# from 0.2 to 1 even at Velocity > VCA Gain -48 dB), so every Surge voice
+# gets the tracker's vel scaled by 0.2, which leaves about 8 dB of accent.
+
+t    = transport { bpm: 124, division: 4, bars: 2 }
+song = tracker { file: "locks.trk", seed: 3 }
+form = tracker { file: "locks-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+bcut_lvl  = func { rise: 1, fall: 1 }
+bass_lvl  = func { rise: 0.3, fall: 0.6 }
+pad_lvl   = func { rise: 2, fall: 2 }
+pcut_lvl  = func { rise: 3, fall: 3 }
+pluck_lvl = func { rise: 1, fall: 1 }
+kick_lvl  = func { rise: 0.05, fall: 0.3 }
+top_lvl   = func { rise: 0.5, fall: 0.5 }
+perc_lvl  = func { rise: 1, fall: 1 }
+dust_lvl  = func { rise: 3, fall: 3 }
+verb_lvl  = func { rise: 2, fall: 2 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1  -> bcut_lvl.in
+form.cva2  -> bass_lvl.in
+form.cva3  -> pad_lvl.in
+form.cva4  -> pcut_lvl.in
+form.cva5  -> pluck_lvl.in
+form.cva6  -> kick_lvl.in
+form.cva7  -> top_lvl.in
+form.cva8  -> perc_lvl.in
+form.cva9  -> dust_lvl.in
+form.cva10 -> verb_lvl.in
+form.cva11 -> main_lvl.in
+
+# ---- bass ----
+bass = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Sub Mix=35 %", "A Osc 1 Unison Voices=2 voices", "A Osc 1 Unison Detune=8 cents",
+        "A Play Mode=Mono (Fingered Portamento)", "A Portamento=45 ms",
+        "A Filter 1 Type=LP Vintage Ladder", "A Filter 1 FEG Mod Amount=26 semitones",
+        "A Filter EG Attack=0 ms", "A Filter EG Decay=170 ms", "A Filter EG Sustain=10 %",
+        "A Filter EG Release=90 ms",
+        "A Amp EG Decay=350 ms", "A Amp EG Sustain=75 %", "A Amp EG Release=50 ms",
+        "A Width=0 %",
+        "FX A1 FX Type=Distortion", "FX A1 Output - Gain=4 dB"],
+  params: ["A Filter 1 Cutoff", "A Filter 1 Resonance"] }
+song.gate8 -> bass.gate
+song.voct8 -> bass.voct
+song.vel8  -> bass.vel : 0.2
+breath = lfo { freq: 0hz }
+t.phrase_phase -> breath.phase
+song.cva8 -> bass.p1
+bcut_lvl  -> bass.p1
+breath    -> bass.p1 : 0.035
+song.cvb8 -> bass.p2
+duck_bass = sub { file: "../lib/duck.sub", depth_db: -7, release: 0.16, curve: exp }
+song.gate1 -> duck_bass.trig
+bass_s = sub { file: "../lib/strip.sub", gain: 6.0, send_gain: 0.1 }
+bass.out_l -> bass_s.in_l
+bass.out_r -> bass_s.in_r
+bass_lvl  -> bass_s.level
+duck_bass -> bass_s.duck
+
+# ---- pad: one instance, the chord in three oscillators ----
+pad = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Wavetable", "A Osc 2 Type=Wavetable", "A Osc 3 Type=Wavetable",
+        "A Osc 2 Mute=Off", "A Osc 3 Mute=Off",
+        "A Osc 1 Volume=-4 dB", "A Osc 2 Volume=-6 dB", "A Osc 3 Volume=-7 dB",
+        "A Osc 1 Unison Voices=3 voices", "A Osc 1 Unison Detune=14 cents",
+        "A Osc 2 Unison Voices=3 voices", "A Osc 2 Unison Detune=17 cents",
+        "A Osc 3 Unison Voices=3 voices", "A Osc 3 Unison Detune=11 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Resonance=20 %",
+        "A Amp EG Attack=450 ms", "A Amp EG Decay=1.2 s", "A Amp EG Sustain=80 %",
+        "A Amp EG Release=600 ms",
+        "FX A1 FX Type=Chorus", "FX A1 Output - Mix=40 %"],
+  params: ["A Osc 1 Morph", "A Osc 2 Morph", "A Osc 3 Morph",
+           "A Osc 2 Pitch", "A Osc 3 Pitch", "A Filter 1 Cutoff"] }
+song.gate7 -> pad.gate
+song.voct7 -> pad.voct
+song.vel7  -> pad.vel : 0.2
+m1 = lfo { freq: 0.143hz }
+m2 = lfo { freq: 0.091hz, phase: 0.3 }
+m3 = lfo { freq: 0.077hz, phase: 0.6 }
+0.45 -> pad.p1
+m1 -> pad.p1 : 0.35
+0.5 -> pad.p2
+m2 -> pad.p2 : 0.4
+0.4 -> pad.p3
+m3 -> pad.p3 : 0.35
+song.cva7 -> pad.p4
+song.cvb7 -> pad.p5
+pcut_lvl -> pad.p6
+m2 -> pad.p6 : 0.04
+duck_pad = sub { file: "../lib/duck.sub", depth_db: -5, release: 0.3, curve: exp }
+song.gate1 -> duck_pad.trig
+pad_s = sub { file: "../lib/strip.sub", gain: 2.0, send_gain: 0.5 }
+pad.out_l -> pad_s.in_l
+pad.out_r -> pad_s.in_r
+pad_lvl  -> pad_s.level
+duck_pad -> pad_s.duck
+
+# ---- pluck: FM2 into a ping-pong echo, thrown per note ----
+pluck = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=FM2", "A Osc 1 M1 Amount=45 %", "A Osc 1 M2 Amount=15 %",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=3000 Hz",
+        "A Amp EG Attack=0 ms", "A Amp EG Decay=260 ms", "A Amp EG Sustain=0 %",
+        "A Amp EG Release=200 ms", "A Width=60 %"],
+  params: ["A Osc 1 M1 Amount"] }
+song.gate9 -> pluck.gate
+song.voct9 -> pluck.voct
+song.vel9  -> pluck.vel : 0.2
+idx = lfo { freq: 0.053hz }
+0.4 -> pluck.p1
+idx -> pluck.p1 : 0.25
+pluck_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.9, pos: 0.2 }
+pluck.out_l -> pluck_s.in_l
+pluck.out_r -> pluck_s.in_r
+pluck_lvl -> pluck_s.level
+song.cvd9 -> pluck_s.send
+0.15 -> pluck_s.send
+dl = tempo { bpm: 124, beats: 0.75 }
+dr = tempo { bpm: 124, beats: 1 }
+echo_l = delay { time: 0ms, feedback: 0.5, tone: 2800, mix: 1 }
+echo_r = delay { time: 0ms, feedback: 0.45, tone: 2400, mix: 1 }
+dl.seconds -> echo_l.time
+dr.seconds -> echo_r.time
+pluck_s.fx -> echo_l.in
+echo_l -> echo_r.in : 0.6     # left feeds right: the throw walks across
+
+# ---- dust: Twist particle noise in Surge's own reverb ----
+dust = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Twist", "A Osc 1 Engine=Particle Noise",
+        "A Filter 1 Type=BP 12 dB", "A Filter 1 Cutoff=2500 Hz", "A Filter 1 Resonance=30 %",
+        "A Amp EG Attack=2 s", "A Amp EG Release=3 s",
+        "FX A1 FX Type=Reverb 2", "FX A1 Reverb - Decay Time=4 s", "FX A1 Output - Mix=55 %"],
+  params: ["A Osc 1 Density", "A Osc 1 Freq Random", "A Filter 1 Cutoff"] }
+1 -> dust.gate
+0.2 -> dust.vel
+0.75 -> dust.voct
+d1 = lfo { freq: 0.031hz }
+d2 = lfo { freq: 0.047hz, phase: 0.5 }
+d3 = lfo { freq: 0.023hz, phase: 0.25 }
+0.35 -> dust.p1
+d1 -> dust.p1 : 0.25
+0.5 -> dust.p2
+d2 -> dust.p2 : 0.4
+0.68 -> dust.p3
+d3 -> dust.p3 : 0.12
+dust_s = sub { file: "../lib/strip.sub", gain: 16, send_gain: 0 }
+dust.out_l -> dust_s.in_l
+dust.out_r -> dust_s.in_r
+dust_lvl -> dust_s.level
+
+# ---- drums: ratsnest ----
+kick = sub { file: "../lib/kick.sub", tune: 46hz, decay: 0.22s, click: 0.4 }
+song.gate1 -> kick.trig
+kick_s = sub { file: "../lib/strip.sub", gain: 0.75 }
+kick -> kick_s.in
+kick_lvl -> kick_s.level
+
+clap = sub { file: "../lib/kit/clap.sub", decay: 0.2s }
+song.gate2 -> clap.trig
+song.vel2  -> clap.accent
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.04s, tone: 11khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+ohat = sub { file: "../lib/kit/hat_model.sub", decay: 0.3s, tone: 9khz }
+song.gate4 -> ohat.trig
+song.vel4  -> ohat.accent
+song.gate3 -> ohat.choke
+top = mix { levels: [1.5, 1.3, 1.0], pans: [0.05, 0.3, -0.3] }
+clap -> top.in1
+hat  -> top.in2
+ohat -> top.in3
+top_s = sub { file: "../lib/strip.sub", gain: 0.8, send_gain: 0.25 }
+top.out_l -> top_s.in_l
+top.out_r -> top_s.in_r
+top_lvl -> top_s.level
+
+rim = sub { file: "../lib/kit/rim.sub", tune: 620hz, decay: 0.35 }
+song.gate5 -> rim.trig
+song.vel5  -> rim.accent
+shaker = sub { file: "../lib/kit/hat_model.sub", tune: -0.6, decay: 0.07s, tone: 7khz }
+song.gate6 -> shaker.trig
+song.vel6  -> shaker.accent
+rim_s = sub { file: "../lib/strip.sub", gain: 0.9, send_gain: 0.6, pos: -0.45 }
+rim -> rim_s.in
+perc_lvl -> rim_s.level
+sway = lfo { freq: 0.11hz }
+shk_s = sub { file: "../lib/strip.sub", gain: 1.1, send_gain: 0.3 }
+shaker -> shk_s.in
+sway -> shk_s.pan : 0.7
+perc_lvl -> shk_s.level
+
+# ---- space ----
+room = reverb { decay: 0.78, damp: 0.45, mix: 1, predelay: 0.025 }
+pad_s.fx  -> room.in_l
+top_s.fx  -> room.in_r
+rim_s.fx  -> room.in_l
+shk_s.fx  -> room.in_r
+echo_r    -> room.in_r : 0.3
+bass_s.fx -> room.in_l
+room_hl = svf { cutoff: 250, res: 0 }
+room_hr = svf { cutoff: 250, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.0 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+verb_lvl -> room_s.level
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.3, true_peak: on, key_bus: 0.3 }
+7 -> master.makeup
+kick_s.l -> master.in_l
+kick_s.r -> master.in_r
+bass_s.l -> master.in_l
+bass_s.r -> master.in_r
+pad_s.l  -> master.in_l
+pad_s.r  -> master.in_r
+pluck_s.l -> master.in_l
+pluck_s.r -> master.in_r
+dust_s.l -> master.in_l
+dust_s.r -> master.in_r
+top_s.l  -> master.in_l
+top_s.r  -> master.in_r
+rim_s.l  -> master.in_l
+rim_s.r  -> master.in_r
+shk_s.l  -> master.in_l
+shk_s.r  -> master.in_r
+echo_l   -> master.in_l : 0.5
+echo_r   -> master.in_r : 0.5
+room_s.l -> master.in_l
+room_s.r -> master.in_r
+kick -> master.side_l : 0.6
+kick -> master.side_r : 0.6
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

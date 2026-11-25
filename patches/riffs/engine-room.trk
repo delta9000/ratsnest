@@ -1,0 +1,171 @@
+# engine-room.trk -- "Engine Room". 98 BPM, D minor, 16 rows per bar, 56 bars.
+# One Surge Twist plays the whole kit: every row locks the engine (cva:
+# kick .863 (pitched up, it is the toms too), snare .929, hi-hat .995,
+# filtered noise .599), its first knob (cvb) and its decay (cvd). A second Twist
+# plays a ghost kit on free-running 6- and 10-row loops. A third is the
+# chord engine, its chord type (cva) and inversion (cvb) locked per chord.
+#
+#   intro 8 | A 16 | B 16 | break 8 | outro 8
+
+track kk    note len 1                  # 1  silent: the duck's kick trigger
+track kit   note vel cva cvb cvd        # 2  Surge Twist, one voice for the kit
+track ghost note vel cva cvb            # 3  Surge Twist, the ghost kit
+track chord note vel cva cvb            # 4  Surge Twist Chords: type, inversion
+track bass  note from chord             # 5  ratsnest reese
+track lead  note vel cva                # 6  Surge Twist Inharmonic String: cva = inharmonicity
+
+# Twist's chord types over 0..1: sus4 .2, m .3, m7 .4, m9 .5, m11 .6,
+# 6/9 .7, maj9 .8, maj7 .9.
+pattern pad 8x16 chord
+1:00 | D3  .8 .5 .45        # Dm9
+3:00 | Bb2 .7 .9 .55        # Bbmaj7
+5:00 | G2  .75 .5 .6        # Gm9
+7:00 | A2  .8 .2 .5         # Asus4
+8:08 | x   .7 .4            # Am7
+
+pattern stabs 8x16 chord
+1:00 | D3:2 .9 .6 .4        # Dm11
+1:03 | x:2  .5
+1:06 | x:3  .7 .5
+1:10 | x:2  .55 .6 .55
+2:00 | x:2  .8
+2:07 | x:2  .5
+2:12 | x:2  .65
+3:00 | F2:2 .85 .8 .5       # Fmaj9
+3:03 | x:2  .5
+3:06 | x:3  .7
+3:10 | x:2  .55 .9
+4:00 | x:2  .8
+4:07 | x:2  .5
+4:12 | x:2  .6
+5:00 | G2:2 .85 .4 .6       # Gm7
+5:03 | x:2  .5
+5:06 | x:3  .7 .5
+5:10 | x:2  .55
+6:00 | x:2  .8
+6:07 | x:2  .5
+6:12 | x:2  .65
+7:00 | Bb2:2 .85 .7 .45     # Bb6/9
+7:03 | x:2  .5
+7:06 | x:3  .7
+7:10 | A2:2 .6 .2 .5        # Asus4
+8:00 | x:2  .8 .4           # Am7
+8:07 | x:2  .55
+8:12 | x:2  .7 .3 .6        # Am, pulling home
+
+pattern bass 2x16 bass
+1:00 | t1-12
+1:06 | off
+1:07 | t1-12
+1:10 | t1-5
+1:12 | off
+1:14 | t1-12
+2:03 | off
+2:04 | t1
+2:06 | ~t1-12
+2:10 | t1-10
+2:11 | off
+2:12 | t1-12
+
+# Kick (F1), snare (C4), hat (A6): a broken beat, two bars.
+pattern kit 2x16 kit kk
+1:00 | F1 .7 .863 .6 .5       | x
+1:02 | A6 .5 .995 .5 .15
+1:04 | C4@.04 .9 .929 .6 .42
+1:06 | A6 .55 .995 .45 .12
+1:07 | F1 .4 .863 .4 .3     | x
+1:08 | A6 .6 .995 .5 .15
+1:10 | F1 .65 .863 .6 .5      | x
+1:11 | A6 .3 .995 .4 .1
+1:12 | C4@.06 1 .929 .62 .45
+1:14 | A6 .6 .995 .55 .35
+1:15 | A6 .45 .995 .5 .35
+2:00 | F1 .7 .863 .6 .5       | x
+2:02 | A6 .5 .995 .5 .15
+2:04 | C4@.04 .9 .929 .6 .42
+2:05 | A6 .3 .995 .4 .1
+2:06 | F1 .55 .863 .55 .45    | x
+2:08 | A6 .6 .995 .5 .15
+2:09 | F1 .5 .863 .5 .4      | x
+2:10 | D3 .55 .863 .5 .3
+2:12 | C4@.06 1 .929 .62 .45
+2:13 | A6 .4 .995 .5 .12
+2:14 | C4 .35 .929 .4 .2
+2:15 | G5 .5 .599 .6 .5
+
+# The intro kit: no snare, the hat opening and closing.
+pattern kit_in 2x16 kit kk
+1:00 | F1 .5 .863 .7 .6       | x
+1:04 | A6 .35 .995 .5 .1
+1:06 | A6 .5 .995 .5 .3
+1:08 | A6 .3 .995 .45 .2
+1:12 | A6 .55 .995 .5 .5
+2:00 | F1 .5 .863 .7 .6       | x
+2:04 | A6 .35 .995 .5 .1
+2:06 | A6 .5 .995 .5 .3
+2:10 | D3 .55 .863 .5 .3
+2:12 | A6 .6 .995 .5 .65
+2:14 | G5 .45 .599 .6 .6
+
+pattern fill 16 kit kk
+00 | F1 .7 .863 .6 .5     | x
+02 | C4 .5 .929 .5 .3
+03 | C4 .6 .929 .5 .3
+04 | D3 .55 .863 .5 .3
+06 | A2 .55 .863 .5 .3
+08 | F1 .65 .863 .6 .5    | x
+09 | C4*2 .6 .929 .55 .3
+10 | E3 .55 .863 .5 .3
+11 | C4*2 .7 .929 .6 .3
+12 | B2 .55 .863 .5 .3
+13 | C4*3 .8 .929 .6 .3
+14 | C4*4 .9 .929 .65 .3
+15 | G5 .7 .599 .7 .7
+
+# Ghost kits: modal clicks and hats, by chance, wide.
+pattern ghost6 6 ghost
+00 | E6 .4 .797 .25
+02 | A6?.5 .25 .995 .6
+03 | B5@.2 .3 .797 .7
+05 | A6?.4 .2 .995 .6
+
+pattern ghost10 10 ghost
+00 | A6 .35 .995 .7
+01 | x?.5 .2
+03 | D6@.1 .35 .797 .3
+05 | A6 .3 .995 .65
+06 | x?.6 .2
+08 | G5@.25 .3 .731 .5
+09 | A6?.5 .25 .995 .7
+
+# The lead: inharmonic strings, a struck line, string to bell and back.
+pattern lead 8x16 lead
+1:00 | D5 .7 .2
+1:03 | F5@.05 .5
+1:06 | E5 .6 .3
+1:10 | A4 .75 .5
+2:08 | C5 .5 .25
+3:00 | D5 .65 .2
+3:04 | F5 .5
+3:07 | A5@.08 .6 .6
+3:12 | G5 .5 .4
+5:00 | Bb4 .7 .3
+5:03 | D5@.05 .5
+5:06 | C5 .55 .45
+5:10 | G4 .7 .7
+6:12 | A4 .5 .3
+7:00 | E5 .6 .2
+7:03 | D5 .5
+7:06 | Cs5@.1 .6 .5
+7:10 | A4 .7 .8
+8:08 | E5 .4 .3
+
+section intro pad+kit_in+ghost6~
+section a     stabs+kit+bass+ghost6~
+section af    stabs+kit+bass+ghost6~+fill@112
+section b     pad+kit+bass+lead+ghost10~
+section bf    stabs+kit+bass+lead+ghost10~+fill@112
+section brk   pad+lead+ghost10~
+section out   stabs+kit_in+bass+ghost6~
+
+order intro a af b bf brk out

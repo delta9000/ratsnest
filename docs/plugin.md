@@ -80,6 +80,19 @@ start phase and analog drift per note, so two renders of a patch differ
 sample by sample (loudness agreed to 0.1 LU across three renders of
 `patches/headless/window.patch`).
 
+**Surge's velocity is flat above about 0.2.** Measured with Surge XT 1.3.4:
+with `A Velocity > VCA Gain` at -48 dB a note gets about 8 dB louder from
+`vel` 0.05 to 0.2 and no louder above that, and at the default 0 dB
+velocity changes nothing. For accents, set `"A Velocity > VCA Gain=-48 dB"`
+and scale the tracker's velocity into that range:
+`song.vel2 -> synth.vel : 0.2`. Twist's engines respond to velocity on
+their own as well. Surge releases a note whose velocity is 0.
+
+**Params can be bound by id.** Surge renames an oscillator's params when its
+type or Twist engine changes, but their ids stay: `params: ["627352114"]` is
+Osc 1's Twist engine whatever it is set to, so a tracker column can switch
+engines per row (`patches/riffs/engine-room.patch`).
+
 **Notes.** One note at a time from `gate`/`voct`/`vel`. A pitch change of a
 semitone or more while the gate is high sends the new note before releasing
 the old, which a mono or legato patch hears as a slur (a tracker `~`).
