@@ -10,8 +10,9 @@ Hand-written C++ DSP underneath, PipeWire out, hot-reload on save so editing a
 patch feels like turning a knob. A graphical node canvas arrives later as
 another *view* of the same file — never as the source of truth.
 
-What it is not: a DAW, a plugin host, a livecoding performance language, or a
-module marketplace. It is a personal instrument whose patches are readable,
+What it is not: a DAW, a host for plugin GUIs or plugin state, a livecoding
+performance language, or a module marketplace. (CLAP plugins load headless as
+the `plugin` module, driven entirely from the patch; docs/plugin.md.) It is a personal instrument whose patches are readable,
 diffable, versionable, and shareable as plain text.
 
 Primary use cases, in build order: generative drone/ambient, MIDI keyboard
@@ -304,8 +305,13 @@ ratsnest describe [module_type]      # JSON interfaces from the runtime registry
 `ratsnest.clap` (docs/plugin.md) is the same RtRunner + Controller inside a
 DAW: each `.patch` in the plugin folder is a CLAP instrument (or effect, if it
 reads `extin`), with host notes as sample-accurate MIDI and hot-reload driven
-by the host's timer. It is a plugin, not a host: ratsnest still loads no
-third-party plugins.
+by the host's timer. The other direction is the `plugin` module: a CLAP
+plugin loaded headless, its params driven by p1..p8, notes from gate/voct or
+keyboard MIDI, run in 64-sample blocks.
+
+```
+ratsnest plugins [file]              # installed CLAP plugins; a file's ids and params
+```
 
 ### 7.5 Error handling
 
@@ -331,8 +337,8 @@ third-party plugins.
 
 ## 9. Tooling & layout
 
-C++20 · CMake · doctest · deps: PipeWire + doctest, plus the header-only CLAP
-ABI for the optional plugin (docs/plugin.md) · mise tasks wrapping
+C++20 · CMake · doctest · deps: PipeWire + doctest + the header-only CLAP ABI
+(the `plugin` module and ratsnest.clap; docs/plugin.md) · mise tasks wrapping
 configure/build/test/run.
 
 ```

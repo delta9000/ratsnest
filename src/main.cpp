@@ -12,6 +12,7 @@
 #include <thread>
 #include <vector>
 #include "dsl/suggest.h"
+#include "dsp/clap_host.h"
 #include "engine/controller.h"
 #include "engine/engine.h"
 #include "engine/audio_in.h"
@@ -44,6 +45,8 @@ int usage() {
       "      --rate <hz>         sample rate (default 48000)\n"
       "      --watch <mod[.port]>  show that signal's value in the status line\n"
       "  ratsnest describe [module_type]     module interfaces as JSON\n"
+      "  ratsnest plugins [file]             installed CLAP plugins; with a file, its\n"
+      "                                      plugin ids and params (for `plugin`)\n"
       "durations: 90, 90s, 500ms, 2m.  Modules and patch syntax: docs/modules.md\n");
   return 2;
 }
@@ -58,6 +61,7 @@ const char* sep(size_t i) { return i ? "," : ""; }
 const char* config_kind(const ms::dsp::ConfigInfo& c) {
   using K = ms::dsp::ConfigKind;
   if (c.kind == K::Enums) return "enum_array";
+  if (c.kind == K::Texts) return "text_array";
   if (c.enum_vals) return "enum";
   if (c.kind == K::Numbers) return "number_array";
   return c.kind == K::Text ? "text" : "number";
@@ -116,6 +120,49 @@ int cmd_describe(int argc, char** argv) {
     std::printf("]");
   }
   std::printf("\n");
+  return 0;
+}
+
+// ---- plugins ----------------------------------------------------------------
+
+// One plugin's params, as a `plugin { params: [...] }` author needs them: the
+// name to list and the default as a normalized p-input base.
+void list_params(const clap_plugin_factory_t* f, const clap_plugin_descriptor_t* d) {
+  const clap_plugin_t* p = f->create_plugin(f, ms::dsp::clap::host(), d->id);
+  if (!p || !p->init(p)) {
+    std::printf("    (cannot create)\n");
+    if (p) p->destroy(p);
+    return;
+  }
+  for (const auto& q : ms::dsp::clap::params(p)) {
+    const double span = q.max - q.min;
+    std::printf("    %-8u \"%s\"  %g..%g  default %g (p base %.3f)%s\n", q.id, q.name.c_str(),
+                q.min, q.max, q.def, span > 0 ? (q.def - q.min) / span : 0.0,
+                q.stepped ? "  stepped" : "");
+  }
+  p->destroy(p);
+}
+
+int cmd_plugins(int argc, char** argv) {
+  if (argc > 3) return usage();
+  const bool one = argc == 3;
+  std::vector<std::string> files;
+  if (one) files.push_back(ms::dsp::clap::resolve(argv[2]));
+  else files = ms::dsp::clap::installed();
+  if (one && files[0].empty()) {
+    std::fprintf(stderr, "error: no plugin '%s' on the CLAP search path\n", argv[2]);
+    return 1;
+  }
+  for (const auto& file : files) {
+    std::string err;
+    const auto* f = ms::dsp::clap::factory(file, err);
+    std::printf("%s%s%s\n", file.c_str(), err.empty() ? "" : "  error: ", err.c_str());
+    for (uint32_t i = 0, n = f ? f->get_plugin_count(f) : 0; i < n; ++i) {
+      const auto* d = f->get_plugin_descriptor(f, i);
+      std::printf("  id: \"%s\"  (%s)\n", d->id, d->name);
+      if (one) list_params(f, d);
+    }
+  }
   return 0;
 }
 
@@ -635,6 +682,7 @@ int main(int argc, char** argv) {
   if (argc < 2) return usage();
   const std::string cmd = argv[1];
   if (cmd == "describe") return cmd_describe(argc, argv);
+  if (cmd == "plugins") return cmd_plugins(argc, argv);
   if (argc < 3) return usage();
   const std::string patch = argv[2];
   if (cmd == "check") return cmd_check(patch);

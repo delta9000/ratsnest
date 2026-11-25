@@ -3,7 +3,7 @@
 A software modular synthesizer for Linux where **the patch is a plain-text
 file**. Hand-written C++20 DSP, PipeWire audio out, hot-reload on save.
 
-It's a personal instrument, not a DAW, plugin host, livecoding language, or
+It's a personal instrument, not a DAW, plugin GUI host, livecoding language, or
 marketplace. You write a `.patch` file describing modules and cables, and
 ratsnest renders it offline to a WAV or plays it live — reloading the graph
 every time you save, so the sound updates as you edit.
@@ -84,6 +84,20 @@ Rescan plugins in Bitwig, REAPER or Qtractor and `keys-poly` is an
 instrument: host notes and MIDI play it, and saving the file hot-reloads it in
 the project. Patches that read `extin` load as audio effects. See
 [docs/plugin.md](docs/plugin.md).
+
+### Load a CLAP plugin into a patch
+
+```text
+synth = plugin { file: "Surge XT", midi: on }
+seq.gate -> synth.gate
+seq.cv -> synth.voct
+synth.out_l -> out.left
+synth.out_r -> out.right
+```
+
+`ratsnest plugins` lists installed CLAP plugins; `ratsnest plugins "Surge XT"`
+lists the params you can drive. Headless: no plugin GUIs, no plugin state;
+the patch drives it. See [docs/plugin.md](docs/plugin.md#loading-plugins).
 
 ### Discover module interfaces
 

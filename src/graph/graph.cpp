@@ -68,8 +68,11 @@ std::string config_error(const dsp::ConfigInfo& ci, const dsl::Value& v) {
   using K = dsl::Value::Kind;
   using C = dsp::ConfigKind;
   if (ci.enum_vals) return enum_error(ci, v);
-  if (ci.kind == C::Text)
-    return v.kind == K::Str || v.kind == K::Ident ? "" : "expects text";
+  auto text = [](const dsl::Value& x) { return x.kind == K::Str || x.kind == K::Ident; };
+  if (ci.kind == C::Text) return text(v) ? "" : "expects text";
+  if (ci.kind == C::Texts)
+    return v.kind == K::Array && std::all_of(v.items.begin(), v.items.end(), text)
+        ? "" : "expects an array of names";
   if (ci.kind == C::Numbers) {
     if (v.kind == K::Array && std::all_of(v.items.begin(), v.items.end(), finite_num)) return {};
     return "expects an array of finite numbers (note names use uppercase, e.g. D2v)";
