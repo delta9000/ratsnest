@@ -1,0 +1,217 @@
+# init-saw -- Headless, track 1. 96 BPM, D dorian, 68 bars (~2:55 with tail).
+#
+# Surge XT's init patch is a bare saw: what Surge plays when nobody tells it
+# anything. The track opens on exactly that (`bare`, a plugin with no `set:`
+# at all) running the album's motif, D F E A, as a sixteenth arp. At bar 9
+# a second Surge, the same saw given a ladder filter, an envelope and a
+# breath of unison, takes the arp over, and ratsnest builds a motorik record
+# around it: a sympathetic-string drone, kick/rim/hats, a Surge bass and a
+# three-instance Surge pad. The coda hands the motif back to the bare saw.
+#
+#   init 8 | grow 8 | groove 16 | break 8 | peak 16 (lead) | outro 8 | coda 4
+#
+# Notes in init-saw.trk; levels per bar in init-saw-form.trk.
+
+t    = transport { bpm: 96, division: 4 }
+song = tracker { file: "init-saw.trk" }
+form = tracker { file: "init-saw-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+bare_lvl  = func { rise: 0.5, fall: 0.5 }
+grown_lvl = func { rise: 0.5, fall: 0.5 }
+cut_lvl   = func { rise: 2, fall: 2 }
+pad_lvl   = func { rise: 2, fall: 2 }
+drone_lvl = func { rise: 3, fall: 3 }
+bass_lvl  = func { rise: 0.3, fall: 0.3 }
+drums_lvl = func { rise: 0.1, fall: 0.3 }
+lead_lvl  = func { rise: 0.5, fall: 0.5 }
+verb_lvl  = func { rise: 2, fall: 2 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1  -> bare_lvl.in
+form.cva2  -> grown_lvl.in
+form.cva3  -> cut_lvl.in
+form.cva4  -> pad_lvl.in
+form.cva5  -> drone_lvl.in
+form.cva6  -> bass_lvl.in
+form.cva7  -> drums_lvl.in
+form.cva8  -> lead_lvl.in
+form.cva9  -> verb_lvl.in
+form.cva10 -> main_lvl.in
+
+# ---- the arp, twice: Surge untouched, and Surge shaped ----
+bare = plugin { file: "Surge XT" }
+song.gate5 -> bare.gate
+song.voct5 -> bare.voct
+song.vel5  -> bare.vel
+bare_s = sub { file: "../lib/strip.sub", gain: 0.5, send_gain: 0.5 }
+bare.out_l -> bare_s.in_l
+bare.out_r -> bare_s.in_r
+bare_lvl -> bare_s.level
+
+grown = plugin { file: "Surge XT",
+  set: ["A Osc 1 Unison Voices=2", "A Osc 1 Unison Detune=9 cents",
+        "A Filter 1 Type=LP Vintage Ladder", "A Filter 1 Resonance=42 %",
+        "A Filter 1 FEG Mod Amount=30 semitones",
+        "A Filter EG Decay=160 ms", "A Filter EG Sustain=0 %", "A Filter EG Release=120 ms",
+        "A Amp EG Decay=260 ms", "A Amp EG Sustain=35 %", "A Amp EG Release=140 ms",
+        "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Filter 1 Cutoff"] }
+song.gate5 -> grown.gate
+song.voct5 -> grown.voct
+song.vel5  -> grown.vel
+cut_lvl -> grown.p1
+grown_s = sub { file: "../lib/strip.sub", gain: 2.8, send_gain: 0.6, pos: 0.15 }
+grown.out_l -> grown_s.in_l
+grown.out_r -> grown_s.in_r
+grown_lvl -> grown_s.level
+
+# ---- pad: one Surge per chord tone, a wide slow saw through Surge's own hall ----
+pad1 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Unison Voices=5", "A Osc 1 Unison Detune=24 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1400 Hz", "A Filter 1 Resonance=10 %",
+        "A Amp EG Attack=1.4 s", "A Amp EG Release=2.5 s",
+        "FX A1 FX Type=Reverb 2", "FX A1 Reverb - Decay Time=4 s", "FX A1 Output - Mix=35 %"] }
+pad2 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Unison Voices=5", "A Osc 1 Unison Detune=24 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1400 Hz", "A Filter 1 Resonance=10 %",
+        "A Amp EG Attack=1.4 s", "A Amp EG Release=2.5 s",
+        "FX A1 FX Type=Reverb 2", "FX A1 Reverb - Decay Time=4 s", "FX A1 Output - Mix=35 %"] }
+pad3 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Unison Voices=5", "A Osc 1 Unison Detune=24 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1400 Hz", "A Filter 1 Resonance=10 %",
+        "A Amp EG Attack=1.4 s", "A Amp EG Release=2.5 s",
+        "FX A1 FX Type=Reverb 2", "FX A1 Reverb - Decay Time=4 s", "FX A1 Output - Mix=35 %"] }
+song.gate3 -> pad1.gate
+song.gate3 -> pad2.gate
+song.gate3 -> pad3.gate
+song.voct3 -> pad1.voct
+song.cva3  -> pad2.voct
+song.cvb3  -> pad3.voct
+0.5 -> pad1.vel
+0.5 -> pad2.vel
+0.5 -> pad3.vel
+pad_s = sub { file: "../lib/strip.sub", gain: 0.75, send_gain: 0.2, width: 0.6 }
+pad1.out_l -> pad_s.in_l
+pad1.out_r -> pad_s.in_r
+pad2.out_l -> pad_s.in_l
+pad2.out_r -> pad_s.in_r
+pad3.out_l -> pad_s.in_l
+pad3.out_r -> pad_s.in_r
+pad_lvl -> pad_s.level
+
+# ---- ratsnest underneath: a D drone of sympathetic strings ----
+drone = sub { file: "../lib/sym-drone.sub", tune: D2 }
+t.phrase -> drone.trig
+drone_s = sub { file: "../lib/strip.sub", gain: 1.5, width: 1 }
+drone -> drone_s.in
+drone_lvl -> drone_s.level
+
+# ---- bass: Surge, a saw and its sub through the legacy ladder ----
+bass = plugin { file: "Surge XT",
+  set: ["A Osc 1 Sub Mix=45 %", "A Filter 1 Type=LP Legacy Ladder",
+        "A Filter 1 Cutoff=260 Hz", "A Filter 1 Resonance=30 %",
+        "A Filter 1 FEG Mod Amount=26 semitones", "A Filter EG Decay=180 ms",
+        "A Filter EG Sustain=10 %", "A Amp EG Decay=350 ms", "A Amp EG Sustain=55 %",
+        "A Amp EG Release=60 ms", "A Width=0 %"] }
+song.gate4 -> bass.gate
+song.voct4 -> bass.voct
+song.vel4  -> bass.vel
+duck_bass = sub { file: "../lib/duck.sub", depth_db: -5, release: 0.2, curve: exp }
+song.gate1 -> duck_bass.trig
+bass_s = sub { file: "../lib/strip.sub", gain: 1.7 }
+bass.out_l -> bass_s.in_l
+bass.out_r -> bass_s.in_r
+bass_lvl -> bass_s.level
+duck_bass -> bass_s.duck
+
+# ---- drums: ratsnest ----
+kick = sub { file: "../lib/kick.sub", tune: 48hz, decay: 0.16s, click: 0.3 }
+song.gate1 -> kick.trig
+rim = sub { file: "../lib/kit/rim.sub", tune: 520hz }
+song.gate7 -> rim.trig
+song.vel7  -> rim.accent
+hat = sub { file: "../lib/kit/hat.sub", decay: 0.18, tone: 8khz }
+song.gate2 -> hat.trig
+song.vel2  -> hat.accent
+dmix = mix { levels: [0.7, 0.9, 0.9], pans: [0, -0.15, 0.25] }
+kick -> dmix.in1
+rim  -> dmix.in2
+hat  -> dmix.in3
+drums = sub { file: "../lib/strip.sub", gain: 0.7 }
+dmix.out_l -> drums.in_l
+dmix.out_r -> drums.in_r
+drums_lvl -> drums.level
+rim -> room.in_l : 0.15
+
+# ---- lead: Surge's Modern saw, mono with glide; ratsnest vibrato on its pitch ----
+lead = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Modern", "A Osc 1 Sawtooth=70 %", "A Osc 1 Pulse=20 %",
+        "A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=12 cents",
+        "A Play Mode=Mono (Fingered Portamento)", "A Portamento=90 ms",
+        "A Filter 1 Type=LP OB-Xd 12 dB", "A Filter 1 Cutoff=2200 Hz", "A Filter 1 Resonance=25 %",
+        "A Amp EG Attack=30 ms", "A Amp EG Release=400 ms"],
+  params: ["A Osc 1 Pitch"], p1: 0.5 }
+song.gate6 -> lead.gate
+song.voct6 -> lead.voct
+song.vel6  -> lead.vel
+vib = lfo { freq: 5.2hz }
+vib -> lead.p1 : 0.006
+lead_s = sub { file: "../lib/strip.sub", gain: 1.6, send_gain: 0.8, pos: -0.1 }
+lead.out_l -> lead_s.in_l
+lead.out_r -> lead_s.in_r
+lead_lvl -> lead_s.level
+
+# ---- space: a dotted-eighth echo and a room, on post-fader sends ----
+de = tempo { bpm: 96, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.42, tone: 2800, mix: 1 }
+de.seconds -> echo.time
+grown_s.fx -> echo.in : 0.5
+bare_s.fx  -> echo.in : 0.5
+lead_s.fx  -> echo.in : 0.6
+room = reverb { decay: 0.82, damp: 0.4, mix: 1, predelay: 0.02 }
+grown_s.fx -> room.in_l
+bare_s.fx  -> room.in_l
+lead_s.fx  -> room.in_l
+pad_s.fx   -> room.in_l
+echo -> room.in_l : 0.3
+room_s = sub { file: "../lib/strip.sub", gain: 1.2 }
+room_hl = svf { cutoff: 220, res: 0 }   # the plate's lows return out of phase
+room_hr = svf { cutoff: 220, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+verb_lvl -> room_s.level
+
+# ---- master ----
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.0, true_peak: on, key_bus: 0.3 }
+10 -> master.makeup
+drums.l   -> master.in_l
+drums.r   -> master.in_r
+bass_s.l  -> master.in_l
+bass_s.r  -> master.in_r
+bare_s.l  -> master.in_l
+bare_s.r  -> master.in_r
+grown_s.l -> master.in_l
+grown_s.r -> master.in_r
+pad_s.l   -> master.in_l
+pad_s.r   -> master.in_r
+drone_s.l -> master.in_l
+drone_s.r -> master.in_r
+lead_s.l  -> master.in_l
+lead_s.r  -> master.in_r
+echo      -> master.in_l : 0.35
+echo      -> master.in_r : 0.45
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+kick -> master.side_l : 0.6
+kick -> master.side_r : 0.6
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

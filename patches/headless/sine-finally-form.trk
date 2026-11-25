@@ -1,0 +1,17 @@
+# sine-finally-form.trk -- one row per bar (36).
+track piano cva   # 1
+track keys  cva   # 2  Surge Sine keys (chords)
+track sine  cva   # 3  Surge Sine melody
+track last  cva   # 4  the init saw
+track verb  cva   # 5
+track main  cva   # 6
+
+pattern form 36
+#    piano  keys   sine   last   verb   main
+00 | .9   | 0    | 0    | 0    | .5   | 1     # A: piano
+08 | .85  | .6   | 0    | 0    | .55  | .     # B: Surge's Sine keys
+16 | 1    | .7   | 0    | 0    | .6   | .     # C: D major
+24 | 0    | .7   | .8   | 0    | .7   | .     # D: Surge alone
+32 | .8   | 0    | 0    | .5   | .7   | .     # coda: the init saw again
+
+order form

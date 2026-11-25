@@ -1,0 +1,191 @@
+# alias -- Headless, track 6. 168 BPM breaks, G minor, 120 bars (~2:55).
+#
+# Surge XT's Alias oscillator is built to alias: a ramp that wraps, masks
+# and bitcrushes, the digital junk that other oscillators spend effort
+# removing. Here it is a mono lead with glide that says the album's motif
+# (G Bb A D) in the break, a three-voice pad, and short stabs. Everything
+# else is ratsnest: a physical-model kit playing a written break (ghost
+# snares that change every pass, laid-back backbeats, ratchets into the
+# bar line, all in alias.trk), and lib/reese.sub, whose sine sub never moves.
+#
+#   intro 16 | A 32 | break 16 (lead) | B 32 | outro 16 | end 8
+#
+# Notes in alias.trk; levels in alias-form.trk.
+
+t    = transport { bpm: 168, division: 4 }
+song = tracker { file: "alias.trk", seed: 5 }
+form = tracker { file: "alias-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+pad_lvl   = func { rise: 2, fall: 2 }
+bass_lvl  = func { rise: 0.3, fall: 0.3 }
+drums_lvl = func { rise: 0.1, fall: 0.3 }
+lead_lvl  = func { rise: 0.5, fall: 0.5 }
+stab_lvl  = func { rise: 0.5, fall: 0.5 }
+crush     = func { rise: 2, fall: 2 }
+verb_lvl  = func { rise: 2, fall: 2 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> pad_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> drums_lvl.in
+form.cva4 -> lead_lvl.in
+form.cva5 -> stab_lvl.in
+form.cva6 -> crush.in
+form.cva7 -> verb_lvl.in
+form.cva8 -> main_lvl.in
+
+# ---- drums: ratsnest's physical kit ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 52hz, decay: 0.35 }
+song.gate1 -> kick.trig
+song.vel1  -> kick.accent
+snare = sub { file: "../lib/kit/snare.sub", tune: 205hz, snap: 0.65, decay: 0.3 }
+song.gate2 -> snare.trig
+song.vel2  -> snare.accent
+hat = sub { file: "../lib/kit/hat.sub", decay: 0.15, tone: 8.5khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+ride = sub { file: "../lib/kit/hat.sub", decay: 0.5, tone: 6khz, tune: 380hz }
+song.gate8 -> ride.trig
+song.vel8  -> ride.accent
+dmix = mix { levels: [1.3, 1.5, 1.2, 0.6], pans: [0, 0.05, 0.2, -0.3] }
+kick  -> dmix.in1
+snare -> dmix.in2
+hat   -> dmix.in3
+ride  -> dmix.in4
+dbus = compressor { threshold: -18, ratio: 4, attack: 0.003, release: 0.08, makeup: 4, mix: 0.5 }
+dmix.out_l -> dbus.in_l
+dmix.out_r -> dbus.in_r
+drums = sub { file: "../lib/strip.sub", gain: 0.8 }
+dbus.out_l -> drums.in_l
+dbus.out_r -> drums.in_r
+drums_lvl -> drums.level
+
+# ---- bass: ratsnest reese ----
+bass = sub { file: "../lib/reese.sub", saw_cut: 320, saw_drive: 0.8 }
+song.voct5 -> bass.voct
+1 -> bass.level
+bgate = adsr { attack: 0.005, decay: 0.2, sustain: 0.9, release: 0.08 }
+song.gate5 -> bgate.gate
+duck_bass = sub { file: "../lib/duck.sub", depth_db: -5, release: 0.12, curve: exp }
+song.gate1 -> duck_bass.trig
+bass_s = sub { file: "../lib/strip.sub", gain: 0.5 }
+bvca = vca { gain: 0 }
+bass.main -> bvca.in
+bgate -> bvca.cv
+bvca -> bass_s.in
+bass_lvl -> bass_s.level
+duck_bass -> bass_s.duck
+
+# ---- the lead: Surge Alias, mono, gliding ----
+lead = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Alias", "A Osc 1 Shape=Pulse", "A Osc 1 Wrap=40 %", "A Osc 1 Mask=20 %",
+        "A Osc 1 Unison Voices=2", "A Osc 1 Unison Detune=10 cents",
+        "A Play Mode=Mono (Fingered Portamento)", "A Portamento=120 ms",
+        "A Filter 1 Type=LP OB-Xd 12 dB", "A Filter 1 Cutoff=3200 Hz", "A Filter 1 Resonance=20 %",
+        "A Amp EG Attack=8 ms", "A Amp EG Release=350 ms"],
+  params: ["A Osc 1 Bitcrush", "A Osc 1 Pitch"], p2: 0.5 }
+song.gate6 -> lead.gate
+song.voct6 -> lead.voct
+song.vel6  -> lead.vel
+crush -> lead.p1
+vib = lfo { freq: 5.8hz }
+vib -> lead.p2 : 0.005
+lead_s = sub { file: "../lib/strip.sub", gain: 0.9, send_gain: 0.7, pos: 0.1 }
+lead.out_l -> lead_s.in_l
+lead.out_r -> lead_s.in_r
+lead_lvl -> lead_s.level
+
+# ---- stabs ----
+stab = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Alias", "A Osc 1 Shape=Ramp", "A Osc 1 Wrap=60 %", "A Osc 1 Bitcrush=4 bits",
+        "A Filter 1 Type=BP 12 dB", "A Filter 1 Cutoff=1800 Hz", "A Filter 1 Resonance=35 %",
+        "A Amp EG Decay=180 ms", "A Amp EG Sustain=0 %", "A Amp EG Release=120 ms"] }
+song.gate7 -> stab.gate
+song.voct7 -> stab.voct
+song.vel7  -> stab.vel
+stab_s = sub { file: "../lib/strip.sub", gain: 4.0, send_gain: 0.8, pos: -0.3 }
+stab.out_l -> stab_s.in_l
+stab.out_r -> stab_s.in_r
+stab_lvl -> stab_s.level
+
+# ---- pad ----
+pad_s = sub { file: "../lib/strip.sub", gain: 0.35, send_gain: 0.4, width: 0.7 }
+pad_lvl -> pad_s.level
+pad1 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Alias", "A Osc 1 Shape=Ramp", "A Osc 1 Wrap=15 %",
+        "A Osc 1 Bitcrush=6 bits", "A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=14 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1600 Hz",
+        "A Amp EG Attack=600 ms", "A Amp EG Release=1.5 s"] }
+song.gate4 -> pad1.gate
+song.voct4 -> pad1.voct
+0.5 -> pad1.vel
+pad1.out_l -> pad_s.in_l
+pad1.out_r -> pad_s.in_r
+pad2 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Alias", "A Osc 1 Shape=Ramp", "A Osc 1 Wrap=15 %",
+        "A Osc 1 Bitcrush=6 bits", "A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=14 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1600 Hz",
+        "A Amp EG Attack=600 ms", "A Amp EG Release=1.5 s"] }
+song.gate4 -> pad2.gate
+song.cva4 -> pad2.voct
+0.5 -> pad2.vel
+pad2.out_l -> pad_s.in_l
+pad2.out_r -> pad_s.in_r
+pad3 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Alias", "A Osc 1 Shape=Ramp", "A Osc 1 Wrap=15 %",
+        "A Osc 1 Bitcrush=6 bits", "A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=14 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1600 Hz",
+        "A Amp EG Attack=600 ms", "A Amp EG Release=1.5 s"] }
+song.gate4 -> pad3.gate
+song.cvb4 -> pad3.voct
+0.5 -> pad3.vel
+pad3.out_l -> pad_s.in_l
+pad3.out_r -> pad_s.in_r
+
+# ---- space ----
+de = tempo { bpm: 168, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.4, tone: 3500, mix: 1 }
+de.seconds -> echo.time
+lead_s.fx -> echo.in
+stab_s.fx -> echo.in
+room = reverb { decay: 0.75, damp: 0.45, mix: 1, predelay: 0.02 }
+lead_s.fx -> room.in_l
+stab_s.fx -> room.in_r
+pad_s.fx  -> room.in_l
+snare -> room.in_r : 0.15
+room_hl = svf { cutoff: 250, res: 0 }   # the plate's lows return out of phase
+room_hr = svf { cutoff: 250, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.0 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+verb_lvl -> room_s.level
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.0, true_peak: on, key_bus: 0.4 }
+8 -> master.makeup
+drums.l  -> master.in_l
+drums.r  -> master.in_r
+bass_s.l -> master.in_l
+bass_s.r -> master.in_r
+lead_s.l -> master.in_l
+lead_s.r -> master.in_r
+stab_s.l -> master.in_l
+stab_s.r -> master.in_r
+pad_s.l  -> master.in_l
+pad_s.r  -> master.in_r
+echo     -> master.in_l : 0.3
+echo     -> master.in_r : 0.4
+room_s.l -> master.in_l
+room_s.r -> master.in_r
+kick -> master.side_l : 0.6
+kick -> master.side_r : 0.6
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

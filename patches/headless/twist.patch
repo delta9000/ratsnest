@@ -1,0 +1,151 @@
+# twist -- Headless, track 5. 128 BPM acid, A minor, 96 bars (~3:03).
+#
+# Surge XT's Twist oscillator is a port of a sixteen-engine macro
+# oscillator. Here its Waveshaper engine is the acid bass: mono, fingered
+# portamento, so the tracker's `~` slurs glide (the plugin host sends a new
+# semitone under a held gate as note-on-before-note-off). Surge's vintage
+# ladder does the squelch; ratsnest drives its cutoff and resonance from the
+# form lanes plus a 4-bar LFO, and Surge's own Distortion is the last stage.
+# A second Twist, on the Vowels/Speech engine, says the album's motif
+# (A C B E) in the B and C sections. Drums are ratsnest.
+#
+#   intro 8 | A 16 | B 16 (talk) | break 8 (no kick) | C 24 | outro 16 | end 8
+#
+# Notes in twist.trk; levels and filter in twist-form.trk.
+
+t    = transport { bpm: 128, division: 4, bars: 4 }
+song = tracker { file: "twist.trk" }
+form = tracker { file: "twist-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+cut_lvl   = func { rise: 1.5, fall: 1.5 }
+res_lvl   = func { rise: 2, fall: 2 }
+drive_lvl = func { rise: 3, fall: 3 }
+acid_lvl  = func { rise: 0.5, fall: 0.5 }
+drums_lvl = func { rise: 0.2, fall: 0.5 }
+talk_lvl  = func { rise: 0.5, fall: 0.5 }
+verb_lvl  = func { rise: 2, fall: 2 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> cut_lvl.in
+form.cva2 -> res_lvl.in
+form.cva3 -> drive_lvl.in
+form.cva4 -> acid_lvl.in
+form.cva5 -> drums_lvl.in
+form.cva6 -> talk_lvl.in
+form.cva7 -> verb_lvl.in
+form.cva8 -> main_lvl.in
+
+# ---- the acid: Surge Twist (waveshaper engine) through Surge's ladder ----
+acid = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Twist", "A Osc 1 Engine=Waveshaper", "A Osc 1 Waveshaper=35 %",
+        "A Osc 1 Fold=30 %", "A Osc 1 Asymmetry=65 %",
+        "A Play Mode=Mono (Fingered Portamento)", "A Portamento=55 ms",
+        "A Filter 1 Type=LP Vintage Ladder",
+        "A Filter 1 FEG Mod Amount=30 semitones", "A Filter EG Attack=0 ms",
+        "A Filter EG Decay=190 ms", "A Filter EG Sustain=5 %", "A Filter EG Release=80 ms",
+        "A Amp EG Decay=400 ms", "A Amp EG Sustain=70 %", "A Amp EG Release=40 ms",
+        "A Velocity > VCA Gain=-14 dB", "A Width=0 %",
+        "FX A1 FX Type=Distortion", "FX A1 Output - Gain=6 dB"],
+  params: ["A Filter 1 Cutoff", "A Filter 1 Resonance", "FX A1 Distortion - Drive"] }
+song.gate5 -> acid.gate
+song.voct5 -> acid.voct
+song.vel5  -> acid.vel
+# cutoff: the lane, plus a 4-bar sine locked to the transport's phrase
+sweep = lfo { freq: 0hz }
+t.phrase_phase -> sweep.phase
+cut = math { op: add }
+cut_lvl -> cut.a
+sweep -> cut.b : 0.06
+cut -> acid.p1
+res_lvl -> acid.p2
+drive_lvl -> acid.p3
+duck_acid = sub { file: "../lib/duck.sub", depth_db: -4, release: 0.15, curve: exp }
+song.gate1 -> duck_acid.trig
+acid_s = sub { file: "../lib/strip.sub", gain: 4.0, send_gain: 0.25 }
+acid.out_l -> acid_s.in_l
+acid.out_r -> acid_s.in_r
+acid_lvl -> acid_s.level
+duck_acid -> acid_s.duck
+
+# ---- the talker: Surge Twist, vowels/speech ----
+talk = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Twist", "A Osc 1 Engine=Vowels/Speech",
+        "A Amp EG Attack=10 ms", "A Amp EG Release=300 ms",
+        "A Filter 1 Type=HP 12 dB", "A Filter 1 Cutoff=300 Hz"],
+  params: ["A Osc 1 Speak"] }
+song.gate6 -> talk.gate
+song.voct6 -> talk.voct
+song.vel6  -> talk.vel
+talk_mod = lfo { freq: 1.1hz }
+0.5 -> talk.p1
+talk_mod -> talk.p1 : 0.35
+talk_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.8, pos: -0.15 }
+talk.out_l -> talk_s.in_l
+talk.out_r -> talk_s.in_r
+talk_lvl -> talk_s.level
+
+# ---- drums: ratsnest ----
+kick = sub { file: "../lib/kick.sub", tune: 50hz, decay: 0.2s, click: 0.45 }
+song.gate1 -> kick.trig
+clap = sub { file: "../lib/kit/clap.sub", decay: 0.18s }
+song.gate2 -> clap.trig
+song.vel2  -> clap.accent
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.045s, tone: 9khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+ohat = sub { file: "../lib/kit/hat_model.sub", decay: 0.28s, tone: 8khz }
+song.gate4 -> ohat.trig
+song.vel4  -> ohat.accent
+song.gate3 -> ohat.choke
+dmix = mix { levels: [0.8, 1.6, 1.4, 1.1], pans: [0, 0.05, 0.25, -0.25] }
+kick -> dmix.in1
+clap -> dmix.in2
+hat  -> dmix.in3
+ohat -> dmix.in4
+drums = sub { file: "../lib/strip.sub", gain: 0.7 }
+dmix.out_l -> drums.in_l
+dmix.out_r -> drums.in_r
+drums_lvl -> drums.level
+
+# ---- space ----
+de = tempo { bpm: 128, beats: 0.75 }
+echo = delay { time: 0ms, feedback: 0.45, tone: 3000, mix: 1 }
+de.seconds -> echo.time
+talk_s.fx -> echo.in
+acid_s.fx -> echo.in : 0.5
+room = reverb { decay: 0.7, damp: 0.4, mix: 1, predelay: 0.015 }
+talk_s.fx -> room.in_l
+clap -> room.in_r : 0.25
+echo -> room.in_l : 0.3
+room_hl = svf { cutoff: 250, res: 0 }   # the plate's lows return out of phase
+room_hr = svf { cutoff: 250, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.0 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+verb_lvl -> room_s.level
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.0, true_peak: on, key_bus: 0.3 }
+9 -> master.makeup
+drums.l  -> master.in_l
+drums.r  -> master.in_r
+acid_s.l -> master.in_l
+acid_s.r -> master.in_r
+talk_s.l -> master.in_l
+talk_s.r -> master.in_r
+echo     -> master.in_l : 0.4
+echo     -> master.in_r : 0.3
+room_s.l -> master.in_l
+room_s.r -> master.in_r
+kick -> master.side_l : 0.6
+kick -> master.side_r : 0.6
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

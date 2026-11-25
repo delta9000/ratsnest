@@ -1,0 +1,167 @@
+# sine-finally -- Headless, track 8. 66 BPM, D minor into D major,
+# 36 bars (~2:25 with the tail).
+#
+# The closer. ratsnest's physical piano plays a chorale whose first four
+# notes are the album's motif, D F E A, in D minor. Surge XT's Sine
+# oscillator, on a DX-style shape with feedback, a second sine an octave up
+# and Surge's Rotary effect, joins as electric keys. The third section turns
+# the motif major (D F# E A). Then the piano stops and Surge's Sine sings the
+# tune alone, both versions, F natural and F sharp. The coda is the piano's
+# last D major and, underneath, the bare init saw from "Init Saw", a
+# plugin with no `set:` at all, holding one D.
+#
+#   A piano 8 | B + Sine keys 8 | C major 8 | D Surge alone 8 | coda 4
+#
+# Notes and pedal in sine-finally.trk; levels in sine-finally-form.trk.
+
+t    = transport { bpm: 66, division: 4 }
+song = tracker { file: "sine-finally.trk" }
+form = tracker { file: "sine-finally-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+piano_lvl = func { rise: 2, fall: 3 }
+keys_lvl  = func { rise: 2, fall: 3 }
+sine_lvl  = func { rise: 1, fall: 3 }
+last_lvl  = func { rise: 2, fall: 2 }
+verb_lvl  = func { rise: 3, fall: 3 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> piano_lvl.in
+form.cva2 -> keys_lvl.in
+form.cva3 -> sine_lvl.in
+form.cva4 -> last_lvl.in
+form.cva5 -> verb_lvl.in
+form.cva6 -> main_lvl.in
+
+# ---- the piano ----
+lh_a = alloc { n: 16, vel: 0 }
+song.gate2 -> lh_a.gate
+song.voct2 -> lh_a.voct
+song.vel2  -> lh_a.vel
+lh = voice { notes: lh_a }
+lh.p = piano { hardness: 0.6 }
+lh_a.gate -> lh.p.gate
+lh_a.voct -> lh.p.voct
+lh_a.vel  -> lh.p.vel
+song.cva5 -> lh.p.pedal
+
+mel_a = alloc { n: 6, vel: 0 }
+song.gate3 -> mel_a.gate
+song.voct3 -> mel_a.voct
+song.vel3  -> mel_a.vel
+mel = voice { notes: mel_a }
+mel.p = piano { hardness: 0.75 }
+mel_a.gate -> mel.p.gate
+mel_a.voct -> mel.p.voct
+mel_a.vel  -> mel.p.vel
+song.cva5 -> mel.p.pedal
+
+board = soundboard {}
+lh.p  -> board.in
+mel.p -> board.in
+song.cva5 -> board.pedal
+piano_s = sub { file: "../lib/strip.sub", gain: 2.2, send_gain: 0.35 }
+board.l -> piano_s.in_l
+board.r -> piano_s.in_r
+piano_lvl -> piano_s.level
+
+# ---- Surge Sine keys: three voices on the chord ----
+keys_s = sub { file: "../lib/strip.sub", gain: 0.8, send_gain: 0.3, width: 0.8 }
+keys_lvl -> keys_s.level
+keys1 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Sine", "A Osc 1 Shape=Wave 2 (TX 2)", "A Osc 1 Feedback=20 %",
+        "A Osc 2 Type=Sine", "A Osc 2 Mute=Off", "A Osc 2 Octave=1", "A Osc 2 Volume=-12 dB",
+        "A Amp EG Attack=2 ms", "A Amp EG Decay=1.6 s", "A Amp EG Sustain=25 %",
+        "A Amp EG Release=1.2 s", "FX A1 FX Type=Rotary"] }
+song.gate6 -> keys1.gate
+song.voct1 -> keys1.voct
+0.5 -> keys1.vel
+keys1.out_l -> keys_s.in_l
+keys1.out_r -> keys_s.in_r
+keys2 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Sine", "A Osc 1 Shape=Wave 2 (TX 2)", "A Osc 1 Feedback=20 %",
+        "A Osc 2 Type=Sine", "A Osc 2 Mute=Off", "A Osc 2 Octave=1", "A Osc 2 Volume=-12 dB",
+        "A Amp EG Attack=2 ms", "A Amp EG Decay=1.6 s", "A Amp EG Sustain=25 %",
+        "A Amp EG Release=1.2 s", "FX A1 FX Type=Rotary"] }
+song.gate6 -> keys2.gate
+song.cva1 -> keys2.voct
+0.5 -> keys2.vel
+keys2.out_l -> keys_s.in_l
+keys2.out_r -> keys_s.in_r
+keys3 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Sine", "A Osc 1 Shape=Wave 2 (TX 2)", "A Osc 1 Feedback=20 %",
+        "A Osc 2 Type=Sine", "A Osc 2 Mute=Off", "A Osc 2 Octave=1", "A Osc 2 Volume=-12 dB",
+        "A Amp EG Attack=2 ms", "A Amp EG Decay=1.6 s", "A Amp EG Sustain=25 %",
+        "A Amp EG Release=1.2 s", "FX A1 FX Type=Rotary"] }
+song.gate6 -> keys3.gate
+song.cvb1 -> keys3.voct
+0.5 -> keys3.vel
+keys3.out_l -> keys_s.in_l
+keys3.out_r -> keys_s.in_r
+
+# ---- Surge Sine, the tune alone ----
+sine = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Sine", "A Osc 1 Shape=Wave 3 (TX 3)", "A Osc 1 Feedback=10 %",
+        "A Play Mode=Mono (Fingered Portamento)", "A Portamento=40 ms",
+        "A Amp EG Attack=30 ms", "A Amp EG Decay=2 s", "A Amp EG Sustain=60 %",
+        "A Amp EG Release=1.5 s"],
+  params: ["A Osc 1 Pitch"], p1: 0.5 }
+song.gate4 -> sine.gate
+song.voct4 -> sine.voct
+song.vel4  -> sine.vel
+vib = lfo { freq: 4.8hz }
+vib -> sine.p1 : 0.004
+sine_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.6 }
+sine.out_l -> sine_s.in_l
+sine.out_r -> sine_s.in_r
+sine_lvl -> sine_s.level
+
+# ---- the init saw, as in track 1: no set at all ----
+bare = plugin { file: "Surge XT" }
+song.gate7 -> bare.gate
+song.voct7 -> bare.voct
+song.vel7  -> bare.vel
+soft = svf { cutoff: 900, res: 0 }
+bare.out_l -> soft.in
+last_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.6 }
+soft.lp -> last_s.in
+last_lvl -> last_s.level
+
+# ---- room ----
+room = reverb { decay: 0.82, damp: 0.45, mix: 1, predelay: 0.03 }
+piano_s.fx -> room.in_l
+piano_s.fx -> room.in_r
+keys_s.fx  -> room.in_l
+sine_s.fx  -> room.in_r
+last_s.fx  -> room.in_l
+room_hl = svf { cutoff: 250, res: 0 }   # the plate's lows return out of phase
+room_hr = svf { cutoff: 250, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.0 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+verb_lvl -> room_s.level
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.0, true_peak: on, key_bus: 1,
+                comp_thr: -20, comp_ratio: 1.8, clip_blend: 0.15 }
+13 -> master.makeup
+1.0 -> master.width
+piano_s.l -> master.in_l
+piano_s.r -> master.in_r
+keys_s.l  -> master.in_l
+keys_s.r  -> master.in_r
+sine_s.l  -> master.in_l
+sine_s.r  -> master.in_r
+last_s.l  -> master.in_l
+last_s.r  -> master.in_r
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

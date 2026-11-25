@@ -1,0 +1,201 @@
+# fm2-for-hammers.trk -- "FM2 for Hammers", Headless track 3. 76 BPM,
+# Db major (Bb minor's motif, Bb Db C F), 16 rows per bar, 56 bars.
+# A 8 piano | B 8 + bells | C 8 bells take the tune | D 8 bridge |
+# A' 8 piano + bells + pad | D' 8 | coda 8.
+
+track harm note cva cvb cvd      # 1  chord; the pad's four voices
+track lh   note vel from harm    # 2  piano left hand, broken chords
+track mel  note vel              # 3  piano melody
+track bell note vel              # 4  Surge FM2
+track ped  cva                   # 5  sustain pedal, lifted after each change
+track pgate note                 # 6  the pad strikes once per chord
+
+pattern harm_a 8x16 harm pgate ped
+1:00 | Db3 F3  Ab3 C4  | x | 0
+1:01 | .               | . | 1
+2:00 | Bb2 Db3 F3  Ab3 | x | 0
+2:01 | .               | . | 1
+3:00 | Gb2 Bb2 Db3 F3  | x | 0
+3:01 | .               | . | 1
+4:00 | Ab2 Db3 Eb3 Gb3 | x | 0
+4:01 | .               | . | 1
+4:08 | Ab2 C3  Eb3 Gb3 | . | 0
+4:09 | .               | . | 1
+5:00 | Db3 F3  Ab3 C4  | x | 0
+5:01 | .               | . | 1
+6:00 | Bb2 Db3 F3  Ab3 | x | 0
+6:01 | .               | . | 1
+7:00 | Gb2 Bb2 Db3 F3  | x | 0
+7:01 | .               | . | 1
+8:00 | Ab2 C3  Eb3 Gb3 | x | 0
+8:01 | .               | . | 1
+
+pattern harm_d 8x16 harm pgate ped
+1:00 | Eb3 Gb3 Bb3 Db4 | x | 0
+1:01 | .               | . | 1
+2:00 | Ab2 C3  Eb3 Gb3 | x | 0
+2:01 | .               | . | 1
+3:00 | F2  Ab2 C3  Eb3 | x | 0
+3:01 | .               | . | 1
+4:00 | Bb2 Db3 F3  Ab3 | x | 0
+4:01 | .               | . | 1
+5:00 | Gb2 Bb2 Db3 F3  | x | 0
+5:01 | .               | . | 1
+6:00 | Eb3 Gb3 Bb3 Db4 | x | 0
+6:01 | .               | . | 1
+7:00 | Ab2 Db3 Eb3 Gb3 | x | 0
+7:01 | .               | . | 1
+8:00 | Ab2 C3  Eb3 Gb3 | x | 0
+8:01 | .               | . | 1
+
+pattern harm_coda 8x16 harm pgate ped
+1:00 | Db3 F3  Ab3 C4  | x | 0
+1:01 | .               | . | 1
+5:00 | Gb2 Bb2 Db3 F3  | x | 0
+5:01 | .               | . | 1
+7:00 | Db3 F3  Ab3 C4  | x | 0
+7:01 | .               | . | 1
+8:12 | off             | off | .
+
+pattern lh 16 lh
+00 | t1-12 .58
+02 | t3-12 .4
+04 | t1 .45
+06 | t2 .4
+08 | t3 .42
+10 | t4 .38
+12 | t2 .36
+14 | t1 .34
+
+pattern lh_coda 8x16 lh
+1:00 | t1-12 .5
+1:04 | t3-12 .35
+1:08 | t2 .35
+1:12 | t4 .3
+5:00 | t1-12 .45
+5:06 | t3-12 .3
+5:12 | t2 .3
+7:00 | t1-24 .5
+7:02 | t1-12 .4
+7:04 | t3-12 .35
+7:06 | t2 .32
+7:08 | t4 .3
+7:10 | t1+12 .28
+
+pattern mel_a 8x16 mel
+1:00 | F4 .62
+1:08 | Ab4 .52
+1:12 | Gb4 .45
+2:00 | Bb3 .55
+2:04 | Db4 .5
+2:08 | C4 .5
+2:12 | F4 .62
+3:00 | Bb4 .66
+3:08 | Ab4 .52
+3:12 | F4 .48
+4:00 | Eb4 .56
+4:08 | Db4 .46
+4:12 | C4 .5
+5:00 | F4 .66
+5:04 | Ab4 .56
+5:08 | Db5 .72
+6:00 | C5 .66
+6:08 | Bb4 .56
+6:12 | Ab4 .52
+7:00 | Bb4 .62
+7:04 | Ab4 .48
+7:08 | F4 .56
+7:12 | Eb4 .48
+8:00 | Eb4 .55
+8:08 | C4 .5
+8:14 | off
+
+pattern mel_d 8x16 mel
+1:00 | Gb4 .6
+1:08 | Bb4 .62
+2:00 | C5 .66
+2:06 | Eb5 .7
+2:12 | Db5 .6
+3:00 | C5 .62
+3:08 | Ab4 .55
+4:00 | Db5 .66
+4:08 | F4 .5
+5:00 | Bb4 .6
+5:04 | Db5 .66
+5:08 | C5 .6
+5:12 | F5 .76
+6:00 | Eb5 .7
+6:08 | Gb4 .5
+7:00 | F4 .56
+7:08 | Eb4 .5
+8:00 | C4 .5
+8:08 | Eb4 .48
+8:14 | off
+
+pattern bell_b 8x16 bell
+1:04 | Ab5 .6
+2:04 | F5 .5
+3:04 | Db6 .55
+4:04 | C6 .5
+5:04 | Ab5 .6
+5:10 | Bb5 .4
+6:04 | F5 .5
+7:04 | Gb5 .5
+8:04 | Eb5 .5
+8:12 | off
+
+pattern bell_c 8x16 bell
+1:00 | F4 .62
+1:08 | Ab4 .52
+1:12 | Gb4 .45
+2:00 | Bb3 .55
+2:04 | Db4 .5
+2:08 | C4 .5
+2:12 | F4 .62
+3:00 | Bb4 .66
+3:08 | Ab4 .52
+3:12 | F4 .48
+4:00 | Eb4 .56
+4:08 | Db4 .46
+4:12 | C4 .5
+5:00 | F4 .66
+5:04 | Ab4 .56
+5:08 | Db5 .72
+6:00 | C5 .66
+6:08 | Bb4 .56
+6:12 | Ab4 .52
+7:00 | Bb4 .62
+7:04 | Ab4 .48
+7:08 | F4 .56
+7:12 | Eb4 .48
+8:00 | Eb4 .55
+8:08 | C4 .5
+8:14 | off
+
+pattern bell_d 8x16 bell
+1:12 | Bb5 .45
+2:12 | Ab5 .42
+3:12 | C6 .45
+4:12 | F5 .4
+6:12 | Db6 .45
+8:10 | Eb5 .4
+8:14 | off
+
+pattern bell_coda 8x16 bell
+1:00 | Bb4 .6
+2:00 | Db5 .5
+3:00 | C5 .5
+4:00 | F5 .62
+6:00 | Bb4 .4
+7:00 | Db5 .35
+7:08 | off
+
+section a    harm_a+lh+mel_a
+section b    harm_a+lh+mel_a+bell_b
+section c    harm_a+lh+bell_c^12
+section d    harm_d+lh+mel_d+bell_d
+section coda harm_coda+lh_coda+bell_coda
+
+order a b c d
+order b d
+order coda

@@ -1,0 +1,20 @@
+# fm2-for-hammers-form.trk -- one row per bar (56).
+track piano cva   # 1
+track bell  cva   # 2
+track pad   cva   # 3
+track verb  cva   # 4
+track main  cva   # 5
+
+pattern form 56
+#    piano  bell   pad    verb   main
+00 | .9   | .8   | 0    | .5   | 1     # A: piano alone
+08 | .    | .    | 0    | .55  | .     # B: bells answer
+16 | .75  | .9   | .5   | .65  | .     # C: the bells sing it, the pad arrives
+24 | .9   | .8   | .6   | .6   | .     # D: bridge
+32 | 1    | .85  | .7   | .6   | .     # A': everything
+40 | .9   | .8   | .5>  | .65  | .     # D'
+47 | .    | .    | .3   | .    | .
+48 | .8   | .9   | .3>  | .75  | .     # coda: bells say the motif
+55 | .    | .    | 0    | .    | .
+
+order form

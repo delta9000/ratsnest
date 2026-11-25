@@ -30,7 +30,8 @@ fx.out_r -> out.right
 ```
 
 Port and config reference: [`plugin` in docs/modules.md](modules.md#plugin).
-A worked patch: `patches/plugins/surge.patch`.
+A worked patch: `patches/plugins/surge.patch`; a whole album built on Surge
+XT, one oscillator per track: `patches/headless/`.
 
 **Finding plugins.** `ratsnest plugins` lists every `.clap` on the search
 path (`$CLAP_PATH`, `~/.clap`, `/usr/lib/clap`, `/usr/local/lib/clap`) with
@@ -68,6 +69,16 @@ re-read after each: Surge renames an effect slot's params to fit its type,
 so `"FX A1 Reverb - Decay Time=6 s"` must follow `"FX A1 FX Type=Reverb
 2"`. Routings, wavetable choices and anything else a plugin keeps outside
 its params are out of reach; a plugin state file is a possible next step.
+
+**Check what a `set:` became.** A plugin may accept text it does not
+understand: Surge maps an unknown enum name ("Burst Chirp") to the first
+entry rather than refusing it. Run `ratsnest plugins <file> "Name=value"...`
+and read the bracketed text before trusting a preset.
+
+**Renders with Surge are not bit-identical.** Surge randomises oscillator
+start phase and analog drift per note, so two renders of a patch differ
+sample by sample (loudness agreed to 0.1 LU across three renders of
+`patches/headless/window.patch`).
 
 **Notes.** One note at a time from `gate`/`voct`/`vel`. A pitch change of a
 semitone or more while the gate is high sends the new note before releasing

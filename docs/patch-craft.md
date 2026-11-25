@@ -440,6 +440,11 @@ counter-line in chord degrees through `quant`):
 
 ## Small gotchas
 
+- `reverb` fed a mono source returns its lows decorrelated to the point of
+  anti-phase: L/R correlation below 200 Hz measured −0.44 on an ambient
+  mix (`patches/headless/two-strings-stiff`), so the low end thins in mono.
+  High-pass the return (`svf` at ~250 Hz, `hp` out) before its strip.
+
 - `quant`'s pitch output is `out`, not `cv` (stepseq has `cv`; quant does
   not).
 - `mix` `lvlN` CVs are **additive** to the config `levels` — both a lane

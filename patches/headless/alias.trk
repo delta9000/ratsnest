@@ -1,0 +1,101 @@
+# alias.trk -- "Alias", Headless track 6. 168 BPM breaks, G minor, 16 rows
+# per bar, 120 bars.
+# intro 16 | A 32 | break 16 (the lead says the motif) | B 32 | outro 16 | end 8
+# Gm | Eb | Cm | D, two bars each.
+
+track kick  note vel len 1     # 1
+track snare note vel len 1     # 2
+track hat   note vel len 1     # 3
+track harm  note cva cvb       # 4  pad voices
+track bass  note from harm     # 5  ratsnest reese
+track lead  note vel           # 6  Surge Alias, mono glide
+track stab  note vel len 2     # 7  Surge Alias stabs on the chord root
+track ride  note vel len 1     # 8
+
+pattern harm 8x16 harm
+1:00 | G3 Bb3 D4
+3:00 | Eb3 G3 Bb3
+5:00 | C3 Eb3 G3
+7:00 | D3 Fs3 A3
+
+pattern bass 2x16 bass
+1:00 | t1-12
+1:10 | x
+1:14 | off
+2:00 | t1-12
+2:06 | ~t3-24
+2:08 | ~t1-12
+2:12 | off
+
+# A two-bar break: laid-back snares, ghost notes that change every pass,
+# ratchets into the bar line.
+pattern brk 2x16 kick snare hat
+1:00 | x .95 | .        | x .7
+1:02 | .     | .        | x .4
+1:04 | .     | x .9     | x .6
+1:06 | .     | .        | x .4
+1:07 | .     | x?.5 .3  | .
+1:08 | .     | .        | x .65
+1:10 | x .8  | .        | x .4
+1:11 | x .5  | .        | .
+1:12 | .     | x@.1 .9  | x .6
+1:14 | .     | x?.6 .35 | x*2 .4
+2:00 | .     | x?.4 .3  | x .7
+2:02 | x .9  | .        | x .4
+2:04 | .     | x .9     | x .6
+2:06 | .     | .        | x .4
+2:07 | .     | x?.5 .3  | .
+2:08 | .     | .        | x .65
+2:10 | x .85 | x?.5 .35 | x .4
+2:12 | .     | x@.1 .95 | x .6
+2:14 | .     | x*3 .5   | x*2 .45
+
+pattern half 2x16 kick snare hat
+1:00 | x .9  | .        | x .5
+1:08 | .     | x .85    | x .5
+2:00 | x .8  | .        | x .5
+2:06 | x .6  | .        | .
+2:08 | .     | x .85    | x .5
+2:14 | .     | x*4 .5   | .
+
+pattern ride 16 ride
+lane ride 6.4.6.4.6.4.6.4.
+
+pattern stab 2x16 stab
+1:00 | D5 .8
+1:03 | D5 .5
+1:10 | Bb4 .7
+2:06 | A4 .6
+2:12 | G4 .7
+
+# The motif in G: G Bb A D, slurred, then answered.
+pattern lead 8x16 lead
+1:00 | G4 .8
+1:08 | ~Bb4
+2:00 | ~A4
+2:08 | D5 .9
+3:12 | off
+5:00 | C5 .8
+5:06 | ~Bb4
+5:12 | ~A4
+6:00 | G4 .8
+6:08 | ~Fs4
+7:00 | A4 .85
+7:08 | ~D5
+8:08 | off
+
+section intro harm+bass
+section a     harm+bass+brk+stab
+section a_r   harm+bass+brk+stab+ride
+section br    harm+lead+half
+section b     harm+bass+brk+lead+ride
+section b_s   harm+bass+brk+lead+stab+ride
+section out   harm+bass+half
+section end   harm
+
+order intro*2
+order a*2 a_r*2
+order br*2
+order b*2 b_s*2
+order out*2
+order end

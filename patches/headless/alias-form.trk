@@ -1,0 +1,25 @@
+# alias-form.trk -- one row per bar (120).
+track pad   cva   # 1
+track bass  cva   # 2
+track drums cva   # 3
+track lead  cva   # 4
+track stab  cva   # 5
+track crush cva   # 6  lead bitcrush (p, normalized: 1 = 8 bits, less = coarser)
+track verb  cva   # 7
+track main  cva   # 8
+
+pattern form 120
+#    pad    bass   drums  lead   stab   crush  verb   main
+00  | .3>  | .6   | 0    | 0    | 0    | .8   | .5   | 1    # intro: pad and reese
+15  | .7   | .    | .    | .    | .    | .    | .    | .
+16  | .5   | .9   | 1    | 0    | .8   | .8   | .3   | .    # A: the break
+48  | .8   | .5   | .7   | .9   | 0    | .9>  | .55  | .    # break: half time, the lead
+63  | .    | .    | .    | .    | .    | .6   | .    | .
+64  | .5   | .95  | 1    | .85  | .7   | .6>  | .35  | .    # B
+95  | .    | .    | .    | .    | .    | .35  | .    | .
+96  | .6>  | .8>  | .8>  | 0    | 0    | .    | .5   | .    # outro
+111 | .5   | .3   | .3   | .    | .    | .    | .    | .
+112 | .5>  | 0    | 0    | .    | .    | .    | .7   | .    # end: the pad, alone
+119 | 0    | .    | .    | .    | .    | .    | .    | .
+
+order form

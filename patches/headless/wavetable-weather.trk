@@ -1,0 +1,77 @@
+# wavetable-weather.trk -- "Wavetable Weather", Headless track 2. 118 BPM,
+# F minor dub techno, 16 rows per bar, 96 bars.
+# intro 8 | A 16 | B 16 (motif) | break 8 | C 24 | outro 16 | end 8
+# Fm7 eight bars, Dbmaj7 four, Ebsus4(add9) four. The motif, F Ab G C, is the
+# album's D F E A moved to F, called into the echo.
+
+track kick  note len 1                # 1
+track hat   note vel len 1            # 2
+track ghost note vel len 1            # 3  sixteenth ghost hats in C
+track rim   note vel len 1            # 4
+track harm  note cva cvb cvd          # 5  the four stab voices
+track stab  note vel len 1            # 6  when the four stab voices strike
+track sub   note vel from harm        # 7
+track motif note vel                  # 8
+
+pattern harm 16x16 harm
+1:00  | F3  Ab3 C4  Eb4
+9:00  | Db3 F3  Ab3 C4
+13:00 | Eb3 Ab3 Bb3 F4
+
+pattern harm8 8x16 harm
+1:00 | F3  Ab3 C4  Eb4
+
+pattern harmb 8x16 harm
+1:00 | Db3 F3  Ab3 C4
+5:00 | Eb3 Ab3 Bb3 F4
+
+pattern harm_end 8x16 harm
+1:00 | F3  Ab3 C4  Eb4
+8:00 | off
+
+pattern stab 2x16 stab
+lane stab ..8.......7.......8.......6..5..
+
+pattern stab_end 8x16 stab
+lane stab ..8.......7.......8.......6..5....7.......6.......7...............5...........................4...............................
+
+pattern sub 16 sub
+00 | t1-24 .9
+05 | off
+06 | t1-24 .7
+09 | off
+10 | t1-24 .8
+13 | off
+
+pattern kick 16 kick
+lane kick x...x...x...x...
+
+pattern hat 16 hat
+lane hat ..5...5...5...57
+
+pattern ghost 16 ghost
+lane ghost 3.2.3.2.3.2.3.24
+
+pattern rim 2x16 rim
+lane rim ......5...................5..3
+
+pattern motif 4x16 motif
+1:02 | F4 .8
+1:06 | Ab4 .6
+1:10 | G4 .7
+2:02 | C5 .85
+2:08 | off
+3:10 | Ab4 .5
+3:14 | G4 .45
+4:02 | off
+
+section intro harm8+stab
+section a     harm+stab+sub+kick+hat
+section b     harm+stab+sub+kick+hat+rim+motif
+section brk   harmb+stab+motif
+section c     harm+stab+sub+kick+hat+ghost+rim+motif
+section c8    harm8+stab+sub+kick+hat+ghost+rim+motif
+section outro harm+stab+sub+kick+hat
+section end   harm_end+stab_end
+
+order intro a b brk c c8 outro end

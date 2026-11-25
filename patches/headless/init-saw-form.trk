@@ -1,0 +1,30 @@
+# init-saw-form.trk -- one row per bar (68). Levels 0..1, slewed by `func`s.
+track bare  cva   # 1  the untouched init saw on the arp
+track grown cva   # 2  the shaped saw on the arp
+track cut   cva   # 3  grown arp's filter cutoff (p1, normalized)
+track pad   cva   # 4
+track drone cva   # 5
+track bass  cva   # 6
+track drums cva   # 7
+track lead  cva   # 8
+track verb  cva   # 9
+track main  cva   # 10
+
+pattern form 68
+#    bare   grown  cut    pad    drone  bass   drums  lead   verb   main
+00 | .8   | 0    | .36  | 0    | 0    | 0    | 0    | 0    | .2   | 1     # INIT: Surge with nothing said to it
+04 | .8>  | 0>   | .36  | .2   | .3   | .    | .    | .    | .3   | .
+08 | 0    | .8   | .48> | .5   | .6   | .    | .    | .    | .4   | .     # grow: the saw is shaped
+15 | .    | .    | .52  | .    | .    | .    | .    | .    | .    | .
+16 | .    | .85  | .48> | .64  | .6   | .85  | .9   | .    | .3   | .     # groove
+31 | .    | .    | .64  | .    | .    | .    | .    | .    | .    | .
+32 | .    | .8   | .42> | .75  | .8   | 0    | 0    | .    | .64  | .     # break: back to arp and pad
+39 | .    | .    | .70  | .    | .    | .    | .    | .    | .    | .
+40 | .    | .9   | .58> | .6   | .6   | .9   | 1    | .8   | .4   | .     # peak, with the lead
+55 | .    | .    | .76  | .    | .    | .    | .    | .    | .    | .
+56 | .    | .8>  | .52> | .7>  | .7>  | 0    | 0    | 0    | .64  | .     # outro
+63 | .    | 0    | .40  | .4   | .5   | .    | .    | .    | .    | .
+64 | .8   | 0    | .    | .2>  | .4>  | .    | .    | .    | .6   | .     # coda: the init saw again, alone
+67 | .    | .    | .    | 0    | 0    | .    | .    | .    | .    | .
+
+order form

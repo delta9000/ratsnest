@@ -1,0 +1,30 @@
+# two-strings-stiff-form.trk -- the arc, one row per 2.5 s (72 rows = 3:00).
+# The notes are not written here: they come from three turing registers on
+# three clocks. This file only says who is playing, how stiff, and, once,
+# near the end, the motif.
+track a      cva          # 1  string voice A level (every 1.62 s)
+track b      cva          # 2  voice B (2.28 s)
+track c      cva          # 3  voice C (3.14 s), the low one
+track mallet cva          # 4  ratsnest mallets (euclid 5 of 13)
+track stiff  cva          # 5  how stiff the strings are (p, normalized)
+track drone  cva          # 6
+track main   cva          # 7
+track motif  note vel     # 8  E G F# B, once, on its own string
+
+pattern form 72
+#    a      b      c      mallet stiff  drone  main  motif
+00 | .8   | 0    | 0    | 0    | .50  | .3>  | 1   | .
+06 | .    | .7   | .    | .    | .    | .6   | .   | .
+12 | .    | .    | .7   | .    | .55> | .    | .   | .
+24 | .9   | .8   | .8   | .6   | .72  | .7   | .   | .        # the strings go stiff: bells
+36 | .    | .    | .    | .    | .72> | .    | .   | .
+44 | .7   | .6   | .8   | .7   | .30  | .    | .   | .        # and slack again: almost a harp
+52 | 0    | 0    | .5   | 0    | .    | .5   | .   | E4 .8    # everything stops for the motif
+53 | .    | .    | .    | .    | .    | .    | .   | G4 .7
+54 | .    | .    | .    | .    | .    | .    | .   | Fs4 .7
+55 | .    | .    | .    | .    | .    | .    | .   | B4 .85
+58 | .6   | .5   | .6   | .5   | .50  | .6   | .   | off
+64 | .6>  | .5>  | .6>  | .5>  | .    | .6>  | .   | .
+70 | 0    | 0    | 0    | 0    | .    | 0    | .   | .
+
+order form
