@@ -417,3 +417,70 @@ TEST_CASE("midi passes bank conformance (reclaim-while-sounding)") {
                          /*can_reclaim_while_sounding=*/true, /*steps=*/64,
                          /*min_release_samples=*/3);
 }
+
+TEST_CASE("note-off and note-on on the same frame still retrigger") {
+  // A sequencer's repeated note lands its note-off and the next note-on on
+  // one frame. The gate never had a low sample between them, so without a
+  // gap the envelope downstream would hear one long note.
+  SUBCASE("mono") {
+    MidiRig m({{"voices", number(1)}});
+    m.noteon(0, 60, 100);
+    m.step();
+    m.noteoff(0, 60);
+    m.noteon(0, 60, 90);
+    m.step();
+    CHECK(m.out("gate1") == doctest::Approx(0.f));  // the retrigger gap
+    m.step();
+    CHECK(m.out("gate1") == doctest::Approx(1.f));
+    CHECK(m.out("vel1") == doctest::Approx(90.f / 127.f));
+    m.noteon(0, 64, 100);  // legato onto a held key stays gapless
+    m.step();
+    CHECK(m.out("gate1") == doctest::Approx(1.f));
+  }
+  SUBCASE("poly, reclaiming the only free voice") {
+    MidiRig m({{"voices", number(2)}});
+    m.noteon(0, 48, 100);  // voice1 holds
+    m.noteon(0, 60, 100);  // voice2
+    m.step();
+    m.noteoff(0, 60);
+    m.noteon(0, 62, 100);  // voice2 is the only free one
+    m.step();
+    CHECK(m.out("gate1") == doctest::Approx(1.f));
+    CHECK(m.out("gate2") == doctest::Approx(0.f));
+    m.step();
+    CHECK(m.out("gate2") == doctest::Approx(1.f));
+    CHECK(m.out("voct2") == doctest::Approx((62 - 57) / 12.f));
+  }
+}
+
+TEST_CASE("all notes off and all sound off release every voice") {
+  for (int voices : {1, 3}) {
+    CAPTURE(voices);
+    MidiRig m({{"voices", number(voices)}});
+    const auto high = [&] {
+      int n = 0;
+      for (int i = 1; i <= 3; ++i) n += m.out("gate" + std::to_string(i)) > 0.5f;
+      return n;
+    };
+    m.noteon(0, 60, 100);
+    m.noteon(0, 64, 100);
+    m.step();
+    m.cc(0, 123, 0);  // All Notes Off
+    m.step();
+    CHECK(high() == 0);
+
+    // Under the pedal, All Notes Off sustains; All Sound Off does not.
+    m.noteon(0, 60, 100);
+    m.cc(0, 64, 127);
+    m.cc(0, 123, 0);
+    m.step();
+    CHECK(high() == 1);
+    m.cc(0, 120, 0);
+    m.step();
+    CHECK(high() == 0);
+    m.cc(0, 64, 0);  // nothing left stranded
+    m.noteon(0, 67, 100);
+    m.step();
+    CHECK(high() == 1);
+  }
+}

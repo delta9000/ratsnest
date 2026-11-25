@@ -53,6 +53,7 @@ class Midi final : public Module {
       const bool active = i < voices_;
       const bool gate = active && gate_[i] && !gap_[i];
       outs[i] = gate ? 1.f : 0.f;
+      was_high_[i] = gate;
       outs[8 + i] = active ? voct_[i] + bend_voct : 0.f;
       outs[16 + i] = active ? vel_[i] : 0.f;
       gap_[i] = false;  // one-sample gap consumed
@@ -106,6 +107,7 @@ class Midi final : public Module {
     for (int i = 0; i < kMaxVoices; ++i) {
       gate_[i] = o.gate_[i];
       gap_[i] = o.gap_[i];
+      was_high_[i] = o.was_high_[i];
       sustained_[i] = o.sustained_[i];
       note_[i] = o.note_[i];
       order_[i] = o.order_[i];
@@ -156,9 +158,11 @@ class Midi final : public Module {
     }
     rr_ = claim;
     // Stealing a still-sounding voice inserts a one-sample gate gap so the
-    // downstream envelope retriggers (spec §2). Reclaiming an already-low
-    // (released) voice needs no gap: the rising edge itself retriggers.
-    gap_[claim] = gate_[claim];
+    // downstream envelope retriggers (spec §2). So does reclaiming a voice
+    // released on this same frame (a sequencer's note-off + note-on pair):
+    // its output never went low. A voice already low needs no gap: the
+    // rising edge itself retriggers.
+    gap_[claim] = gate_[claim] || was_high_[claim];
     gate_[claim] = true;
     sustained_[claim] = false;
     note_[claim] = note;
@@ -182,6 +186,10 @@ class Midi final : public Module {
   }
 
   void control_change(uint8_t num, uint8_t val) {
+    // Channel mode messages: 120 All Sound Off silences at once; 123 All
+    // Notes Off and the omni/mono/poly switches 124..127 (which imply it)
+    // release every key, still honoring a held sustain pedal.
+    if (num == 120 || num >= 123) all_notes_off(num == 120);
     if (num == 64) {  // sustain pedal
       const bool down = val >= 64;
       if (pedal_ && !down) {
@@ -200,6 +208,23 @@ class Midi final : public Module {
         cc_target_[k] = static_cast<float>(val) / 127.f;
   }
 
+  void all_notes_off(bool hard) {
+    const bool hold = pedal_ && !hard;
+    if (voices_ == 1) {
+      if (hold)
+        for (int i = 0; i < stack_n_; ++i) stack_[i].released = true;
+      else
+        stack_n_ = 0;
+      mono_update();
+      return;
+    }
+    for (int i = 0; i < voices_; ++i) {
+      if (!gate_[i]) continue;
+      sustained_[i] = hold;
+      gate_[i] = hold;
+    }
+  }
+
   // --- Mono (voices == 1): legato held-key stack, no retrigger gaps. -------
   struct Held { uint8_t note; float vel; bool released; };
 
@@ -215,6 +240,9 @@ class Midi final : public Module {
 
   void mono_press(uint8_t note, uint8_t vel) {
     stack_remove(note);
+    // A press after every key let go on this same frame is a new note, not
+    // legato: gap the gate so it retriggers, as a later frame would.
+    if (stack_n_ == 0 && was_high_[0]) gap_[0] = true;
     if (stack_n_ == kStackDepth) {  // drop the oldest to make room
       for (int j = 0; j < stack_n_ - 1; ++j) stack_[j] = stack_[j + 1];
       --stack_n_;
@@ -264,6 +292,7 @@ class Midi final : public Module {
   // Per-voice tracker (poly; index 0 also used by mono).
   bool gate_[kMaxVoices] = {};
   bool gap_[kMaxVoices] = {};
+  bool was_high_[kMaxVoices] = {};  // gate as process() last output it
   bool sustained_[kMaxVoices] = {};
   uint8_t note_[kMaxVoices] = {};
   uint32_t order_[kMaxVoices] = {};

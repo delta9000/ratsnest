@@ -87,7 +87,9 @@ struct MidiIn::Impl {
       if ((b0 & 0x80) != 0) {
         status = b0;
         data_start = i + 1;
-        running = status < 0xf0 ? status : 0;  // system messages clear running status
+        // System common clears running status; realtime (clock, active
+        // sensing) may sit between messages and leaves it alone.
+        if (status < 0xf8) running = status < 0xf0 ? status : 0;
       } else {
         status = running;
         data_start = i;

@@ -867,18 +867,23 @@ rule (`alloc`/`midi` expose only banks so `poly.voct` can resolve to
   in v/oct units (`bend / 12` at full deflection) for routing elsewhere.
 - `voices` `1..8`: each note-on claims a free voice round-robin; at capacity
   it steals the **oldest** sounding voice, inserting a one-sample gate gap so
-  envelopes retrigger. Note identity is tracked, so note-off drops the right
-  voice.
+  envelopes retrigger. A note-on that reuses a voice released on the same
+  frame (a sequencer's note-off + note-on pair) gets the same gap. Note
+  identity is tracked, so note-off drops the right voice.
 - `mode` applies only at `voices: 1`: `last` = newest key wins and previous
   held keys restore on release (legato — the restore does **not** re-gap or
-  retrigger); `lowest` = the lowest held key sounds (bass-pedal style).
+  retrigger); `lowest` = the lowest held key sounds (bass-pedal style). A
+  press after every key was released on the same frame is a new note and
+  retriggers.
 - `cc: [74, 1]` maps `cc1` to controller 74, `cc2` to the mod wheel, etc.
   (≤ 4 entries, each clamped `0..127`, only the first four read); each `cc<k>`
   is `0..1`, smoothed by a fixed ~3 ms one-pole. Unmapped slots output 0.
 - `at` is channel pressure `0..1`. Sustain (CC 64) defers note-offs until the
   pedal releases; it can also be mapped like any controller (`cc: [64]`) to
   drive a `piano`'s or `soundboard`'s `pedal`. `channel` `0` = omni (default), else `1..16`; velocity-0
-  note-ons are note-offs. All tracker state survives hot reload.
+  note-ons are note-offs. CC 123 (All Notes Off, also implied by 124..127)
+  releases every key, still honoring a held pedal; CC 120 (All Sound Off)
+  drops every gate at once. All tracker state survives hot reload.
 
 ## `dcblock`
 
