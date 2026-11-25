@@ -86,6 +86,8 @@ class Plugin final : public Module {
       outs[0] = outs[1] = 0.0f;
       return;
     }
+    for (size_t i = 0; i < n_params_; ++i)  // p-locks: a param's first move lands on its sample
+      if (!moved_[i]) moved_[i] = param(i, ins[kP1 + i], pos_);
     notes(ins);
     in_l_[pos_] = ins[kInL];
     in_r_[pos_] = ins[kInR];
@@ -123,6 +125,7 @@ class Plugin final : public Module {
       if (!q) return "no param named '" + names[i] + "'";
       bound_[i] = *q;
       sent_[i] = -1.0;
+      moved_[i] = false;
     }
     return {};
   }
@@ -157,8 +160,8 @@ class Plugin final : public Module {
     for (auto& port : outs_) out_bufs_.push_back(port.buf);
   }
 
-  // Events stay in time order: notes and MIDI at the sample they arrive on,
-  // params on the block's last sample. Full: the last slot is overwritten.
+  // Events stay in time order: notes, MIDI and each param's first move in a
+  // block at the sample they arrive on; later moves on the block's last sample. Full: the last slot is overwritten.
   Event& push(uint16_t size, uint16_t type, size_t time) {
     Event& e = events_[std::min(n_events_, kMaxEvents - 1)];
     n_events_ = std::min(n_events_ + 1, kMaxEvents);
@@ -195,9 +198,10 @@ class Plugin final : public Module {
     key_ = key;
   }
 
-  // Block boundary: params that moved, then the plugin itself.
+  // Block boundary: params that moved again since their first move, then the plugin.
   void run(const float* ins) {
-    for (size_t i = 0; i < n_params_; ++i) param(i, ins[kP1 + i]);
+    for (size_t i = 0; i < n_params_; ++i) param(i, ins[kP1 + i], kBlock - 1);
+    moved_.fill(false);
     if (!ins_.empty()) copy_in();
     if (!started_) started_ = p_->start_processing(p_);
     clap_input_events_t in{this, &Plugin::ev_size, &Plugin::ev_get};
@@ -218,14 +222,15 @@ class Plugin final : public Module {
     frames_ += kBlock;
   }
 
-  void param(size_t i, float v) {
+  bool param(size_t i, float v, size_t time) {
     const clap::Param& b = bound_[i];
     double x = b.min + std::clamp(static_cast<double>(std::isfinite(v) ? v : 0.0f), 0.0, 1.0) *
                            (b.max - b.min);
     if (b.stepped) x = std::round(x);
-    if (x == sent_[i]) return;
+    if (x == sent_[i]) return false;
     sent_[i] = x;
-    fill_param(push(sizeof(clap_event_param_value_t), CLAP_EVENT_PARAM_VALUE, kBlock - 1), b.id, x);
+    fill_param(push(sizeof(clap_event_param_value_t), CLAP_EVENT_PARAM_VALUE, time), b.id, x);
+    return true;
   }
 
   void copy_in() {
@@ -278,6 +283,7 @@ class Plugin final : public Module {
   std::array<Event, kMaxEvents> events_{};
   std::array<clap::Param, kParams> bound_{};
   std::array<double, kParams> sent_{};
+  std::array<bool, kParams> moved_{};
 };
 
 std::unique_ptr<Module> make() { return std::make_unique<Plugin>(); }
