@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(RATSNEST_WERROR "Treat warnings as errors" OFF)
 option(RATSNEST_SAN "Enable ASan + UBSan for every target" OFF)
+option(RATSNEST_CLAP "Build ratsnest.clap, the patch-as-plugin (docs/plugin.md)" ON)
 
 add_compile_options(-Wall -Wextra -Wconversion)
 # Never fuse a*b+c into an FMA: it rounds differently, so the same patch would
@@ -27,8 +28,11 @@ endif()
 
 file(GLOB_RECURSE MSCORE_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 list(REMOVE_ITEM MSCORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+list(FILTER MSCORE_SOURCES EXCLUDE REGEX "/src/plugin/")
 add_library(mscore STATIC ${MSCORE_SOURCES})
 target_include_directories(mscore PUBLIC src)
+# The plugin links mscore into a shared object.
+set_target_properties(mscore PROPERTIES POSITION_INDEPENDENT_CODE ${RATSNEST_CLAP})
 
 find_package(PkgConfig REQUIRED)
 # 1.6: the MIDI input calls spa_ump_to_midi with conversion state, which
@@ -45,11 +49,45 @@ FetchContent_Declare(doctest
   URL https://github.com/doctest/doctest/archive/refs/tags/v2.4.11.tar.gz)
 FetchContent_MakeAvailable(doctest)
 
+# ratsnest.clap: each .patch in the plugin folder becomes a CLAP instrument or
+# effect (docs/plugin.md). CLAP is header-only (MIT); SOURCE_SUBDIR points at
+# nothing so only the headers are fetched, none of CLAP's own targets.
+if(RATSNEST_CLAP)
+  FetchContent_Declare(clap
+    URL https://github.com/free-audio/clap/archive/refs/tags/1.2.9.tar.gz
+    SOURCE_SUBDIR headers-only)
+  FetchContent_MakeAvailable(clap)
+  add_library(ratsnest_clap MODULE src/plugin/clap_plugin.cpp)
+  target_include_directories(ratsnest_clap SYSTEM PRIVATE ${clap_SOURCE_DIR}/include)
+  target_link_libraries(ratsnest_clap PRIVATE mscore)
+  # Only clap_entry is exported; the engine stays private to the plugin so two
+  # builds loaded in one host cannot bind each other's symbols.
+  set_target_properties(ratsnest_clap PROPERTIES
+    PREFIX "" OUTPUT_NAME ratsnest SUFFIX ".clap" CXX_VISIBILITY_PRESET hidden)
+  target_link_options(ratsnest_clap PRIVATE
+    -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/plugin/clap.map
+    -Wl,--as-needed -Wl,--no-undefined)
+  set_target_properties(ratsnest_clap PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/plugin/clap.map)
+endif()
+
 enable_testing()
 file(GLOB MSTEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 add_executable(mstests ${MSTEST_SOURCES})
 target_link_libraries(mstests PRIVATE mscore doctest::doctest)
 add_test(NAME unit COMMAND mstests)
+
+# A minimal CLAP host that dlopens the built plugin and drives it the way a
+# DAW does: scan, instantiate, play notes, hot-reload, survive a bad save.
+if(RATSNEST_CLAP)
+  add_executable(clap_host_test tests/plugin/clap_host.cpp)
+  target_include_directories(clap_host_test SYSTEM PRIVATE ${clap_SOURCE_DIR}/include)
+  target_link_libraries(clap_host_test PRIVATE doctest::doctest ${CMAKE_DL_LIBS})
+  add_dependencies(clap_host_test ratsnest_clap)
+  add_test(NAME clap_plugin
+    COMMAND clap_host_test $<TARGET_FILE:ratsnest_clap>
+            ${CMAKE_CURRENT_BINARY_DIR}/clap-test-patches)
+endif()
 
 file(GLOB_RECURSE MSPATCHES CONFIGURE_DEPENDS
   ${CMAKE_CURRENT_SOURCE_DIR}/patches/*.patch

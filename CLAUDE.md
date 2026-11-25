@@ -49,6 +49,7 @@ Prefer mise tasks (see `mise tasks`):
     mise run play -- patches/first.patch          # live PipeWire + hot-reload
     mise run complexity   # score for src/; fails past docs/complexity.json
     mise run syx -- bank.syx -o patches/dx/bank   # 6-op SysEx voices -> .sub (docs/fm-syx.md)
+    mise run plugin-install   # ratsnest.clap -> ~/.clap; patches in ~/.config/ratsnest/plugins (docs/plugin.md)
 
 ## Complexity budget
 
@@ -74,8 +75,9 @@ Violating these is a design bug, not a style preference.
 5. Modules are small and single-purpose; compose with cables.
 6. Errors never kill the session: bad patch → report line:col, keep the last
    good graph playing.
-7. External deps: PipeWire and doctest. Adding a third is a design decision,
-   not a convenience.
+7. External deps: PipeWire and doctest, plus the header-only CLAP ABI for the
+   optional `ratsnest.clap` plugin (docs/plugin.md, `-DRATSNEST_CLAP=OFF` drops
+   it). Adding another is a design decision, not a convenience.
 8. Signal conventions (spec §4): audio/bipolar ±1, unipolar 0..1, v_oct in
    octaves, gates rise through 0.5. Every port respects them.
 

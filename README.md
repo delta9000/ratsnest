@@ -73,6 +73,18 @@ Starts a PipeWire output stream and plays the patch. Edit and save the
 state (filter memory, envelope phase, sequencer position, ...) intact
 wherever the module name and type haven't changed.
 
+### Play a patch inside a DAW (CLAP)
+
+```sh
+mise run plugin-install                      # ratsnest.clap -> ~/.clap/
+ln -s "$PWD/patches/keys-poly.patch" ~/.config/ratsnest/plugins/
+```
+
+Rescan plugins in Bitwig, REAPER or Qtractor and `keys-poly` is an
+instrument: host notes and MIDI play it, and saving the file hot-reloads it in
+the project. Patches that read `extin` load as audio effects. See
+[docs/plugin.md](docs/plugin.md).
+
 ### Discover module interfaces
 
 ```sh
