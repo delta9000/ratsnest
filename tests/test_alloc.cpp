@@ -197,7 +197,7 @@ TEST_CASE("alloc migrates claim state") {
   a->init(48000.0, cfg);
   b->init(48000.0, cfg);
   float ins[3] = {0.0f, 0.0f, 1.0f};
-  float out_a[32] = {}, out_b[32] = {};
+  float out_a[64] = {}, out_b[64] = {};
   auto step = [&](Module* m, float* out, float gate, float voct, float vel) {
     ins[0] = gate;
     ins[1] = voct;
@@ -216,7 +216,7 @@ TEST_CASE("alloc migrates claim state") {
     ins[2] = 0.9f;
     a->process(ins, out_a);
     b->process(ins, out_b);
-    for (int j = 0; j < 32; ++j)
+    for (int j = 0; j < 64; ++j)
       CHECK(out_a[j] == doctest::Approx(out_b[j]));
   }
 }
