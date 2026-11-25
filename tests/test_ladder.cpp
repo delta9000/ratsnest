@@ -151,3 +151,28 @@ TEST_CASE("ladder stays bounded under fast cutoff modulation at full res") {
     REQUIRE(std::abs(out[0]) < 6.0f);
   }
 }
+
+TEST_CASE("ladder stays bounded when resonance toggles every few samples") {
+  // Switching res between 0 and 1 jumps the feedback gain k between 0 and
+  // 4.9 with the stages full of energy; a ZDF loop solved against a stale
+  // saturator point is where that would blow up. Saw input, cutoffs across
+  // the range, toggle periods from every sample to slower than the loop.
+  for (float cutoff : {200.0f, 2000.0f, 12000.0f}) {
+    for (int period : {1, 2, 3, 17, 240}) {
+      CAPTURE(cutoff);
+      CAPTURE(period);
+      auto m = make_ladder();
+      float ins[5] = {0.0f, cutoff, 0.0f, 0.0f};
+      float out[1];
+      float peak = 0.0f;
+      for (int i = 0; i < 48000; ++i) {
+        ins[0] = std::fmod(static_cast<float>(i) * 110.0f / 48000.0f, 1.0f) * 2.0f - 1.0f;
+        ins[2] = (i / period) % 2 == 0 ? 1.0f : 0.0f;
+        m->process(ins, out);
+        peak = std::max(peak, std::abs(out[0]));
+      }
+      CHECK(std::isfinite(peak));
+      CHECK(peak < 4.0f);  // measured 2.4; steady full res reaches about the same
+    }
+  }
+}

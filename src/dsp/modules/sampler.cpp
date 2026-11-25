@@ -31,7 +31,7 @@ class Sampler final : public Module {
   void init(double rate, const Config& cfg) override {
     engine_rate_ = static_cast<float>(rate);
     loop_ = (cfg_str(cfg, "loop", "off") == "on");
-    buf_.clear();
+    mips_.clear();
     len_ = 0;
     file_rate_ = engine_rate_;
 
@@ -40,18 +40,16 @@ class Sampler final : public Module {
       io::WavData w;
       if (io::read_wav_f32(file, w) && w.frames > 0 && w.channels > 0) {
         // Mix any channel count down to a single mono buffer.
-        buf_.resize(w.frames);
+        std::vector<float> mono(w.frames);
         const size_t ch = static_cast<size_t>(w.channels);
         for (size_t fr = 0; fr < w.frames; ++fr) {
           float acc = 0.0f;
           for (size_t c = 0; c < ch; ++c) acc += w.samples[fr * ch + c];
-          buf_[fr] = acc / static_cast<float>(w.channels);
+          mono[fr] = acc / static_cast<float>(w.channels);
         }
-        len_ = buf_.size();
-        // Guard frame: interpolation past the last frame wraps to the first
-        // when looping and holds the last otherwise.
-        buf_.push_back(loop_ ? buf_.front() : buf_.back());
+        len_ = mono.size();
         file_rate_ = static_cast<float>(w.sample_rate);
+        build_mips(std::move(mono));
       }
     }
     pos_ = 0.0;
@@ -85,8 +83,9 @@ class Sampler final : public Module {
     float out = 0.0f;
     float eos = 0.0f;
     const double before = pos_;
+    const Mip mip = pick(step);
     if (playing_) {
-      out = read(pos_);
+      out = read(pos_, mip);
       pos_ += step;
       playing_ = loop_ || pos_ < static_cast<double>(len_);  // one-shot ends
       eos = static_cast<float>(!playing_);
@@ -98,7 +97,7 @@ class Sampler final : public Module {
     last_ = out;
     out = seam_dc_(out);
     if (old_left_ > 0.0f) {  // fade head; holds the last frame at the end
-      out += read(old_pos_) * (old_left_ / fade_);
+      out += read(old_pos_, mip) * (old_left_ / fade_);
       old_left_ -= 1.0f;
       old_pos_ = std::min(old_pos_ + step, static_cast<double>(len_ - 1));
     }
@@ -126,17 +125,89 @@ class Sampler final : public Module {
   }
 
  private:
-  // Linear interpolation at pos in [0, len_), reading the guard frame last.
-  float read(double pos) const {
-    const size_t i0 = static_cast<size_t>(pos);
-    const float frac = static_cast<float>(pos - static_cast<double>(i0));
-    return buf_[i0] + (buf_[i0 + 1] - buf_[i0]) * frac;
+  // Mip levels: level k is the file low-passed and decimated k times by
+  // two, so reading it at step / 2^k keeps partials below Nyquist. Built
+  // once at load (init may allocate); level 0 is the file itself. Each level
+  // carries one guard frame before and two after for the 4-point read: the
+  // other end's frames when looping, else the edge frame repeated.
+  static constexpr int kMaxMips = 6;  // levels 0..5: clean up to +5 octaves
+  static void guard(std::vector<float>& v, bool loop) {
+    const size_t n = v.size();
+    const float pre = loop ? v[n - 1] : v[0];
+    const float post1 = loop ? v[0] : v[n - 1], post2 = loop ? v[n > 1 ? 1 : 0] : v[n - 1];
+    v.insert(v.begin(), pre);
+    v.push_back(post1);
+    v.push_back(post2);
+  }
+  void build_mips(std::vector<float> file) {
+    // Half-band low-pass: 63-tap Blackman-windowed sinc, cutoff 0.21 of the
+    // level's rate, so the stopband begins near the decimated Nyquist.
+    constexpr int kTaps = 63, kHalf = kTaps / 2;
+    constexpr double kCut = 0.21, kPi = 3.14159265358979323846;
+    double h[kTaps], sum = 0.0;
+    for (int i = 0; i < kTaps; ++i) {
+      const double t = i - kHalf;
+      const double sinc = t == 0 ? 2.0 * kCut : std::sin(2.0 * kPi * kCut * t) / (kPi * t);
+      const double w = 0.42 - 0.5 * std::cos(2.0 * kPi * i / (kTaps - 1)) +
+                       0.08 * std::cos(4.0 * kPi * i / (kTaps - 1));
+      sum += h[i] = sinc * w;
+    }
+    std::vector<float> src = std::move(file);
+    for (int k = 0;; ++k) {
+      const auto n = static_cast<std::ptrdiff_t>(src.size());
+      std::vector<float> next;
+      if (k + 1 < kMaxMips && n > 2 * kTaps) {
+        next.resize(static_cast<size_t>((n + 1) / 2));
+        for (std::ptrdiff_t j = 0; j < static_cast<std::ptrdiff_t>(next.size()); ++j) {
+          double acc = 0.0;
+          for (int i = 0; i < kTaps; ++i) {
+            std::ptrdiff_t at = 2 * j + i - kHalf;  // wrap when looping, else hold
+            at = loop_ ? ((at % n) + n) % n : std::clamp<std::ptrdiff_t>(at, 0, n - 1);
+            acc += h[i] * static_cast<double>(src[static_cast<size_t>(at)]);
+          }
+          next[static_cast<size_t>(j)] = static_cast<float>(acc / sum);
+        }
+      }
+      guard(src, loop_);
+      mips_.push_back(std::move(src));
+      if (next.empty()) return;
+      src = std::move(next);
+    }
+  }
+  // Which levels a step reads: up to unity, level 0 alone (the file
+  // itself); above, an octave's crossfade from level k (step/2^k in [1, 2))
+  // toward k + 1 as that step nears 2, so no level switch is audible.
+  struct Mip { int k = 0; float mix = 0.0f; };
+  Mip pick(double step) const {
+    if (!(step > 1.0) || mips_.size() < 2) return {};
+    const double oct = std::log2(step);
+    const int top = static_cast<int>(mips_.size()) - 1;
+    const int k = std::min(static_cast<int>(oct), top);
+    return {k, k < top ? static_cast<float>(oct - k) : 0.0f};
+  }
+  // The sample at file position pos in [0, len_).
+  float read(double pos, const Mip& m) const {
+    const float a = read_level(m.k, pos);
+    return m.mix > 0.0f ? a + m.mix * (read_level(m.k + 1, pos) - a) : a;
+  }
+  // 4-point, 3rd-order Hermite: exact on whole frames, and its images sit
+  // far lower than linear interpolation's once a level plays sped up.
+  float read_level(int k, double pos) const {
+    const std::vector<float>& b = mips_[static_cast<size_t>(k)];
+    const double p = std::ldexp(pos, -k);
+    const size_t i = std::min(static_cast<size_t>(p), b.size() - 4);  // b[i+1] = frame i
+    const float t = static_cast<float>(p - static_cast<double>(i));
+    const float xm = b[i], x0 = b[i + 1], x1 = b[i + 2], x2 = b[i + 3];
+    const float c1 = 0.5f * (x1 - xm);
+    const float c2 = xm - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
+    const float c3 = 0.5f * (x2 - xm) + 1.5f * (x0 - x1);
+    return ((c3 * t + c2) * t + c1) * t + x0;
   }
 
   float engine_rate_ = 48000.0f;
   float file_rate_ = 48000.0f;
   bool loop_ = false;
-  std::vector<float> buf_;  // len_ frames plus one guard frame
+  std::vector<std::vector<float>> mips_;  // level 0 = the file, len_ frames + guard
   size_t len_ = 0;
   double pos_ = 0.0;
   bool playing_ = false;

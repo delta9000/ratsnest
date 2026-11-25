@@ -167,3 +167,62 @@ TEST_CASE("sampler: retrigger crossfades the old voice out instead of cutting") 
   CHECK(steady == doctest::Approx(0.0288f).epsilon(0.02));
   CHECK(event < 1.5f * steady);  // a hard cut stepped by ~1 here
 }
+
+namespace {
+// Amplitude of the f-Hz component of x (Goertzel, normalized to a sine's peak).
+double tone(const std::vector<float>& x, double f, double rate) {
+  const double w = 2.0 * 3.14159265358979323846 * f / rate, c = 2.0 * std::cos(w);
+  double s1 = 0.0, s2 = 0.0;
+  for (float v : x) {
+    const double s0 = v + c * s1 - s2;
+    s2 = s1;
+    s1 = s0;
+  }
+  return std::sqrt(s1 * s1 + s2 * s2 - c * s1 * s2) / (static_cast<double>(x.size()) / 2.0);
+}
+
+std::vector<float> play(const std::string& file, float pitch, size_t skip, size_t n,
+                        double rate = 48000.0) {
+  auto m = make_sampler(file, "on", rate);
+  float ins[3] = {0.0f, pitch, 1.0f}, outs[2];
+  std::vector<float> got;
+  for (size_t i = 0; i < skip + n; ++i) {
+    m->process(ins, outs);
+    if (i >= skip) got.push_back(outs[0]);
+  }
+  return got;
+}
+}  // namespace
+
+TEST_CASE("sampler: pitching up does not fold partials back below Nyquist") {
+  // A 15 kHz partial an octave up is 30 kHz: above Nyquist, it must vanish,
+  // not fold to 18 kHz. A 3 kHz partial must land at 6 kHz at full level.
+  const auto sine = [](double f) {
+    std::vector<float> d(48000);
+    for (size_t i = 0; i < d.size(); ++i)
+      d[i] = static_cast<float>(0.4 * std::sin(2.0 * 3.14159265358979323846 * f *
+                                               static_cast<double>(i) / 48000.0));
+    return d;
+  };
+  const auto high = sine(15000.0), low = sine(3000.0);
+  auto hp = write_fixture("ratsnest_alias_hi.wav", high, 48000);
+  auto lp = write_fixture("ratsnest_alias_lo.wav", low, 48000);
+  constexpr double kFloor = 0.4 * 0.01;  // -40 dB under the partial
+  CHECK(tone(play(hp.string(), 1.0f, 2000, 4800), 18000.0, 48000.0) < kFloor);
+  CHECK(tone(play(lp.string(), 1.0f, 2000, 4800), 6000.0, 48000.0) ==
+        doctest::Approx(0.4).epsilon(0.03));
+  // Between octaves the crossfade still suppresses the fold:
+  // 15 kHz x 2^1.5 = 42.4 kHz would fold to 5.6 kHz.
+  CHECK(tone(play(hp.string(), 1.5f, 2000, 4800), 48000.0 - 15000.0 * std::exp2(1.5),
+             48000.0) < kFloor);
+  CHECK(tone(play(lp.string(), 1.5f, 2000, 4800), 3000.0 * std::exp2(1.5), 48000.0) ==
+        doctest::Approx(0.4).epsilon(0.05));
+  // Unpitched playback is untouched: level 0 is the file itself.
+  const auto same = play(hp.string(), 0.0f, 0, 64);
+  for (size_t i = 0; i < same.size(); ++i) CHECK(same[i] == doctest::Approx(high[i]));
+  // A 96 kHz file at a 48 kHz engine is a step of 2 at pitch 0, decimated
+  // too: its 30 kHz partial (15 kHz in samples) would fold to 18 kHz.
+  auto fast = write_fixture("ratsnest_alias96.wav", high, 96000);
+  CHECK(tone(play(fast.string(), 0.0f, 2000, 4800), 18000.0, 48000.0) < kFloor);
+  for (const auto& f : {hp, lp, fast}) std::filesystem::remove(f);
+}

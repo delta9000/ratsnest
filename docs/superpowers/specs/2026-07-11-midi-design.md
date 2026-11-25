@@ -40,6 +40,11 @@ Unlike `alloc`'s strum semantics, midi tracks which key each voice sounds:
 - Note-on claims a free voice (round-robin over free voices); if none are
   free, **steal the oldest** sounding voice. Stealing or reclaiming inserts
   the same one-sample gate gap `alloc` guarantees, so envelopes retrigger.
+  A voice released on the frame it is reclaimed also gaps: its output never
+  went low. In mono, a press after every key let go on the same frame gaps.
+- CC 123 All Notes Off (and 124..127, which imply it) releases every key as
+  note-offs would, so a held pedal still sustains; CC 120 All Sound Off
+  drops every gate immediately.
 - Note-off (or sustain-pedal release for deferred offs) drops that note's
   gate; voct and vel hold, so release tails keep pitch — same hold rule as
   `alloc`.
