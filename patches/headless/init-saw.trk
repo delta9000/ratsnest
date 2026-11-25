@@ -1,0 +1,109 @@
+# init-saw.trk -- "Init Saw", Headless track 1. 96 BPM, D dorian, 16 rows per bar.
+# init 8 | grow 8 | groove 16 | break 8 | peak 16 | outro 8 | coda 4 = 68 bars
+# Dm | G | C | Am, two bars each. The motif D F E A (1 b3 2 5) is the arp's
+# first four sixteenths over every chord, and the album's through-line.
+
+track kick  note len 1        # 1
+track hat   note vel len 1    # 2
+track harm  note cva cvb      # 3  chord tones: pad voices, bass and arp follow
+track bass  note vel from harm   # 4
+track arp   note vel from harm   # 5  both the bare init saw and the grown one
+track lead  note vel          # 6
+track rim   note vel len 1    # 7
+
+pattern harm 8x16 harm
+1:00 | D3 F3 A3
+3:00 | G3 B3 D4
+5:00 | C3 E3 G3
+7:00 | A2 C3 E3
+
+pattern coda_h 4x16 harm
+1:00 | D3 F3 A3
+4:12 | off
+
+# The motif, then its answer an octave up, one bar, over whatever chord.
+pattern arp 16 arp
+00 | t1 .95
+01 | t2 .55
+02 | t1+2 .65
+03 | t3 .75
+04 | t1+12 .85
+05 | t2 .5
+06 | t1+2 .6
+07 | t3 .7
+08 | t1 .9
+09 | t2+12 .5
+10 | t1+14 .6
+11 | t3 .7
+12 | t1+12 .8
+13 | t3 .5
+14 | t2 .6
+15 | t1+2 .7
+
+# The coda: the motif alone, slowing to eighths, then quarter notes.
+pattern coda_a 4x16 arp
+1:00 | t1 .9
+1:01 | t2 .5
+1:02 | t1+2 .6
+1:03 | t3 .7
+1:08 | t1 .8
+1:09 | t2 .5
+1:10 | t1+2 .6
+1:11 | t3 .7
+2:00 | t1 .8
+2:02 | t2 .5
+2:04 | t1+2 .6
+2:06 | t3 .7
+3:00 | t1 .7
+3:04 | t2 .45
+3:08 | t1+2 .5
+3:12 | t3 .6
+4:08 | off
+
+pattern bass 16 bass
+00 | t1-12 .95
+02 | x .6
+04 | t1-12 .8
+06 | x .55
+08 | t1-12 .9
+10 | x .6
+12 | t3-24 .85
+14 | t1-12 .7
+
+pattern drums 16 kick hat rim
+lane kick x.......x.x.....
+lane hat  7.4.7.4.7.4.7.48
+lane rim  ....7.......7...
+
+pattern drums_fill 16 kick hat rim
+lane kick x.......x.x.x.x.
+lane hat  7.4.7.4.7.4.7474
+lane rim  ....7.......7.79
+
+pattern lead 8x16 lead
+1:00 | D5 .8
+2:08 | F5 .7
+3:00 | E5 .85
+4:00 | D5 .6
+4:08 | B4 .65
+5:00 | C5 .8
+5:08 | E5 .7
+6:00 | G5 .85
+6:12 | ~F5
+7:00 | E5 .8
+8:00 | A4 .7
+8:12 | off
+
+section init   harm+arp
+section groove harm+arp+bass+drums
+section fill   harm+arp+bass+drums+drums_fill@112
+section peak   harm+arp+bass+drums+lead
+section peakf  harm+arp+bass+drums+lead+drums_fill@112
+section coda   coda_h+coda_a
+
+order init*2
+order groove fill
+order init
+order peak peakf
+order init
+order coda

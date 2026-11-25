@@ -1,0 +1,162 @@
+# fm2-for-hammers -- Headless, track 3. 76 BPM, Db major, 56 bars (~3:05).
+#
+# Two kinds of struck thing. ratsnest's physical piano (felt hammers on
+# stiff waveguide strings, one soundboard, a real sustain pedal) plays a
+# song in Db; Surge XT's FM2 oscillator, a carrier and two modulators at
+# 1:3 and 1:7 with a little feedback, makes bells that answer it, then take
+# the tune an octave up while the piano accompanies. Under the second half
+# a pad of four more Surge FM2 voices, nearly unmodulated, breathes through
+# Surge's own chorus. The bridge is Ebm7-Ab-Fm-Bbm; the coda gives the
+# bells the album's motif (Bb Db C F here) over a last Dbmaj7.
+#
+#   A piano 8 | B +bells 8 | C bells sing 8 | D bridge 8 | A' 8 | D' 8 | coda 8
+#
+# Notes and pedal in fm2-for-hammers.trk; levels in fm2-for-hammers-form.trk.
+
+t    = transport { bpm: 76, division: 4 }
+song = tracker { file: "fm2-for-hammers.trk" }
+form = tracker { file: "fm2-for-hammers-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+piano_lvl = func { rise: 2, fall: 2 }
+bell_lvl  = func { rise: 2, fall: 2 }
+pad_lvl   = func { rise: 4, fall: 4 }
+verb_lvl  = func { rise: 3, fall: 3 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> piano_lvl.in
+form.cva2 -> bell_lvl.in
+form.cva3 -> pad_lvl.in
+form.cva4 -> verb_lvl.in
+form.cva5 -> main_lvl.in
+
+# ---- the piano: ratsnest's physical model (as patches/piano/nocturne) ----
+lh_a = alloc { n: 16, vel: 0 }
+song.gate2 -> lh_a.gate
+song.voct2 -> lh_a.voct
+song.vel2  -> lh_a.vel
+lh = voice { notes: lh_a }
+lh.p = piano { hardness: 0.6 }
+lh_a.gate -> lh.p.gate
+lh_a.voct -> lh.p.voct
+lh_a.vel  -> lh.p.vel
+song.cva5 -> lh.p.pedal
+
+mel_a = alloc { n: 6, vel: 0 }
+song.gate3 -> mel_a.gate
+song.voct3 -> mel_a.voct
+song.vel3  -> mel_a.vel
+mel = voice { notes: mel_a }
+mel.p = piano { hardness: 0.75 }
+mel_a.gate -> mel.p.gate
+mel_a.voct -> mel.p.voct
+mel_a.vel  -> mel.p.vel
+song.cva5 -> mel.p.pedal
+
+board = soundboard {}
+lh.p  -> board.in
+mel.p -> board.in
+song.cva5 -> board.pedal
+piano_s = sub { file: "../lib/strip.sub", gain: 2.2, send_gain: 0.35 }
+board.l -> piano_s.in_l
+board.r -> piano_s.in_r
+piano_lvl -> piano_s.level
+
+# ---- the bells: Surge FM2 ----
+bell = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=FM2", "A Osc 1 M1 Amount=42 %", "A Osc 1 M1 Ratio=C : 3",
+        "A Osc 1 M2 Amount=22 %", "A Osc 1 M2 Ratio=C : 7", "A Osc 1 Feedback=12 %",
+        "A Amp EG Attack=1 ms", "A Amp EG Decay=2.2 s", "A Amp EG Sustain=0 %",
+        "A Amp EG Release=2.4 s", "A Velocity > VCA Gain=-18 dB",
+        "FX A1 FX Type=Delay"],
+  params: ["A Osc 1 M1 Amount"], p1: 0.42 }
+song.gate4 -> bell.gate
+song.voct4 -> bell.voct
+song.vel4  -> bell.vel
+shimmer = lfo { freq: 0.07hz }
+shimmer -> bell.p1 : 0.08
+bell_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.5, pos: 0.25 }
+bell.out_l -> bell_s.in_l
+bell.out_r -> bell_s.in_r
+bell_lvl -> bell_s.level
+
+# ---- the pad: four more FM2 voices, the modulators barely open ----
+pad_s = sub { file: "../lib/strip.sub", gain: 0.1, send_gain: 0.3, width: 0.8 }
+pad_lvl -> pad_s.level
+pad1 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=FM2", "A Osc 1 M1 Amount=18 %", "A Osc 1 M1 Ratio=C : 2",
+        "A Osc 1 M2 Amount=8 %", "A Osc 1 M2 Ratio=C : 3", "A Osc 1 M1/2 Offset=0.4 Hz",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1800 Hz",
+        "A Amp EG Attack=1.8 s", "A Amp EG Sustain=80 %", "A Amp EG Release=3 s",
+        "FX A1 FX Type=Chorus", "A Width=100 %"] }
+song.gate6 -> pad1.gate
+song.voct1 -> pad1.voct
+0.4 -> pad1.vel
+pad1.out_l -> pad_s.in_l
+pad1.out_r -> pad_s.in_r
+pad2 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=FM2", "A Osc 1 M1 Amount=18 %", "A Osc 1 M1 Ratio=C : 2",
+        "A Osc 1 M2 Amount=8 %", "A Osc 1 M2 Ratio=C : 3", "A Osc 1 M1/2 Offset=0.4 Hz",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1800 Hz",
+        "A Amp EG Attack=1.8 s", "A Amp EG Sustain=80 %", "A Amp EG Release=3 s",
+        "FX A1 FX Type=Chorus", "A Width=100 %"] }
+song.gate6 -> pad2.gate
+song.cva1 -> pad2.voct
+0.4 -> pad2.vel
+pad2.out_l -> pad_s.in_l
+pad2.out_r -> pad_s.in_r
+pad3 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=FM2", "A Osc 1 M1 Amount=18 %", "A Osc 1 M1 Ratio=C : 2",
+        "A Osc 1 M2 Amount=8 %", "A Osc 1 M2 Ratio=C : 3", "A Osc 1 M1/2 Offset=0.4 Hz",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1800 Hz",
+        "A Amp EG Attack=1.8 s", "A Amp EG Sustain=80 %", "A Amp EG Release=3 s",
+        "FX A1 FX Type=Chorus", "A Width=100 %"] }
+song.gate6 -> pad3.gate
+song.cvb1 -> pad3.voct
+0.4 -> pad3.vel
+pad3.out_l -> pad_s.in_l
+pad3.out_r -> pad_s.in_r
+pad4 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=FM2", "A Osc 1 M1 Amount=18 %", "A Osc 1 M1 Ratio=C : 2",
+        "A Osc 1 M2 Amount=8 %", "A Osc 1 M2 Ratio=C : 3", "A Osc 1 M1/2 Offset=0.4 Hz",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=1800 Hz",
+        "A Amp EG Attack=1.8 s", "A Amp EG Sustain=80 %", "A Amp EG Release=3 s",
+        "FX A1 FX Type=Chorus", "A Width=100 %"] }
+song.gate6 -> pad4.gate
+song.cvd1 -> pad4.voct
+0.4 -> pad4.vel
+pad4.out_l -> pad_s.in_l
+pad4.out_r -> pad_s.in_r
+
+# ---- one room for all of it ----
+room = reverb { decay: 0.78, damp: 0.5, mix: 1, predelay: 0.025 }
+piano_s.fx -> room.in_l
+piano_s.fx -> room.in_r
+bell_s.fx  -> room.in_l
+pad_s.fx   -> room.in_r
+room_s = sub { file: "../lib/strip.sub", gain: 1.0 }
+room.out_l -> room_s.in_l
+room.out_r -> room_s.in_r
+verb_lvl -> room_s.level
+
+# ---- master: gentle; no kick, so the bus keys itself ----
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.0, true_peak: on, key_bus: 1,
+                comp_thr: -20, comp_ratio: 1.8, clip_blend: 0.15 }
+10 -> master.makeup
+1.0 -> master.width
+piano_s.l -> master.in_l
+piano_s.r -> master.in_r
+bell_s.l  -> master.in_l
+bell_s.r  -> master.in_r
+pad_s.l   -> master.in_l
+pad_s.r   -> master.in_r
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

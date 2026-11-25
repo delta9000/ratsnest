@@ -1,0 +1,202 @@
+# window -- Headless, track 7. 60 BPM, Ab lydian, no drums, 46 bars (~3:10).
+#
+# Surge XT's Window oscillator plays a wavetable through a window function,
+# so its Morph and Formant move like light through glass. Four Window
+# voices hold the chords (Abmaj7#11, Fm9, Dbmaj9, Ebsus), each with its own
+# slow ratsnest LFO walking Morph and Formant, so the chord never quite
+# repeats. A fifth Window voice plays the album's motif, C Eb D G (four tones
+# of the first chord), through Surge's Nimbus granular effect; a form lane
+# freezes Nimbus at bar 31 and the motif hangs there. ratsnest adds glints
+# (lib/mallet.sub on random-timed dust, quantized to the chord's scale) and,
+# for the swell, its own frozen cloud of the pads.
+#
+#   pads 8 | glints 8 | motif 8 | answer 8 | swell (two clouds) 8 | fade 6
+#
+# Notes in window.trk; levels in window-form.trk.
+
+t    = transport { bpm: 60, division: 1 }
+song = tracker { file: "window.trk" }
+form = tracker { file: "window-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+pad_lvl    = func { rise: 6, fall: 6 }
+glint_lvl  = func { rise: 4, fall: 4 }
+motif_lvl  = func { rise: 2, fall: 4 }
+freeze_lvl = func { rise: 0.01, fall: 0.01 }
+morph_lvl  = func { rise: 12, fall: 12 }
+cloud_lvl  = func { rise: 6, fall: 6 }
+main_lvl   = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> pad_lvl.in
+form.cva2 -> glint_lvl.in
+form.cva3 -> motif_lvl.in
+form.cva4 -> freeze_lvl.in
+form.cva5 -> morph_lvl.in
+form.cva6 -> cloud_lvl.in
+form.cva7 -> main_lvl.in
+
+# ---- pads: four Surge Window voices ----
+pad_s = sub { file: "../lib/strip.sub", gain: 0.5, send_gain: 0.5, width: 0.8 }
+pad_lvl -> pad_s.level
+pad1 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Window", "A Osc 1 Window=Sine",
+        "A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=9 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=2400 Hz",
+        "A Amp EG Attack=3 s", "A Amp EG Sustain=90 %", "A Amp EG Release=5 s",
+        "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Morph", "A Osc 1 Formant"] }
+song.gate1 -> pad1.gate
+song.voct1 -> pad1.voct
+0.5 -> pad1.vel
+dr1 = lfo { freq: 0.031hz }
+morph_v1 = math { op: add }
+morph_lvl -> morph_v1.a
+dr1 -> morph_v1.b : 0.15
+morph_v1 -> pad1.p1
+0.5 -> pad1.p2
+dr1 -> pad1.p2 : 0.06
+pad1.out_l -> pad_s.in_l
+pad1.out_r -> pad_s.in_r
+pad2 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Window", "A Osc 1 Window=Sine",
+        "A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=9 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=2400 Hz",
+        "A Amp EG Attack=3 s", "A Amp EG Sustain=90 %", "A Amp EG Release=5 s",
+        "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Morph", "A Osc 1 Formant"] }
+song.gate1 -> pad2.gate
+song.cva1 -> pad2.voct
+0.5 -> pad2.vel
+dr2 = lfo { freq: 0.023hz }
+morph_v2 = math { op: add }
+morph_lvl -> morph_v2.a
+dr2 -> morph_v2.b : 0.15
+morph_v2 -> pad2.p1
+0.5 -> pad2.p2
+dr2 -> pad2.p2 : 0.06
+pad2.out_l -> pad_s.in_l
+pad2.out_r -> pad_s.in_r
+pad3 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Window", "A Osc 1 Window=Sine",
+        "A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=9 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=2400 Hz",
+        "A Amp EG Attack=3 s", "A Amp EG Sustain=90 %", "A Amp EG Release=5 s",
+        "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Morph", "A Osc 1 Formant"] }
+song.gate1 -> pad3.gate
+song.cvb1 -> pad3.voct
+0.5 -> pad3.vel
+dr3 = lfo { freq: 0.037hz }
+morph_v3 = math { op: add }
+morph_lvl -> morph_v3.a
+dr3 -> morph_v3.b : 0.15
+morph_v3 -> pad3.p1
+0.5 -> pad3.p2
+dr3 -> pad3.p2 : 0.06
+pad3.out_l -> pad_s.in_l
+pad3.out_r -> pad_s.in_r
+pad4 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Window", "A Osc 1 Window=Sine",
+        "A Osc 1 Unison Voices=3", "A Osc 1 Unison Detune=9 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=2400 Hz",
+        "A Amp EG Attack=3 s", "A Amp EG Sustain=90 %", "A Amp EG Release=5 s",
+        "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Morph", "A Osc 1 Formant"] }
+song.gate1 -> pad4.gate
+song.cvd1 -> pad4.voct
+0.5 -> pad4.vel
+dr4 = lfo { freq: 0.029hz }
+morph_v4 = math { op: add }
+morph_lvl -> morph_v4.a
+dr4 -> morph_v4.b : 0.15
+morph_v4 -> pad4.p1
+0.5 -> pad4.p2
+dr4 -> pad4.p2 : 0.06
+pad4.out_l -> pad_s.in_l
+pad4.out_r -> pad_s.in_r
+
+# ---- the motif: Surge Window through Surge Nimbus ----
+motif = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Window", "A Osc 1 Window=Sine", "A Osc 1 Morph=40 %",
+        "A Amp EG Attack=40 ms", "A Amp EG Release=2 s",
+        "FX A1 FX Type=Nimbus", "FX A1 Grain - Size=60 %", "FX A1 Grain - Density=30 %",
+        "FX A1 Grain - Texture=70 %", "FX A1 Grain - Spread=60 %",
+        "FX A1 Playback - Feedback=40 %", "FX A1 Output - Reverb=50 %", "FX A1 Output - Mix=60 %"],
+  params: ["FX A1 Playback - Freeze"] }
+song.gate2 -> motif.gate
+song.voct2 -> motif.voct
+song.vel2  -> motif.vel
+freeze_lvl -> motif.p1
+motif_s = sub { file: "../lib/strip.sub", gain: 1.3, send_gain: 0.6, pos: 0.15 }
+motif.out_l -> motif_s.in_l
+motif.out_r -> motif_s.in_r
+motif_lvl -> motif_s.level
+
+# ---- glints: ratsnest mallets on dust, quantized to Ab lydian ----
+spark = dust { rate: 0.7hz, seed: 12 }
+pick = noise { color: white, seed: 3 }
+note = sh {}
+pick -> note.in
+spark.trig -> note.trig
+q = quant { scale: [0, 2, 4, 6, 7, 9, 11], root: -1, mode: clock }
+note -> q.in : 0.9
+1.2 -> q.transpose
+spark.trig -> q.clock
+glint = sub { file: "../lib/mallet.sub", tune: A3, decay: 1.6s }
+spark.trig -> glint.trig
+q -> glint.cv
+glint_s = sub { file: "../lib/strip.sub", gain: 0.25, send_gain: 1.0, pos: -0.35 }
+glint -> glint_s.in
+glint_lvl -> glint_s.level
+
+# ---- ratsnest's own frozen cloud of the pads ----
+cloud = sub { file: "../lib/frozen-cloud.sub", secs: 2.0, seed: 4 }
+pad_s.l -> cloud.in : 2
+freeze_lvl -> cloud.freeze
+cloud_s = sub { file: "../lib/strip.sub", gain: 1.0 }
+cloud.main -> cloud_s.in
+cloud_lvl -> cloud_s.level
+
+# ---- space ----
+de = tempo { bpm: 60, beats: 1.5 }
+echo = delay { time: 0ms, feedback: 0.55, tone: 2500, mix: 1 }
+de.seconds -> echo.time
+motif_s.fx -> echo.in
+glint_s.fx -> echo.in : 0.6
+room = reverb { decay: 0.92, damp: 0.3, mix: 1, predelay: 0.05 }
+pad_s.fx   -> room.in_l
+motif_s.fx -> room.in_r
+glint_s.fx -> room.in_l
+echo -> room.in_r : 0.5
+room_hl = svf { cutoff: 250, res: 0 }   # the plate's lows return out of phase
+room_hr = svf { cutoff: 250, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 0.9 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.0, true_peak: on, key_bus: 1,
+                comp_thr: -22, comp_ratio: 1.6, clip_blend: 0.1 }
+10 -> master.makeup
+1.0 -> master.width
+pad_s.l   -> master.in_l
+pad_s.r   -> master.in_r
+motif_s.l -> master.in_l
+motif_s.r -> master.in_r
+glint_s.l -> master.in_l
+glint_s.r -> master.in_r
+cloud_s.l -> master.in_l
+cloud_s.r -> master.in_r
+echo      -> master.in_l : 0.3
+echo      -> master.in_r : 0.35
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

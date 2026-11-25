@@ -1,0 +1,28 @@
+# wavetable-weather-form.trk -- one row per bar (96).
+track stab  cva   # 1  stab dry level
+track cut   cva   # 2  stab cutoff (p, normalized)
+track morph cva   # 3  wavetable position (p base; an LFO rides on it)
+track echo  cva   # 4  echo send into the dub room
+track sub   cva   # 5
+track drums cva   # 6
+track wx    cva   # 7  the weather: rain, crackle
+track motif cva   # 8
+track main  cva   # 9
+
+pattern form 96
+#    stab   cut    morph  echo   sub    drums  wx     motif  main
+00 | .6   | .35> | .10  | .7   | 0    | 0    | .9   | 0    | 1     # intro: weather and chords
+07 | .    | .45  | .    | .    | .    | .    | .    | .    | .
+08 | .7   | .42  | .15> | .6   | .9   | .9   | .5   | .    | .     # A
+23 | .    | .    | .30  | .    | .    | .    | .    | .    | .
+24 | .7   | .45> | .30  | .65  | .9   | .9   | .45  | .8   | .     # B, the motif calls
+39 | .    | .55  | .    | .    | .    | .    | .    | .    | .
+40 | .5   | .40  | .45  | .9   | 0    | 0    | .9   | .9   | .     # break: everything into the room
+48 | .8   | .48> | .30> | .7   | 1    | 1    | .4   | .7   | .     # C: the table opens
+71 | .    | .66  | .70  | .    | .    | .    | .    | .    | .
+72 | .7   | .55> | .50> | .7   | .9   | .9   | .5   | 0    | .     # outro
+87 | .    | .40  | .20  | .    | .    | .    | .    | .    | .
+88 | .6   | .38  | .15  | .9   | 0    | 0    | .9>  | .    | 1>    # end: the weather keeps going
+95 | .    | .    | .    | .    | .    | .    | .3   | .    | 0
+
+order form

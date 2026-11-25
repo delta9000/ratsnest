@@ -1,0 +1,188 @@
+# two-strings-stiff -- Headless, track 4. No tempo, E aeolian, 3:05.
+#
+# Surge XT's String oscillator is two plucked waveguide strings with a
+# Stiffness control: slack, they are a harp; stiff, their partials stretch
+# into bells. Three Surge string voices play from three ratsnest clocks
+# whose periods never line up (1.62 s, 2.28 s, 3.14 s), each with its own
+# turing register (prob 0.04: a loop that mutates now and then) quantized
+# to E aeolian. A ratsnest mallet answers in a 5-of-13 euclid, and a
+# sympathetic-string drone sits on E. One form lane makes the strings stiff
+# through the middle and slack again; near the end everything stops and a
+# fourth string plays the album's motif, E G F# B, once.
+#
+# Arc in two-strings-stiff-form.trk (one row per 2.5 s).
+
+form_clk = clock { bpm: 24 }
+form = tracker { file: "two-strings-stiff-form.trk" }
+form_clk -> form.clock
+
+a_lvl  = func { rise: 4, fall: 4 }
+b_lvl  = func { rise: 4, fall: 4 }
+c_lvl  = func { rise: 4, fall: 4 }
+m_lvl  = func { rise: 4, fall: 4 }
+stiff  = func { rise: 10, fall: 10 }
+d_lvl  = func { rise: 6, fall: 6 }
+main_lvl = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> a_lvl.in
+form.cva2 -> b_lvl.in
+form.cva3 -> c_lvl.in
+form.cva4 -> m_lvl.in
+form.cva5 -> stiff.in
+form.cva6 -> d_lvl.in
+form.cva7 -> main_lvl.in
+
+# ---- three clocks, three registers, one scale ----
+ca = clock { bpm: 37.04 }
+cb = clock { bpm: 26.32 }
+cc = clock { bpm: 19.11 }
+ta = turing { len: 7, prob: 0.04, seed: 3 }
+tb = turing { len: 5, prob: 0.04, seed: 8 }
+tc = turing { len: 11, prob: 0.03, seed: 21 }
+ca -> ta.clock
+cb -> tb.clock
+cc -> tc.clock
+qa = quant { scale: [0, 2, 3, 5, 7, 8, 10], root: 7, mode: clock }
+qb = quant { scale: [0, 2, 3, 5, 7, 8, 10], root: 7, mode: clock }
+qc = quant { scale: [0, 2, 3, 5, 7, 8, 10], root: 7, mode: clock }
+ta -> qa.in : 1.5
+tb -> qb.in : 1.5
+tc -> qc.in : 1.0
+0.58 -> qa.transpose
+0.25 -> qb.transpose
+-1.4 -> qc.transpose
+ca -> qa.clock
+cb -> qb.clock
+cc -> qc.clock
+
+sa = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=String", "A Osc 1 Exciter=Burst Pink Noise",
+        "A Osc 1 String 1 Decay=97 %", "A Osc 1 String 2 Decay=96 %",
+        "A Osc 1 String 2 Detune=6 cents", "A Filter 1 Type=LP 12 dB",
+        "A Filter 1 Cutoff=5000 Hz", "A Amp EG Release=4 s",
+        "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Stiffness"] }
+sb = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=String", "A Osc 1 Exciter=Burst Pink Noise",
+        "A Osc 1 String 1 Decay=97 %", "A Osc 1 String 2 Decay=96 %",
+        "A Osc 1 String 2 Detune=6 cents", "A Filter 1 Type=LP 12 dB",
+        "A Filter 1 Cutoff=5000 Hz", "A Amp EG Release=4 s",
+        "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Stiffness"] }
+sc = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=String", "A Width=0 %", "A Osc 1 Exciter=Burst Pink Noise",
+        "A Osc 1 String 1 Decay=97 %", "A Osc 1 String 2 Decay=96 %",
+        "A Osc 1 String 2 Detune=6 cents", "A Filter 1 Type=LP 12 dB",
+        "A Filter 1 Cutoff=5000 Hz", "A Amp EG Release=4 s",
+        "A Velocity > VCA Gain=-12 dB", "A Osc 1 Exciter=Burst Sine"],
+  params: ["A Osc 1 Stiffness"] }
+ca -> sa.gate
+cb -> sb.gate
+cc -> sc.gate
+qa -> sa.voct
+qb -> sb.voct
+qc -> sc.voct
+0.6 -> sa.vel
+0.55 -> sb.vel
+0.7 -> sc.vel
+stiff -> sa.p1
+stiff -> sb.p1
+stiff -> sc.p1
+sway = lfo { freq: 0.021hz }
+sway -> sb.p1 : 0.08
+
+sa_s = sub { file: "../lib/strip.sub", gain: 1.0, pos: -0.45, send_gain: 0.6 }
+sb_s = sub { file: "../lib/strip.sub", gain: 1.0, pos: 0.45, send_gain: 0.6 }
+sc_s = sub { file: "../lib/strip.sub", gain: 0.6, pos: 0, send_gain: 0.5 }
+sa.out_l -> sa_s.in_l
+sa.out_r -> sa_s.in_r
+sb.out_l -> sb_s.in_l
+sb.out_r -> sb_s.in_r
+sc.out_l -> sc_s.in_l
+sc.out_r -> sc_s.in_r
+a_lvl -> sa_s.level
+b_lvl -> sb_s.level
+c_lvl -> sc_s.level
+
+# ---- the motif string ----
+sm = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=String", "A Osc 1 Exciter=Burst Pink Noise",
+        "A Osc 1 String 1 Decay=97 %", "A Osc 1 String 2 Decay=96 %",
+        "A Osc 1 String 2 Detune=6 cents", "A Filter 1 Type=LP 12 dB",
+        "A Filter 1 Cutoff=5000 Hz", "A Amp EG Release=4 s",
+        "A Velocity > VCA Gain=-12 dB", "A Osc 1 Exciter=Burst Triangle"],
+  params: ["A Osc 1 Stiffness"] }
+form.gate8 -> sm.gate
+form.voct8 -> sm.voct
+form.vel8  -> sm.vel
+0.5 -> sm.p1
+sm_s = sub { file: "../lib/strip.sub", gain: 1.2, send_gain: 0.8 }
+sm.out_l -> sm_s.in_l
+sm.out_r -> sm_s.in_r
+
+# ---- ratsnest answers: mallets on a 5-of-13 euclid, pitches from voice A's register ----
+mclk = clock { bpm: 98 }
+eu = euclid { steps: 13, hits: 5, rot: 2 }
+mclk -> eu.clock
+qm = quant { scale: [0, 2, 3, 5, 7, 8, 10], root: 7, mode: clock }
+ta -> qm.in : 1.2
+1.0 -> qm.transpose
+eu.trig -> qm.clock
+mallet = sub { file: "../lib/mallet.sub", tune: A3, decay: 0.9s }
+eu.trig -> mallet.trig
+qm -> mallet.cv
+m_s = sub { file: "../lib/strip.sub", gain: 0.6, pos: 0.2, send_gain: 0.8 }
+mallet -> m_s.in
+m_lvl -> m_s.level
+
+# ---- an E drone of sympathetic strings ----
+drone = sub { file: "../lib/sym-drone.sub", tune: E2 }
+cc -> drone.trig
+d_s = sub { file: "../lib/strip.sub", gain: 1.4 }
+drone -> d_s.in
+d_lvl -> d_s.level
+
+# ---- space ----
+room = reverb { decay: 0.88, damp: 0.35, mix: 1, predelay: 0.04 }
+sa_s.fx -> room.in_l
+sb_s.fx -> room.in_r
+sc_s.fx -> room.in_l
+sc_s.fx -> room.in_r
+sm_s.fx -> room.in_l
+sm_s.fx -> room.in_r
+m_s.fx  -> room.in_r
+room_s = sub { file: "../lib/strip.sub", gain: 0.9 }
+# The room's low end comes back out of phase between sides (mono sources
+# into a decorrelating plate); cut it below 250 Hz.
+room_hl = svf { cutoff: 250, res: 0 }
+room_hr = svf { cutoff: 250, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.0, true_peak: on, key_bus: 1,
+                comp_thr: -22, comp_ratio: 1.6, clip_blend: 0.1 }
+10 -> master.makeup
+1.05 -> master.width
+sa_s.l -> master.in_l
+sa_s.r -> master.in_r
+sb_s.l -> master.in_l
+sb_s.r -> master.in_r
+sc_s.l -> master.in_l
+sc_s.r -> master.in_r
+sm_s.l -> master.in_l
+sm_s.r -> master.in_r
+m_s.l  -> master.in_l
+m_s.r  -> master.in_r
+d_s.l  -> master.in_l
+d_s.r  -> master.in_r
+room_s.l -> master.in_l
+room_s.r -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

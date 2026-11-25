@@ -1,0 +1,28 @@
+# twist-form.trk -- one row per bar (96).
+track cut   cva   # 1  ladder cutoff (p, normalized)
+track res   cva   # 2  ladder resonance (p, normalized)
+track drive cva   # 3  Surge's own distortion (p, normalized drive)
+track acid  cva   # 4  bass level
+track drums cva   # 5
+track talk  cva   # 6
+track verb  cva   # 7
+track main  cva   # 8
+
+pattern form 96
+#    cut    res    drive  acid   drums  talk   verb   main
+00 | .30> | .45  | .45  | .8   | .9   | 0    | .3   | 1     # intro: closed
+07 | .40  | .    | .    | .    | .    | .    | .    | .
+08 | .38> | .55  | .50  | .85  | .9   | 0    | .3   | .     # A: opening
+23 | .56  | .    | .    | .    | .    | .    | .    | .
+24 | .50> | .62  | .55  | .85  | .95  | .8   | .4   | .     # B: it talks
+39 | .63  | .    | .    | .    | .    | .    | .    | .
+40 | .58> | .80> | .55  | .9   | .8   | 0    | .6   | .     # break: squelch, no kick
+47 | .80  | .88  | .    | .    | .    | .    | .    | .
+48 | .63> | .70  | .65> | .9   | 1    | .8   | .4   | .     # C: everything, driven
+71 | .78  | .    | .75  | .    | .    | .    | .    | .
+72 | .58> | .60  | .55  | .85  | .95  | 0    | .4   | .     # outro
+87 | .43  | .    | .    | .    | .    | .    | .    | .
+88 | .38> | .50  | .45  | .8>  | .9>  | .    | .5   | .     # end
+95 | .28  | .    | .    | .2   | .2   | .    | .    | .
+
+order form

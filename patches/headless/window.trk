@@ -1,0 +1,37 @@
+# window.trk -- "Window", Headless track 7. 60 BPM, Ab lydian, 4 rows per
+# bar (quarter notes), 46 bars.
+# Abmaj7#11 | Fm9 | Dbmaj9 | Ebsus, two bars each. The motif C Eb D G is
+# four tones of the first chord, so it can float over all of them.
+
+track harm  note cva cvb cvd    # 1  the four Window pad voices
+track motif note vel            # 2  Surge Window, through Surge's Nimbus
+pattern harm 8x4 harm
+1:00 | Ab2 Eb3 G3  D4
+3:00 | F2  C3  Eb3 G3
+5:00 | Db3 Ab3 C4  Eb4
+7:00 | Eb3 Ab3 Bb3 F4
+
+pattern harm_end 6x4 harm
+1:00 | Ab2 Eb3 G3  D4
+6:00 | off
+
+pattern motif 8x4 motif
+1:00 | C5 .7
+2:00 | Eb5 .6
+3:00 | D5 .6
+4:00 | G5 .8
+6:00 | off
+
+pattern motif_b 8x4 motif
+1:00 | G4 .6
+1:02 | C5 .5
+3:00 | Eb5 .6
+4:00 | D5 .55
+5:00 | Bb4 .5
+6:02 | C5 .65
+8:00 | off
+
+section m  harm+motif
+section mb harm+motif_b
+
+order harm*2 m mb harm harm_end

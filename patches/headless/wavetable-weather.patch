@@ -1,0 +1,213 @@
+# wavetable-weather -- Headless, track 2. 118 BPM, F minor dub techno,
+# 96 bars (~3:20 with the room's tail).
+#
+# Four Surge XT instances are the chord: Surge's Wavetable oscillator, one
+# instance per chord tone, struck on the offbeats and decaying through a
+# 24 dB ladder. ratsnest owns everything around them: a slow LFO walking
+# the wavetable's Morph (so each stab is a slightly different table), the
+# form lane opening the filter section by section, and the dub room, two
+# tempo echoes and a plate (lib/tape-echo.sub), which is the real
+# instrument. The sub is Surge's Sine oscillator. The weather is ratsnest:
+# pink-noise rain through a wandering band-pass, and dust crackle.
+#
+#   intro 8 | A 16 | B 16 (motif) | break 8 | C 24 | outro 16 | end 8
+#
+# Notes in wavetable-weather.trk; levels in wavetable-weather-form.trk.
+
+t    = transport { bpm: 118, division: 4 }
+song = tracker { file: "wavetable-weather.trk" }
+form = tracker { file: "wavetable-weather-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+stab_lvl  = func { rise: 1, fall: 1 }
+cut_lvl   = func { rise: 3, fall: 3 }
+morph_lvl = func { rise: 6, fall: 6 }
+echo_lvl  = func { rise: 2, fall: 2 }
+sub_lvl   = func { rise: 0.3, fall: 0.3 }
+drums_lvl = func { rise: 0.1, fall: 0.3 }
+wx_lvl    = func { rise: 4, fall: 4 }
+motif_lvl = func { rise: 1, fall: 1 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> stab_lvl.in
+form.cva2 -> cut_lvl.in
+form.cva3 -> morph_lvl.in
+form.cva4 -> echo_lvl.in
+form.cva5 -> sub_lvl.in
+form.cva6 -> drums_lvl.in
+form.cva7 -> wx_lvl.in
+form.cva8 -> motif_lvl.in
+form.cva9 -> main_lvl.in
+
+# Morph: the lane's base plus a 23-second wander, so no two stabs match.
+wander = lfo { freq: 0.043hz }
+morph = math { op: add }
+morph_lvl -> morph.a
+wander -> morph.b : 0.12
+
+stab_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 1.0, width: 0.8 }
+stab_lvl -> stab_s.level
+echo_lvl -> stab_s.send
+
+wt1 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Wavetable", "A Osc 1 Unison Voices=2", "A Osc 1 Unison Detune=7 cents",
+        "A Filter 1 Type=LP 24 dB", "A Filter 1 Resonance=38 %",
+        "A Filter 1 FEG Mod Amount=18 semitones", "A Filter EG Decay=240 ms",
+        "A Filter EG Sustain=0 %", "A Amp EG Decay=420 ms", "A Amp EG Sustain=0 %",
+        "A Amp EG Release=380 ms", "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Morph", "A Filter 1 Cutoff"] }
+song.gate6 -> wt1.gate
+song.voct5 -> wt1.voct
+song.vel6 -> wt1.vel
+morph -> wt1.p1
+cut_lvl -> wt1.p2
+wt1.out_l -> stab_s.in_l
+wt1.out_r -> stab_s.in_r
+wt2 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Wavetable", "A Osc 1 Unison Voices=2", "A Osc 1 Unison Detune=7 cents",
+        "A Filter 1 Type=LP 24 dB", "A Filter 1 Resonance=38 %",
+        "A Filter 1 FEG Mod Amount=18 semitones", "A Filter EG Decay=240 ms",
+        "A Filter EG Sustain=0 %", "A Amp EG Decay=420 ms", "A Amp EG Sustain=0 %",
+        "A Amp EG Release=380 ms", "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Morph", "A Filter 1 Cutoff"] }
+song.gate6 -> wt2.gate
+song.cva5 -> wt2.voct
+song.vel6 -> wt2.vel
+morph -> wt2.p1
+cut_lvl -> wt2.p2
+wt2.out_l -> stab_s.in_l
+wt2.out_r -> stab_s.in_r
+wt3 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Wavetable", "A Osc 1 Unison Voices=2", "A Osc 1 Unison Detune=7 cents",
+        "A Filter 1 Type=LP 24 dB", "A Filter 1 Resonance=38 %",
+        "A Filter 1 FEG Mod Amount=18 semitones", "A Filter EG Decay=240 ms",
+        "A Filter EG Sustain=0 %", "A Amp EG Decay=420 ms", "A Amp EG Sustain=0 %",
+        "A Amp EG Release=380 ms", "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Morph", "A Filter 1 Cutoff"] }
+song.gate6 -> wt3.gate
+song.cvb5 -> wt3.voct
+song.vel6 -> wt3.vel
+morph -> wt3.p1
+cut_lvl -> wt3.p2
+wt3.out_l -> stab_s.in_l
+wt3.out_r -> stab_s.in_r
+wt4 = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Wavetable", "A Osc 1 Unison Voices=2", "A Osc 1 Unison Detune=7 cents",
+        "A Filter 1 Type=LP 24 dB", "A Filter 1 Resonance=38 %",
+        "A Filter 1 FEG Mod Amount=18 semitones", "A Filter EG Decay=240 ms",
+        "A Filter EG Sustain=0 %", "A Amp EG Decay=420 ms", "A Amp EG Sustain=0 %",
+        "A Amp EG Release=380 ms", "A Velocity > VCA Gain=-12 dB"],
+  params: ["A Osc 1 Morph", "A Filter 1 Cutoff"] }
+song.gate6 -> wt4.gate
+song.cvd5 -> wt4.voct
+song.vel6 -> wt4.vel
+morph -> wt4.p1
+cut_lvl -> wt4.p2
+wt4.out_l -> stab_s.in_l
+wt4.out_r -> stab_s.in_r
+
+# ---- the dub room ----
+room = sub { file: "../lib/tape-echo.sub", fb_a: 0.6, fb_b: 0.5, verb_decay: 0.88 }
+118 -> room.bpm
+stab_s.fx -> room.in
+duck_room = sub { file: "../lib/duck.sub", depth_db: -3, release: 0.3, curve: exp }
+song.gate1 -> duck_room.trig
+room_s = sub { file: "../lib/strip.sub", gain: 1.1 }
+room.l -> room_s.in_l
+room.r -> room_s.in_r
+duck_room -> room_s.duck
+
+# ---- sub: Surge's Sine, nothing else ----
+subb = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Sine", "A Amp EG Attack=4 ms", "A Amp EG Release=40 ms", "A Width=0 %"] }
+song.gate7 -> subb.gate
+song.voct7 -> subb.voct
+song.vel7  -> subb.vel
+duck_sub = sub { file: "../lib/duck.sub", depth_db: -6, release: 0.18, curve: exp }
+song.gate1 -> duck_sub.trig
+sub_s = sub { file: "../lib/strip.sub", gain: 0.42 }
+subb.out_l -> sub_s.in_l
+subb.out_r -> sub_s.in_r
+sub_lvl -> sub_s.level
+duck_sub -> sub_s.duck
+
+# ---- drums ----
+kick = sub { file: "../lib/kick.sub", tune: 46hz, decay: 0.2s, click: 0.25 }
+song.gate1 -> kick.trig
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.05s, tone: 8khz }
+song.gate2 -> hat.trig
+song.vel2  -> hat.accent
+ghost = sub { file: "../lib/kit/hat_model.sub", decay: 0.03s, tone: 10khz }
+song.gate3 -> ghost.trig
+song.vel3  -> ghost.accent
+rim = sub { file: "../lib/kit/rim.sub", tune: 610hz }
+song.gate4 -> rim.trig
+song.vel4  -> rim.accent
+rim -> room.in : 0.5
+dmix = mix { levels: [0.75, 1.3, 1.0, 0.7], pans: [0, 0.2, -0.3, -0.1] }
+kick  -> dmix.in1
+hat   -> dmix.in2
+ghost -> dmix.in3
+rim   -> dmix.in4
+drums = sub { file: "../lib/strip.sub", gain: 0.8 }
+dmix.out_l -> drums.in_l
+dmix.out_r -> drums.in_r
+drums_lvl -> drums.level
+
+# ---- the motif: one more wavetable, held longer, mostly heard as echo ----
+motif = plugin { file: "Surge XT",
+  set: ["A Osc 1 Type=Wavetable", "A Osc 1 Morph=60 %",
+        "A Filter 1 Type=BP 12 dB", "A Filter 1 Cutoff=1500 Hz", "A Filter 1 Resonance=30 %",
+        "A Amp EG Attack=8 ms", "A Amp EG Decay=600 ms", "A Amp EG Sustain=40 %",
+        "A Amp EG Release=500 ms"] }
+song.gate8 -> motif.gate
+song.voct8 -> motif.voct
+song.vel8  -> motif.vel
+motif_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 1.6, pos: 0.3 }
+motif.out_l -> motif_s.in_l
+motif.out_r -> motif_s.in_r
+motif_lvl -> motif_s.level
+motif_s.fx -> room.in
+
+# ---- weather: ratsnest noise ----
+rain_src = noise { color: pink, seed: 4 }
+rain = svf { cutoff: 2400, res: 0.2 }
+rain_src -> rain.in
+gust = lfo { freq: 0.031hz }
+gust -> rain.cutoff : 1400
+crackle = dust { rate: 7hz, seed: 9 }
+crk = svf { cutoff: 3500, res: 0.1 }
+crackle -> crk.in
+wx = mix { levels: [0.22, 0.5], pans: [0, 0] }
+rain.bp -> wx.in1
+crk.hp  -> wx.in2
+wx_s = sub { file: "../lib/strip.sub", gain: 2.2, width: 1.2 }
+wx.out_l -> wx_s.in_l
+wx.out_r -> wx_s.in_r
+wx_lvl -> wx_s.level
+
+# ---- master ----
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.0, true_peak: on, key_bus: 0.3 }
+9 -> master.makeup
+drums.l   -> master.in_l
+drums.r   -> master.in_r
+sub_s.l   -> master.in_l
+sub_s.r   -> master.in_r
+stab_s.l  -> master.in_l
+stab_s.r  -> master.in_r
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+motif_s.l -> master.in_l
+motif_s.r -> master.in_r
+wx_s.l    -> master.in_l
+wx_s.r    -> master.in_r
+kick -> master.side_l : 0.6
+kick -> master.side_r : 0.6
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right
