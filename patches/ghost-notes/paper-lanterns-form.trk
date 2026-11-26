@@ -1,0 +1,31 @@
+# paper-lanterns-form.trk -- one row per bar (64). Every lane is slewed by
+# a `func` in the patch, so a `>` ramp or a step is a fade, not a click.
+track kit   cva   # 1
+track ghost cva   # 2  rim and shaker
+track keys  cva   # 3
+track pad   cva   # 4
+track pcut  cva   # 5  pad cutoff (Surge, normalized)
+track bass  cva   # 6
+track lead  cva   # 7
+track vinyl cva   # 8
+track verb  cva   # 9
+track wow   cva   # 10 tape degrade on the pad and keys bus
+track main  cva   # 11
+
+pattern form 64
+#    kit    ghost  keys   pad    pcut   bass   lead   vinyl  verb   wow    main
+00 | 0    | 0    | .8   | .5   | .42> | 0    | 0    | 1    | .7   | .6   | 1     # intro: piano, records
+03 | .    | .45  | .    | .    | .    | .    | .    | .    | .    | .    | .
+04 | .5>  | .    | .    | .7   | .    | .    | .    | .    | .    | .    | .
+07 | .75  | .    | .    | .    | .52  | .    | .    | .    | .    | .    | .
+08 | 1    | .8   | .9   | .8   | .55> | .9   | 0    | .5   | .45  | .3   | .     # A
+23 | .    | .    | .    | .    | .64  | .    | .    | .    | .    | .    | .
+24 | 1    | .9   | .9   | .9   | .62  | .95  | .8   | .45  | .5   | .25  | .     # B: the lead's first entry
+32 | 1    | 1    | .85  | .85  | .58> | 1    | .9   | .4   | .45  | .2   | .     # A2
+47 | .    | .    | .    | .    | .7   | .    | .    | .    | .    | .    | .
+48 | 0    | .5   | 1    | 1    | .5   | .7   | .85  | .9   | .8   | .7   | .     # break: drums out, tape wobbles
+56 | .8   | .5   | .9   | .7   | .5>  | .9   | 0    | .6   | .55  | .4   | .     # outro
+60 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | 1>
+63 | .4   | .    | .    | .    | .4   | .4   | .    | 1    | .    | .    | 0
+
+order form

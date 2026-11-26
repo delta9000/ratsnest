@@ -1,0 +1,96 @@
+# murmuration.trk -- "Murmuration". 72 BPM, A-flat lydian, 16 rows per bar,
+# 52 bars, no drums. Everything that moves here is a loop of a different
+# length, firing by chance: a Surge string on 11 rows, native bars on 7 and
+# 13, so the three almost never fall together the same way twice.
+# Levels in murmuration-form.trk.
+#
+#   Abmaj9 | Fm9 | Dbmaj9 | Eb sus   (two bars each)
+#   then Abmaj7#11 | Cm7 | Dbmaj7#11 | Eb sus
+#
+#   intro 8 | A 16 | B 16 | coda 12
+
+track pad   note vel cva cvb            # 1  Surge Window: Osc 2 / Osc 3 pitch per chord
+track root  note                        # 2  native drone root
+track str   note vel cva                # 3  Surge String, 11-row loop: cva = stiffness
+track bar1  note vel                    # 4  native modal bar, 7-row loop
+track bar2  note vel                    # 5  native modal bar, 13-row loop
+track bell  note vel                    # 6  native FM bell, written
+track flock note vel                    # 7  Surge Twist Particle Noise (the flock), held
+
+# Osc 2/3 pitch: +4 .786, +5 .857, +6 .929, +7 1, -1 .429, -3 .286
+pattern chords_a 8x16 pad root
+1:00 | Ab3 .5 .786 1        | Ab1         # Ab C Eb
+3:00 | Ab3 .5 .786 .429     | F1          # Ab C G   (Fm9)
+5:00 | Db3 .5 1 .429        | Db2         # Db Ab C  (Dbmaj9)
+7:00 | Eb3 .55 .857 1       | Eb1         # Eb Ab Bb (sus)
+
+pattern chords_b 8x16 pad root
+1:00 | Ab3 .5 .929 .786     | Ab1         # Ab D C   (Abmaj7#11)
+3:00 | Eb3 .5 .786 .286     | C2          # Eb G C   (Cm7)
+5:00 | F3 .5 .714 1         | Db2         # F Ab C over Db (Dbmaj7)
+7:00 | Eb3 .55 .857 1       | Eb1
+8:08 | ~Bb3 .5 .857 .786
+
+pattern coda 12x16 pad root
+1:00 | Ab3 .45 .786 1       | Ab1
+5:00 | Db3 .45 1 .429       | Db2
+9:00 | Ab3 .4 .786 .429     | Ab1         # Ab C G: maj7, left open
+12:12 | off                 | off
+
+# ---- the loops: Ab Bb C Eb F G only, so any hit fits any chord ----
+pattern str11 11 str
+00 | Eb5 .9 .3
+03 | C5?.6 .6 .2
+06 | Ab4@.3 .7 .25
+08 | G5?.4 .5 .4
+
+pattern str11_b 11 str
+00 | G5 .9 .35
+02 | Eb5?.5 .55 .25
+05 | Bb5@.2 .7 .45
+07 | C6?.5 .5 .3
+09 | F5@.4 .6 .2
+
+pattern bar7 7 bar1
+00 | Bb5?.7 .45
+04 | F5@.2 .35
+
+pattern bar7_b 7 bar1
+00 | C6?.7 .45
+02 | G5?.4 .3
+04 | Eb6@.25 .35
+
+pattern bar13 13 bar2
+00 | C6 .35
+05 | G5?.5 .3
+09 | Eb6@.4 .3
+
+# ---- bells: the album's figure, 5 3 #4 2 (Eb C D Bb), once in B and once in the coda ----
+pattern bells_b 8x16 bell
+5:00 | Eb6 .6
+5:06 | C6@.1 .5
+5:12 | D6 .55
+6:04 | Bb5 .6
+
+pattern bells_c 12x16 bell
+3:00 | Eb6 .5
+3:08 | C6@.2 .45
+4:00 | D6 .5
+4:10 | Bb5 .55
+9:00 | Eb6 .4
+10:00 | C6 .35
+
+pattern flock 8x16 flock
+1:00 | Eb4 1
+
+pattern flock_c 12x16 flock
+1:00 | Eb4 1
+11:00 | off
+
+section intro chords_a+flock
+section a     chords_a+str11~+bar13~+flock
+section b     chords_b+str11_b~+bar7~+bar13~+bells_b+flock
+section b2    chords_b+str11_b~+bar7_b~+bar13~+flock
+section cd    coda+str11~+bar13~+bells_c+flock_c
+
+order intro a*2 b b2 cd

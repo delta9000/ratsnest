@@ -1,0 +1,195 @@
+# tin-orchestra -- a gamelan-shaped piece for Surge's modal resonators and
+# ratsnest's struck bars. Pelog-like set C Db Eb G Ab, 56 bars, the tempo
+# moving 76 -> 108 -> 56 BPM (~2:50). Track 3 of "Ghost Notes".
+#
+# The form tracker drives the transport's bpm, so the whole band speeds up
+# into the loud middle and slows to the final gong, as a gamelan does.
+#   saron    native modal bars play the balungan, one note a beat; each
+#            stroke's structure is locked (cva), so the bars ring unevenly.
+#   kenong   Surge Twist 2-op FM on each bar's last beat, FM amount per note.
+#   gong     native 6-op FM: inharmonic, slow, every four bars.
+#   polos / sangsih   two Surge Twist Modal Resonators interlocking the
+#            kotekan in 16ths, panned apart; material locked per stroke,
+#            brightness opened by the form.
+# Also: a native kick and a 7-row shaker in the fast middle, and a
+# sympathetic drone on Ab.
+# Velocity: Surge parts set "A Velocity > VCA Gain=-48 dB" and take vel x 0.2.
+
+form = tracker { file: "tin-orchestra-form.trk" }
+# the tempo lane is (BPM - 76) / 100, slewed, summed onto the base of 76
+bpm  = func { rise: 1, fall: 1 }
+form.cva1 -> bpm.in
+t    = transport { bpm: 76, division: 4, bars: 4 }
+bpm -> t.bpm : 100
+song = tracker { file: "tin-orchestra.trk", seed: 29 }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+saron_lvl  = func { rise: 1, fall: 1 }
+kenong_lvl = func { rise: 1, fall: 1 }
+bonang_lvl = func { rise: 2, fall: 2 }
+bright_lvl = func { rise: 4, fall: 4 }
+kick_lvl   = func { rise: 1, fall: 1 }
+drone_lvl  = func { rise: 4, fall: 4 }
+verb_lvl   = func { rise: 3, fall: 3 }
+main_lvl   = func { rise: 1, fall: 1 }
+form.cva2 -> saron_lvl.in
+form.cva3 -> kenong_lvl.in
+form.cva4 -> bonang_lvl.in
+form.cva5 -> bright_lvl.in
+form.cva6 -> kick_lvl.in
+form.cva7 -> drone_lvl.in
+form.cva8 -> verb_lvl.in
+form.cva9 -> main_lvl.in
+
+# ---- saron: native modal bars ----
+saron = modal { modes: 24 }
+song.voct1 -> saron.v_oct
+song.gate1 -> saron.strike
+song.cva1  -> saron.structure
+0.36 -> saron.brightness
+0.66 -> saron.damping
+0.22 -> saron.position
+sar_v = vca { gain: 0 }
+saron -> sar_v.in
+song.vel1 -> sar_v.cv
+saron_s = sub { file: "../lib/strip.sub", gain: 0.13, send_gain: 0.4, pos: 0.05 }
+sar_v -> saron_s.in
+saron_lvl -> saron_s.level
+
+# ---- kenong: Twist 2-op FM ----
+kenong = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Twist", "A Osc 1 Engine=2-Operator FM",
+        "A Osc 1 Ratio=62 %", "A Osc 1 Feedback=10 %",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=3000 Hz",
+        "A Amp EG Attack=1 ms", "A Amp EG Decay=2.2 s", "A Amp EG Sustain=0 %", "A Amp EG Release=2 s",
+        "A Width=50 %"],
+  params: ["627352116"] }
+song.gate2 -> kenong.gate
+song.voct2 -> kenong.voct
+song.vel2  -> kenong.vel : 0.2
+song.cva2  -> kenong.p1
+ken_s = sub { file: "../lib/strip.sub", gain: 1.3, send_gain: 0.45, pos: -0.2 }
+kenong.out_l -> ken_s.in_l
+kenong.out_r -> ken_s.in_r
+kenong_lvl -> ken_s.level
+
+# ---- gong: native FM ----
+gong = fm { algo: dual, ratios: [1, 1.41, 1, 2.76, 1, 1], levels: [0.9, 0.35, 0, 0, 0, 0],
+            t1: [0.004, 0.01], t2: [7, 3], l1: [1, 1], l2: [0, 0], l3: [0, 0],
+            t4: [5, 2], curve: exp }
+song.gate3 -> gong.gate
+song.voct3 -> gong.v_oct
+song.vel3  -> gong.vel
+gwob = lfo { freq: 2.3hz }
+gong_v = vca { gain: 0.85 }
+gong -> gong_v.in
+gwob -> gong_v.cv : 0.15
+gong_s = sub { file: "../lib/strip.sub", gain: 0.55, send_gain: 0.3 }
+gong_v -> gong_s.in
+kenong_lvl -> gong_s.level
+
+# ---- bonang: polos and sangsih, two Twist modal resonators ----
+polos = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Twist", "A Osc 1 Engine=Modal Resonator",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=7000 Hz",
+        "A Amp EG Release=600 ms", "A Width=30 %"],
+  params: ["627352115", "627352116", "627352117"] }
+song.gate4 -> polos.gate
+song.voct4 -> polos.voct
+song.vel4  -> polos.vel : 0.2
+song.cva4  -> polos.p1
+bright_lvl -> polos.p2
+0.45 -> polos.p3
+pol_s = sub { file: "../lib/strip.sub", gain: 0.9, send_gain: 0.35, pos: -0.45 }
+polos.out_l -> pol_s.in_l
+polos.out_r -> pol_s.in_r
+bonang_lvl -> pol_s.level
+
+sangsih = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Twist", "A Osc 1 Engine=Modal Resonator",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=7000 Hz",
+        "A Amp EG Release=600 ms", "A Width=30 %"],
+  params: ["627352115", "627352116", "627352117"] }
+song.gate5 -> sangsih.gate
+song.voct5 -> sangsih.voct
+song.vel5  -> sangsih.vel : 0.2
+song.cva5  -> sangsih.p1
+bright_lvl -> sangsih.p2
+0.05 -> sangsih.p2
+0.42 -> sangsih.p3
+sang_s = sub { file: "../lib/strip.sub", gain: 0.9, send_gain: 0.35, pos: 0.45 }
+sangsih.out_l -> sang_s.in_l
+sangsih.out_r -> sang_s.in_r
+bonang_lvl -> sang_s.level
+
+# ---- kick and shaker ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 48hz, decay: 0.4, bend: 2 }
+song.gate6 -> kick.trig
+song.vel6  -> kick.accent
+kick_s = sub { file: "../lib/strip.sub", gain: 1.8 }
+kick -> kick_s.in
+kick_lvl -> kick_s.level
+shaker = sub { file: "../lib/kit/hat_model.sub", tune: -0.6, decay: 0.06s, tone: 8khz }
+song.gate7 -> shaker.trig
+song.vel7  -> shaker.accent
+ssway = lfo { freq: 0.11hz }
+shk_s = sub { file: "../lib/strip.sub", gain: 1.2, send_gain: 0.25 }
+shaker -> shk_s.in
+ssway -> shk_s.pan : 0.6
+kick_lvl -> shk_s.level
+
+# ---- drone on Ab ----
+dclk = clock { bpm: 20 }
+drone = sub { file: "../lib/sym-drone.sub", tune: Ab2, damp: 0.9, damp2: 0.92, prate: 0.05 }
+dclk -> drone.trig
+drone_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.3 }
+drone -> drone_s.in
+drone_lvl -> drone_s.level
+
+# ---- space: a big pavilion ----
+hall = reverb { decay: 0.86, damp: 0.42, mix: 1, predelay: 0.04 }
+saron_s.fx -> hall.in_l
+ken_s.fx   -> hall.in_r
+gong_s.fx  -> hall.in_l
+pol_s.fx   -> hall.in_l
+sang_s.fx  -> hall.in_r
+shk_s.fx   -> hall.in_r
+drone_s.fx -> hall.in_l
+hall_hl = svf { cutoff: 200, res: 0 }
+hall_hr = svf { cutoff: 200, res: 0 }
+hall.out_l -> hall_hl.in
+hall.out_r -> hall_hr.in
+hall_s = sub { file: "../lib/strip.sub", gain: 1.3 }
+hall_hl.hp -> hall_s.in_l
+hall_hr.hp -> hall_s.in_r
+verb_lvl -> hall_s.level
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.5, true_peak: on, key_bus: 0.2 }
+4 -> master.makeup
+saron_s.l -> master.in_l
+saron_s.r -> master.in_r
+ken_s.l   -> master.in_l
+ken_s.r   -> master.in_r
+gong_s.l  -> master.in_l
+gong_s.r  -> master.in_r
+pol_s.l   -> master.in_l
+pol_s.r   -> master.in_r
+sang_s.l  -> master.in_l
+sang_s.r  -> master.in_r
+kick_s.l  -> master.in_l
+kick_s.r  -> master.in_r
+shk_s.l   -> master.in_l
+shk_s.r   -> master.in_r
+drone_s.l -> master.in_l
+drone_s.r -> master.in_r
+hall_s.l  -> master.in_l
+hall_s.r  -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

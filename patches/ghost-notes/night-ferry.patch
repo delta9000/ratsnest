@@ -1,0 +1,256 @@
+# night-ferry -- liquid drum and bass. 172 BPM, F# minor, 128 bars (~2:59).
+# Track 7 of "Ghost Notes".
+#
+# Ratsnest: the physical kit on a two-step break (ghost snares, ratchets,
+# a fill every eighth bar), a ride on a 6-row loop that drifts against
+# it, the physical piano rolling rootless voicings, rain.
+# Surge:
+#   pad   Classic supersaw, three oscillators, Osc 2/3 pitch locked per
+#         chord; cutoff arcs with the form; Chorus and Reverb 2 inside.
+#   bass  two wavetables detuned against each other (a reese), mono with
+#         slides, cutoff locked per note and swept by a 2-bar sine.
+#   lead  the Sine oscillator with feedback locked per note, and a
+#         vibrato that fades in on every held note (an envelope times an
+#         LFO, cabled into Osc 1 Pitch).
+# Velocity: Surge parts set "A Velocity > VCA Gain=-48 dB" and take vel x 0.2.
+
+t    = transport { bpm: 172, division: 4, bars: 2 }
+song = tracker { file: "night-ferry.trk", seed: 19 }
+form = tracker { file: "night-ferry-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drums_lvl = func { rise: 0.2, fall: 0.3 }
+hats_lvl  = func { rise: 1, fall: 1 }
+keys_lvl  = func { rise: 1, fall: 1 }
+pad_lvl   = func { rise: 2, fall: 2 }
+pcut_lvl  = func { rise: 4, fall: 4 }
+bass_lvl  = func { rise: 0.3, fall: 0.5 }
+bcut_lvl  = func { rise: 4, fall: 2 }
+lead_lvl  = func { rise: 1, fall: 1 }
+rain_lvl  = func { rise: 3, fall: 3 }
+verb_lvl  = func { rise: 2, fall: 2 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1  -> drums_lvl.in
+form.cva2  -> hats_lvl.in
+form.cva3  -> keys_lvl.in
+form.cva4  -> pad_lvl.in
+form.cva5  -> pcut_lvl.in
+form.cva6  -> bass_lvl.in
+form.cva7  -> bcut_lvl.in
+form.cva8  -> lead_lvl.in
+form.cva9  -> rain_lvl.in
+form.cva10 -> verb_lvl.in
+form.cva11 -> main_lvl.in
+
+duck = sub { file: "../lib/duck.sub", depth_db: -6, release: 0.15, curve: exp }
+song.gate1 -> duck.trig
+drums_lvl -> duck.amount
+
+# ---- kit ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 52hz, decay: 0.35, bend: 2.6 }
+song.gate1 -> kick.trig
+song.vel1  -> kick.accent
+kick_s = sub { file: "../lib/strip.sub", gain: 1.6 }
+kick -> kick_s.in
+drums_lvl -> kick_s.level
+
+snare = sub { file: "../lib/kit/snare.sub", tune: 210hz, decay: 0.3, snap: 0.65 }
+song.gate2 -> snare.trig
+song.vel2  -> snare.accent
+snare_s = sub { file: "../lib/strip.sub", gain: 1.4, send_gain: 0.3 }
+snare -> snare_s.in
+drums_lvl -> snare_s.level
+
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.045s, tone: 11khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+hat_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.12, pos: 0.25 }
+hat -> hat_s.in
+hats_lvl -> hat_s.level
+
+ride = sub { file: "../lib/kit/hat_model.sub", tune: 0.4, decay: 0.5s, tone: 6khz }
+song.gate4 -> ride.trig
+song.vel4  -> ride.accent
+ride_s = sub { file: "../lib/strip.sub", gain: 0.55, send_gain: 0.25, pos: -0.35 }
+ride -> ride_s.in
+hats_lvl -> ride_s.level
+duck -> ride_s.duck
+
+# ---- keys: physical piano ----
+kc = chord { n: 4, strum: 0.022, vel: 0 }
+song.gate5 -> kc.gate
+song.vel5  -> kc.vel
+song.voct5 -> kc.p1
+song.cva5  -> kc.p2
+song.cvb5  -> kc.p3
+song.cvd5  -> kc.p4
+keys = voice { notes: kc }
+keys.p = piano { seed: 5 }
+kc.gate -> keys.p.gate
+kc.voct -> keys.p.voct
+kc.vel  -> keys.p.vel
+0.45 -> keys.p.hardness
+0.7 -> keys.p.pedal
+board = soundboard { body: 0.45 }
+keys.p -> board.in
+0.7 -> board.pedal
+keys_s = sub { file: "../lib/strip.sub", gain: 4.5, send_gain: 0.4 }
+board.l -> keys_s.in_l
+board.r -> keys_s.in_r
+keys_lvl -> keys_s.level
+duck -> keys_s.duck
+
+# ---- pad: supersaw chord ----
+pad = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 2 Mute=Off", "A Osc 3 Mute=Off",
+        "A Osc 1 Volume=-5 dB", "A Osc 2 Volume=-7 dB", "A Osc 3 Volume=-7 dB",
+        "A Osc 1 Unison Voices=5 voices", "A Osc 1 Unison Detune=18 cents",
+        "A Osc 2 Unison Voices=3 voices", "A Osc 2 Unison Detune=14 cents",
+        "A Osc 3 Unison Voices=3 voices", "A Osc 3 Unison Detune=16 cents",
+        "A Filter 1 Type=LP 24 dB", "A Filter 1 Resonance=12 %",
+        "A Amp EG Attack=900 ms", "A Amp EG Decay=2 s", "A Amp EG Sustain=80 %", "A Amp EG Release=1.2 s",
+        "FX A1 FX Type=Chorus", "FX A1 Output - Mix=35 %",
+        "FX A2 FX Type=Reverb 2", "FX A2 Reverb - Decay Time=3.5 s", "FX A2 Output - Mix=30 %"],
+  params: ["A Osc 2 Pitch", "A Osc 3 Pitch", "A Filter 1 Cutoff", "A Osc 1 Width 1"] }
+song.gate6 -> pad.gate
+song.voct6 -> pad.voct
+song.vel6  -> pad.vel : 0.2
+song.cva6 -> pad.p1
+song.cvb6 -> pad.p2
+pc = lfo { freq: 0.061hz }
+pcut_lvl -> pad.p3
+pc -> pad.p3 : 0.03
+pw = lfo { freq: 0.097hz, phase: 0.3 }
+0.5 -> pad.p4
+pw -> pad.p4 : 0.3
+duck_pad = sub { file: "../lib/duck.sub", depth_db: -5, release: 0.25, curve: exp }
+song.gate1 -> duck_pad.trig
+drums_lvl -> duck_pad.amount
+pad_s = sub { file: "../lib/strip.sub", gain: 4.0, send_gain: 0.2 }
+pad.out_l -> pad_s.in_l
+pad.out_r -> pad_s.in_r
+pad_lvl -> pad_s.level
+duck_pad -> pad_s.duck
+
+# ---- bass: wavetable reese ----
+bass = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Wavetable", "A Osc 2 Type=Wavetable", "A Osc 2 Mute=Off",
+        "A Osc 2 Pitch=0.12 semitones", "A Osc 1 Volume=-3 dB", "A Osc 2 Volume=-3 dB",
+        "A Osc 1 Unison Voices=2 voices", "A Osc 1 Unison Detune=9 cents",
+        "A Play Mode=Mono (Fingered Portamento)", "A Portamento=70 ms",
+        "A Filter 1 Type=LP Vintage Ladder", "A Filter 1 Resonance=18 %",
+        "A Filter 1 FEG Mod Amount=10 semitones", "A Filter EG Decay=400 ms", "A Filter EG Sustain=40 %",
+        "A Amp EG Attack=5 ms", "A Amp EG Decay=600 ms", "A Amp EG Sustain=85 %", "A Amp EG Release=120 ms",
+        "A Width=0 %",
+        "FX A1 FX Type=Distortion", "FX A1 Output - Gain=2 dB"],
+  params: ["A Filter 1 Cutoff", "A Osc 1 Morph", "A Osc 2 Morph"] }
+song.gate7 -> bass.gate
+song.voct7 -> bass.voct
+song.vel7  -> bass.vel : 0.2
+wobble = lfo { freq: 0hz }
+t.bar_phase -> wobble.phase
+song.cva7 -> bass.p1
+bcut_lvl -> bass.p1
+wobble -> bass.p1 : 0.025
+bm1 = lfo { freq: 0.13hz }
+bm2 = lfo { freq: 0.083hz, phase: 0.5 }
+0.3 -> bass.p2
+bm1 -> bass.p2 : 0.2
+0.4 -> bass.p3
+bm2 -> bass.p3 : 0.25
+bass_s = sub { file: "../lib/strip.sub", gain: 2.2 }
+bass.out_l -> bass_s.in_l
+bass.out_r -> bass_s.in_r
+bass_lvl -> bass_s.level
+duck -> bass_s.duck
+
+# ---- lead: Surge Sine + feedback, delayed vibrato ----
+lead = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Sine", "A Osc 1 Unison Voices=2 voices", "A Osc 1 Unison Detune=6 cents",
+        "A Play Mode=Mono (Fingered Portamento)", "A Portamento=60 ms",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=3800 Hz",
+        "A Amp EG Attack=15 ms", "A Amp EG Decay=800 ms", "A Amp EG Sustain=75 %", "A Amp EG Release=400 ms",
+        "FX A1 FX Type=Delay", "FX A1 Delay Time - Left=262 ms", "FX A1 Delay Time - Right=523 ms",
+        "FX A1 Feedback/EQ - Feedback=35 %", "FX A1 Output - Mix=25 %"],
+  params: ["A Osc 1 Feedback", "A Osc 1 Pitch"] }
+song.gate8 -> lead.gate
+song.voct8 -> lead.voct
+song.vel8  -> lead.vel : 0.2
+0.5 -> lead.p1
+song.cva8 -> lead.p1 : 0.45
+vib = lfo { freq: 5.3hz }
+vib_env = adsr { attack: 0.5, decay: 0.1, sustain: 1, release: 0.2 }
+song.gate8 -> vib_env.gate
+vib_vca = vca { gain: 0 }
+vib -> vib_vca.in
+vib_env -> vib_vca.cv
+0.5 -> lead.p2
+vib_vca -> lead.p2 : 0.012
+lead_s = sub { file: "../lib/strip.sub", gain: 1.1, send_gain: 0.4, pos: 0.12 }
+lead.out_l -> lead_s.in_l
+lead.out_r -> lead_s.in_r
+lead_lvl -> lead_s.level
+
+# ---- rain ----
+rn = noise { color: pink, seed: 3 }
+rain_f = svf { cutoff: 3500, res: 0.05 }
+rn -> rain_f.in
+drops = dust { rate: 14hz, seed: 6 }
+drop_f = svf { cutoff: 5000, res: 0.4 }
+drops -> drop_f.in
+rain = mix { levels: [0.06, 0.25], pans: [0.2, -0.3] }
+rain_f.bp -> rain.in1
+drop_f.bp -> rain.in2
+rain_s = sub { file: "../lib/strip.sub", gain: 6, width: 1.3 }
+rain.out_l -> rain_s.in_l
+rain.out_r -> rain_s.in_r
+rain_lvl -> rain_s.level
+
+# ---- space ----
+room = reverb { decay: 0.8, damp: 0.5, mix: 1, predelay: 0.02 }
+snare_s.fx -> room.in_l
+hat_s.fx   -> room.in_r
+ride_s.fx  -> room.in_l
+keys_s.fx  -> room.in_r
+pad_s.fx   -> room.in_l
+lead_s.fx  -> room.in_r
+room_hl = svf { cutoff: 260, res: 0 }
+room_hr = svf { cutoff: 260, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.1 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+verb_lvl -> room_s.level
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.5, true_peak: on, key_bus: 0.3 }
+6 -> master.makeup
+kick_s.l  -> master.in_l
+kick_s.r  -> master.in_r
+snare_s.l -> master.in_l
+snare_s.r -> master.in_r
+hat_s.l   -> master.in_l
+hat_s.r   -> master.in_r
+ride_s.l  -> master.in_l
+ride_s.r  -> master.in_r
+keys_s.l  -> master.in_l
+keys_s.r  -> master.in_r
+pad_s.l   -> master.in_l
+pad_s.r   -> master.in_r
+bass_s.l  -> master.in_l
+bass_s.r  -> master.in_r
+lead_s.l  -> master.in_l
+lead_s.r  -> master.in_r
+rain_s.l  -> master.in_l
+rain_s.r  -> master.in_r
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

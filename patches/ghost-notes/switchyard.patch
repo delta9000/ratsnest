@@ -1,0 +1,259 @@
+# switchyard -- minimal techno with an acid line that never plays the same
+# bar twice. 124 BPM, F minor, 88 bars (~2:50). Track 2 of "Ghost Notes".
+#
+# Surge parts, every one moved by ratsnest:
+#   bass  Classic saw through Surge's vintage ladder, mono with fingered
+#         portamento. Cutoff and resonance are locked per step (cva, cvb);
+#         a form lane opens the whole line across each section, and a
+#         2-bar sine breathes on top.
+#   perc  one Twist: hats, a snare tuned up into a clap, filtered-noise
+#         sweeps, engine chosen per row. Through Surge's Ensemble, so the
+#         hats are wide.
+#   stab  three wavetable oscillators, Osc 2/3 pitch locked per chord,
+#         into ratsnest's dub tape echo, whose feedback the form pushes.
+#   blp   FM2 bleeps on a 5-row loop, through Surge's Nimbus granulator.
+# Native: the kick, clap and open hat, a 6-op FM bleep on a 7-row loop
+# (the two loops realign every 35 rows), and a noise riser.
+#
+# Velocity: Surge parts set "A Velocity > VCA Gain=-48 dB" and take vel x 0.2.
+
+t    = transport { bpm: 124, division: 4, bars: 2 }
+song = tracker { file: "switchyard.trk", seed: 7 }
+form = tracker { file: "switchyard-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+kick_lvl = func { rise: 0.05, fall: 0.3 }
+perc_lvl = func { rise: 1, fall: 1 }
+bass_lvl = func { rise: 0.3, fall: 0.6 }
+bcut_lvl = func { rise: 4, fall: 2 }
+stab_lvl = func { rise: 1, fall: 1 }
+scut_lvl = func { rise: 4, fall: 4 }
+blp_lvl  = func { rise: 1, fall: 1 }
+echo_lvl = func { rise: 4, fall: 4 }
+rise_lvl = func { rise: 4, fall: 0.2 }
+verb_lvl = func { rise: 2, fall: 2 }
+main_lvl = func { rise: 0.5, fall: 0.5 }
+form.cva1  -> kick_lvl.in
+form.cva2  -> perc_lvl.in
+form.cva3  -> bass_lvl.in
+form.cva4  -> bcut_lvl.in
+form.cva5  -> stab_lvl.in
+form.cva6  -> scut_lvl.in
+form.cva7  -> blp_lvl.in
+form.cva8  -> echo_lvl.in
+form.cva9  -> rise_lvl.in
+form.cva10 -> verb_lvl.in
+form.cva11 -> main_lvl.in
+
+# ---- kick and duck ----
+kick = sub { file: "../lib/kick.sub", tune: 45hz, decay: 0.26s, click: 0.38 }
+song.gate1 -> kick.trig
+kick_s = sub { file: "../lib/strip.sub", gain: 0.55 }
+kick -> kick_s.in
+kick_lvl -> kick_s.level
+duck = sub { file: "../lib/duck.sub", depth_db: -8, release: 0.17, curve: exp }
+song.gate1 -> duck.trig
+kick_lvl -> duck.amount
+
+# ---- perc: one Twist, engine per row ----
+perc = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Twist", "A Osc 1 Engine=Analog Hi-Hat",
+        "A Filter 1 Type=HP 12 dB", "A Filter 1 Cutoff=500 Hz", "A Amp EG Release=300 ms",
+        "FX A1 FX Type=Ensemble", "FX A1 Output - Mix=45 %"],
+  params: ["627352114", "627352115", "627352117"] }
+song.gate2 -> perc.gate
+song.voct2 -> perc.voct
+song.vel2  -> perc.vel : 0.2
+song.cva2  -> perc.p1
+song.cvb2  -> perc.p2
+song.cvd2  -> perc.p3
+perc_s = sub { file: "../lib/strip.sub", gain: 8, send_gain: 0.15 }
+perc.out_l -> perc_s.in_l
+perc.out_r -> perc_s.in_r
+perc_lvl -> perc_s.level
+
+clap = sub { file: "../lib/kit/clap.sub", tune: 1.2khz, decay: 0.22s }
+song.gate3 -> clap.trig
+song.vel3  -> clap.accent
+clap_s = sub { file: "../lib/strip.sub", gain: 1.1, send_gain: 0.45, pos: 0.05 }
+clap -> clap_s.in
+perc_lvl -> clap_s.level
+
+ohat = sub { file: "../lib/kit/hat_model.sub", decay: 0.22s, tone: 9khz }
+song.gate4 -> ohat.trig
+song.vel4  -> ohat.accent
+drift = lfo { freq: 0.07hz }
+ohat_s = sub { file: "../lib/strip.sub", gain: 0.8, send_gain: 0.2 }
+ohat -> ohat_s.in
+drift -> ohat_s.pan : 0.4
+perc_lvl -> ohat_s.level
+duck -> ohat_s.duck
+
+# ---- bass: acid, locks per step ----
+bass = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Unison Voices=2 voices", "A Osc 1 Unison Detune=6 cents",
+        "A Osc 1 Sub Mix=25 %",
+        "A Play Mode=Mono (Fingered Portamento)", "A Portamento=40 ms",
+        "A Filter 1 Type=LP Vintage Ladder", "A Filter 1 FEG Mod Amount=30 semitones",
+        "A Filter EG Attack=0 ms", "A Filter EG Decay=140 ms", "A Filter EG Sustain=5 %",
+        "A Filter EG Release=80 ms",
+        "A Amp EG Decay=300 ms", "A Amp EG Sustain=70 %", "A Amp EG Release=40 ms",
+        "A Width=0 %",
+        "FX A1 FX Type=Distortion", "FX A1 Output - Gain=3 dB"],
+  params: ["A Filter 1 Cutoff", "A Filter 1 Resonance"] }
+song.gate5 -> bass.gate
+song.voct5 -> bass.voct
+song.vel5  -> bass.vel : 0.2
+breath = lfo { freq: 0hz }
+t.phrase_phase -> breath.phase
+song.cva5 -> bass.p1
+bcut_lvl  -> bass.p1
+breath    -> bass.p1 : 0.03
+song.cvb5 -> bass.p2
+bass_s = sub { file: "../lib/strip.sub", gain: 8, send_gain: 0.08 }
+bass.out_l -> bass_s.in_l : 1.2
+bass.out_r -> bass_s.in_r : 1.2
+bass_lvl -> bass_s.level
+duck -> bass_s.duck
+
+# ---- stab: wavetable chord into the dub echo ----
+stab = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Wavetable", "A Osc 2 Type=Wavetable", "A Osc 3 Type=Wavetable",
+        "A Osc 2 Mute=Off", "A Osc 3 Mute=Off",
+        "A Osc 1 Volume=-4 dB", "A Osc 2 Volume=-6 dB", "A Osc 3 Volume=-6 dB",
+        "A Osc 1 Unison Voices=2 voices", "A Osc 1 Unison Detune=10 cents",
+        "A Osc 2 Unison Voices=2 voices", "A Osc 2 Unison Detune=12 cents",
+        "A Filter 1 Type=LP 24 dB", "A Filter 1 Resonance=30 %", "A Filter 1 FEG Mod Amount=12 semitones",
+        "A Filter EG Decay=180 ms", "A Filter EG Sustain=20 %",
+        "A Amp EG Attack=2 ms", "A Amp EG Decay=400 ms", "A Amp EG Sustain=50 %", "A Amp EG Release=180 ms"],
+  params: ["A Osc 1 Morph", "A Osc 2 Morph", "A Osc 2 Pitch", "A Osc 3 Pitch", "A Filter 1 Cutoff"] }
+song.gate6 -> stab.gate
+song.voct6 -> stab.voct
+song.vel6  -> stab.vel : 0.2
+sm1 = lfo { freq: 0.113hz }
+sm2 = lfo { freq: 0.071hz, phase: 0.5 }
+0.3 -> stab.p1
+sm1 -> stab.p1 : 0.25
+0.55 -> stab.p2
+sm2 -> stab.p2 : 0.3
+song.cva6 -> stab.p3
+song.cvb6 -> stab.p4
+scut_lvl -> stab.p5
+sm1 -> stab.p5 : 0.03
+stab_s = sub { file: "../lib/strip.sub", gain: 2.2, send_gain: 1.0, pos: -0.1 }
+stab.out_l -> stab_s.in_l
+stab.out_r -> stab_s.in_r
+stab_lvl -> stab_s.level
+duck -> stab_s.duck
+dub = sub { file: "../lib/tape-echo.sub", fb_a: 0.5, fb_b: 0.42, verb_send: 0.5 }
+124 -> dub.bpm
+stab_s.fx -> dub.in
+echo_lvl -> dub.fb_mod : 0.3
+dub_s = sub { file: "../lib/strip.sub", gain: 0.9 }
+dub.l -> dub_s.in_l
+dub.r -> dub_s.in_r
+duck -> dub_s.duck
+
+# ---- bleeps: Surge FM2 into Nimbus (5 rows), native FM (7 rows) ----
+blp = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=FM2", "A Osc 1 M1 Ratio=C : 3", "A Osc 1 M2 Ratio=C : 7",
+        "A Osc 1 M2 Amount=10 %",
+        "A Amp EG Attack=0 ms", "A Amp EG Decay=120 ms", "A Amp EG Sustain=0 %", "A Amp EG Release=120 ms",
+        "FX A1 FX Type=Nimbus", "FX A1 Grain - Size=40 %", "FX A1 Grain - Density=30 %",
+        "FX A1 Grain - Spread=80 %", "FX A1 Playback - Feedback=35 %", "FX A1 Output - Reverb=40 %",
+        "FX A1 Output - Mix=55 %"],
+  params: ["A Osc 1 M1 Amount", "FX A1 Grain - Pitch", "FX A1 Grain - Position"] }
+song.gate7 -> blp.gate
+song.voct7 -> blp.voct
+song.vel7  -> blp.vel : 0.2
+song.cva7  -> blp.p1
+gp = lfo { freq: 0.041hz, wave: square }
+0.5 -> blp.p2
+gp -> blp.p2 : 0.0
+gpos = lfo { freq: 0.029hz }
+0.4 -> blp.p3
+gpos -> blp.p3 : 0.3
+blp_s = sub { file: "../lib/strip.sub", gain: 2.4, send_gain: 0.3, pos: 0.3 }
+blp.out_l -> blp_s.in_l
+blp.out_r -> blp_s.in_r
+blp_lvl -> blp_s.level
+
+fmb = fm { algo: dual, ratios: [1, 3.5, 1, 2, 1, 1], levels: [0.7, 0.35, 0, 0, 0, 0],
+           t1: [0.001, 0.001], t2: [0.18, 0.05], l1: [1, 1], l2: [0, 0.1], l3: [0, 0],
+           t4: [0.1, 0.05], curve: exp }
+song.gate8 -> fmb.gate
+song.voct8 -> fmb.v_oct
+song.vel8  -> fmb.vel
+fmb_pan = lfo { freq: 0.09hz, phase: 0.5 }
+fmb_s = sub { file: "../lib/strip.sub", gain: 0.5, send_gain: 0.6 }
+fmb -> fmb_s.in
+fmb_pan -> fmb_s.pan : 0.7
+blp_lvl -> fmb_s.level
+fmb_s.fx -> dub.in : 0.4
+
+# ---- riser ----
+rn = noise { color: white, seed: 21 }
+rsweep = adsr { attack: 7.5, decay: 0.1, sustain: 1, release: 0.05 }
+song.gate9 -> rsweep.gate
+rf = svf { cutoff: 300, res: 0.45 }
+rn -> rf.in
+rsweep -> rf.v_oct : 5
+rvca = vca { gain: 0 }
+rf.bp -> rvca.in
+rsweep -> rvca.cv
+rise_s = sub { file: "../lib/strip.sub", gain: 0.25, send_gain: 0.8 }
+rvca -> rise_s.in
+rise_lvl -> rise_s.level
+
+# ---- space ----
+room = reverb { decay: 0.75, damp: 0.5, mix: 1, predelay: 0.02 }
+perc_s.fx -> room.in_l
+clap_s.fx -> room.in_r
+ohat_s.fx -> room.in_l
+blp_s.fx  -> room.in_r
+fmb_s.fx  -> room.in_l
+rise_s.fx -> room.in_r
+bass_s.fx -> room.in_l
+room_hl = svf { cutoff: 280, res: 0 }
+room_hr = svf { cutoff: 280, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.2 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+verb_lvl -> room_s.level
+duck -> room_s.duck
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.2, true_peak: on, key_bus: 0.3 }
+8 -> master.makeup
+kick_s.l  -> master.in_l
+kick_s.r  -> master.in_r
+perc_s.l  -> master.in_l
+perc_s.r  -> master.in_r
+clap_s.l  -> master.in_l
+clap_s.r  -> master.in_r
+ohat_s.l  -> master.in_l
+ohat_s.r  -> master.in_r
+bass_s.l  -> master.in_l
+bass_s.r  -> master.in_r
+stab_s.l  -> master.in_l
+stab_s.r  -> master.in_r
+dub_s.l   -> master.in_l
+dub_s.r   -> master.in_r
+blp_s.l   -> master.in_l
+blp_s.r   -> master.in_r
+fmb_s.l   -> master.in_l
+fmb_s.r   -> master.in_r
+rise_s.l  -> master.in_l
+rise_s.r  -> master.in_r
+room_s.l  -> master.in_l
+room_s.r  -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

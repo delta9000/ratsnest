@@ -1,0 +1,27 @@
+# concrete-garden-form.trk -- one row per bar (72), slewed in the patch.
+track drums cva   # 1  kick, snare, hats
+track tom   cva   # 2
+track ep    cva   # 3
+track bass  cva   # 4
+track lead  cva   # 5
+track vox   cva   # 6
+track crush cva   # 7  lead bitcrush (Surge normalized: 1 = 8 bits .. lower = fewer)
+track verb  cva   # 8
+track main  cva   # 9
+
+pattern form 72
+#    drums  tom    ep     bass   lead   vox    crush  verb   main
+00 | 0    | 0    | .8   | 0    | 0    | .7   | 1    | .6   | 1     # intro
+04 | .6>  | .    | .    | .    | .    | .    | .    | .    | .
+07 | .8   | .    | .    | .    | .    | .    | .    | .    | .
+08 | 1    | .7   | .9   | .9   | 0    | 0    | .    | .4   | .     # A
+24 | 1    | .7   | .8   | .9   | .85  | 0    | 1>   | .45  | .     # B: Alias
+39 | .    | .    | .    | .    | .    | .    | .7   | .    | .
+40 | 0    | .8   | .9   | 0    | 0    | .9   | 1    | .75  | .     # break: voices, toms
+48 | 1    | .9   | .85  | 1    | .9   | .6   | .85> | .45  | .     # A2
+63 | .    | .    | .    | .    | .    | .    | .6   | .    | .
+64 | .7   | .6   | .8   | .7   | 0    | .7   | 1    | .6   | .     # outro
+68 | .    | .    | .    | .    | .    | .    | .    | .    | 1>
+71 | .3   | .3   | .    | .4   | .    | .    | .    | .    | 0
+
+order form

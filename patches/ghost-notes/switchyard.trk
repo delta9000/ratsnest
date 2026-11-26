@@ -1,0 +1,233 @@
+# switchyard.trk -- "Switchyard". 124 BPM, F minor, 16 rows per bar, 88 bars.
+# Levels and filter arcs are in switchyard-form.trk.
+#
+# The acid line is Surge with cutoff (cva) and resonance (cvb) locked per
+# step; every chord stab locks its Osc 2/3 pitch (the chord quality). Two
+# bleep loops of 5 and 7 rows free-run against the bar, one Surge FM2 into
+# Nimbus, one native FM.
+#
+#   intro 8 | A 16 | B 16 | break 8 | drop 24 | outro 16
+
+track kick  note len 1                  # 1  native kick; the duck trigger
+track perc  note vel cva cvb cvd        # 2  Surge Twist: hats, snare-clap, noise per row
+track clap  note vel                    # 3  native clap
+track ohat  note vel                    # 4  native open hat
+track bass  note vel cva cvb            # 5  Surge acid: cutoff, resonance per step
+track stab  note vel cva cvb            # 6  Surge wavetable stab: Osc 2/3 pitch per chord
+track blp   note vel cva                # 7  Surge FM2 bleep, 5-row loop: cva = FM depth
+track fmb   note vel                    # 8  native FM bleep, 7-row loop
+track rise  note                        # 9  native noise riser gate
+
+pattern four 16 kick
+lane kick x... x... x... x...
+
+pattern four_b 16 kick
+lane kick x... x... x... x.x.
+
+# Twist: hi-hat .995, snare .929 (tone up = clap-ish), filtered noise .599
+pattern perc 2x16 perc
+1:02 | A6 .55 .995 .55 .14
+1:04 | A6?.5 .25 .995 .4 .08
+1:06 | A6 .6 .995 .55 .16
+1:07 | A6?.4 .2 .995 .4 .08
+1:10 | A6 .55 .995 .55 .14
+1:11 | A6@.3 .25 .995 .45 .08
+1:14 | A6 .65 .995 .6 .18
+1:15 | E6?.5 .3 .929 .8 .1
+2:02 | A6 .55 .995 .55 .14
+2:03 | A6?.5 .25 .995 .4 .08
+2:06 | A6 .6 .995 .55 .16
+2:09 | E6?.4 .3 .929 .8 .1
+2:10 | A6 .55 .995 .55 .14
+2:12 | A6*2 .4 .995 .45 .08
+2:14 | A6 .7 .995 .6 .3
+2:15 | G5@.2 .4 .599 .5 .4
+
+pattern perc_in 16 perc
+02 | A6 .45 .995 .5 .12
+06 | A6 .5 .995 .55 .14
+10 | A6 .45 .995 .5 .12
+14 | A6 .55 .995 .6 .2
+
+pattern clap 2x16 clap
+1:04 | x@.04 .7
+1:12 | x@.06 .8
+2:04 | x@.04 .7
+2:11 | x?.35 .3
+2:12 | x@.06 .85
+
+pattern ohat 16 ohat
+lane ohat ..5. ..6. ..5. ..7.
+
+# ---- acid: notes, accents, slides; cva = cutoff, cvb = resonance ----
+pattern bass_a 2x16 bass
+1:00 | F1 .6 .34 .35
+1:02 | off
+1:03 | F1 .4 .32
+1:04 | off
+1:06 | F2 .8 .42 .45
+1:07 | ~Eb2 .5 .38
+1:08 | off
+1:10 | F1 .55 .33
+1:11 | Ab1?.6 .5 .36
+1:12 | off
+1:14 | C2 .7 .4 .5
+1:15 | off
+2:00 | F1 .6 .34 .35
+2:02 | off
+2:03 | F1@.1 .4 .32
+2:04 | off
+2:06 | Ab1 .6 .36
+2:07 | ~Bb1 .55 .38
+2:08 | off
+2:10 | F1 .55 .33
+2:12 | Eb2 .8 .46 .55
+2:13 | off
+2:14 | F2?.7 .6 .4 .5
+2:15 | off
+
+pattern bass_b 2x16 bass
+1:00 | F1 .7 .36 .4
+1:01 | F1 .4 .32
+1:02 | F2 .8 .48 .5
+1:03 | off
+1:04 | F1 .5 .34
+1:05 | Ab1 .5 .36
+1:06 | ~C2 .8 .5 .6
+1:07 | off
+1:08 | F1 .5 .33
+1:09 | Eb2?.6 .6 .42
+1:10 | F1 .6 .35
+1:11 | off
+1:12 | Db2 .85 .52 .65
+1:13 | ~C2 .55 .44
+1:14 | Ab1 .6 .38
+1:15 | off
+2:00 | F1 .7 .36 .4
+2:01 | F1@.2 .4 .32
+2:02 | Ab2 .8 .52 .55
+2:03 | ~G2 .5 .44
+2:04 | off
+2:05 | F1 .5 .34
+2:06 | F2 .85 .55 .6
+2:07 | ~Eb2 .55 .46
+2:08 | C2 .6 .4
+2:09 | off
+2:10 | F1 .55 .35
+2:11 | Bb1?.5 .5 .38
+2:12 | Eb2 .9 .58 .7
+2:13 | ~F2 .6 .5
+2:14 | off
+2:15 | C2*2 .5 .4 .5
+
+# the drop: the busy line, an octave higher in the accents, fully open by the end
+pattern bass_c 2x16 bass
+1:00 | F1 .75 .4 .45
+1:01 | F2 .5 .38
+1:02 | F1 .8 .5 .55
+1:03 | ~F2 .55 .46
+1:04 | off
+1:05 | Ab1 .55 .4
+1:06 | C3 .9 .62 .7
+1:07 | ~Bb2 .6 .5
+1:08 | F1 .55 .38
+1:09 | off
+1:10 | Eb2 .7 .5 .55
+1:11 | F2 .5 .44
+1:12 | Db2 .9 .64 .75
+1:13 | ~C2 .6 .5
+1:14 | Ab1?.7 .6 .42
+1:15 | off
+2:00 | F1 .75 .4 .45
+2:01 | F1@.2 .45 .36
+2:02 | Ab2 .85 .58 .6
+2:03 | ~G2 .55 .5
+2:04 | F2 .7 .48
+2:05 | off
+2:06 | C3 .9 .66 .7
+2:07 | ~Eb3 .6 .55
+2:08 | C2 .6 .44
+2:09 | off
+2:10 | F1 .6 .4
+2:11 | Bb1 .55 .44
+2:12 | Eb2 .95 .7 .8
+2:13 | ~F2 .65 .55
+2:14 | F3?.5 .7 .6 .6
+2:15 | off
+
+# ---- stabs: Fm9 (F +3 Ab, +7 C; or +2 G), Dbmaj7 shapes, Eb sus ----
+# Osc 2/3 pitch: +2 .643, +3 .714, +5 .857, +7 1, -2 .357, -4 .214
+pattern stab_a 4x16 stab
+1:00 | F3:2 .7 .714 1
+1:06 | x:1 .45
+1:10 | x:2 .6
+2:03 | x:1 .4
+2:06 | F3:2 .65 .643 .714      # F G Ab
+2:10 | x:2 .55
+3:00 | F3:2 .7 .714 1
+3:06 | x:1 .45
+3:10 | x:2 .6
+3:14 | x?.5 .35
+4:03 | Eb3:1 .45 .857 1        # Eb Ab Bb
+4:06 | Eb3:2 .65 .857 1
+4:10 | Db3:3 .7 .786 1         # Db F Ab
+4:14 | x@.25 .4
+
+pattern stab_b 4x16 stab
+1:00 | F3:2 .75 .714 .357      # F Ab Eb
+1:03 | x:1 .4
+1:06 | x:1 .55
+1:10 | x:2 .65
+2:00 | Db3:2 .7 .786 1         # Db F Ab
+2:06 | x:1 .5
+2:10 | x:2 .6
+2:13 | x?.5 .35
+3:00 | Bb2:2 .7 .714 1         # Bb Db F
+3:06 | x:1 .5
+3:10 | x:2 .6
+4:00 | C3:2 .75 .786 .214      # C E Ab (the augmented pull back to F)
+4:06 | x:1 .5
+4:10 | Eb3:2 .65 .857 1
+4:14 | x@.2 .45
+
+# the break: long chords, washed
+pattern stab_brk 4x16 stab
+1:00 | F3:12 .6 .714 .357
+2:00 | Db3:12 .55 .786 1
+3:00 | Bb2:12 .55 .714 1
+4:00 | C3:12 .6 .786 .214
+
+# ---- bleeps: 5 rows (Surge FM2 into Nimbus) and 7 rows (native FM), by chance ----
+pattern blp5 5 blp
+00 | C6 .5 .3
+02 | Ab5?.6 .35 .5
+03 | Eb6@.25 .3 .2
+
+pattern blp5_b 5 blp
+00 | F6 .55 .4
+01 | x?.4 .3
+03 | C6@.3 .4 .6
+
+pattern fmb7 7 fmb
+00 | F5 .5
+03 | Ab5?.5 .35
+04 | Eb5@.33 .4
+06 | C6?.6 .3
+
+pattern riser 4x16 rise
+1:00 | x
+4:15 | off
+
+section intro four+perc_in
+section a     perc+four+bass_a+ohat
+section a2    perc+four+bass_a+ohat+clap
+section b     stab_a+four+perc+bass_b+ohat+clap+blp5~
+section bb    stab_b+four_b+perc+bass_b+ohat+clap+blp5~+fmb7~
+section brk   stab_brk+blp5_b~+fmb7~
+section brk_r stab_brk+blp5_b~+fmb7~+riser
+section drop  stab_b+four+perc+bass_c+ohat+clap+blp5_b~+fmb7~
+section drop2 stab_a+four_b+perc+bass_c+ohat+clap+blp5~+fmb7~
+section out   stab_a+four+perc+bass_a+ohat+fmb7~
+section out2  bass_a+four+perc_in
+
+order intro*8 a*4 a2*4 b*2 bb*2 brk brk_r drop*2 drop2 drop*2 drop2 out*2 out2*4
