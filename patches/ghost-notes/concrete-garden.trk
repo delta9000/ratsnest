@@ -1,0 +1,272 @@
+# concrete-garden.trk -- "Concrete Garden". 96 BPM, D dorian, 16 rows per
+# bar, 72 bars. A broken beat on ratsnest's physical kit; Surge sings and
+# leads. Levels in concrete-garden-form.trk.
+#
+# A: Dm9  G13  Bbmaj7  A7sus      B: Bbmaj9  C6  Dm9  A7b13
+#
+#   intro 8 | A 16 | B 16 | break 8 | A2 16 | outro 8
+
+track kick  note vel                    # 1  native kit kick; the duck trigger
+track snare note vel                    # 2  native kit snare
+track hat   note vel                    # 3  native kit hat
+track tom   note vel                    # 4  native kit toms, 9-row free loop
+track ep    note vel cva cvb cvd        # 5  native 6-op FM electric piano, four voices
+track bass  note                        # 6  native reese
+track lead  note vel cva cvb            # 7  Surge Alias: cva = wrap, cvb = mask, per note
+track vox   note vel cva cvb            # 8  Surge Twist Vowels/Speech: cva = segment, cvb = speak
+
+# ---- beat: two bars, broken; ghosts, flams and ratchets ----
+pattern beat 2x16 kick snare hat
+1:00 | x .85      | .           | x .6
+1:02 | .          | .           | x?.6 .3
+1:03 | x@.1 .5    | .           | x .45
+1:04 | .          | x@.04 .9    | .
+1:06 | .          | x?.4 .25    | x .55
+1:07 | .          | .           | x@.3 .3
+1:08 | .          | .           | x .5
+1:10 | x .7       | .           | x*2 .4
+1:11 | .          | x?.5 .2     | .
+1:12 | .          | x@.06 .95   | x .5
+1:14 | x?.6 .5    | .           | x .55
+1:15 | .          | x@.2 .3     | .
+2:00 | x .8       | .           | x .6
+2:02 | .          | .           | x .35
+2:03 | .          | x?.4 .22    | x?.5 .3
+2:04 | .          | x@.04 .9    | .
+2:05 | x .55      | .           | x .45
+2:06 | .          | .           | x .5
+2:08 | x@.15 .6   | .           | x*3 .35
+2:09 | .          | x?.5 .25    | .
+2:10 | .          | .           | x .5
+2:11 | x .5       | .           | .
+2:12 | .          | x@.06 1     | x .5
+2:13 | .          | .           | x?.5 .3
+2:14 | .          | x*2 .35     | x .6
+2:15 | x?.5 .45   | .           | .
+
+# the second A: hats doubled up, kick pushed
+pattern beat_b 2x16 kick snare hat
+1:00 | x .85      | .           | x .6
+1:01 | .          | .           | x .3
+1:02 | .          | .           | x?.7 .35
+1:03 | x@.1 .55   | .           | x .45
+1:04 | .          | x@.04 .9    | x .3
+1:05 | .          | .           | x?.5 .25
+1:06 | x .5       | x?.4 .25    | x .55
+1:07 | .          | .           | x@.3 .3
+1:08 | .          | .           | x*2 .5
+1:10 | x .7       | .           | x .4
+1:11 | .          | x?.5 .2     | x .3
+1:12 | .          | x@.06 .95   | x .5
+1:13 | .          | .           | x?.6 .3
+1:14 | x .55      | .           | x*3 .55
+1:15 | .          | x@.2 .3     | .
+2:00 | x .8       | .           | x .6
+2:01 | .          | .           | x .3
+2:02 | .          | .           | x .35
+2:03 | x@.05 .5   | x?.4 .22    | x?.5 .3
+2:04 | .          | x@.04 .9    | x .3
+2:05 | x .55      | .           | x .45
+2:06 | .          | .           | x .5
+2:07 | .          | .           | x?.6 .3
+2:08 | x@.15 .6   | .           | x*3 .35
+2:09 | .          | x?.5 .25    | .
+2:10 | .          | x .4        | x .5
+2:11 | x .5       | x .5        | .
+2:12 | .          | x@.06 1     | x .5
+2:13 | x .5       | x*2 .45     | .
+2:14 | .          | x*3 .55     | x .6
+2:15 | x?.5 .45   | x*4 .7      | .
+
+pattern beat_in 2x16 kick hat
+1:00 | x .55      | x .4
+1:06 | .          | x .4
+1:10 | x?.5 .4    | x .35
+1:14 | .          | x .45
+2:00 | x .5       | x .4
+2:06 | .          | x .4
+2:12 | .          | x*2 .35
+2:14 | .          | x .45
+
+# toms on 9 rows: a figure that crosses the bar line
+pattern tom9 9 tom
+00 | D3 .35
+03 | A2?.5 .3
+05 | F3@.25 .3
+07 | C3?.4 .25
+
+pattern tom9_b 9 tom
+00 | D3 .5
+02 | F3 .35
+04 | A2 .45
+05 | C3@.5 .3
+07 | E3?.6 .35
+08 | G2?.5 .3
+
+# ---- EP: four-note voicings, comped; vel and timing vary ----
+pattern ep_a 4x16 ep
+1:00 | F3 .55 A3 C4 E4         # Dm9
+1:06 | x@.1 .35
+1:10 | x?.6 .45
+2:00 | F3 .55 A3 B3 E4         # G13
+2:03 | x@.2 .35
+2:08 | x?.5 .4
+2:14 | x .3
+3:00 | A3 .55 Bb3 D4 F4        # Bbmaj7
+3:06 | x@.1 .35
+3:10 | x?.6 .45
+4:00 | G3 .55 A3 D4 E4         # A7sus
+4:06 | x .4
+4:08 | G3 .5 A3 Cs4 E4         # sus resolves
+4:12 | x?.5 .35
+
+pattern ep_b 4x16 ep
+1:00 | A3 .55 C4 D4 F4         # Bbmaj9
+1:06 | x@.1 .35
+1:10 | x?.6 .45
+2:00 | G3 .55 A3 C4 E4         # C6
+2:06 | x@.15 .35
+2:11 | x?.5 .4
+3:00 | F3 .55 A3 C4 E4         # Dm9
+3:06 | x@.1 .35
+3:10 | x?.6 .45
+4:00 | G3 .58 A3 Cs4 F4        # A7b13
+4:04 | x?.5 .3
+4:08 | x@.15 .45
+4:14 | off
+
+pattern ep_hold 4x16 ep
+1:00 | F3 .4 A3 C4 E4
+2:00 | F3 .4 A3 B3 E4
+3:00 | A3 .4 Bb3 D4 F4
+4:00 | G3 .45 A3 Cs4 E4
+4:14 | off
+
+# ---- bass: reese, syncopated around the kick ----
+pattern bass_a 4x16 bass
+1:00 | D2
+1:06 | off
+1:07 | D2
+1:10 | A1
+1:12 | off
+1:14 | C2
+2:00 | G1
+2:06 | off
+2:08 | G1
+2:11 | B1
+2:13 | off
+3:00 | Bb1
+3:06 | off
+3:07 | Bb1
+3:10 | F1
+3:12 | off
+3:14 | G1
+4:00 | A1
+4:06 | off
+4:08 | A1
+4:10 | ~E2
+4:12 | Cs2
+4:14 | off
+
+pattern bass_b 4x16 bass
+1:00 | Bb1
+1:06 | off
+1:07 | Bb1
+1:10 | F2
+1:12 | off
+1:14 | Bb1
+2:00 | C2
+2:06 | off
+2:08 | C2
+2:11 | G1
+2:13 | off
+3:00 | D2
+3:06 | off
+3:07 | D2
+3:10 | A1
+3:12 | off
+3:14 | C2
+4:00 | A1
+4:06 | off
+4:08 | E2
+4:09 | ~A1
+4:12 | G1
+4:14 | off
+
+# ---- lead: Surge Alias. Wrap and mask locked per note: the timbre is the phrase ----
+pattern lead_b 4x16 lead
+1:00 | A4 .6 .2 .1             # the album's figure: 5 b3 4 2
+1:03 | F4@.1 .5 .3 .15
+1:06 | G4 .55 .35 .2
+1:08 | E4 .65 .5 .4
+1:12 | off
+2:00 | C5 .55 .25 .1
+2:02 | A4 .45
+2:04 | G4 .5 .4 .3
+2:06 | E4 .55
+2:10 | D4 .6 .6 .5
+2:14 | off
+3:00 | F4 .6 .2 .15
+3:03 | A4@.1 .5 .3
+3:06 | C5 .55 .4 .25
+3:08 | E5 .7 .55 .45
+3:11 | ~D5 .5 .6
+3:14 | off
+4:00 | Cs5 .6 .3 .2
+4:04 | A4 .5 .45
+4:06 | G4 .55 .5 .35
+4:08 | F4 .6 .6 .5
+4:10 | E4 .55 .7 .6
+4:13 | off
+
+pattern lead_a2 4x16 lead
+1:00 | D5 .6 .25 .15
+1:02 | C5 .45
+1:04 | A4 .55 .35
+1:07 | F4@.1 .5 .45 .3
+1:10 | G4 .55
+1:12 | E4 .6 .6 .5
+1:15 | off
+2:04 | B4 .55 .3 .2
+2:06 | D5 .5
+2:08 | E5 .65 .5 .4
+2:12 | off
+3:00 | F5 .7 .4 .3
+3:02 | E5 .5
+3:04 | D5 .55 .5
+3:06 | Bb4 .5
+3:08 | A4 .6 .65 .55
+3:12 | off
+4:00 | A4 .6 .2 .1
+4:03 | F4@.1 .5 .3
+4:06 | G4 .55 .4
+4:08 | E4 .7 .7 .65
+4:14 | off
+
+# ---- vox: Twist speech; each note a different segment (vowel/word) ----
+pattern vox_a 4x16 vox
+1:00 | A4 .5 .1 .2
+2:00 | ~B4 .5 .3
+3:00 | ~D5 .5 .5
+4:00 | ~Cs5 .5 .7
+4:12 | off
+
+pattern vox_b 4x16 vox
+1:00 | F4 .5 .2 .25
+1:08 | ~A4 .45 .35
+2:00 | ~G4 .5 .5
+2:08 | ~E4 .45 .6
+3:00 | ~F4 .5 .8
+3:08 | ~A4 .45 .9
+4:00 | ~E4 .55 .4 .3
+4:12 | off
+
+section intro ep_hold+vox_a+beat_in
+section a     ep_a+bass_a+beat+tom9~
+section b     ep_b+bass_b+beat+tom9~+lead_b
+section brk   ep_hold+vox_b+tom9_b~
+section a2    ep_a+bass_a+beat_b+tom9_b~+lead_a2+vox_a
+section a2b   ep_b+bass_b+beat_b+tom9_b~+lead_b
+section out   ep_hold+bass_a+beat_in+tom9~+vox_a
+
+order intro*2 a*4 b*4 brk*2 a2 a2b a2 a2b out*2

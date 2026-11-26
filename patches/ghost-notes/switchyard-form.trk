@@ -1,0 +1,32 @@
+# switchyard-form.trk -- one row per bar (88), slewed in the patch.
+track kick  cva   # 1
+track perc  cva   # 2  Twist perc, clap, open hat
+track bass  cva   # 3
+track bcut  cva   # 4  bass cutoff offset (Surge normalized, sums onto the locks)
+track stab  cva   # 5
+track scut  cva   # 6  stab cutoff (Surge normalized)
+track blp   cva   # 7  both bleeps
+track echo  cva   # 8  dub echo feedback push
+track rise  cva   # 9
+track verb  cva   # 10
+track main  cva   # 11
+
+pattern form 88
+#    kick   perc   bass   bcut   stab   scut   blp    echo   rise   verb   main
+00 | 1    | .5>  | 0    | 0    | 0    | .5   | 0    | 0    | 0    | .4   | 1     # intro
+07 | .    | .8   | .    | .    | .    | .    | .    | .    | .    | .    | .
+08 | 1    | .85  | .85  | -.06>| 0    | .    | 0    | 0    | 0    | .35  | .     # A: the acid line, closed
+23 | .    | .    | .    | .04  | .    | .    | .    | .    | .    | .    | .
+24 | 1    | .9   | .9   | 0>   | .8   | .5>  | .7   | .2>  | 0    | .45  | .     # B: stabs, bleeps
+39 | .    | .    | .    | .08  | .    | .62  | .    | .6   | .    | .    | .
+40 | 0    | .3   | 0    | 0    | 1    | .55> | 1    | .9   | .2>  | .75  | .     # break
+47 | .    | .    | .    | .    | .    | .7   | .    | .    | 1    | .    | .
+48 | 1    | 1    | 1    | .02> | .85  | .62> | .8   | .4>  | 0    | .5   | .     # drop
+71 | .    | .    | .    | .14  | .    | .72  | .    | .8   | .    | .    | .
+72 | 1    | .85  | .9   | .06> | .7>  | .6   | .6>  | .5   | 0    | .5   | .     # outro
+79 | .    | .    | .    | .    | 0    | .    | 0    | .    | .    | .    | .
+80 | 1    | .7   | .8   | 0>   | 0    | .    | 0    | .3   | .    | .4   | .
+84 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | 1>
+87 | .6   | .5   | .4   | -.08 | .    | .    | .    | .    | .    | .    | 0
+
+order form

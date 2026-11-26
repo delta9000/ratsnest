@@ -1,0 +1,208 @@
+# lantern-out.trk -- "Lantern Out". 66 BPM, C major, 16 rows per bar, 48
+# bars. The closer: the physical piano leads; Surge plays a rotary organ,
+# a bowed string and, at the very end, the tine from track 1. The album's
+# figure (5 3 4 2: G E F D) is the piano's first phrase and its last,
+# now in major. Levels in lantern-out-form.trk.
+#
+# A: Cmaj9  Am9  Fmaj9  G13sus     B: Em7  Am9  Dm9  G7b9
+#
+#   intro 8 | A 16 | B 16 | coda 8
+
+track mel   note vel                    # 1  piano melody (four voices, strum polyphony)
+track keys  note vel cva cvb cvd        # 2  piano chords
+track ped   cva                         # 3  sustain pedal, lifted at each change
+track organ note vel cva cvb            # 4  Surge Sine x3: Osc 2 / Osc 3 pitch per chord, Rotary
+track cello note vel cva                # 5  Surge String, bowed: cva = bow pressure
+track tine  note vel cva cvd            # 6  Surge FM2 tine (track 1's lead): cvd = echo throw
+track brush note vel                    # 7  native brush, 12-row loop
+track rim   note vel                    # 8  native rim, 5-row loop
+track kick  note vel                    # 9  native soft kick
+
+pattern ped 16 ped
+00 | 0
+01 | .85
+
+# ---- piano chords ----
+pattern keys_a 4x16 keys
+1:00 | E3@.1 .4 G3 B3 D4         # Cmaj9
+1:10 | x?.5 .25
+2:00 | G3@.1 .4 B3 C4 E4         # Am9
+2:10 | x?.5 .25
+3:00 | G3@.1 .4 A3 C4 E4         # Fmaj9
+3:10 | x?.5 .25
+4:00 | F3@.1 .42 A3 D4 E4        # G13sus
+4:08 | x@.2 .3
+4:12 | x?.5 .22
+
+pattern keys_b 4x16 keys
+1:00 | G3@.1 .42 B3 D4 E4        # Em7
+1:10 | x?.5 .25
+2:00 | G3@.1 .42 B3 C4 E4        # Am9
+2:10 | x?.5 .26
+3:00 | F3@.1 .42 A3 C4 E4        # Dm9
+3:08 | x@.2 .3
+4:00 | F3@.1 .46 Ab3 B3 D4       # G7b9
+4:08 | x@.15 .34
+4:12 | x?.6 .28
+
+pattern keys_c 8x16 keys
+1:00 | E3@.15 .38 G3 B3 D4       # Cmaj9
+3:00 | G3@.15 .36 A3 C4 E4       # Fmaj9 over C
+5:00 | E3@.2 .34 G3 B3 D4
+7:00 | E3@.3 .3 G3 C4 D4         # C add9, the last chord
+8:14 | off
+
+# ---- piano melody ----
+pattern mel_in 8x16 mel
+1:00 | G5 .42                    # the figure: 5 3 4 2
+1:06 | E5@.1 .36
+1:12 | F5 .4
+2:04 | D5 .45
+3:00 | C5 .36
+3:08 | B4 .32
+4:00 | A4 .38
+4:10 | G4@.15 .3
+5:00 | E5 .4
+5:06 | G5 .44
+5:12 | A5@.1 .4
+6:00 | G5 .38
+6:08 | E5 .34
+7:00 | F5 .4
+7:06 | E5 .34
+7:12 | D5@.2 .36
+8:04 | C5 .3
+
+pattern mel_a 4x16 mel
+1:04 | D5 .36
+1:08 | E5 .4
+1:12 | G5@.1 .38
+2:04 | C6 .42
+2:10 | B5 .34
+3:00 | A5 .38
+3:06 | G5@.1 .32
+3:12 | E5 .36
+4:04 | F5 .38
+4:12 | D5@.2 .34
+
+pattern mel_a2 4x16 mel
+1:00 | G5 .4
+1:03 | A5@.1 .34
+1:06 | G5 .36
+1:10 | E5@.15 .34
+1:14 | D5 .3
+2:00 | E5 .4
+2:04 | C5?.7 .3
+2:08 | E5@.1 .36
+2:12 | G5 .4
+3:00 | A5 .42
+3:04 | C6@.1 .38
+3:10 | B5 .34
+3:12 | A5?.6 .3
+4:00 | G5 .4
+4:06 | F5@.2 .34
+4:10 | E5 .36
+4:13 | D5?.6 .3
+
+pattern keys_a2 4x16 keys
+1:00 | E3@.05 .42 G3 B3 D4
+1:06 | x?.6 .24
+1:12 | x@.2 .28
+2:00 | G3@.2 .4 B3 C4 E4
+2:08 | x?.6 .26
+3:00 | A3@.1 .42 C4 E4 G4         # Fmaj9, higher
+3:06 | x@.1 .26
+3:12 | x?.5 .24
+4:00 | F3@.05 .44 G3 C4 D4        # G sus, open
+4:06 | x?.6 .28
+4:10 | F3@.1 .4 A3 D4 E4
+4:14 | x?.5 .24
+
+pattern mel_b 4x16 mel
+1:00 | B5 .42
+1:06 | G5@.1 .34
+1:12 | E5 .36
+2:04 | C6 .44
+2:10 | E6@.1 .4
+3:00 | D6 .42
+3:06 | C6 .36
+3:12 | A5@.15 .34
+4:00 | Ab5 .4
+4:06 | G5 .36
+4:10 | F5@.1 .34
+4:14 | D5 .36
+
+pattern mel_c 8x16 mel
+1:00 | G5 .38                    # the figure again, slower
+1:08 | E5@.2 .32
+2:00 | F5 .34
+2:08 | D5@.3 .3
+5:00 | G5 .3
+5:10 | E5@.2 .26
+6:04 | F5 .26
+7:00 | D5@.3 .24
+7:08 | E5@.4 .22
+
+# ---- organ: Surge Sine x3 through Rotary (+4 .786, +5 .857, +7 1, +3 .714, -3 .286, -2 .357) ----
+pattern organ_a 4x16 organ
+1:00 | C4 .5 .786 1              # C E G
+2:00 | A3 .5 .714 1              # A C E
+3:00 | F3 .5 .786 1              # F A C
+4:00 | G3 .5 .857 1              # G C D
+
+pattern organ_b 4x16 organ
+1:00 | G3 .5 .286 .786           # G E B
+2:00 | A3 .5 .714 1              # A C E
+3:00 | D4 .5 .714 1              # D F A
+4:00 | G3 .55 .786 .357          # G B F
+
+# ---- cello: bowed Surge string, slurred roots; cva = bow pressure ----
+pattern cello_a 4x16 cello
+1:00 | C3 .6 .5
+2:00 | ~A2 .6 .55
+3:00 | ~F2 .6 .6
+4:00 | ~G2 .65 .7
+4:12 | ~B2 .6 .55
+
+pattern cello_b 4x16 cello
+1:00 | E3 .6 .5
+2:00 | ~A2 .6 .6
+3:00 | ~D3 .6 .55
+3:12 | ~C3 .6 .5
+4:00 | ~G2 .65 .75
+4:12 | ~B2 .6 .6
+
+# ---- tine: track 1's FM2 lead, once, at the end ----
+pattern tine_c 8x16 tine
+3:00 | G4 .5 .35 .6
+3:06 | E4@.1 .42
+3:12 | F4 .45
+4:04 | D4 .5 .4 .9
+4:12 | off
+
+# ---- brushes and rim: loops of 12 and 5 rows against the 16-row bar ----
+pattern brush12 12 brush
+00 | x .5
+03 | x?.6 .25
+06 | x .4
+09 | x@.3 .3
+
+pattern rim5 5 rim
+00 | x?.7 .35
+03 | x@.25 .25
+
+pattern kick_a 4x16 kick
+1:00 | x .45
+1:10 | x?.5 .3
+2:00 | x .45
+3:00 | x .45
+3:10 | x?.5 .3
+4:00 | x .45
+4:08 | x?.4 .3
+
+section intro mel_in+ped
+section a     keys_a+ped+organ_a+cello_a+mel_a+brush12~
+section a2    keys_a2+ped+organ_a+cello_a+mel_a2+brush12~+rim5~+kick_a
+section b     keys_b+ped+organ_b+cello_b+mel_b+brush12~+rim5~+kick_a
+section cd    keys_c+mel_c+tine_c+ped
+
+order intro a a2 a a2 b*2 a2 b cd

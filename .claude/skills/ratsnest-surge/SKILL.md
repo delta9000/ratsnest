@@ -11,8 +11,9 @@ cables into `p1`..`p8`. Load `ratsnest-patching` first; `docs/plugin.md` is
 the port authority and has the host's timing rules.
 
 Every number here was measured on Surge XT 1.3.4. Worked patches:
-`patches/headless/` (one oscillator per track) and `patches/riffs/`
-(tracker-driven, with a native A/B).
+`patches/headless/` (one oscillator per track), `patches/riffs/`
+(tracker-driven, with a native A/B) and `patches/ghost-notes/` (an album
+mixing Surge with native voices, every part moved per step or by LFO).
 
 ## Setup
 
@@ -64,8 +65,18 @@ apt-get install -y ./surge-xt.deb      # the CLAP lands in /usr/lib/clap
 - **Engine levels differ by 15 to 20 dB.** Modal Resonator and 2-op FM come
   out far hotter than Analog Kick/Snare/Hi-Hat, which is more than velocity
   can make up. Particle Noise and the Chords engine behind a ladder are very
-  quiet (strip gains of 14 to 16 were needed). Keep hot engines on their
-  own instance.
+  quiet. Keep hot engines on their own instance.
+- **`strip.sub` gain stops at 8.** Its fader is a `vca` cv, which clamps at
+  8, so `gain: 14` or `gain: 80` is the same as `gain: 8` (measured: a
+  Particle Noise strip at 14, 40 and 80 read the same level). For a quiet
+  Surge part put the extra gain on the cables into the strip
+  (`flock.out_l -> flock_s.in_l : 3`).
+- **Particle Noise is loudest near vel 0.2.** Through `vel : 0.2`, a
+  written vel of 1 (0.2 at Surge) read about 8 dB louder than a written
+  0.2 (0.04), and 0.8 at Surge was 10 dB under 0.2.
+- **Some enum params take only names.** `"A Osc 1 Shape=Ramp"` works for
+  the Alias oscillator; a number (`=0.06`) silently falls back to Sine.
+  Read the bracketed text after every `set`.
 - **String Stiffness above about 0.75 (normalized) goes near-silent.**
 - **Use the synth's own FX slots** (`FX A1`..`FX A4`, `"FX A1 FX Type=Spring Reverb"`).
   The separate "Surge XT Effects" plugin ignores an FX Type set. FX param

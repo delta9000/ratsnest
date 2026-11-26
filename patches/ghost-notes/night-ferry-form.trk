@@ -1,0 +1,32 @@
+# night-ferry-form.trk -- one row per bar (128), slewed in the patch.
+track drums cva   # 1  kick, snare
+track hats  cva   # 2  hats, ride
+track keys  cva   # 3
+track pad   cva   # 4
+track pcut  cva   # 5  pad cutoff (Surge normalized)
+track bass  cva   # 6
+track bcut  cva   # 7  bass cutoff offset (Surge normalized, sums onto the locks)
+track lead  cva   # 8
+track rain  cva   # 9
+track verb  cva   # 10
+track main  cva   # 11
+
+pattern form 128
+#     drums  hats   keys   pad    pcut   bass   bcut   lead   rain   verb   main
+000 | 0    | .4>  | .8   | .6   | .45> | 0    | 0    | 0    | 1    | .7   | 1     # intro: rain, piano, pad
+015 | .    | .8   | .    | .8   | .6   | .    | .    | .    | .    | .    | .
+016 | 1    | .9   | .8   | .85  | .6>  | 1    | -.04>| 0    | .5   | .45  | .     # A
+031 | .    | .    | .    | .    | .66  | .    | .04  | .    | .    | .    | .
+032 | 1    | .9   | .75  | .85  | .62  | 1    | 0>   | .85  | .4   | .45  | .     # A, lead
+047 | .    | .    | .    | .    | .    | .    | .06  | .    | .    | .    | .
+048 | 0    | .5   | 1    | 1    | .5>  | .7   | -.04 | 0    | .9   | .8   | .     # break
+063 | .    | .    | .    | .    | .64  | .    | .    | .    | .    | .    | .
+064 | 1    | 1    | .8   | .85  | .64> | 1    | 0>   | .9   | .4   | .45  | .     # A2
+095 | .    | .    | .    | .    | .72  | .    | .1   | .    | .    | .    | .
+096 | 1    | 1    | .75  | .85  | .68  | 1    | .04  | .9   | .4   | .5   | .
+111 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | .
+112 | 0    | .7>  | .9   | .8>  | .55> | 0    | 0    | 0    | 1    | .75  | .     # outro
+124 | .    | .    | .    | .    | .    | .    | .    | .    | .    | .    | 1>
+127 | .    | .2   | .    | .3   | .4   | .    | .    | .    | .    | .    | 0
+
+order form

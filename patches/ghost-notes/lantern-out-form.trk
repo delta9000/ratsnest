@@ -1,0 +1,26 @@
+# lantern-out-form.trk -- one row per bar (48), slewed in the patch.
+track keys  cva   # 1  piano (melody and chords)
+track organ cva   # 2
+track drive cva   # 3  rotary horn rate (Surge normalized): slow -> fast in B
+track cello cva   # 4
+track tine  cva   # 5
+track kit   cva   # 6  brushes, rim, kick
+track vinyl cva   # 7  track 1's crackle, back at the end
+track verb  cva   # 8
+track main  cva   # 9
+
+pattern form 48
+#    keys   organ  drive  cello  tine   kit    vinyl  verb   main
+00 | 1    | 0    | .3   | 0    | 0    | 0    | 0    | .7   | 1     # intro: the piano alone
+08 | 1    | .6>  | .3   | .7   | 0    | .5   | 0    | .55  | .     # A
+15 | .    | .8   | .    | .    | .    | .7   | .    | .    | .
+16 | .    | .8   | .3>  | .8   | .    | .8   | .    | .    | .
+24 | 1    | .9   | .7   | .9   | 0    | .9   | 0    | .5   | .     # B: the horn speeds up
+31 | .    | .    | .7>  | .    | .    | .    | .    | .    | .
+32 | .    | .85  | .4   | .85  | .    | .8   | .    | .    | .     # A again, settling
+36 | 1    | .9   | .5   | .9   | .    | .9   | .    | .    | .     # B
+40 | 1    | 0    | .3   | 0    | .9   | 0    | .6>  | .75  | .     # coda: piano, the tine, crackle
+45 | .    | .    | .    | .    | .    | .    | .    | .    | 1>
+47 | .    | .    | .    | .    | .    | .    | 1    | .    | 0
+
+order form

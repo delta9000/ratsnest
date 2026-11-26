@@ -1,0 +1,249 @@
+# murmuration -- ambient; a flock of small loops that never land the same
+# way twice. 72 BPM, A-flat lydian, 52 bars (~2:53). Track 4 of "Ghost Notes".
+#
+# Surge:
+#   pad    three Window oscillators, unison; Osc 2/3 pitch are tracker
+#          columns (one note plays the chord); each Morph on its own LFO
+#          (17, 23 and 31 s) around a centre the form moves; Reverb 2 inside.
+#   str    the String oscillator (two waveguides) on an 11-row loop,
+#          stiffness locked per note, into ratsnest `grains`.
+#   flock  Twist's Particle Noise, held the whole piece: density and
+#          frequency spread wander on slow LFOs, the form swells it.
+# Native: a sympathetic-string drone on the chord roots, two modal bars on
+# 7- and 13-row loops, a 2-op FM bell that states the album's figure.
+# Velocity: Surge parts set "A Velocity > VCA Gain=-48 dB" and take vel x 0.2.
+
+t    = transport { bpm: 72, division: 4, bars: 4 }
+song = tracker { file: "murmuration.trk", seed: 13 }
+form = tracker { file: "murmuration-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+pad_lvl   = func { rise: 3, fall: 3 }
+pmor_lvl  = func { rise: 6, fall: 6 }
+drone_lvl = func { rise: 4, fall: 4 }
+str_lvl   = func { rise: 2, fall: 2 }
+bars_lvl  = func { rise: 2, fall: 2 }
+bell_lvl  = func { rise: 1, fall: 1 }
+flock_lvl = func { rise: 5, fall: 5 }
+dens_lvl  = func { rise: 6, fall: 6 }
+cloud_lvl = func { rise: 4, fall: 4 }
+verb_lvl  = func { rise: 3, fall: 3 }
+main_lvl  = func { rise: 1, fall: 1 }
+form.cva1  -> pad_lvl.in
+form.cva2  -> pmor_lvl.in
+form.cva3  -> drone_lvl.in
+form.cva4  -> str_lvl.in
+form.cva5  -> bars_lvl.in
+form.cva6  -> bell_lvl.in
+form.cva7  -> flock_lvl.in
+form.cva8  -> dens_lvl.in
+form.cva9  -> cloud_lvl.in
+form.cva10 -> verb_lvl.in
+form.cva11 -> main_lvl.in
+
+# ---- pad: Window x3, the chord in one note ----
+pad = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Window", "A Osc 2 Type=Window", "A Osc 3 Type=Window",
+        "A Osc 2 Mute=Off", "A Osc 3 Mute=Off",
+        "A Osc 1 Volume=-5 dB", "A Osc 2 Volume=-7 dB", "A Osc 3 Volume=-8 dB",
+        "A Osc 1 Unison Voices=3 voices", "A Osc 1 Unison Detune=9 cents",
+        "A Osc 2 Unison Voices=3 voices", "A Osc 2 Unison Detune=13 cents",
+        "A Osc 3 Unison Voices=2 voices", "A Osc 3 Unison Detune=7 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=2400 Hz", "A Filter 1 Resonance=10 %",
+        "A Amp EG Attack=2.5 s", "A Amp EG Decay=3 s", "A Amp EG Sustain=85 %",
+        "A Amp EG Release=3.5 s", "A Width=60 %",
+        "FX A1 FX Type=Reverb 2", "FX A1 Reverb - Decay Time=6 s", "FX A1 Reverb - Room Size=60 %",
+        "FX A1 Output - Mix=35 %"],
+  params: ["A Osc 1 Morph", "A Osc 2 Morph", "A Osc 3 Morph", "A Osc 2 Pitch", "A Osc 3 Pitch"] }
+song.gate1 -> pad.gate
+song.voct1 -> pad.voct
+song.vel1  -> pad.vel : 0.2
+w1 = lfo { freq: 0.059hz }
+w2 = lfo { freq: 0.043hz, phase: 0.33 }
+w3 = lfo { freq: 0.032hz, phase: 0.66 }
+pmor_lvl -> pad.p1
+w1 -> pad.p1 : 0.18
+pmor_lvl -> pad.p2
+w2 -> pad.p2 : 0.2
+pmor_lvl -> pad.p3 : 0.8
+w3 -> pad.p3 : 0.22
+song.cva1 -> pad.p4
+song.cvb1 -> pad.p5
+pad_s = sub { file: "../lib/strip.sub", gain: 7, send_gain: 0.3, width: 0.9 }
+pad.out_l -> pad_s.in_l
+pad.out_r -> pad_s.in_r
+pad_lvl -> pad_s.level
+
+# ---- drone: native sympathetic strings on the root ----
+dclk = clock { bpm: 18 }
+drone = sub { file: "../lib/sym-drone.sub", tune: 220hz, damp: 0.9, damp2: 0.92, prate: 0.07 }
+dclk -> drone.trig
+song.voct2 -> drone.root
+drone_s = sub { file: "../lib/strip.sub", gain: 0.9, send_gain: 0.3 }
+drone -> drone_s.in
+drone_lvl -> drone_s.level
+# a sine an octave under the drone, breathing on a 29 s cycle
+sub_osc = vco { freq: 220hz, wave: sine }
+song.voct2 -> sub_osc.v_oct
+sub_breath = lfo { freq: 0.034hz }
+sub_vca = vca { gain: 0.6 }
+sub_osc -> sub_vca.in
+sub_breath -> sub_vca.cv : 0.35
+sub_s = sub { file: "../lib/strip.sub", gain: 0.12 }
+sub_vca -> sub_s.in
+drone_lvl -> sub_s.level
+
+# ---- str: Surge String on 11 rows, into grains ----
+str = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=String", "A Osc 1 Exciter=Burst Noise",
+        "A Osc 1 String 1 Decay=96 %", "A Osc 1 String 2 Decay=94 %", "A Osc 1 String 2 Detune=7 cents",
+        "A Filter 1 Type=LP 12 dB", "A Filter 1 Cutoff=5000 Hz",
+        "A Amp EG Attack=0 ms", "A Amp EG Decay=2.5 s", "A Amp EG Sustain=0 %", "A Amp EG Release=2.5 s",
+        "A Width=70 %",
+        "FX A1 FX Type=Delay", "FX A1 Delay Time - Left=625 ms", "FX A1 Delay Time - Right=416 ms",
+        "FX A1 Feedback/EQ - Feedback=40 %", "FX A1 Output - Mix=30 %"],
+  params: ["A Osc 1 Stiffness", "A Osc 1 Exciter Level"] }
+song.gate3 -> str.gate
+song.voct3 -> str.voct
+song.vel3  -> str.vel : 0.2
+0.5 -> str.p1
+song.cva3 -> str.p1 : 0.4
+0.6 -> str.p2
+song.vel3 -> str.p2 : 0.4
+str_s = sub { file: "../lib/strip.sub", gain: 6, send_gain: 0.6, pos: -0.2 }
+str.out_l -> str_s.in_l
+str.out_r -> str_s.in_r
+str_lvl -> str_s.level
+
+cloud = grains { secs: 6, seed: 5 }
+str_s.fx -> cloud.in
+0.6 -> cloud.position
+0.4 -> cloud.scatter
+0.35 -> cloud.size
+14 -> cloud.density
+0.9 -> cloud.jitter
+0.9 -> cloud.spread
+0.8 -> cloud.shape
+cloud_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.5 }
+cloud.out_l -> cloud_s.in_l
+cloud.out_r -> cloud_s.in_r
+cloud_lvl -> cloud_s.level
+
+# ---- bars: native modal, 7 and 13 rows ----
+bar1 = modal { modes: 24 }
+song.voct4 -> bar1.v_oct
+song.gate4 -> bar1.strike
+0.5 -> bar1.structure
+-1 -> bar1.v_oct
+0.35 -> bar1.brightness
+0.62 -> bar1.damping
+0.2 -> bar1.position
+bar1_s = sub { file: "../lib/strip.sub", gain: 0.2, send_gain: 0.7, pos: 0.55 }
+bar1_v = vca { gain: 0 }
+bar1 -> bar1_v.in
+song.vel4 -> bar1_v.cv
+bar1_v -> bar1_s.in
+bars_lvl -> bar1_s.level
+
+bar2 = modal { modes: 24 }
+song.voct5 -> bar2.v_oct
+song.gate5 -> bar2.strike
+0.46 -> bar2.structure
+-1 -> bar2.v_oct
+0.3 -> bar2.brightness
+0.66 -> bar2.damping
+0.3 -> bar2.position
+bar2_v = vca { gain: 0 }
+bar2 -> bar2_v.in
+song.vel5 -> bar2_v.cv
+bar2_s = sub { file: "../lib/strip.sub", gain: 0.25, send_gain: 0.7, pos: -0.5 }
+bar2_v -> bar2_s.in
+bars_lvl -> bar2_s.level
+
+# ---- bell: native FM, the album's figure ----
+bell = fm { algo: dual, ratios: [1, 3.5, 1, 1, 1, 1], levels: [0.8, 0.3, 0, 0, 0, 0],
+            t1: [0.002, 0.002], t2: [4, 1.2], l1: [1, 1], l2: [0, 0], l3: [0, 0],
+            t4: [3, 1], curve: exp }
+song.gate6 -> bell.gate
+song.voct6 -> bell.v_oct
+song.vel6  -> bell.vel
+bell_s = sub { file: "../lib/strip.sub", gain: 0.45, send_gain: 0.8, pos: 0.25 }
+bell -> bell_s.in
+bell_lvl -> bell_s.level
+
+# ---- flock: Twist particle noise ----
+flock = plugin { file: "Surge XT",
+  set: ["A Velocity > VCA Gain=-48 dB", "A Osc 1 Type=Twist", "A Osc 1 Engine=Particle Noise",
+        "A Filter 1 Type=BP 12 dB", "A Filter 1 Cutoff=3200 Hz", "A Filter 1 Resonance=25 %",
+        "A Amp EG Attack=3 s", "A Amp EG Release=4 s",
+        "FX A1 FX Type=Reverb 2", "FX A1 Reverb - Decay Time=5 s", "FX A1 Output - Mix=60 %",
+        "FX A2 FX Type=Ensemble", "FX A2 Output - Mix=60 %"],
+  params: ["A Osc 1 Density", "A Osc 1 Freq Random", "A Filter 1 Cutoff"] }
+song.gate7 -> flock.gate
+song.voct7 -> flock.voct
+song.vel7  -> flock.vel : 0.2
+f1 = lfo { freq: 0.037hz }
+f2 = lfo { freq: 0.053hz, phase: 0.5 }
+f3 = lfo { freq: 0.027hz, phase: 0.25 }
+dens_lvl -> flock.p1
+f1 -> flock.p1 : 0.15
+0.5 -> flock.p2
+f2 -> flock.p2 : 0.4
+0.69 -> flock.p3
+f3 -> flock.p3 : 0.1
+flock_s = sub { file: "../lib/strip.sub", gain: 8, width: 0.8 }
+flock.out_l -> flock_s.in_l : 3
+flock.out_r -> flock_s.in_r : 3
+flock_lvl -> flock_s.level
+swirl = lfo { freq: 0.019hz }
+swirl -> flock_s.pan : 0.5
+
+# ---- space ----
+hall = reverb { decay: 0.9, damp: 0.4, mix: 1, predelay: 0.05 }
+pad_s.fx   -> hall.in_l
+str_s.fx   -> hall.in_r
+cloud_s.fx -> hall.in_l
+bar1_s.fx  -> hall.in_r
+bar2_s.fx  -> hall.in_l
+bell_s.fx  -> hall.in_r
+drone_s.fx -> hall.in_l
+hall_hl = svf { cutoff: 220, res: 0 }
+hall_hr = svf { cutoff: 220, res: 0 }
+hall.out_l -> hall_hl.in
+hall.out_r -> hall_hr.in
+hall_s = sub { file: "../lib/strip.sub", gain: 0.9 }
+hall_hl.hp -> hall_s.in_l
+hall_hr.hp -> hall_s.in_r
+verb_lvl -> hall_s.level
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.5, true_peak: on, key_bus: 0 }
+3.2 -> master.makeup
+pad_s.l   -> master.in_l
+pad_s.r   -> master.in_r
+drone_s.l -> master.in_l
+drone_s.r -> master.in_r
+sub_s.l   -> master.in_l
+sub_s.r   -> master.in_r
+str_s.l   -> master.in_l
+str_s.r   -> master.in_r
+cloud_s.l -> master.in_l
+cloud_s.r -> master.in_r
+bar1_s.l  -> master.in_l
+bar1_s.r  -> master.in_r
+bar2_s.l  -> master.in_l
+bar2_s.r  -> master.in_r
+bell_s.l  -> master.in_l
+bell_s.r  -> master.in_r
+flock_s.l -> master.in_l
+flock_s.r -> master.in_r
+hall_s.l  -> master.in_l
+hall_s.r  -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

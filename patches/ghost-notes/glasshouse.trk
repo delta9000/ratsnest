@@ -1,0 +1,193 @@
+# glasshouse.trk -- "Glasshouse". 132 BPM, G minor, 16 rows per bar (the
+# transport swings them), 96 bars. Two-step garage: ratsnest's kit, Surge's
+# organ bass, stabs and a chopped Twist voice. Levels in glasshouse-form.trk.
+#
+#   Gm9 | Ebmaj9 | Cm9 | D7#9
+#
+#   intro 8 | A 16 | B 16 | break 8 | A2 32 | outro 16
+
+track kick  note vel                    # 1  native kit kick; the duck trigger
+track snare note vel                    # 2  native snare + clap
+track hat   note vel                    # 3  native hats
+track ohat  note vel                    # 4  native open hat, 6-row free loop
+track bass  note vel cva                # 5  Surge FM2 organ bass: cva = M1 amount per note
+track stab  note vel cva cvb            # 6  Surge Classic stab: Osc 2 / Osc 3 pitch per chord
+track vox   note vel cva cvb            # 7  Surge Twist Vowels/Speech chops: cva = segment, cvb = speak
+track sweep note                        # 8  native noise sweep
+
+# ---- two-step: kick skips, snare on 2 and 4 ----
+pattern step 2x16 kick snare hat
+1:00 | x .9      | .          | x .5
+1:02 | .         | .          | x .35
+1:04 | .         | x@.02 .9   | x .45
+1:06 | .         | .          | x?.6 .3
+1:08 | .         | .          | x .5
+1:10 | x .75     | .          | x .35
+1:12 | .         | x@.04 .95  | x .45
+1:14 | .         | .          | x .4
+1:15 | .         | x?.4 .2    | .
+2:00 | x .85     | .          | x .5
+2:02 | .         | .          | x .35
+2:03 | x@.05 .55 | .          | .
+2:04 | .         | x@.02 .9   | x .45
+2:06 | .         | .          | x*2 .3
+2:08 | .         | .          | x .5
+2:09 | .         | x?.5 .25   | .
+2:11 | x .7      | .          | x .4
+2:12 | .         | x@.04 1    | x .45
+2:14 | .         | .          | x .4
+2:15 | x?.5 .45  | x?.4 .25   | .
+
+pattern step_b 2x16 kick snare hat
+1:00 | x .9      | .          | x .5
+1:02 | .         | .          | x .35
+1:03 | .         | x?.5 .22   | x?.5 .25
+1:04 | .         | x@.02 .9   | x .45
+1:06 | .         | .          | x .3
+1:07 | x .5      | .          | .
+1:08 | .         | .          | x .5
+1:10 | x .75     | .          | x*2 .35
+1:12 | .         | x@.04 .95  | x .45
+1:14 | .         | x .3       | x .4
+2:00 | x .85     | .          | x .5
+2:02 | .         | .          | x .35
+2:03 | x@.05 .55 | .          | .
+2:04 | .         | x@.02 .9   | x .45
+2:06 | .         | x?.5 .25   | x .3
+2:08 | .         | .          | x*3 .5
+2:10 | x .6      | .          | .
+2:11 | x .7      | .          | x .4
+2:12 | .         | x@.04 1    | x .45
+2:13 | .         | x .35      | .
+2:14 | .         | x*2 .45    | x .4
+2:15 | x?.5 .45  | x*3 .55    | .
+
+pattern hats_in 16 hat
+lane hat 4.3.5.3.4.3.6.3.
+
+pattern ohat6 6 ohat
+02 | x .5
+05 | x?.5 .3
+
+# ---- organ bass: short, syncopated; cva = FM M1 amount ----
+pattern bass_a 4x16 bass
+1:00 | G1 .8 .35
+1:02 | off
+1:03 | G2 .55 .5
+1:04 | off
+1:07 | Bb1 .6 .4
+1:09 | off
+1:10 | G1 .7 .35
+1:12 | off
+1:14 | F2 .55 .5
+1:15 | off
+2:00 | Eb1 .8 .35
+2:02 | off
+2:03 | Eb2 .55 .5
+2:04 | off
+2:07 | G1 .6 .4
+2:09 | off
+2:10 | Bb1 .7 .4
+2:12 | off
+2:14 | ~D2 .55 .5
+2:15 | off
+3:00 | C2 .8 .35
+3:02 | off
+3:03 | C2?.6 .5 .45
+3:04 | off
+3:07 | Eb2 .6 .4
+3:09 | off
+3:10 | G1 .7 .35
+3:12 | off
+3:14 | Bb1 .55 .5
+3:15 | off
+4:00 | D2 .8 .4
+4:02 | off
+4:03 | D2 .55 .55
+4:04 | off
+4:06 | F2 .6 .5
+4:07 | ~Fs2 .6
+4:08 | off
+4:10 | A1 .7 .45
+4:12 | C2 .6 .5
+4:14 | D2 .7 .6
+4:15 | off
+
+pattern bass_brk 4x16 bass
+1:00 | G1 .6 .3
+2:00 | Eb1 .6
+3:00 | C2 .6
+4:00 | D2 .65 .35
+4:14 | off
+
+# ---- stabs (Osc 2/3: +4 .786, +7 1, +3 .714, -1 .429, +5 .857, -6 .071) ----
+pattern stab_a 4x16 stab
+1:00 | Bb3:2 .7 .786 1          # Bb D F (Gm9)
+1:06 | x:1 .45
+1:10 | x:2 .6
+2:00 | G3:2 .7 .714 1           # G Bb D (Ebmaj9)
+2:06 | x:1 .45
+2:10 | x:2 .55
+2:13 | x?.5 .35
+3:00 | Eb4:2 .7 .786 .429       # Eb G D (Cm9)
+3:06 | x:1 .45
+3:10 | x:2 .6
+4:00 | C4:2 .75 .071 .857       # C F#3 F (D7#9)
+4:06 | x:1 .5
+4:10 | x:3 .65
+4:14 | x@.2 .4
+
+pattern stab_hold 4x16 stab
+1:00 | Bb3:14 .55 .786 1
+2:00 | G3:14 .5 .714 1
+3:00 | Eb4:14 .5 .786 .429
+4:00 | C4:14 .55 .071 .857
+
+# ---- vox chops: one Twist voice; every hit its own segment ----
+pattern vox_a 2x16 vox
+1:00 | D5 .7 .2 .3
+1:01 | off
+1:03 | Bb4@.05 .5 .35
+1:04 | off
+1:06 | D5 .6 .5
+1:07 | ~F5 .5 .55
+1:08 | off
+1:11 | G5?.6 .55 .7
+1:12 | off
+1:14 | F5 .5 .4
+1:15 | off
+2:00 | D5 .7 .25
+2:02 | off
+2:03 | C5@.1 .5 .8
+2:04 | off
+2:07 | Bb4 .6 .45
+2:08 | ~A4 .5 .6
+2:10 | off
+2:12 | G4?.7 .55 .15
+2:13 | off
+
+# the break: the voice held, slurred through segments; the album's figure (5 b3 4 2 = D Bb C A)
+pattern vox_brk 4x16 vox
+1:00 | D5 .6 .1 .2
+1:08 | ~Bb4 .55 .3
+2:00 | ~C5 .55 .5
+2:08 | ~A4 .55 .7
+3:00 | ~D5 .6 .9
+4:00 | ~G4 .5 .4 .4
+4:12 | off
+
+pattern sweep 4x16 sweep
+1:00 | x
+4:15 | off
+
+section intro stab_hold+hats_in+ohat6~
+section a     stab_a+step+bass_a+ohat6~
+section b     stab_a+step_b+bass_a+vox_a+ohat6~
+section brk   stab_hold+vox_brk+bass_brk
+section brk_s stab_hold+vox_brk+bass_brk+sweep
+section a2    stab_a+step_b+bass_a+vox_a+ohat6~
+section a2b   stab_a+step+bass_a+vox_a+ohat6~
+section out   stab_a+step+bass_a+ohat6~
+section out2  stab_hold+hats_in+ohat6~
+
+order intro*2 a*4 b*4 brk brk_s a2*4 a2b*4 out*2 out2*2

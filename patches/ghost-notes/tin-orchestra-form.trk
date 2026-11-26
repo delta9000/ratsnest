@@ -1,0 +1,25 @@
+# tin-orchestra-form.trk -- one row per bar (56), slewed in the patch.
+# Column 1 is the tempo, written as (BPM - 76) / 100: 0 = 76, .32 = 108.
+track bpm     cva   # 1
+track saron   cva   # 2
+track kenong  cva   # 3  kenong and gong
+track bonang  cva   # 4  polos and sangsih
+track bright  cva   # 5  bonang brightness (Surge normalized)
+track kick    cva   # 6  kick and shaker
+track drone   cva   # 7
+track verb    cva   # 8
+track main    cva   # 9
+
+pattern form 56
+#    bpm    saron  kenong bonang bright kick   drone  verb   main
+00 | 0    | .9   | .8   | 0    | .4   | 0    | .4   | .7   | 1     # buka: saron and gongs, slow
+04 | .04> | .85  | .8   | .7   | .4>  | 0    | .6   | .6   | .     # polos enters
+12 | .16> | .8   | .8   | .8   | .5   | .5   | .6   | .55  | .     # sangsih, shaker
+20 | .32  | .75  | .85  | .85  | .5>  | .9   | .7   | .5   | .     # rame: the kick, full speed
+35 | .    | .    | .    | .    | .65  | .    | .    | .    | .
+36 | .32> | .8   | .85  | .85  | .6>  | .7   | .7   | .55  | .     # slowing
+44 | .08> | .85  | .85  | .75  | .4   | 0    | .7   | .65  | .
+52 | -.08>| .9   | .9   | .6   | .35  | 0    | .6   | .75  | .     # suwuk: the ending, gong to rest
+55 | -.2  | .    | 1    | .4   | .3   | .    | 0    | .8   | .
+
+order form
