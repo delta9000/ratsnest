@@ -29,6 +29,7 @@ Invoke `ratsnest-patching` for any patch work; it routes to the rest:
 | `ratsnest-composition` | form, harmony, mixing, mastering — with the calibration numbers |
 | `ratsnest-inspiration` | provocations, artist lenses, seed sketches, starting from nothing |
 | `ratsnest-instrument` | playing it: MIDI, polyphony, live hot-reload, capture, writing subpatches |
+| `ratsnest-surge` | Surge XT through `plugin`: set lists, finding params, tracker p-locks, its quirks, when native is better |
 | `ratsnest-debugging` | silent, clipping, out of tune, or not what the header claims — the solo-probe procedure |
 
 Worked, verified examples live in `patches/etudes/`. The evidence behind the

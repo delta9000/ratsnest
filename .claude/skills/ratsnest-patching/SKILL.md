@@ -25,6 +25,7 @@ Then load the skill that matches the job:
 | structure, harmony, arrangement, mixing, mastering | `ratsnest-composition` |
 | "surprise me", a starting point, a way out of a rut | `ratsnest-inspiration` |
 | MIDI, polyphony, chords, live play, capture, writing a `.sub` | `ratsnest-instrument` |
+| Surge XT or another CLAP synth through the `plugin` module | `ratsnest-surge` |
 | a patch that is silent, clipping, out of tune, or not what the comment claims | `ratsnest-debugging` |
 
 Worked examples with verified numbers live in `patches/etudes/`:
