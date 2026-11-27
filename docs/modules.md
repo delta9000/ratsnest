@@ -166,7 +166,7 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tracker`, `tempo`, `alloc`, `chord`, `midi` |
-| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `echo`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `plugin`, `out` |
+| Effects/I/O | `channel`, `clipper`, `compressor`, `gate`, `transient`, `crossover`, `dcblock`, `delay`, `echo`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `plugin`, `out` |
 
 ## `vca`
 
@@ -962,6 +962,53 @@ feed-forward log-domain compressor.
 *   `gain`: Output. Linear gain reduction factor (excluding makeup).
 *   `gr`: Output. Current gain reduction in positive dB.
 
+## `gate`
+
+`gate { sidechain: internal }` — stereo-linked noise gate / downward
+expander. Inputs `in_l` 0, `in_r` 0, `side_l` 0, `side_r` 0, `threshold` -40
+dBFS (`-120..0`), `ratio` 10 (`1..1000`: below the threshold the cut
+grows by `ratio - 1` dB per dB under, so 2 is a gentle expander and 10 and up
+a gate), `range` 60 dB (`0..120`, the most it cuts: 12 for
+a duck that never closes), `attack` 0.001 s (opening), `hold` 0.02 s
+(`0..0.25`, capped at 16384 samples), `release` 0.1 s (closing); outputs
+`out_l`, `out_r`, `gain` (linear), `gr` (dB of cut), `open` (1 while the
+held level is at or above the threshold, else 0: a gate signal from audio).
+The detector is the louder side's peak, held for `hold` so it does not
+chatter through zero crossings or a short dip; set `hold` to at least half
+the lowest period you gate. `sidechain: external` keys it from
+`side_l`/`side_r` instead (a kick opening a pad, a drum bus gated by its
+own close mic).
+
+```text
+g = gate { threshold: -45, range: 30, release: 80ms }
+snare_room -> g.in_l
+snare_room -> g.in_r
+```
+
+## `transient`
+
+`transient` — stereo-linked transient shaper. Inputs `in_l`, `in_r`,
+`attack` 0 dB (`-24..24`), `sustain` 0 dB (`-24..24`); outputs `out_l`,
+`out_r`, `gain`. A fast and a slow envelope follower disagree at an onset;
+`attack` is the gain added (or, negative, taken) at the sharpest onsets,
+fading as the slow follower catches up over about 20 ms. Two followers with
+a short and a long release disagree in a decay; `sustain` is the gain
+reached deep in a tail (a gap of 12 dB counts as full). A steady tone is left
+alone, level-independent: there is no threshold. Both at 0 is an exact
+pass. `attack: 6` puts snap back on a soft kit; `sustain: -9` dries a
+roomy one; `sustain: 6` blooms a pluck.
+
+## `crossover`
+
+`crossover` — three-band Linkwitz-Riley (24 dB/oct) band split. Inputs
+`in_l`, `in_r`, `low` 200 Hz, `high` 2000 Hz (each `20..0.45*rate`; `high`
+is held at or above `low`); outputs `low_l`, `low_r`, `mid_l`, `mid_r`,
+`high_l`, `high_r`. The three bands sum back to the input's magnitude
+exactly (within 0.05 dB; the sum is an allpass, so phase shifts around the
+splits). Each band is −6 dB at its split. Process each band, then sum the
+bands by cabling them to the same input. For two bands, ignore `mid` and
+set `high` = `low`. Recipes below: multiband compression and dynamic EQ.
+
 ## `eq`
 
 `eq` — inputs `in_l` 0, `in_r` 0, `hp_freq` 0, `low_freq` 120, `low_gain` 0,
@@ -1555,6 +1602,47 @@ m = mix { levels: [.8, .6] }
 kick -> m.in1
 pad -> m.in2
 kick_env -> m.lvl2 : -.3
+```
+
+### Multiband compression (`crossover` + `compressor`)
+
+Split, compress each band on its own terms, sum by cabling the bands to one
+input. Here the lows are held steady and the highs are only tamed:
+
+```text
+xo = crossover { low: 150, high: 3000 }
+bus_l -> xo.in_l
+bus_r -> xo.in_r
+lo = compressor { threshold: -20, ratio: 4, attack: 30ms, release: 200ms }
+hi = compressor { threshold: -26, ratio: 3, attack: 2ms, release: 60ms }
+xo.low_l -> lo.in_l
+xo.low_r -> lo.in_r
+xo.high_l -> hi.in_l
+xo.high_r -> hi.in_r
+lo.out_l -> sum.in_l
+xo.mid_l -> sum.in_l
+hi.out_l -> sum.in_l
+lo.out_r -> sum.in_r
+xo.mid_r -> sum.in_r
+hi.out_r -> sum.in_r
+sum = stereo {}     # or the master chain's inputs
+```
+
+### Dynamic EQ (`follow` -> `eq` gain)
+
+The `eq` gains are inputs, so an envelope can ride one. A bell that cuts
+harsh 3 kHz only when 3 kHz is loud (key it from a band-pass of the same
+bus so it hears only that band):
+
+```text
+key = svf { cutoff: 3000, res: 0.3 }
+bus_l -> key.in
+det = follow { mode: rms, attack: 5ms, release: 80ms }
+key.bp -> det.in
+dyn = eq { mid2_freq: 3000, mid2_q: 1.4 }
+bus_l -> dyn.in_l
+bus_r -> dyn.in_r
+det.env -> dyn.mid2_gain : -24   # 0.25 of envelope -> -6 dB
 ```
 
 ### Sympathetic strings (Rings recipe)

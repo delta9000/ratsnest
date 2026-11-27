@@ -84,6 +84,22 @@ inline BiquadCoeffs make_lpf(float freq, float sample_rate) {
   return c;
 }
 
+// Second-order allpass, Q = 0.7071: what a Linkwitz-Riley LP4 + HP4 pair
+// at the same frequency sums to (the crossover's phase match).
+inline BiquadCoeffs make_apf(float freq, float sample_rate) {
+  const float w0 = 2.0f * std::numbers::pi_v<float> * freq / sample_rate;
+  const float cos_w0 = std::cos(w0);
+  const float alpha = std::sin(w0) / (2.0f * 0.70710678f);
+  const float a0 = 1.0f + alpha;
+  BiquadCoeffs c;
+  c.b0 = (1.0f - alpha) / a0;
+  c.b1 = (-2.0f * cos_w0) / a0;
+  c.b2 = 1.0f;  // (1 + alpha) / a0 == 1 exactly
+  c.a1 = c.b1;
+  c.a2 = c.b0;
+  return c;
+}
+
 inline BiquadCoeffs make_low_shelf(float freq, float gain_db, float sample_rate) {
   if (std::abs(gain_db) < 1e-4f) {
     return make_bypass();

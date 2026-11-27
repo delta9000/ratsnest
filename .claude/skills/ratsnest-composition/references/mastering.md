@@ -108,6 +108,17 @@ RMS (crest ~7 dB: loud, as club masters are). `drive: 13` with `makeup` 11
 reaches −8.0. At that density a kick-less break sits only ~2.3 dB under the
 drop, so mix breaks lower still.
 
+## When one band misbehaves
+
+The chain above treats the mix as one signal. When only the low end pumps
+or only the top is harsh, split it: `crossover` (three Linkwitz-Riley bands
+that sum flat) with a `compressor` per band is multiband compression, and a
+`follow` on a band-passed key riding an `eq` gain is a dynamic EQ (both are
+recipes in `docs/modules.md`). Fix drums before the bus, not on it:
+`transient { attack: 4 }` gives a soft kit snap back without raising the
+peak-to-loudness ratio the limiter has to absorb for long, and `gate`
+cleans room and bleed tails that the glue compressor would otherwise lift.
+
 ## The self-own that costs 2 dB
 
 A post-limiter attenuation scales the ceiling. The fade idiom
