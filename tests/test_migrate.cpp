@@ -699,8 +699,8 @@ TEST_CASE("compressor migrates gain reduction state") {
 }
 
 TEST_CASE("eq migrates cascade filter states") {
-  // eq inputs: in_l, in_r, hp_freq, low_freq, low_gain, mid1_freq, mid1_gain, mid1_q, mid2_freq, mid2_gain, mid2_q, high_freq, high_gain
-  const float ins[13] = {0.8f, -0.5f, 50.0f, 120.0f, 6.0f, 1000.0f, -12.0f, 2.0f, 3000.0f, 9.0f, 1.5f, 8000.0f, -6.0f};
+  // eq inputs: in_l, in_r, hp_freq, low_freq, low_gain, mid1_freq, mid1_gain, mid1_q, mid2_freq, mid2_gain, mid2_q, high_freq, high_gain, lp_freq, low_q, high_q
+  const float ins[16] = {0.8f, -0.5f, 50.0f, 120.0f, 6.0f, 1000.0f, -12.0f, 2.0f, 3000.0f, 9.0f, 1.5f, 8000.0f, -6.0f, 12000.0f, 0.707f, 2.0f};
   check_continuity("eq", ins, 1000);
 }
 

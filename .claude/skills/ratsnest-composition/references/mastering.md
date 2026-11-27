@@ -108,6 +108,15 @@ RMS (crest ~7 dB: loud, as club masters are). `drive: 13` with `makeup` 11
 reaches −8.0. At that density a kick-less break sits only ~2.3 dB under the
 drop, so mix breaks lower still.
 
+## Colour before the clipper
+
+`saturate` is level-compensated bus saturation: `drive` adds density and
+harmonics without raising the level, `bias` adds even harmonics. A light
+`saturate { drive: 3, bias: 0.2 }` between the glue compressor and the
+clipper rounds what the clipper would otherwise shave, so the clipper's
+`drive` can come down. For a darker top without a shelf, `eq { lp_freq:
+16000 }`; for a resonant low-end bump, `low_q: 2` on a gentle `low_gain`.
+
 ## When one band misbehaves
 
 The chain above treats the mix as one signal. When only the low end pumps

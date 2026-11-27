@@ -52,6 +52,7 @@ extern const ModuleInfo transient_info;
 extern const ModuleInfo crossover_info;
 extern const ModuleInfo eq_info;
 extern const ModuleInfo clipper_info;
+extern const ModuleInfo saturate_info;
 extern const ModuleInfo limiter_info;
 extern const ModuleInfo follow_info;
 extern const ModuleInfo sampler_info;

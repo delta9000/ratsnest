@@ -166,7 +166,7 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tracker`, `tempo`, `alloc`, `chord`, `midi` |
-| Effects/I/O | `channel`, `clipper`, `compressor`, `gate`, `transient`, `crossover`, `dcblock`, `delay`, `echo`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `plugin`, `out` |
+| Effects/I/O | `channel`, `clipper`, `saturate`, `compressor`, `gate`, `transient`, `crossover`, `dcblock`, `delay`, `echo`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `plugin`, `out` |
 
 ## `vca`
 
@@ -1013,15 +1013,17 @@ set `high` = `low`. Recipes below: multiband compression and dynamic EQ.
 
 `eq` — inputs `in_l` 0, `in_r` 0, `hp_freq` 0, `low_freq` 120, `low_gain` 0,
 `mid1_freq` 500, `mid1_gain` 0, `mid1_q` 0.707, `mid2_freq` 2500, `mid2_gain` 0,
-`mid2_q` 0.707, `high_freq` 10000, `high_gain` 0; outputs `out_l`, `out_r`.
+`mid2_q` 0.707, `high_freq` 10000, `high_gain` 0, `lp_freq` 0, `low_q` 1,
+`high_q` 1; outputs `out_l`, `out_r`.
 A stereo parametric mastering equalizer with 20 ms parameter smoothing; the
 first sample starts at the patched settings, so there is no startup sweep.
-Consists of five cascaded biquad sections per channel:
+Consists of six cascaded biquad sections per channel:
 1.  **HPF**: `hp_freq: 0` bypasses it (the default). Positive values enable a second-order high-pass, clamped `5..0.45*rate`, Q fixed to `0.707`.
-2.  **Low Shelf**: Low shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. Slope fixed to `1.0`.
+2.  **Low Shelf**: Low shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. `low_q` (`0.3..3`, default 1) shapes the corner: 0.707 is the plain shelf with no bump, the default 1 has a slight resonant bump past the corner (the original shelf, bit-identical), 2 and up a pronounced Pultec-style bump and dip; under 0.707 the shelf is gentler and wider.
 3.  **Mid1 Peaking**: Peaking/bell filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB, Q clamped `0.1..18`.
 4.  **Mid2 Peaking**: Peaking/bell filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB, Q clamped `0.1..18`.
-5.  **High Shelf**: High shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. Slope fixed to `1.0`.
+5.  **High Shelf**: High shelving filter. Frequency clamped `5..0.45*rate`, gain clamped `+/-24` dB. `high_q` as `low_q`.
+6.  **LPF**: `lp_freq: 0` bypasses it (the default). Positive values enable a second-order Butterworth low-pass, clamped `5..0.45*rate` (−3 dB at the corner, 12 dB/oct): tame a top end, or with `hp_freq` make a band.
 
 Zero-gain sections are optimized with exact bypass coefficients.
 
@@ -1037,6 +1039,21 @@ Zero-gain sections are optimized with exact bypass coefficients.
 
 Internally oversampled at 4x using a cascade of highly optimized 2-path polyphase allpass IIR half-band filters.
 The dry branch is delay-aligned by exactly 1 sample to match the filter's peak latency.
+
+## `saturate`
+
+`saturate` — stereo bus saturation. Inputs `in_l`, `in_r`, `drive` 0 dB
+(`-12..36`), `bias` 0 (`-1..1`), `mix` 1 (linear dry/wet); outputs `out_l`,
+`out_r`. A tanh curve at 4x oversampling (the clipper's oversampler, so a
+one-sample latency the dry path matches), level-compensated: small signals
+pass at unity whatever the `drive`, and `drive` lowers the level where it
+bends (about `1/drive`: at 12 dB a −12 dBFS peak comes out 2.4 dB lower),
+so turning it adds harmonics and density, not loudness. `bias` offsets the
+curve for even harmonics (a tube-ish second harmonic; 0 is purely odd); the
+DC that makes is removed by a 5 Hz high-pass. Unlike `clipper` it has no
+ceiling: it is colour before the clipper and limiter, not a peak control.
+`drive: 3, bias: 0.2` is glue on a bus; `drive: 12, mix: 0.4` is parallel
+grit.
 
 ## `limiter`
 

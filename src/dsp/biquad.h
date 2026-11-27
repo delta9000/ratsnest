@@ -100,14 +100,17 @@ inline BiquadCoeffs make_apf(float freq, float sample_rate) {
   return c;
 }
 
-inline BiquadCoeffs make_low_shelf(float freq, float gain_db, float sample_rate) {
+inline BiquadCoeffs make_low_shelf(float freq, float gain_db, float sample_rate,
+                                  float q = 1.0f) {
   if (std::abs(gain_db) < 1e-4f) {
     return make_bypass();
   }
   float w0 = 2.0f * std::numbers::pi_v<float> * freq / sample_rate;
   float cos_w0 = std::cos(w0);
   float A = std::pow(10.0f, gain_db / 40.0f);
-  float beta = std::sqrt(A) * std::sin(w0); // slope S = 1.0
+  // beta = sqrt(A) / Q * sin(w0); Q = 1 (the default) is the original
+  // shelf, with a small bump past the corner; 0.707 has none.
+  float beta = std::sqrt(A) * std::sin(w0) / q;
   
   float a0 = (A + 1.0f) + (A - 1.0f) * cos_w0 + beta;
   BiquadCoeffs c;
@@ -119,14 +122,17 @@ inline BiquadCoeffs make_low_shelf(float freq, float gain_db, float sample_rate)
   return c;
 }
 
-inline BiquadCoeffs make_high_shelf(float freq, float gain_db, float sample_rate) {
+inline BiquadCoeffs make_high_shelf(float freq, float gain_db, float sample_rate,
+                                  float q = 1.0f) {
   if (std::abs(gain_db) < 1e-4f) {
     return make_bypass();
   }
   float w0 = 2.0f * std::numbers::pi_v<float> * freq / sample_rate;
   float cos_w0 = std::cos(w0);
   float A = std::pow(10.0f, gain_db / 40.0f);
-  float beta = std::sqrt(A) * std::sin(w0); // slope S = 1.0
+  // beta = sqrt(A) / Q * sin(w0); Q = 1 (the default) is the original
+  // shelf, with a small bump past the corner; 0.707 has none.
+  float beta = std::sqrt(A) * std::sin(w0) / q;
   
   float a0 = (A + 1.0f) - (A - 1.0f) * cos_w0 + beta;
   BiquadCoeffs c;
