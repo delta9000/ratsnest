@@ -142,11 +142,11 @@ Check, in order:
 4. **Section RMS steps** land at the seconds your block table predicts.
 5. **No dead air** after the fade, and no return of the intro (grid wrap).
 
-For LUFS, and to confirm the true peak, measure outside the patch with `ffmpeg`:
-
-```bash
-ffmpeg -i take.wav -af ebur128=peak=true -f null -
-```
+`render --stats` prints the integrated LUFS, loudness range and true peak
+(dBTP) on its first two lines, and LUFS per window in the timeline; it matches
+`ffmpeg -af ebur128=peak=true` to 0.1 LU. Calibrate `makeup` against those
+numbers instead of rendering twice. For a 16-bit delivery, render with
+`--bits 16` (TPDF-dithered) rather than letting an encoder truncate the float.
 
 ## When not to master
 

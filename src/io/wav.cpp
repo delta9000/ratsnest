@@ -1,7 +1,11 @@
 #include "io/wav.h"
+#include "dsp/util.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 namespace ms::io {
 namespace {
@@ -20,29 +24,58 @@ bool tag_eq(const uint8_t* p, const char* t) {
   return p[0] == static_cast<uint8_t>(t[0]) && p[1] == static_cast<uint8_t>(t[1]) &&
          p[2] == static_cast<uint8_t>(t[2]) && p[3] == static_cast<uint8_t>(t[3]);
 }
-}  // namespace
-
-bool write_wav_f32(const std::string& path, const float* interleaved,
-                   size_t frames, int channels, int sample_rate) {
-  std::FILE* f = std::fopen(path.c_str(), "wb");
-  if (!f) return false;
-  const uint32_t data_bytes = static_cast<uint32_t>(frames * static_cast<size_t>(channels) * 4);
-  const uint16_t ch = static_cast<uint16_t>(channels);
-  const uint32_t byte_rate = static_cast<uint32_t>(sample_rate) * ch * 4;
-
+// Writes a canonical 44-byte header for `format` (1 = PCM, 3 = float).
+void put_header(std::FILE* f, uint16_t format, uint16_t ch, int rate, uint16_t bits,
+                uint32_t data_bytes) {
+  const uint16_t block = static_cast<uint16_t>(ch * (bits / 8));
   std::fwrite("RIFF", 1, 4, f);
   put_u32(f, 36 + data_bytes);
   std::fwrite("WAVE", 1, 4, f);
   std::fwrite("fmt ", 1, 4, f);
   put_u32(f, 16);
-  put_u16(f, 3);  // IEEE float
+  put_u16(f, format);
   put_u16(f, ch);
-  put_u32(f, static_cast<uint32_t>(sample_rate));
-  put_u32(f, byte_rate);
-  put_u16(f, static_cast<uint16_t>(ch * 4));
-  put_u16(f, 32);
+  put_u32(f, static_cast<uint32_t>(rate));
+  put_u32(f, static_cast<uint32_t>(rate) * block);
+  put_u16(f, block);
+  put_u16(f, bits);
   std::fwrite("data", 1, 4, f);
   put_u32(f, data_bytes);
+}
+
+}  // namespace
+
+bool write_wav_pcm(const std::string& path, const float* interleaved,
+                   size_t frames, int channels, int sample_rate, int bits) {
+  if (bits != 16 && bits != 24) return false;
+  std::FILE* f = std::fopen(path.c_str(), "wb");
+  if (!f) return false;
+  const size_t n = frames * static_cast<size_t>(channels);
+  const size_t bytes = static_cast<size_t>(bits / 8);
+  put_header(f, 1, static_cast<uint16_t>(channels), sample_rate, static_cast<uint16_t>(bits),
+             static_cast<uint32_t>(n * bytes));
+  const double full = bits == 16 ? 32768.0 : 8388608.0;
+  uint32_t seed = 0x9E3779B9u;
+  auto uniform = [&seed] { return static_cast<double>(ms::dsp::xorshift32(seed)) / 4294967296.0; };
+  std::vector<uint8_t> out(n * bytes);
+  for (size_t i = 0; i < n; ++i) {
+    // Triangular PDF: the sum of two uniforms spans +-1 LSB.
+    const double x = static_cast<double>(interleaved[i]) * full + uniform() - uniform();
+    const double q = std::clamp(std::round(std::isfinite(x) ? x : 0.0), -full, full - 1.0);
+    const auto v = static_cast<uint32_t>(static_cast<int32_t>(q));
+    for (size_t b = 0; b < bytes; ++b) out[i * bytes + b] = static_cast<uint8_t>(v >> (8 * b));
+  }
+  const size_t written = std::fwrite(out.data(), 1, out.size(), f);
+  std::fclose(f);
+  return written == out.size();
+}
+
+bool write_wav_f32(const std::string& path, const float* interleaved,
+                   size_t frames, int channels, int sample_rate) {
+  std::FILE* f = std::fopen(path.c_str(), "wb");
+  if (!f) return false;
+  put_header(f, 3, static_cast<uint16_t>(channels), sample_rate, 32,
+             static_cast<uint32_t>(frames * static_cast<size_t>(channels) * 4));
   const size_t written = std::fwrite(interleaved, 4, frames * static_cast<size_t>(channels), f);
   std::fclose(f);
   return written == frames * static_cast<size_t>(channels);

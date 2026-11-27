@@ -296,7 +296,7 @@ swap; old graph freed on the main thread.
 ```
 ratsnest play   drone.patch          # watch + play + meters
 ratsnest render drone.patch -d 30s -o take.wav   # offline, faster than RT
-ratsnest render drone.patch -d 300s --stats 8s   # + peak/RMS/DC level timeline
+ratsnest render drone.patch -d 300s --stats 8s   # + peak/true peak/LUFS/LRA/RMS/DC, timeline
 ratsnest render song.patch -o t.wav --tap kick   # + t.kick.wav and its own timeline
 ratsnest check  drone.patch          # parse/validate — editor lint
 ratsnest describe [module_type]      # JSON interfaces from the runtime registry

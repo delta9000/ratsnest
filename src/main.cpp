@@ -22,6 +22,7 @@
 #include "graph/graph.h"
 #include "graph/subs.h"
 #include "graph/tap.h"
+#include "io/loudness.h"
 #include "io/wav.h"
 #include "io/watcher.h"
 #include "rt/denormal.h"
@@ -32,12 +33,14 @@ int usage() {
   std::fprintf(stderr,
       "usage:\n"
       "  ratsnest check  <patch>             validate; errors print as file:line:col\n"
-      "  ratsnest render <patch> [options]   offline render to a stereo float WAV\n"
+      "  ratsnest render <patch> [options]   offline render to a stereo WAV\n"
       "      -d <dur>          length (default 10s)\n"
       "      --start <dur>     begin the take this far in (the skipped part still runs)\n"
       "      -o <file.wav>     output path (default out.wav)\n"
       "      --rate <hz>       sample rate (default 48000)\n"
-      "      --stats [<dur>]   print peak/RMS/DC and a level timeline per window (default 10s)\n"
+      "      --bits 16|24|32   16/24: dithered integer PCM; 32: float (default)\n"
+      "      --stats [<dur>]   print peak, true peak, LUFS, LRA, RMS, DC and a level\n"
+      "                        timeline per window (default 10s)\n"
       "      --tap NAME[=node[.port]]  also write <out>.NAME.wav from that endpoint (stereo\n"
       "                        if it has l/r or out_l/out_r) and print its stats; repeatable\n"
       "  ratsnest play   <patch> [options]   live PipeWire output; hot-reloads on save\n"
@@ -268,6 +271,7 @@ struct RenderOpts {
   std::string out_path = "out.wav";
   double stats_window = 10.0;  // also the window of each --tap's table
   bool stats = false;
+  int bits = 32;
   std::vector<ms::graph::Tap> taps;
 };
 
@@ -277,6 +281,13 @@ bool parse_render(int argc, char** argv, RenderOpts& o) {
     else if (const char* v = option(argc, argv, i, "-o")) o.out_path = v;
     else if (const char* v = option(argc, argv, i, "--start")) o.start_sec = parse_duration(v);
     else if (const char* v = option(argc, argv, i, "--rate")) { if (!rate_option(v, o.rate)) return false; }
+    else if (const char* v = option(argc, argv, i, "--bits")) {
+      o.bits = std::atoi(v);
+      if (o.bits != 16 && o.bits != 24 && o.bits != 32) {
+        std::fprintf(stderr, "error: --bits takes 16, 24 or 32, not '%s'\n", v);
+        return false;
+      }
+    }
     else if (const char* v = option(argc, argv, i, "--tap")) o.taps.push_back(ms::graph::parse_tap(v));
     else if (!std::strcmp(argv[i], "--stats")) {
       // The window length is optional: take the next word only if it is one.
@@ -312,16 +323,20 @@ void print_stats(const std::vector<float>& l, const std::vector<float>& r,
   const size_t frames = l.size();
   const double n = 2.0 * static_cast<double>(frames);
   const Level all = measure(l, r, 0, frames);
-  std::printf("peak %6.1f dBFS   rms %6.1f dBFS   dc %+.5f\n",
-              db(all.peak), db(std::sqrt(all.sumsq / n)), all.dc / n);
+  const ms::io::Loudness lu = ms::io::measure_loudness(l.data(), r.data(), frames, o.rate);
+  std::printf("peak %6.1f dBFS   true peak %6.1f dBTP   rms %6.1f dBFS   dc %+.5f\n",
+              db(all.peak), lu.true_peak, db(std::sqrt(all.sumsq / n)), all.dc / n);
+  std::printf("loudness %6.1f LUFS integrated   range %4.1f LU\n", lu.integrated, lu.range);
   const size_t win = static_cast<size_t>(o.stats_window * o.rate);
   for (size_t start = 0; start < frames; start += win) {
     const size_t end = std::min(frames, start + win);
     const Level w = measure(l, r, start, end);
     const double wrms = db(std::sqrt(w.sumsq / (2.0 * static_cast<double>(end - start))));
     const int fill = static_cast<int>(std::clamp((wrms + 60.0) / 60.0, 0.0, 1.0) * 20.0);
-    std::printf("%7.1fs  rms %6.1f  peak %6.1f  |%s|\n",
-                o.start_sec + static_cast<double>(start) / o.rate, wrms, db(w.peak),
+    const double wlu =
+        ms::io::measure_loudness(&l[start], &r[start], end - start, o.rate).integrated;
+    std::printf("%7.1fs  rms %6.1f  peak %6.1f  lufs %6.1f  |%s|\n",
+                o.start_sec + static_cast<double>(start) / o.rate, wrms, db(w.peak), wlu,
                 meter(fill).c_str());
   }
 }
@@ -342,14 +357,15 @@ void skip_frames(ms::engine::Engine& engine, size_t skip) {
 
 // A mono take (channels 1) writes `l`; pass it as `r` too.
 bool write_take(const std::string& path, double rate, const std::vector<float>& l,
-                const std::vector<float>& r, size_t channels) {
+                const std::vector<float>& r, size_t channels, int bits) {
   std::vector<float> interleaved(l.size() * channels);
   for (size_t i = 0; i < l.size(); ++i) {
     interleaved[channels * i + channels - 1] = r[i];
     interleaved[channels * i] = l[i];
   }
-  return ms::io::write_wav_f32(path, interleaved.data(), l.size(), static_cast<int>(channels),
-                               static_cast<int>(rate));
+  const int ch = static_cast<int>(channels), hz = static_cast<int>(rate);
+  if (bits != 32) return ms::io::write_wav_pcm(path, interleaved.data(), l.size(), ch, hz, bits);
+  return ms::io::write_wav_f32(path, interleaved.data(), l.size(), ch, hz);
 }
 
 // One tapped endpoint's samples, captured beside the mix: one channel per
@@ -366,7 +382,7 @@ bool finish_taps(const RenderOpts& o, const std::vector<Take>& takes) {
     const std::string path =
         std::filesystem::path(o.out_path).replace_extension("." + t.name + ".wav").string();
     const auto& ch = takes[i].ch;
-    if (!write_take(path, o.rate, ch.front(), ch.back(), ch.size())) {
+    if (!write_take(path, o.rate, ch.front(), ch.back(), ch.size(), o.bits)) {
       std::fprintf(stderr, "error: cannot write '%s'\n", path.c_str());
       return false;
     }
@@ -419,7 +435,7 @@ int cmd_render(const std::string& patch, int argc, char** argv) {
   for (const ms::graph::Tap& t : o.taps)
     takes.push_back({std::vector<std::vector<float>>(t.nodes.size(), std::vector<float>(frames))});
   run_take(engine, o, l, r, takes);
-  if (!write_take(o.out_path, o.rate, l, r, 2)) {
+  if (!write_take(o.out_path, o.rate, l, r, 2, o.bits)) {
     std::fprintf(stderr, "error: cannot write '%s'\n", o.out_path.c_str());
     return 1;
   }
