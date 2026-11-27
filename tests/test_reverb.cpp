@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 #include <cmath>
+#include <utility>
 #include "dsp/modules.h"
 
 using namespace ms::dsp;
@@ -14,8 +15,14 @@ std::unique_ptr<Module> make_reverb(double rate = 48000.0, Config cfg = {}) {
 }
 
 // in_l, in_r, decay, damp, mix, freeze
+Config cfg(const char* model, double size = 1.0) {
+  return {{"model", ConfigValue{model, 0.0, {}, false}}, {"size", ConfigValue{"", size, {}, true}}};
+}
+
 struct Rig {
   std::unique_ptr<Module> m = make_reverb();
+  Rig() = default;
+  explicit Rig(Config c) : m(make_reverb(48000.0, std::move(c))) {}
   float ins[6] = {0.0f, 0.0f, 0.5f, 0.25f, 1.0f, 0.0f};  // wet-only default
   float out[2] = {0.0f, 0.0f};
   void tick(float l, float r) {
@@ -160,4 +167,110 @@ TEST_CASE("reverb stays finite under hostile inputs and odd rates") {
     REQUIRE(std::isfinite(out[0]));
     ins[0] = ins[1] = 0.0f;
   }
+}
+
+// ---- model: hall ------------------------------------------------------------
+
+TEST_CASE("hall: an impulse grows a tail that decays, longer with decay") {
+  Rig shortr(cfg("hall")), longr(cfg("hall"));
+  shortr.ins[2] = 0.2f;
+  longr.ins[2] = 0.9f;
+  shortr.tick(1.0f, 1.0f);
+  longr.tick(1.0f, 1.0f);
+  const double early = longr.window_rms(24000);
+  (void)shortr.window_rms(24000);
+  CHECK(early > 1e-4);
+  (void)shortr.window_rms(24000);
+  const double mid = longr.window_rms(24000);
+  CHECK(mid < early);
+  CHECK(mid > shortr.window_rms(48000) * 5.0);
+}
+
+TEST_CASE("hall: size scales the tail time") {
+  Rig room(cfg("hall", 0.4)), big(cfg("hall", 2.0));
+  room.tick(1.0f, 1.0f);
+  big.tick(1.0f, 1.0f);
+  (void)room.window_rms(48000);
+  (void)big.window_rms(48000);
+  CHECK(big.window_rms(48000) > room.window_rms(48000) * 10.0);
+}
+
+TEST_CASE("hall: true stereo, a left-only source stays left early on") {
+  Rig r(cfg("hall"));
+  r.tick(1.0f, 0.0f);
+  double ll = 0.0, rr = 0.0;
+  for (int i = 0; i < 2880; ++i) {  // to 60 ms: 20 ms predelay, then reflections
+    r.tick(0.0f, 0.0f);
+    if (i < 960) continue;
+    ll += static_cast<double>(r.out[0]) * r.out[0];
+    rr += static_cast<double>(r.out[1]) * r.out[1];
+  }
+  CHECK(ll > rr * 2.0);
+}
+
+TEST_CASE("hall: outputs are decorrelated and the level sits near the plate's") {
+  Rig hall(cfg("hall")), plate;
+  hall.tick(1.0f, 1.0f);
+  plate.tick(1.0f, 1.0f);
+  double dot = 0.0, ll = 0.0, rr = 0.0;
+  for (int i = 0; i < 96000; ++i) {
+    hall.tick(0.0f, 0.0f);
+    dot += static_cast<double>(hall.out[0]) * hall.out[1];
+    ll += static_cast<double>(hall.out[0]) * hall.out[0];
+    rr += static_cast<double>(hall.out[1]) * hall.out[1];
+  }
+  CHECK(std::abs(dot / std::sqrt(ll * rr)) < 0.5);
+  const double p = plate.window_rms(96000);
+  const double h = std::sqrt(0.5 * (ll + rr) / 96000.0);
+  CHECK(h > p * 0.5);  // within 6 dB of the plate at the same settings
+  CHECK(h < p * 2.0);
+}
+
+TEST_CASE("hall: freeze holds, damping darkens, hostile inputs stay finite") {
+  Rig r(cfg("hall"));
+  r.ins[2] = 0.6f;
+  for (int i = 0; i < 24000; ++i) r.tick(i % 7 == 0 ? 0.8f : -0.3f, 0.4f);
+  r.ins[5] = 1.0f;
+  (void)r.window_rms(4800);
+  const double held_early = r.window_rms(48000);
+  CHECK(r.window_rms(96000) > held_early * 0.5);
+
+  Rig bright(cfg("hall")), dark(cfg("hall"));
+  bright.ins[3] = 0.0f;
+  dark.ins[3] = 0.95f;
+  bright.tick(1.0f, 1.0f);
+  dark.tick(1.0f, 1.0f);
+  auto hf = [](Rig& x) {
+    (void)x.window_rms(24000);
+    double d = 0.0;
+    float prev = x.out[0];
+    for (int i = 0; i < 24000; ++i) {
+      x.tick(0.0f, 0.0f);
+      d += std::abs(x.out[0] - prev);
+      prev = x.out[0];
+    }
+    return d;
+  };
+  CHECK(hf(dark) < hf(bright) * 0.5);
+
+  Rig h(cfg("hall", 4.0));
+  for (int i = 0; i < 200000; ++i) {
+    h.ins[2] = i % 3 == 0 ? 5.0f : -2.0f;
+    h.ins[3] = i % 5 == 0 ? -4.0f : 4.0f;
+    h.ins[5] = i % 11 == 0 ? 1.0f : 0.0f;
+    h.tick(i % 2 == 0 ? 1.0f : -1.0f, i % 3 == 0 ? -1.0f : 1.0f);
+    REQUIRE(std::isfinite(h.out[0]));
+    REQUIRE(std::abs(h.out[0]) < 100.0f);
+  }
+}
+
+TEST_CASE("reverb: hot reload migrates the hall tail") {
+  Rig a(cfg("hall")), b(cfg("hall"));
+  a.tick(1.0f, 1.0f);
+  (void)a.window_rms(4800);
+  b.m->copy_state_from(*a.m);
+  a.tick(0.0f, 0.0f);
+  b.tick(0.0f, 0.0f);
+  CHECK(b.out[0] == a.out[0]);
+  CHECK(b.out[1] == a.out[1]);
 }

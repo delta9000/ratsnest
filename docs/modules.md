@@ -166,7 +166,7 @@ Recipes. Full design: `docs/superpowers/specs/2026-07-18-subpatch-design.md`.
 | Tone/dynamics | `vca`, `adsr`, `func`, `lpg`, `svf`, `ladder`, `fold`, `drive`, `overdrive` |
 | Routing | `math`, `xfade`, `mix`, `logic`, `switch`, `sh`, `quant`, `follow` |
 | Sequencing | `transport`, `scene`, `phrase`, `clock`, `div`, `euclid`, `bern`, `turing`, `stepseq`, `tracker`, `tempo`, `alloc`, `chord`, `midi` |
-| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `plugin`, `out` |
+| Effects/I/O | `channel`, `clipper`, `compressor`, `dcblock`, `delay`, `echo`, `eq`, `grains`, `limiter`, `reverb`, `chorus`, `phaser`, `soundboard`, `scope`, `stereo`, `rec`, `extin`, `plugin`, `out` |
 
 ## `vca`
 
@@ -533,6 +533,20 @@ Inputs `in` 0, `time` 0.4 s (`0..10`), `pitch` 0 v/oct, `feedback` 0.35
 Effective time is `time * 2^-pitch` (at least 2 samples). The dark,
 DC-blocked, tanh-saturated feedback can self-oscillate above 1. `tone` sits in
 the feedback path only: the first echo is undarkened, later repeats darken. Example: `{ time: 375ms, feedback: .65, mix: 1 }`.
+Mono; for a stereo or ping-pong echo use `echo`.
+
+## `echo`
+
+`echo { mode: ping }` — stereo echo: two `delay` lines (same Hermite read,
+time glide, dark DC-blocked tanh feedback). Inputs `in_l`, `in_r`, `time`
+0.375 s (`0..10`), `feedback` 0.4 (`0..1.2`), equal-power `mix` 0.5, feedback
+`tone` 6000 Hz, `spread` 0 (`0..1`: the right side's time is
+`time * (1 + spread)`), `slew` 0.1 s; outputs `out_l`, `out_r`. Config `mode`:
+`ping` (default) sums the input to mono into the left line and cross-feeds
+the lines, so repeats alternate left, right, left at `time`; `stereo` keeps
+the sides apart (no crosstalk), and with `spread` gives a Haas-style offset.
+No `pitch` input: modulate `time` instead. Example: `echo { time: 375ms,
+feedback: .55, tone: 3000, mix: .3 }` on a send.
 
 ## `adsr`
 
@@ -557,13 +571,27 @@ at 95%: write about 3x the time for the same heard length
 
 ## `reverb`
 
-Stereo Dattorro plate. Inputs `in_l`, `in_r`, `decay` .5 (`0..0.9995`, the
-tank loop gain), `damp` .25 (`0..1`, tank high-frequency loss), equal-power
-`mix` .3, `freeze` gate; outputs `out_l`, `out_r`. The tank input is the mono
-sum; the stereo image comes from the output taps. Configs: `predelay` .02 s
-(`0..0.25`), input `bandwidth` .9995 (`0..1`), `mod_rate` 1 Hz (`0..20`),
-`mod_depth` 13 samples (`0..100`). Freeze smoothly mutes input and makes the
-tank lossless while held.
+`reverb { model: plate }` — a stereo space. Inputs `in_l`, `in_r`, `decay` .5
+(`0..0.9995`, the tank loop gain), `damp` .25 (`0..1`, tank high-frequency
+loss), equal-power `mix` .3, `freeze` gate; outputs `out_l`, `out_r`. Configs:
+`model` (below), `size` 1 (`0.25..4`, scales every delay, so the space and
+its decay time), `predelay` .02 s (`0..0.25`), input `bandwidth` .9995
+(`0..1`), `mod_rate` 1 Hz (`0..20`), `mod_depth` 13 samples (`0..100`).
+Freeze smoothly mutes input and makes the tank lossless while held.
+
+*   `plate` (default): the Dattorro plate. Dense and bright from the first
+    millisecond, no early reflections. The tank input is the mono sum; the
+    stereo image comes from the output taps.
+*   `hall`: true-stereo early reflections (eight taps per side; the far
+    wall's taps cross sides, quieter) into an eight-line feedback delay
+    network with a Householder mix and per-line damping. A left source stays
+    left in the reflections and spreads in the tail. `decay` is matched to
+    the plate's tail time (RT60 ≈ 1.0 s at .3, 1.4 s at .5, 2.9 s at .8,
+    7 s at .95 at `size` 1, a little shorter than the plate past .5) and the
+    tail sits within about 3 dB of the plate's level. `size: 0.4` is a room
+    (RT60 ≈ 0.6 s at `decay` .5), `size: 2` a big hall (≈ 3 s).
+
+Old patches keep the plate, bit-identical.
 
 ## `euclid`
 

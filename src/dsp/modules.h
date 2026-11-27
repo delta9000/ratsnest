@@ -30,6 +30,7 @@ extern const ModuleInfo quant_info;
 extern const ModuleInfo mix_info;
 extern const ModuleInfo scope_info;
 extern const ModuleInfo delay_info;
+extern const ModuleInfo echo_info;
 extern const ModuleInfo adsr_info;
 extern const ModuleInfo reverb_info;
 extern const ModuleInfo euclid_info;
