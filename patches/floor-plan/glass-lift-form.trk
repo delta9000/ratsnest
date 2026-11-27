@@ -1,0 +1,27 @@
+# glass-lift-form.trk -- one row per bar (80), slewed in the patch.
+track drums cva   # 1  kick, snare, hats
+track bass  cva   # 2
+track pad   cva   # 3
+track pcut  cva   # 4  pad low-pass (eq lp_freq, scaled in the patch)
+track arp   cva   # 5
+track lead  cva   # 6
+track echo  cva   # 7  lead echo send
+track gverb cva   # 8  gated hall return
+track main  cva   # 9
+
+pattern form 80
+#    drums  bass   pad    pcut   arp    lead   echo   gverb  main
+00 | .6   | 0    | .6   | .2>  | .6   | 0    | .5   | .8   | 1     # intro: pad opening, arp, kick
+07 | .8   | .    | .    | .5   | .    | .    | .    | .    | .
+08 | 1    | .9   | .55  | .45  | 0    | .8   | .4   | .8   | .     # verse
+12 | .    | .    | .    | .    | .5   | .    | .    | .    | .     # verse, the arp joins
+24 | 1    | 1    | .75  | .8   | .75  | .95  | .6   | 1    | .     # chorus
+40 | 1    | .9   | .55  | .45  | .5   | .8   | .4   | .8   | .     # verse 2
+48 | 1    | 1    | .75  | .85  | .8   | 1    | .65  | 1    | .     # chorus 2
+64 | 0    | .7   | .9   | .3>  | 0    | .8   | 1    | 0    | .     # bridge: no kit, the echo blooms
+71 | .    | .    | .    | .9   | .    | .    | .    | .    | .
+72 | 1    | 1    | .7   | .8   | .8   | 0    | .3   | 1    | .     # outro
+76 | .7   | 0    | .    | .    | .    | .    | .    | .    | 1>
+79 | .4   | .    | .    | .    | .    | .    | .    | .    | 0
+
+order form

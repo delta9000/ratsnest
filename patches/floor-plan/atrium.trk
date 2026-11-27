@@ -1,0 +1,193 @@
+# atrium.trk -- "Atrium". 72 BPM, A-flat major, 16 rows per bar, 54 bars.
+# Piano (left hand from the chord, right hand written), strings, a bowed
+# cello line. Levels in atrium-form.trk.
+#
+#   A   Ab | Fm | Db | Eb                     (piano alone)
+#   B   Ab/C | Db | Bbm7 | Eb7                (strings enter)
+#   C   Fm | Db | Ab | Eb                     (the cello: the figure)
+#   D   Db | Eb | Fm | Fm/Eb                  (all of it)
+#   coda Db | Dbm | Ab
+#
+#   A 8 | B 16 | C 16 | D 8 | coda 6
+
+track harm  note vel cva cvb cvd        # 1  strings: the chord
+track lh    note vel from harm          # 2  piano left hand, broken chord
+track rh    note vel                    # 3  piano right hand
+track cello note vel                    # 4  bowed cello
+track ped   cva                         # 5  sustain pedal (re-pedalled at each bar)
+
+pattern ped 16 ped
+00 | 0
+01 | 1
+
+pattern lh8 16 lh
+00 | t1-12 .55
+02 | t3-12 .4
+04 | t2 .45
+06 | t3 .4
+08 | t4 .45
+10 | t3 .4
+12 | t2 .42
+14 | t3-12 .38
+
+pattern lh_half 16 lh
+00 | t1-12 .5
+08 | t3-12 .4
+
+pattern a_h 4x16 harm
+1:00 | Ab3 .6 C4 Eb4 G4
+2:00 | F3 .6 Ab3 C4 Eb4
+3:00 | Db3 .6 F3 Ab3 C4
+4:00 | Eb3 .6 G3 Bb3 Db4
+
+pattern b_h 4x16 harm
+1:00 | C3 .6 Eb3 Ab3 Bb3
+2:00 | Db3 .6 F3 Ab3 C4
+3:00 | Bb2 .6 Db3 F3 Ab3
+4:00 | Eb3 .6 G3 Bb3 Db4
+
+pattern c_h 4x16 harm
+1:00 | F3 .65 Ab3 C4 Eb4
+2:00 | Db3 .65 F3 Ab3 C4
+3:00 | Ab2 .65 C3 Eb3 G3
+4:00 | Eb3 .65 G3 Bb3 Db4
+
+pattern d_h 4x16 harm
+1:00 | Db3 .75 F3 Ab3 C4
+2:00 | Eb3 .75 G3 Bb3 Db4
+3:00 | F3 .75 Ab3 C4 Eb4
+4:00 | Eb3 .7 F3 Ab3 C4
+
+pattern coda_h 6x16 harm
+1:00 | Db3 .55 F3 Ab3 C4
+3:00 | Db3 .5 E3 Ab3 Cb4
+5:00 | Ab2 .5 C3 Eb3 G3
+
+pattern coda_lh 6x16 lh
+1:00 | t1-12 .45
+1:08 | t3-12 .35
+2:00 | t2 .35
+3:00 | t1-12 .45
+3:08 | t3-12 .35
+4:00 | t2 .35
+5:00 | t1-12 .45
+5:08 | t3 .35
+
+# ---- right hand ----
+pattern a_rh 4x16 rh
+1:00 | Eb5 .55
+1:06 | C5 .45
+1:08 | Bb4 .45
+1:12 | C5 .5
+2:00 | Ab4 .5
+2:08 | C5 .45
+2:12 | Eb5 .5
+3:00 | F5 .55
+3:06 | Eb5 .45
+3:08 | Db5 .45
+3:12 | C5 .45
+4:00 | Bb4 .5
+4:08 | G4 .4
+4:12 | Bb4 .4
+
+pattern b_rh 4x16 rh
+1:00 | C5 .5
+1:04 | Eb5 .5
+1:08 | Ab5 .55
+1:14 | G5 .45
+2:00 | F5 .5
+2:06 | Ab5 .45
+2:08 | C6 .5
+3:00 | Bb5 .5
+3:06 | Ab5 .45
+3:08 | F5 .45
+3:12 | Db5 .45
+4:00 | Eb5 .5
+4:08 | Db5 .45
+4:12 | Bb4 .4
+
+pattern c_rh 4x16 rh
+1:00 | C5 .4
+1:08 | Ab4 .35
+2:00 | F4 .4
+2:08 | Ab4 .35
+3:00 | Eb5 .4
+3:08 | C5 .35
+4:00 | Bb4 .4
+4:08 | G4 .35
+
+pattern d_rh 4x16 rh
+1:00 | Ab5 .65
+1:04 | F5 .5
+1:06 | Ab5 .5
+1:08 | C6 .6
+1:12 | Db6 .55
+2:00 | Bb5 .6
+2:06 | G5 .5
+2:08 | Eb6 .65
+3:00 | C6 .7
+3:04 | Ab5 .55
+3:08 | F5 .55
+3:12 | C5 .5
+4:00 | C6 .6
+4:08 | Ab5 .5
+4:12 | Eb5 .5
+
+# the coda: the figure in major and minor (Ab Eb Db Cb, then Ab Eb Db C)
+pattern coda_rh 6x16 rh
+1:00 | Ab5 .5
+1:08 | Eb5 .42
+2:00 | Db5 .45
+3:00 | Cb5 .45
+4:08 | Eb5 .38
+5:00 | Ab5 .42
+5:08 | Eb5 .35
+6:00 | C5 .4
+
+# ---- cello: the figure (1 5 4 b3 = F C Bb Ab in F minor), then free ----
+pattern c_cello1 4x16 cello
+1:00 | F3 .7
+2:00 | ~C4 .65
+2:08 | ~Bb3 .6
+3:00 | ~Ab3 .7
+4:00 | ~G3 .6
+4:12 | off
+
+pattern c_cello2 4x16 cello
+1:00 | F3 .7
+1:08 | ~Ab3 .6
+2:00 | ~Db4 .7
+2:08 | ~C4 .6
+3:00 | ~Eb4 .75
+3:08 | ~C4 .6
+4:00 | ~Bb3 .65
+4:12 | off
+
+pattern d_cello 4x16 cello
+1:00 | Ab3 .8
+1:08 | ~Bb3 .7
+2:00 | ~G3 .75
+3:00 | ~F3 .8
+3:08 | ~Ab3 .7
+4:00 | ~Eb3 .7
+4:12 | off
+
+pattern b_cello 4x16 cello
+1:00 | C3 .55
+2:00 | ~Db3 .55
+3:00 | ~Bb2 .55
+4:00 | ~Eb3 .55
+4:12 | off
+
+section a     a_h+lh8+a_rh+ped
+section b     b_h+lh8+b_rh+b_cello+ped
+section b2    b_h+lh8+a_rh+b_cello+ped
+section c     c_h+lh_half+c_rh+ped
+section d     d_h+lh8+d_rh+d_cello+ped
+section coda  coda_h+coda_lh+coda_rh+ped
+
+order a*2
+order b b2 b b2
+order c+c_cello1 c+c_cello2 c+c_cello1 c+c_cello2
+order d*2
+order coda

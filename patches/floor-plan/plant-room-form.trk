@@ -1,0 +1,28 @@
+# plant-room-form.trk -- one row per bar (100), slewed in the patch.
+track drums cva   # 1  kick and clap
+track hats  cva   # 2
+track pipes cva   # 3
+track bass  cva   # 4
+track bcut  cva   # 5  bass filter, the build
+track stab  cva   # 6
+track steam cva   # 7
+track rumb  cva   # 8  the kick's rumble
+track main  cva   # 9
+
+pattern form 100
+#    drums  hats   pipes  bass   bcut   stab   steam  rumb   main
+00 | .8   | .3>  | 0    | 0    | 0    | 0    | 0    | .5   | 1     # intro: kick and hats
+08 | .9   | .7   | .6   | .    | .    | .    | .3   | .7   | .     # clap, pipes
+15 | .    | .8   | .    | .    | .    | .    | .    | .    | .
+16 | 1    | .9   | .7   | .9   | .2>  | .7   | .7   | .8   | .     # A
+47 | .    | .    | .    | .    | .65  | .    | .    | .    | .
+48 | 0    | .2   | .65  | 0    | 0    | 0    | .55  | 0    | .     # break: pipes, the figure, steam
+60 | .    | .5>  | .    | .    | .    | .    | .    | .    | .
+63 | .    | .9   | .    | .    | .    | .    | .    | .    | .
+64 | 1    | 1    | .7   | 1    | .4>  | .8   | .8   | .9   | .     # B
+91 | .    | .    | .    | .    | .8   | .    | .    | .    | .
+92 | .9   | .7   | .6   | 0    | 0    | 0    | .3   | .7   | .     # outro
+96 | .    | .4   | .    | .    | .    | .    | 0    | .    | 1>
+99 | .5   | .    | .    | .    | .    | .    | .    | .    | 0
+
+order form

@@ -1,0 +1,190 @@
+# cistern -- ambient, in a flooded underground tank. 60 BPM (4 s bars),
+# E-flat minor, 52 bars (~3:28). Track 3 of "Floor Plan".
+#
+# The hall is enormous (`size` 4, `decay` .93, an eight-second tail) and
+# almost everything goes into it. A huge stone room piles up its low mids,
+# so the return runs through a dynamic EQ: a `follow` on a 320 Hz band of
+# the return rides an `eq` bell down by up to 9 dB while that band is
+# loud, then lets it back. In bars 36-40 the hall is frozen and every dry
+# part drops out, so the room holds the last chord on its own; then it
+# thaws. The master is only DC block, EQ and a true-peak limiter: no
+# compressor, no clipper, crest kept.
+#
+# Parts: random drips into the hall (dust-timed modal strikes, pitches
+# from E-flat minor pentatonic); a sympathetic-string drone on the chord
+# roots; a modal bowl on an 11-row loop; a modal bell that strikes the
+# album's figure (Eb Bb Ab Gb) slowly; a four-voice pad with long swells.
+#
+#   water 8 | drone 4 | Ebm9 8 | Cbmaj7#11 8 | Abm9 8 | frozen 4 | thaw 8 | drone 4
+
+t    = transport { bpm: 60, division: 4, bars: 4 }
+song = tracker { file: "cistern.trk", seed: 3 }
+form = tracker { file: "cistern-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drips_lvl = func { rise: 3, fall: 3 }
+drone_lvl = func { rise: 6, fall: 6 }
+bell_lvl  = func { rise: 2, fall: 4 }
+bowl_lvl  = func { rise: 3, fall: 3 }
+pad_lvl   = func { rise: 6, fall: 6 }
+dry_lvl   = func { rise: 2.5, fall: 0.8 }
+main_lvl  = func { rise: 2, fall: 2 }
+form.cva1 -> drips_lvl.in
+form.cva2 -> drone_lvl.in
+form.cva3 -> bell_lvl.in
+form.cva4 -> bowl_lvl.in
+form.cva5 -> pad_lvl.in
+form.cva6 -> dry_lvl.in
+form.cva8 -> main_lvl.in
+
+# ---- drips: irregular, pentatonic, mostly room ----
+drop = dust { rate: 1.3hz, seed: 21 }
+pick = noise { color: white, seed: 22 }
+pitch = sh {}
+pick -> pitch.in
+drop.trig -> pitch.trig
+scale = quant { scale: [0, 3, 5, 7, 10], root: 6 }
+pitch -> scale.in : 0.8
+1.5 -> scale.in
+drip = modal { modes: 8 }
+scale -> drip.v_oct
+drop.trig -> drip.strike
+0.3 -> drip.structure
+0.25 -> drip.brightness
+0.42 -> drip.damping
+0.15 -> drip.position
+drip_s = sub { file: "../lib/strip.sub", gain: 0.45, send_gain: 0.6 }
+drip_pan = sh {}
+pick -> drip_pan.in
+drop.trig -> drip_pan.trig
+drip_lp = svf { cutoff: 1900, res: 0.15 }
+drip -> drip_lp.in
+drip_lp.lp -> drip_s.in
+drip_pan -> drip_s.pan : 0.8
+drips_lvl -> drip_s.level
+
+# ---- drone: sympathetic strings on the root ----
+drone = sub { file: "../lib/sym-drone.sub", tune: A3, damp: 0.9, damp2: 0.92, prate: 0.07 }
+song.gate3 -> drone.trig
+song.voct3 -> drone.root
+song.voct3 -> drone.fifth
+0.58333 -> drone.fifth
+drone_s = sub { file: "../lib/strip.sub", gain: 3.5, send_gain: 0.5, width: 1 }
+drone -> drone_s.in
+drone_lvl -> drone_s.level
+
+# ---- bowl: modal, 11-row loop ----
+bowl = modal { modes: 32 }
+song.voct2 -> bowl.v_oct
+song.gate2 -> bowl.strike
+0.62 -> bowl.structure
+0.3 -> bowl.brightness
+0.78 -> bowl.damping
+0.3 -> bowl.position
+bowl_v = vca { gain: 0 }
+bowl -> bowl_v.in
+song.vel2 -> bowl_v.cv
+bowl_s = sub { file: "../lib/strip.sub", gain: 0.3, send_gain: 0.9, pos: -0.4 }
+bowl_v -> bowl_s.in
+bowl_lvl -> bowl_s.level
+
+# ---- bell: the figure ----
+bell = modal { modes: 48 }
+song.voct1 -> bell.v_oct
+song.gate1 -> bell.strike
+0.78 -> bell.structure
+0.45 -> bell.brightness
+0.8 -> bell.damping
+0.18 -> bell.position
+bell_v = vca { gain: 0 }
+bell -> bell_v.in
+song.vel1 -> bell_v.cv
+bell_s = sub { file: "../lib/strip.sub", gain: 0.3, send_gain: 1.0, pos: 0.35 }
+bell_v -> bell_s.in
+bell_lvl -> bell_s.level
+
+# ---- pad: four voices, long swells ----
+pad = sub { file: "../lib/poly-pad.sub", n: 4, attack: 3.5, decay: 2, sustain: 0.8,
+            release: 5, curve: lin, cutoff: 650, res: 0.1, detune: 0.006 }
+song.gate4 -> pad.gate
+song.vel4  -> pad.vel
+song.voct4 -> pad.p1
+song.cva4  -> pad.p2
+song.cvb4  -> pad.p3
+song.cvd4  -> pad.p4
+0.003 -> pad.p2
+pbreath = lfo { freq: 0.05hz }
+pbreath -> pad.cut : 250
+pad_ch = chorus { rate: 0.2, depth: 0.6 }
+pad -> pad_ch.in_l
+pad -> pad_ch.in_r
+pad_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.7, width: 1.4 }
+pad_ch.out_l -> pad_s.in_l
+pad_ch.out_r -> pad_s.in_r
+pad_lvl -> pad_s.level
+
+# ---- the cistern: a frozen-capable giant hall ----
+tank = reverb { model: hall, size: 4, decay: 0.93, damp: 0.45, mix: 1, predelay: 0.08 }
+form.cva7 -> tank.freeze
+drip_s.fx  -> tank.in_l
+drip_s.fx  -> tank.in_r
+drone_s.fx -> tank.in_l
+bowl_s.fx  -> tank.in_l
+bell_s.fx  -> tank.in_r
+pad_s.fx   -> tank.in_r
+
+# dynamic EQ: the 320 Hz band of the return rides its own cut
+key = svf { cutoff: 320, res: 0.4 }
+tank.out_l -> key.in : 0.5
+tank.out_r -> key.in : 0.5
+det = follow { mode: rms, attack: 30ms, release: 400ms }
+key.bp -> det.in
+tame = eq { hp_freq: 140, mid1_freq: 320, mid1_q: 1.2, high_freq: 7000, high_gain: -2 }
+tank.out_l -> tame.in_l
+tank.out_r -> tame.in_r
+det.env -> tame.mid1_gain : -105   # env peaks near 0.085: about -9 dB
+tank_s = sub { file: "../lib/strip.sub", gain: 1.6 }
+tame.out_l -> tank_s.in_l
+tame.out_r -> tank_s.in_r
+
+# ---- dry bus: drops out while the hall is frozen ----
+dry_l = vca { gain: 0 }
+dry_r = vca { gain: 0 }
+drip_s.l  -> dry_l.in
+drip_s.r  -> dry_r.in
+drone_s.l -> dry_l.in
+drone_s.r -> dry_r.in
+bowl_s.l  -> dry_l.in
+bowl_s.r  -> dry_r.in
+bell_s.l  -> dry_l.in
+bell_s.r  -> dry_r.in
+pad_s.l   -> dry_l.in
+pad_s.r   -> dry_r.in
+dry_lvl -> dry_l.cv
+dry_lvl -> dry_r.cv
+
+# ---- master: no compression ----
+dc = dcblock { cutoff: 15hz }
+dry_l    -> dc.in_l
+dry_r    -> dc.in_r
+tank_s.l -> dc.in_l
+tank_s.r -> dc.in_r
+tone = eq { hp_freq: 30, low_freq: 120, low_gain: -1, high_freq: 9000, high_gain: 1, lp_freq: 17000 }
+dc.out_l -> tone.in_l
+dc.out_r -> tone.in_r
+trim_l = vca { gain: 0.8 }
+trim_r = vca { gain: 0.8 }
+tone.out_l -> trim_l.in
+tone.out_r -> trim_r.in
+brick = limiter { threshold: -1.5, release: 0.3, true_peak: on }
+trim_l -> brick.in_l
+trim_r -> brick.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+brick.out_l -> fade_l.in
+brick.out_r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

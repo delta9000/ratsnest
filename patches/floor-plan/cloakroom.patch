@@ -1,0 +1,164 @@
+# cloakroom -- lo-fi boom-bap in a small dry room. 88 BPM, F minor, 64 bars
+# (~2:55). Track 1 of "Floor Plan".
+#
+# The room is the subject: everything is close and dry, the way a coat
+# cupboard deadens a voice. The kit goes through one drum bus with a
+# transient shaper (+5 dB attack, -6 dB sustain), so every hit is a snap
+# with almost no ring; the only space is a tiny hall (`size: 0.3`, about
+# 0.4 s) at a modest send. The master bus is warmed by `saturate` with
+# bias (even harmonics) before the glue and limiter.
+#
+# Parts: kick, laid-back snare, ghosted hats, a rim on a 7-row loop
+# (native kit); a four-voice 6-op FM electric piano with tremolo; a
+# synth-voice bass; a synth-voice pluck that states the album's figure
+# (F C Bb Ab) in the intro and outro and plays a counter-line in B.
+
+t    = transport { bpm: 88, division: 4, bars: 4, swing: 0.22 }
+song = tracker { file: "cloakroom.trk", seed: 11 }
+form = tracker { file: "cloakroom-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drums_lvl = func { rise: 0.2, fall: 0.4 }
+bass_lvl  = func { rise: 0.4, fall: 0.8 }
+ep_lvl    = func { rise: 1, fall: 1 }
+pluck_lvl = func { rise: 0.5, fall: 1 }
+rim_lvl   = func { rise: 0.5, fall: 0.5 }
+room_lvl  = func { rise: 2, fall: 2 }
+main_lvl  = func { rise: 1, fall: 1 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> ep_lvl.in
+form.cva4 -> pluck_lvl.in
+form.cva5 -> rim_lvl.in
+form.cva6 -> room_lvl.in
+form.cva7 -> main_lvl.in
+
+duck = sub { file: "../lib/duck.sub", depth_db: -3, release: 0.22, curve: exp }
+song.gate1 -> duck.trig
+drums_lvl -> duck.amount
+
+# ---- kit: one bus, snapped by the transient shaper ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 52hz, decay: 0.38, bend: 2.2 }
+song.gate1 -> kick.trig
+song.vel1  -> kick.accent
+snare = sub { file: "../lib/kit/snare.sub", tune: 205hz, decay: 0.3, snap: 0.55 }
+song.gate2 -> snare.trig
+song.vel2  -> snare.accent
+hat = sub { file: "../lib/kit/hat.sub", tune: 470hz, decay: 0.16, tone: 7khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+kit = mix { levels: [1.0, 1.4, 1.1], pans: [0, -0.06, 0.22] }
+kick  -> kit.in1
+snare -> kit.in2
+hat   -> kit.in3
+snap = transient { attack: 4, sustain: -6 }
+kit.out_l -> snap.in_l
+kit.out_r -> snap.in_r
+kit_s = sub { file: "../lib/strip.sub", gain: 1.45, send_gain: 0.12 }
+snap.out_l -> kit_s.in_l
+snap.out_r -> kit_s.in_r
+drums_lvl -> kit_s.level
+
+rim = sub { file: "../lib/kit/rim.sub", tune: 540hz, decay: 0.22 }
+song.gate4 -> rim.trig
+song.vel4  -> rim.accent
+rim_s = sub { file: "../lib/strip.sub", gain: 0.9, send_gain: 0.3, pos: -0.3 }
+rim -> rim_s.in
+rim_lvl -> rim_s.level
+
+# ---- electric piano: 6-op FM, four voices, tremolo ----
+ec = chord { n: 4, strum: 0.012, vel: 0 }
+song.gate5 -> ec.gate
+song.vel5  -> ec.vel
+song.voct5 -> ec.p1
+song.cva5  -> ec.p2
+song.cvb5  -> ec.p3
+song.cvd5  -> ec.p4
+ep = voice { notes: ec }
+ep.v = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
+            t2: [.6, .07, .06, .5, .06, .09], l2: [.55, .25, .2, .5, .2, .25],
+            l3: [.2, 0, 0, .16, 0, 0], fb: [0, 0, 0, 0, .2, 0], t4: [.3, .2, .2, .3, .2, .2],
+            vel_sens: [.6, .8, .9, .6, .9, .8], curve: log }
+ec.gate -> ep.v.gate
+ec.voct -> ep.v.v_oct
+ec.vel  -> ep.v.vel
+ep_tone = svf { cutoff: 4200, res: 0.1 }
+ep.v -> ep_tone.in : 0.35
+ep_ch = chorus {}
+ep_tone.lp -> ep_ch.in_l
+ep_tone.lp -> ep_ch.in_r
+trem = lfo { freq: 4.2hz }
+ep_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.3, width: 1.3 }
+ep_ch.out_l -> ep_s.in_l
+ep_ch.out_r -> ep_s.in_r
+trem -> ep_s.pan : 0.3
+ep_lvl -> ep_s.level
+duck -> ep_s.duck
+
+# ---- bass ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0, sublvl: 0.7, sub_oct: 0,
+             wave1: tri, cutoff: 260, res: 0.15, drive: 0.3, env_amt: 500,
+             attack: 0.004, decay: 0.9, sustain: 0.5, release: 0.12 }
+song.voct6 -> bass.voct
+song.gate6 -> bass.gate
+song.vel6  -> bass.vel
+bass_s = sub { file: "../lib/strip.sub", gain: 0.5 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+duck -> bass_s.duck
+
+# ---- pluck: the figure ----
+pluck = sub { file: "../lib/synth-voice.sub", wave1: tri, wave2: saw, blend: 0.3,
+              sustain: 0, decay: 1.1, release: 0.9, cutoff: 700, env_amt: 2600, slope: 0 }
+song.voct7 -> pluck.voct
+song.gate7 -> pluck.gate
+song.vel7  -> pluck.vel
+pluck_s = sub { file: "../lib/strip.sub", gain: 1.3, send_gain: 0.45, pos: 0.35 }
+pluck -> pluck_s.in
+pluck_lvl -> pluck_s.level
+
+# ---- the room: a tiny hall, high-passed ----
+room = reverb { model: hall, size: 0.3, decay: 0.42, damp: 0.55, mix: 1, predelay: 0.004 }
+kit_s.fx   -> room.in_l
+rim_s.fx   -> room.in_l
+ep_s.fx    -> room.in_r
+pluck_s.fx -> room.in_r
+room_hl = svf { cutoff: 240, res: 0 }
+room_hr = svf { cutoff: 240, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.9 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+room_lvl -> room_s.level
+
+# ---- bus: warm, then master ----
+bus = saturate { drive: 5, bias: 0.25 }
+kit_s.l   -> bus.in_l
+kit_s.r   -> bus.in_r
+rim_s.l   -> bus.in_l
+rim_s.r   -> bus.in_r
+ep_s.l    -> bus.in_l
+ep_s.r    -> bus.in_r
+bass_s.l  -> bus.in_l
+bass_s.r  -> bus.in_r
+pluck_s.l -> bus.in_l
+pluck_s.r -> bus.in_r
+room_s.l  -> bus.in_l
+room_s.r  -> bus.in_r
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.8, true_peak: on, key_bus: 0.35,
+               low_gain: -1.5, mid2_freq: 1800, mid2_gain: 2.0, high_gain: -0.5, clip_drive: 2 }
+7 -> master.makeup
+1.05 -> master.width
+bus.out_l -> master.in_l
+bus.out_r -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

@@ -1,0 +1,171 @@
+# atrium -- piano, strings and cello under a glass roof. 72 BPM, A-flat
+# major, 54 bars (~3:00). Track 6 of "Floor Plan".
+#
+# A tall, open hall (`size` 2.2, `decay` .85, about four seconds), and a
+# placed stage: the piano sits left, the cello right, the strings wide.
+# The hall's early reflections are true stereo, so each source keeps its
+# side in the first reflections and only the tail spreads. The piano's
+# soundboard goes through a `transient` shaper (attack -2 dB, sustain
+# +5 dB): the hammer softened and the bloom lifted, so the room hears more
+# of each note's body. The master is light: an `eq` with a wide low shelf
+# (`low_q` .707) and a Pultec-style air bump (+3 dB at 9 kHz, `high_q` 2), a 1.6:1 bus
+# compressor and a true-peak limiter.
+#
+# Parts: a physical piano (left hand broken chords from the strings'
+# chord, right hand written; re-pedalled every bar); a four-voice string
+# pad; a bowed cello (a Karplus string excited by bowed noise) that
+# carries the album's figure in F minor (F C Bb Ab) in C; in the coda the
+# piano plays the figure in A-flat with the borrowed C-flat, then with C.
+#
+#   A 8 (piano) | B 16 (strings) | C 16 (cello) | D 8 | coda 6
+
+t    = transport { bpm: 72, division: 4, bars: 4, swing: 0.05 }
+song = tracker { file: "atrium.trk", seed: 4 }
+form = tracker { file: "atrium-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+piano_lvl = func { rise: 1, fall: 1 }
+str_lvl   = func { rise: 4, fall: 4 }
+cello_lvl = func { rise: 2, fall: 2 }
+hall_lvl  = func { rise: 3, fall: 3 }
+main_lvl  = func { rise: 1.5, fall: 1.5 }
+form.cva1 -> piano_lvl.in
+form.cva2 -> str_lvl.in
+form.cva3 -> cello_lvl.in
+form.cva4 -> hall_lvl.in
+form.cva5 -> main_lvl.in
+
+# ---- piano: two hands, one soundboard ----
+ped = func { rise: 0.05, fall: 0.03 }
+song.cva5 -> ped.in
+la = alloc { n: 6, vel: 0 }
+song.gate2 -> la.gate
+song.voct2 -> la.voct
+song.vel2  -> la.vel
+left = voice { notes: la }
+left.p = piano { seed: 5 }
+la.gate -> left.p.gate
+la.voct -> left.p.voct
+la.vel  -> left.p.vel
+0.5 -> left.p.hardness
+ped -> left.p.pedal
+ra = alloc { n: 6, vel: 0 }
+song.gate3 -> ra.gate
+song.voct3 -> ra.voct
+song.vel3  -> ra.vel
+right = voice { notes: ra }
+right.p = piano { seed: 6 }
+ra.gate -> right.p.gate
+ra.voct -> right.p.voct
+ra.vel  -> right.p.vel
+0.7 -> right.p.hardness
+ped -> right.p.pedal
+board = soundboard { body: 0.5, resonance: 0.8 }
+left.p  -> board.in
+right.p -> board.in
+ped -> board.pedal
+bloom = transient { attack: -2, sustain: 5 }
+board.l -> bloom.in_l
+board.r -> bloom.in_r
+piano_s = sub { file: "../lib/strip.sub", gain: 5.0, send_gain: 0.5, pos: -0.3, width: 0.8 }
+bloom.out_l -> piano_s.in_l
+bloom.out_r -> piano_s.in_r
+piano_lvl -> piano_s.level
+hall_lvl -> piano_s.send
+
+# ---- strings: four voices ----
+str = sub { file: "../lib/poly-pad.sub", n: 4, attack: 1.4, decay: 2, sustain: 0.85,
+            release: 2.5, curve: lin, cutoff: 1300, res: 0.1, detune: 0.006, slope: 0 }
+song.gate1 -> str.gate
+song.vel1  -> str.vel
+song.voct1 -> str.p1
+song.cva1  -> str.p2
+song.cvb1  -> str.p3
+song.cvd1  -> str.p4
+str_ch = chorus { rate: 0.25, depth: 0.6, voices: 4 }
+str -> str_ch.in_l
+str -> str_ch.in_r
+str_s = sub { file: "../lib/strip.sub", gain: 2.6, send_gain: 0.6, width: 1.5 }
+str_ch.out_l -> str_s.in_l
+str_ch.out_r -> str_s.in_r
+str_lvl -> str_s.level
+hall_lvl -> str_s.send
+
+# ---- cello: a bowed string ----
+bow = adsr { attack: 0.35, decay: 0.8, sustain: 0.7, release: 0.5 }
+song.gate4 -> bow.gate
+hair = noise { color: pink, seed: 31 }
+bow_v = vca { gain: 0 }
+hair -> bow_v.in
+bow -> bow_v.cv
+cello = string { seed: 12 }
+bow_v -> cello.in : 0.016
+glide = func { rise: 0.06, fall: 0.06 }
+song.voct4 -> glide.in
+glide -> cello.v_oct
+cvib = lfo { freq: 5.1hz }
+cvib_env = adsr { attack: 1.0, decay: 0.1, sustain: 1, release: 0.3 }
+song.gate4 -> cvib_env.gate
+cvib_v = vca { gain: 0 }
+cvib -> cvib_v.in
+cvib_env -> cvib_v.cv
+cvib_v -> cello.v_oct : 0.006
+0.88 -> cello.damping
+0.42 -> cello.brightness
+0.13 -> cello.position
+cello_hp = svf { cutoff: 70, res: 0 }
+cello -> cello_hp.in
+cello_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.55, pos: 0.4 }
+cello_lp = svf { cutoff: 2600, res: 0 }
+cello_hp.hp -> cello_lp.in
+cello_lp.lp -> cello_s.in
+cello_lvl -> cello_s.level
+hall_lvl -> cello_s.send
+
+# ---- the atrium: true-stereo hall; each source sent on its own side ----
+atrium = reverb { model: hall, size: 2.2, decay: 0.85, damp: 0.35, mix: 1, predelay: 0.03 }
+piano_s.fx -> atrium.in_l
+str_s.fx   -> atrium.in_l : 0.5
+str_s.fx   -> atrium.in_r : 0.5
+cello_s.fx -> atrium.in_r
+atr_hl = svf { cutoff: 200, res: 0 }
+atr_hr = svf { cutoff: 200, res: 0 }
+atrium.out_l -> atr_hl.in
+atrium.out_r -> atr_hr.in
+atr_s = sub { file: "../lib/strip.sub", gain: 0.75 }
+atr_hl.hp -> atr_s.in_l
+atr_hr.hp -> atr_s.in_r
+
+# ---- master: light ----
+dc = dcblock { cutoff: 15hz }
+piano_s.l -> dc.in_l
+piano_s.r -> dc.in_r
+str_s.l   -> dc.in_l
+str_s.r   -> dc.in_r
+cello_s.l -> dc.in_l
+cello_s.r -> dc.in_r
+atr_s.l   -> dc.in_l
+atr_s.r   -> dc.in_r
+tone = eq { hp_freq: 25, low_freq: 90, low_gain: -1, low_q: 0.707, mid1_freq: 400, mid1_gain: -1,
+            mid1_q: 0.8, high_freq: 9000, high_gain: 3, high_q: 2 }
+dc.out_l -> tone.in_l
+dc.out_r -> tone.in_r
+glue = compressor { threshold: -22, ratio: 1.6, knee: 8, attack: 30ms, release: 300ms, makeup: 2 }
+tone.out_l -> glue.in_l
+tone.out_r -> glue.in_r
+trim_l = vca { gain: 1.25 }
+trim_r = vca { gain: 1.25 }
+glue.out_l -> trim_l.in
+glue.out_r -> trim_r.in
+brick = limiter { threshold: -1.5, release: 0.2, true_peak: on }
+trim_l -> brick.in_l
+trim_r -> brick.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+brick.out_l -> fade_l.in
+brick.out_r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

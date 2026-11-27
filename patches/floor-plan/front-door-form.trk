@@ -1,0 +1,25 @@
+# front-door-form.trk -- one row per bar (44), slewed in the patch.
+track piano  cva   # 1
+track pad    cva   # 2
+track ep     cva   # 3
+track pluck  cva   # 4
+track room   cva   # 5  the small room's return
+track hall   cva   # 6  the big hall's return
+track wind   cva   # 7  outside
+track freeze cva   # 8  hall freeze
+track main   cva   # 9
+
+pattern form 44
+#    piano  pad    ep     pluck  room   hall   wind   freeze main
+00 | .85  | 0    | 0    | 0    | 0    | 0    | 0    | 0    | 1     # A: dry, no room at all
+08 | .85  | .5   | 0    | 0    | .2>  | 0    | 0    | 0    | .     # B: a small room fades in
+15 | .    | .    | .    | .    | .8   | .    | .    | .    | .
+16 | .75  | .6   | .8   | 0    | .5   | .2>  | 0    | 0    | .     # C: the hall opens; the figure
+27 | .    | .    | .    | .    | .    | .8   | .    | .    | .
+28 | 1    | .8   | 0    | 0    | .2   | 1    | 0    | 0    | .     # D
+36 | .7   | .5   | .7   | .8   | 0    | 1    | .3>  | 0    | .     # coda: the door; wind
+40 | .    | .    | .    | .    | .    | .    | .6   | 1    | .     # the hall holds the last chord
+41 | .    | 0    | .    | .    | .    | .    | .    | .    | 1>
+43 | .    | .    | .    | .    | .    | .    | .    | .    | 0
+
+order form
