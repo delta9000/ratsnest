@@ -7,6 +7,12 @@ namespace ms::io {
 bool write_wav_f32(const std::string& path, const float* interleaved,
                    size_t frames, int channels, int sample_rate);
 
+// Integer PCM (16 or 24 bit), quantized with TPDF dither of +-1 LSB from a
+// fixed-seed generator, so the same take writes the same bytes. Samples past
+// full scale clip. Returns false for any other bit depth or a write failure.
+bool write_wav_pcm(const std::string& path, const float* interleaved,
+                   size_t frames, int channels, int sample_rate, int bits);
+
 // Decoded PCM, interleaved and normalized to ~[-1, 1] as 32-bit float.
 struct WavData {
   std::vector<float> samples;  // interleaved: frame 0 ch 0, frame 0 ch 1, ...

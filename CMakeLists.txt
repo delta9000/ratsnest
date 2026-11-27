@@ -171,6 +171,15 @@ add_test(NAME cli_render_tap
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first-tap.wav --tap saw=osc2)
 set_tests_properties(cli_render_tap PROPERTIES
   PASS_REGULAR_EXPRESSION "tap saw = osc2 \\(mono\\) -> .*first-tap\\.saw\\.wav\npeak +-?[0-9]")
+add_test(NAME cli_render_loudness
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+          -d 2s --bits 16 --stats -o ${CMAKE_CURRENT_BINARY_DIR}/first-16.wav)
+set_tests_properties(cli_render_loudness PROPERTIES
+  PASS_REGULAR_EXPRESSION "true peak +-?[0-9.]+ dBTP.*\nloudness +-?[0-9.]+ LUFS integrated +range +[0-9.]+ LU")
+add_test(NAME cli_render_bad_bits
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
+          -d 100ms --bits 12 -o ${CMAKE_CURRENT_BINARY_DIR}/first-bad.wav)
+set_tests_properties(cli_render_bad_bits PROPERTIES PASS_REGULAR_EXPRESSION "error: --bits takes 16, 24 or 32")
 add_test(NAME cli_render_tap_unknown
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first-tap.wav --tap x=osc3)

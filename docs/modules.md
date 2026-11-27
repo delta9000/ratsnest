@@ -33,7 +33,11 @@ seconds. Pick the suffix that matches the input's unit (Hz for `freq`/`cutoff`/
 `rate`, seconds for times, BPM for `bpm`). Omitted output means the first output
 (a bare `stepseq` name reads its `cv`, a bare `svf` its `lp`). Validate with
 `ratsnest check patch.patch`; `ratsnest render ... --stats [dur]` prints
-overall peak/RMS/DC plus a per-window level timeline for mix work, and
+overall peak, true peak (dBTP), integrated loudness (LUFS, ITU-R BS.1770-4
+gating) and loudness range (LU, EBU Tech 3342), RMS and DC, plus a per-window
+timeline of RMS, peak and LUFS for mix work. `--bits 16` or `--bits 24`
+writes integer PCM with TPDF dither (fixed seed, so a take's bytes repeat);
+the default `32` is float.
 `--tap NAME[=node[.port]]` (repeatable) measures one part in place: it also
 writes `<out-stem>.NAME.wav` from that endpoint (stereo when it has `l`/`r`
 or `out_l`/`out_r`; a sub's output, a voice member or a default port, as a
