@@ -110,6 +110,19 @@ the source.
 
 ## Variations
 
+**Pick the space.** `reverb` defaults to the Dattorro plate: dense and
+bright at once, no early reflections, a mono-summed input. `reverb { model:
+hall }` is true stereo with early reflections, so a panned part keeps its
+side and a drum hit reads as being *in a room*; `size: 0.4` is a room,
+`size: 2` a big hall. Same `decay` reads as about the same tail time on both.
+Give different parts different spaces (plate on the snare, hall on the pad)
+and an album stops sounding like one reverb.
+
+**Stereo echoes without cabling two delays.** `echo` is two `delay` lines in
+one module: `mode: ping` (default) bounces left-right-left at `time`;
+`mode: stereo` keeps the sides apart, with `spread` stretching the right
+side's time. The `time` base rule below applies to it too.
+
 **Zeroing the time base — the classic self-own.** Cables sum onto input
 bases, and `delay { time: }` defaults to 0.4 s. This:
 
