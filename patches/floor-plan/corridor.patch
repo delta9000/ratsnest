@@ -1,0 +1,228 @@
+# corridor -- motorik down a long corridor. 128 BPM, D dorian, 96 bars
+# (~3:00). Track 7 of "Floor Plan".
+#
+# Two uses of the stereo `echo`. The plucked strings go through one in
+# `stereo` mode at 11 ms with `spread` .6 (the right side at 17.6 ms) and
+# no feedback, mixed with the dry: a Haas widener, so a mono pluck comes
+# out wide without a chorus. A second one, on sends from the plucks and
+# the lead, repeats a quarter note on the left and a dotted quarter on the
+# right. The corridor itself is a hall with a long predelay (90 ms: the
+# far wall is a long way off) and a mid-length tail. The bass gets an
+# `eq` low shelf with `low_q` 2 (a resonant bump at 90 Hz and a dip under
+# it) and a little biased `saturate` before its strip.
+#
+# Parts: a motorik kit that never stops (kick on every beat, eighth hats,
+# snare on 2 and 4); an eighth-note bass, plucked Karplus strings (four
+# voices), a sixteenth sequence and an organ, all from one chord track;
+# a lead in B carrying the album's figure (D A G F) as long notes.
+#
+#   intro 8 | A 24 | B 24 | hall 8 | A 24 | outro 8
+
+t    = transport { bpm: 128, division: 4, bars: 4, swing: 0.02 }
+song = tracker { file: "corridor.trk", seed: 14 }
+form = tracker { file: "corridor-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drums_lvl = func { rise: 0.2, fall: 0.3 }
+bass_lvl  = func { rise: 0.3, fall: 0.5 }
+pluck_lvl = func { rise: 1, fall: 1 }
+seq_lvl   = func { rise: 1, fall: 1 }
+organ_lvl = func { rise: 2, fall: 2 }
+lead_lvl  = func { rise: 0.5, fall: 1 }
+scut_lvl  = func { rise: 2, fall: 2 }
+hall_lvl  = func { rise: 3, fall: 3 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> pluck_lvl.in
+form.cva4 -> seq_lvl.in
+form.cva5 -> organ_lvl.in
+form.cva6 -> lead_lvl.in
+form.cva7 -> scut_lvl.in
+form.cva8 -> hall_lvl.in
+form.cva9 -> main_lvl.in
+
+pump = sub { file: "../lib/duck.sub", depth_db: -5, release: 0.2, curve: exp }
+song.gate1 -> pump.trig
+drums_lvl -> pump.amount
+
+# ---- kit ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 50hz, decay: 0.34, bend: 2.3 }
+song.gate1 -> kick.trig
+song.vel1  -> kick.accent
+kick_s = sub { file: "../lib/strip.sub", gain: 2.4 }
+kick -> kick_s.in
+drums_lvl -> kick_s.level
+
+snare = sub { file: "../lib/kit/snare.sub", tune: 185hz, decay: 0.28, snap: 0.45 }
+song.gate2 -> snare.trig
+song.vel2  -> snare.accent
+snare_s = sub { file: "../lib/strip.sub", gain: 2.5, send_gain: 0.25, pos: -0.05 }
+snare -> snare_s.in
+drums_lvl -> snare_s.level
+
+hat = sub { file: "../lib/kit/hat.sub", tune: 480hz, decay: 0.14, tone: 7.5khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+ohat = sub { file: "../lib/kit/hat.sub", tune: 480hz, decay: 0.42, tone: 7khz }
+song.gate4 -> ohat.trig
+song.vel4  -> ohat.accent
+song.gate3 -> ohat.choke
+hats = mix { levels: [1.0, 0.8], pans: [0.25, 0.1] }
+hat  -> hats.in1
+ohat -> hats.in2
+hats_s = sub { file: "../lib/strip.sub", gain: 1.4, send_gain: 0.1 }
+hats.out_l -> hats_s.in_l
+hats.out_r -> hats_s.in_r
+drums_lvl -> hats_s.level
+
+# ---- bass: a bump and a little bias ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0.15, sublvl: 0.4, sub_oct: 0, cutoff: 380,
+             res: 0.25, drive: 0.3, env_amt: 1100, attack: 0.002, decay: 0.3, sustain: 0.4,
+             release: 0.06 }
+song.voct6 -> bass.voct
+song.gate6 -> bass.gate
+song.vel6  -> bass.vel
+bump = eq { low_freq: 90, low_gain: 3, low_q: 2, hp_freq: 32 }
+bass -> bump.in_l
+bass -> bump.in_r
+warm = saturate { drive: 6, bias: 0.3 }
+bump.out_l -> warm.in_l
+bump.out_r -> warm.in_r
+bass_s = sub { file: "../lib/strip.sub", gain: 1.2, width: 0 }
+warm.out_l -> bass_s.in_l
+warm.out_r -> bass_s.in_r
+bass_lvl -> bass_s.level
+pump -> bass_s.duck
+
+# ---- plucked strings, Haas-widened ----
+pa = alloc { n: 4 }
+song.gate7 -> pa.gate
+song.voct7 -> pa.voct
+pl = voice { notes: pa }
+pl.s = string { seed: 3 }
+pa.voct -> pl.s.v_oct
+pa.gate -> pl.s.strike
+0.62 -> pl.s.damping
+0.55 -> pl.s.brightness
+0.2 -> pl.s.position
+haas = echo { mode: stereo, time: 0.011, spread: 0.6, feedback: 0, mix: 0.5, slew: 0 }
+pl.s -> haas.in_l : 0.5
+pl.s -> haas.in_r : 0.5
+pluck_s = sub { file: "../lib/strip.sub", gain: 0.1, send_gain: 0.6, width: 1.3 }
+haas.out_l -> pluck_s.in_l
+haas.out_r -> pluck_s.in_r
+pluck_lvl -> pluck_s.level
+
+# ---- sixteenth sequence ----
+seq = sub { file: "../lib/synth-voice.sub", wave1: pulse, wave2: saw, blend: 0.2, pw: 0.3,
+            sustain: 0, decay: 0.3, release: 0.1, cutoff: 400, res: 0.45, env_amt: 1500 }
+song.voct8 -> seq.voct
+song.gate8 -> seq.gate
+song.vel8  -> seq.vel
+scut_lvl -> seq.cut : 3000
+seq_pan = lfo { freq: 0.067hz }
+seq_s = sub { file: "../lib/strip.sub", gain: 1.2, send_gain: 0.25 }
+seq -> seq_s.in
+seq_pan -> seq_s.pan : 0.6
+seq_lvl -> seq_s.level
+pump -> seq_s.duck
+
+# ---- organ ----
+organ = sub { file: "../lib/poly-pad.sub", n: 4, wave1: tri, wave2: pulse, blend: 0.25,
+              attack: 0.06, decay: 1, sustain: 0.9, release: 0.4, cutoff: 2200, res: 0.05,
+              slope: 0, detune: 0.003 }
+song.gate5 -> organ.gate
+song.vel5  -> organ.vel
+song.voct5 -> organ.p1
+song.cva5  -> organ.p2
+song.cvb5  -> organ.p3
+song.cvd5  -> organ.p4
+org_ch = chorus { rate: 6.5, depth: 0.15, voices: 2 }
+organ -> org_ch.in_l
+organ -> org_ch.in_r
+organ_s = sub { file: "../lib/strip.sub", gain: 1.4, send_gain: 0.4, width: 1.2 }
+org_ch.out_l -> organ_s.in_l
+org_ch.out_r -> organ_s.in_r
+organ_lvl -> organ_s.level
+pump -> organ_s.duck
+
+# ---- lead ----
+lead = sub { file: "../lib/synth-voice.sub", wave1: saw, wave2: saw, blend: 0.5, detune: 0.006,
+             cutoff: 1800, env_amt: 1500, attack: 0.03, decay: 0.8, sustain: 0.7, release: 0.5,
+             glide: 0.06, vib: 0.006, vib_rate: 5hz, slope: 0 }
+song.voct9 -> lead.voct
+song.gate9 -> lead.gate
+song.vel9  -> lead.vel
+lead_s = sub { file: "../lib/strip.sub", gain: 0.5, send_gain: 0.8, pos: 0.1 }
+lead -> lead_s.in
+lead_lvl -> lead_s.level
+
+# ---- the long echo: quarter left, dotted quarter right ----
+qtr = tempo { bpm: 128, beats: 1 }
+far = echo { mode: stereo, time: 0ms, spread: 0.5, feedback: 0.45, tone: 2800, mix: 1 }
+qtr.seconds -> far.time
+pluck_s.fx -> far.in_l
+pluck_s.fx -> far.in_r
+lead_s.fx  -> far.in_l
+lead_s.fx  -> far.in_r
+far_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.4 }
+far.out_l -> far_s.in_l
+far.out_r -> far_s.in_r
+pump -> far_s.duck
+
+# ---- the corridor: late first reflection ----
+hallway = reverb { model: hall, size: 1.3, decay: 0.7, damp: 0.3, mix: 1, predelay: 0.09 }
+snare_s.fx -> hallway.in_l
+hats_s.fx  -> hallway.in_r
+pluck_s.fx -> hallway.in_l
+seq_s.fx   -> hallway.in_r
+organ_s.fx -> hallway.in_l
+far_s.fx   -> hallway.in_r
+lead_s.fx  -> hallway.in_l : 0.4
+hw_hl = svf { cutoff: 260, res: 0 }
+hw_hr = svf { cutoff: 260, res: 0 }
+hallway.out_l -> hw_hl.in
+hallway.out_r -> hw_hr.in
+hw_s = sub { file: "../lib/strip.sub", gain: 1.2 }
+hw_hl.hp -> hw_s.in_l
+hw_hr.hp -> hw_s.in_r
+hall_lvl -> hw_s.level
+pump -> hw_s.duck
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.8, true_peak: on, key_bus: 0.3,
+               clip_drive: 3 }
+8 -> master.makeup
+drums_lvl -> master.makeup : 1.5
+1.1 -> master.width
+kick -> master.side_l : 0.7
+kick -> master.side_r : 0.7
+kick_s.l  -> master.in_l
+kick_s.r  -> master.in_r
+snare_s.l -> master.in_l
+snare_s.r -> master.in_r
+hats_s.l  -> master.in_l
+hats_s.r  -> master.in_r
+bass_s.l  -> master.in_l
+bass_s.r  -> master.in_r
+pluck_s.l -> master.in_l
+pluck_s.r -> master.in_r
+seq_s.l   -> master.in_l
+seq_s.r   -> master.in_r
+organ_s.l -> master.in_l
+organ_s.r -> master.in_r
+lead_s.l  -> master.in_l
+lead_s.r  -> master.in_r
+far_s.l   -> master.in_l
+far_s.r   -> master.in_r
+hw_s.l    -> master.in_l
+hw_s.r    -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

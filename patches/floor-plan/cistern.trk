@@ -1,0 +1,81 @@
+# cistern.trk -- "Cistern". 60 BPM (one bar = 4 s), E-flat minor, 16 rows
+# per bar, 52 bars. No beat: bells, a bowl on an 11-row loop, a string
+# drone, a slow chord, and drips (in the patch). Levels in cistern-form.trk.
+#
+#   Ebm9 | Cbmaj7#11 | Abm9   (eight bars each, from bar 12)
+#
+#   water 8 | drone 4 | chords 24 | frozen 4 | thaw 8 | drone 4
+
+track bell  note vel                    # 1  modal bell: the figure
+track bowl  note vel                    # 2  modal bowl, 11-row free loop
+track drone note                        # 3  sympathetic-string drone: strike + root
+track pad   note vel cva cvb cvd        # 4  slow chord, four voices
+
+pattern silence 4x16 bell
+
+pattern drone_eb 4x16 drone
+1:00 | Eb2
+
+pattern drone_cb 4x16 drone
+1:00 | Cb2
+
+pattern drone_ab 4x16 drone
+1:00 | Ab1
+
+pattern drone_bb 4x16 drone
+1:00 | Bb1
+
+pattern bowl11 11 bowl
+00 | Eb4 .6
+07 | Bb3?.6 .4
+
+pattern bowl11b 11 bowl
+00 | Gb4 .55
+07 | Db4?.6 .4
+
+pattern pad_eb 8x16 pad
+1:00 | Gb3 .5 Bb3 Db4 F4
+5:00 | x .45
+
+pattern pad_cb 8x16 pad
+1:00 | Gb3 .5 Bb3 Eb4 F4
+5:00 | x .45
+
+pattern pad_ab 8x16 pad
+1:00 | Gb3 .5 Bb3 Cb4 Eb4
+5:00 | x .45
+
+pattern pad_end 8x16 pad
+1:00 | Gb3 .4 Bb3 Db4 F4
+6:00 | off
+
+# the figure (1 5 4 b3 = Eb Bb Ab Gb), struck slowly
+pattern figure 8x16 bell
+1:00 | Eb5 .7
+2:08 | Bb4 .6
+4:00 | Ab4 .65
+5:08 | Gb4 .6
+7:00 | F4?.7 .4
+
+pattern bells 8x16 bell
+1:04 | Bb5 .45
+3:00 | Gb5 .4
+4:10 | Db5?.6 .35
+6:00 | F5 .4
+7:12 | Eb5?.5 .3
+
+pattern bells_end 8x16 bell
+1:00 | Eb5 .55
+3:00 | Bb4 .45
+5:00 | Ab4 .45
+7:00 | Gb4 .5
+
+section water  silence
+section drone  drone_eb+bowl11~
+section ch_eb  pad_eb+drone_eb+figure+bowl11~
+section ch_cb  pad_cb+drone_cb+bells+bowl11b~
+section ch_ab  pad_ab+drone_ab+bells+bowl11~
+section frozen silence
+section thaw   pad_end+drone_eb+bells_end+bowl11~
+
+order water*2 drone ch_eb ch_cb ch_ab frozen thaw drone

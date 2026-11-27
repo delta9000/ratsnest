@@ -1,0 +1,213 @@
+# front-door -- the closer: from a dry room out through the door. 66 BPM,
+# D major, 44 bars (~2:45). Track 8 of "Floor Plan".
+#
+# The space is the arrangement. The first eight bars have no reverb at all,
+# only the piano's own soundboard. A small room (hall `size` .4) fades in
+# for B; in C a big hall (`size` 3, `decay` .9) opens under it while the
+# small room closes, and in the coda the wind comes in, as if a door had
+# opened, and the big hall freezes on the last chord, holding it after the
+# piano has stopped. The master is DC block, EQ, a gentle 1.5:1 compressor
+# and a true-peak limiter.
+#
+# Parts: a physical piano (rolled chords and a melody, re-pedalled every
+# bar); a soft four-voice pad on the same chords; track 1's FM electric
+# piano, which plays the album's figure in major (D A G F#) through C and
+# a last D chord in the coda; track 1's pluck, which states the figure
+# once more at the door; filtered-noise wind.
+#
+#   A 8 (dry) | B 8 (small room) | C 12 (the hall opens) | D 8 | coda 8
+
+t    = transport { bpm: 66, division: 4, bars: 4, swing: 0.04 }
+song = tracker { file: "front-door.trk", seed: 2 }
+form = tracker { file: "front-door-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+piano_lvl = func { rise: 1, fall: 1 }
+pad_lvl   = func { rise: 4, fall: 4 }
+ep_lvl    = func { rise: 1.5, fall: 2 }
+pluck_lvl = func { rise: 1, fall: 2 }
+room_lvl  = func { rise: 4, fall: 4 }
+hall_lvl  = func { rise: 5, fall: 5 }
+wind_lvl  = func { rise: 6, fall: 6 }
+main_lvl  = func { rise: 2, fall: 2 }
+form.cva1 -> piano_lvl.in
+form.cva2 -> pad_lvl.in
+form.cva3 -> ep_lvl.in
+form.cva4 -> pluck_lvl.in
+form.cva5 -> room_lvl.in
+form.cva6 -> hall_lvl.in
+form.cva7 -> wind_lvl.in
+form.cva9 -> main_lvl.in
+
+# ---- piano: rolled chords and a melody, one soundboard ----
+ped = func { rise: 0.05, fall: 0.03 }
+song.cva5 -> ped.in
+kc = chord { n: 4, strum: 0.028, vel: 0 }
+song.gate1 -> kc.gate
+song.vel1  -> kc.vel
+song.voct1 -> kc.p1
+song.cva1  -> kc.p2
+song.cvb1  -> kc.p3
+song.cvd1  -> kc.p4
+keys = voice { notes: kc }
+keys.p = piano { seed: 9 }
+kc.gate -> keys.p.gate
+kc.voct -> keys.p.voct
+kc.vel  -> keys.p.vel
+0.5 -> keys.p.hardness
+ped -> keys.p.pedal
+ma = alloc { n: 6, vel: 0 }
+song.gate2 -> ma.gate
+song.voct2 -> ma.voct
+song.vel2  -> ma.vel
+mel = voice { notes: ma }
+mel.p = piano { seed: 10 }
+ma.gate -> mel.p.gate
+ma.voct -> mel.p.voct
+ma.vel  -> mel.p.vel
+0.65 -> mel.p.hardness
+ped -> mel.p.pedal
+board = soundboard { body: 0.5, resonance: 0.7 }
+keys.p -> board.in
+mel.p  -> board.in
+ped -> board.pedal
+piano_s = sub { file: "../lib/strip.sub", gain: 4.5, send_gain: 0.5, width: 1.2 }
+board.l -> piano_s.in_l
+board.r -> piano_s.in_r
+piano_lvl -> piano_s.level
+
+# ---- pad ----
+pad = sub { file: "../lib/poly-pad.sub", n: 4, wave1: tri, wave2: saw, blend: 0.2, attack: 2,
+            decay: 2, sustain: 0.85, release: 3, curve: lin, cutoff: 800, res: 0.05, slope: 0 }
+song.gate1 -> pad.gate
+song.voct1 -> pad.p1
+song.cva1  -> pad.p2
+song.cvb1  -> pad.p3
+song.cvd1  -> pad.p4
+2 -> pad.p1                 # the root two octaves up, on top
+pad_ch = chorus { rate: 0.2, depth: 0.5 }
+pad -> pad_ch.in_l
+pad -> pad_ch.in_r
+pad_s = sub { file: "../lib/strip.sub", gain: 0.9, send_gain: 0.6, width: 1.5 }
+pad_ch.out_l -> pad_s.in_l
+pad_ch.out_r -> pad_s.in_r
+pad_lvl -> pad_s.level
+
+# ---- track 1's electric piano ----
+ec = chord { n: 4, strum: 0.012, vel: 0 }
+song.gate3 -> ec.gate
+song.vel3  -> ec.vel
+song.voct3 -> ec.p1
+song.cva3  -> ec.p2
+song.cvb3  -> ec.p3
+song.cvd3  -> ec.p4
+ep = voice { notes: ec }
+ep.v = fm { algo: dual, ratios: [1, 1, 7, 1, 14, 1], levels: [.5, .3, .1, .45, .1, .15],
+            t2: [.6, .07, .06, .5, .06, .09], l2: [.55, .25, .2, .5, .2, .25],
+            l3: [.2, 0, 0, .16, 0, 0], fb: [0, 0, 0, 0, .2, 0], t4: [.6, .2, .2, .6, .2, .2],
+            vel_sens: [.6, .8, .9, .6, .9, .8], curve: log }
+ec.gate -> ep.v.gate
+ec.voct -> ep.v.v_oct
+ec.vel  -> ep.v.vel
+ep_tone = svf { cutoff: 4200, res: 0.1 }
+ep.v -> ep_tone.in : 0.35
+ep_ch = chorus {}
+ep_tone.lp -> ep_ch.in_l
+ep_tone.lp -> ep_ch.in_r
+trem = lfo { freq: 3.6hz }
+ep_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.6, width: 1.3, pos: 0.2 }
+ep_ch.out_l -> ep_s.in_l
+ep_ch.out_r -> ep_s.in_r
+trem -> ep_s.pan : 0.25
+ep_lvl -> ep_s.level
+
+# ---- track 1's pluck ----
+pluck = sub { file: "../lib/synth-voice.sub", wave1: tri, wave2: saw, blend: 0.3,
+              sustain: 0, decay: 1.4, release: 1.2, cutoff: 700, env_amt: 2600, slope: 0 }
+song.voct4 -> pluck.voct
+song.gate4 -> pluck.gate
+song.vel4  -> pluck.vel
+pluck_s = sub { file: "../lib/strip.sub", gain: 1.3, send_gain: 0.7, pos: -0.3 }
+pluck -> pluck_s.in
+pluck_lvl -> pluck_s.level
+
+# ---- wind ----
+air = noise { color: pink, seed: 44 }
+gust = random { rate: 0.15hz, smooth: 1, seed: 45 }
+air_f = svf { cutoff: 700, res: 0.35 }
+air -> air_f.in
+gust -> air_f.v_oct : 1.2
+air_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.3, width: 1 }
+air_f.bp -> air_s.in
+gust -> air_s.pan : 0.7
+wind_lvl -> air_s.level
+
+# ---- the small room, then the big hall ----
+room = reverb { model: hall, size: 0.4, decay: 0.45, damp: 0.5, mix: 1, predelay: 0.006 }
+hall = reverb { model: hall, size: 3, decay: 0.9, damp: 0.35, mix: 1, predelay: 0.05 }
+form.cva8 -> hall.freeze
+piano_s.fx -> room.in_l
+piano_s.fx -> room.in_r
+pad_s.fx   -> room.in_r
+piano_s.fx -> hall.in_l
+piano_s.fx -> hall.in_r
+pad_s.fx   -> hall.in_l
+ep_s.fx    -> hall.in_r
+pluck_s.fx -> hall.in_l
+air_s.fx   -> hall.in_r
+room_hl = svf { cutoff: 250, res: 0 }
+room_hr = svf { cutoff: 250, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 1.2 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+room_lvl -> room_s.level
+hall_hl = svf { cutoff: 260, res: 0 }
+hall_hr = svf { cutoff: 260, res: 0 }
+hall.out_l -> hall_hl.in
+hall.out_r -> hall_hr.in
+hall_s = sub { file: "../lib/strip.sub", gain: 0.45 }
+hall_hl.hp -> hall_s.in_l
+hall_hr.hp -> hall_s.in_r
+hall_lvl -> hall_s.level
+
+# ---- master ----
+dc = dcblock { cutoff: 15hz }
+piano_s.l -> dc.in_l
+piano_s.r -> dc.in_r
+pad_s.l   -> dc.in_l
+pad_s.r   -> dc.in_r
+ep_s.l    -> dc.in_l
+ep_s.r    -> dc.in_r
+pluck_s.l -> dc.in_l
+pluck_s.r -> dc.in_r
+air_s.l   -> dc.in_l
+air_s.r   -> dc.in_r
+room_s.l  -> dc.in_l
+room_s.r  -> dc.in_r
+hall_s.l  -> dc.in_l
+hall_s.r  -> dc.in_r
+tone = eq { hp_freq: 25, low_freq: 100, low_gain: -1, low_q: 0.707, high_freq: 9000, high_gain: 2,
+            high_q: 1.4 }
+dc.out_l -> tone.in_l
+dc.out_r -> tone.in_r
+glue = compressor { threshold: -22, ratio: 1.5, knee: 8, attack: 30ms, release: 300ms, makeup: 1.5 }
+tone.out_l -> glue.in_l
+tone.out_r -> glue.in_r
+trim_l = vca { gain: 1.5 }
+trim_r = vca { gain: 1.5 }
+glue.out_l -> trim_l.in
+glue.out_r -> trim_r.in
+brick = limiter { threshold: -1.5, release: 0.2, true_peak: on }
+trim_l -> brick.in_l
+trim_r -> brick.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+brick.out_l -> fade_l.in
+brick.out_r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

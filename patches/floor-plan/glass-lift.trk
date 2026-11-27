@@ -1,0 +1,189 @@
+# glass-lift.trk -- "Glass Lift". 108 BPM, G minor, 16 rows per bar, 80
+# bars. Synth-pop: a gated-reverb snare, a pumping octave bass, a bright
+# pad, a sixteenth arp and a lead with a hook built on the album's figure
+# (G D C Bb). Levels in glass-lift-form.trk.
+#
+#   verse  Gm | Eb | Bb | F        chorus  Eb | F | Gm | Bb
+#   bridge Cm | Eb | F  | Dsus-D
+#
+#   intro 8 | verse 16 | chorus 16 | verse 8 | chorus 16 | bridge 8 | outro 8
+
+track kick  note vel                    # 1  kick; the duck trigger
+track snare note vel                    # 2  snare + clap, into the gated hall
+track hat   note vel                    # 3  hats
+track tom   note vel                    # 4  toms, fills only, also gated
+track pad   note vel cva cvb cvd        # 5  pad: root, third, fifth, colour
+track bass  note vel from pad           # 6  octave bass, chord tones
+track arp   note vel from pad           # 7  sixteenth arp, chord tones
+track lead  note vel                    # 8  lead
+
+pattern beat 16 kick snare hat
+00 | x .95  | .        | x .6
+02 | .      | .        | x .35
+04 | .      | x .9     | x .5
+06 | .      | .        | x .35
+08 | x .9   | .        | x .6
+10 | x?.4 .5 | .       | x .35
+12 | .      | x .95    | x .5
+14 | .      | .        | x?.7 .35
+
+pattern beat_in 16 kick hat
+00 | x .9   | .
+04 | x .8   | x .3
+08 | x .9   | .
+12 | x .8   | x .3
+
+pattern fill 16 tom snare
+08 | G3 .7  | .
+10 | D3 .75 | .
+12 | A2 .8  | .
+14 | .      | x*3 .7
+
+# ---- harmony: the pad (bass and arp follow it) ----
+pattern verse_h 4x16 pad
+1:00 | G3 .7 Bb3 D4 F4
+2:00 | Eb3 .7 G3 Bb3 D4
+3:00 | Bb2 .7 D3 F3 A3
+4:00 | F3 .7 A3 C4 E4
+
+pattern chorus_h 4x16 pad
+1:00 | Eb3 .75 G3 Bb3 D4
+2:00 | F3 .75 A3 C4 Eb4
+3:00 | G3 .75 Bb3 D4 F4
+4:00 | Bb2 .75 D3 F3 A3
+
+pattern bridge_h 4x16 pad
+1:00 | C3 .65 Eb3 G3 Bb3
+2:00 | Eb3 .65 G3 Bb3 D4
+3:00 | F3 .65 A3 C4 Eb4
+4:00 | D3 .7 G3 A3 C4
+4:08 | ~D3 .7 Fs3 A3 C4
+
+pattern bass8 16 bass
+00 | t1-12 .85
+02 | t1 .5
+04 | t1-12 .75
+06 | t1 .5
+08 | t1-12 .8
+10 | t1 .5
+12 | t1-12 .75
+14 | t3-12 .55
+
+pattern bass_bridge 16 bass
+00 | t1-12 .7
+06 | off
+08 | t1-12 .6
+14 | off
+
+pattern arp16 16 arp
+00 | t1+12 .6
+01 | t2+12 .35
+02 | t3+12 .45
+03 | t4 .35
+04 | t1+24 .5
+05 | t3+12 .35
+06 | t2+12 .45
+07 | t4 .3
+08 | t1+12 .55
+09 | t2+12 .35
+10 | t3+12 .45
+11 | t4+12 .35
+12 | t3+12 .5
+13 | t2+12 .35
+14 | t1+12 .45
+15 | t4 .3
+
+# ---- lead ----
+pattern verse_l1 4x16 lead
+1:00 | D5:4 .7
+1:04 | Bb4:2 .55
+1:06 | C5:2 .6
+1:08 | D5:4 .7
+1:12 | F5:2 .65
+1:14 | D5:2 .55
+2:00 | Eb5:8 .7
+2:08 | D5:2 .6
+2:10 | C5:2 .55
+2:12 | Bb4:4 .6
+3:00 | D5:4 .65
+3:04 | F5:4 .65
+3:08 | Bb5:6 .75
+3:14 | A5:2 .6
+4:00 | F5:8 .7
+4:08 | C5:4 .55
+4:12 | A4:3 .5
+
+pattern verse_l2 4x16 lead
+1:00 | D5:4 .7
+1:04 | Bb4:2 .55
+1:06 | C5:2 .6
+1:08 | D5:4 .7
+1:12 | G5:2 .7
+1:14 | F5:2 .6
+2:00 | Eb5:6 .7
+2:06 | D5:2 .6
+2:08 | C5:4 .6
+2:12 | Bb4:4 .55
+3:00 | Bb4:4 .6
+3:04 | C5:4 .6
+3:08 | D5:4 .65
+3:12 | F5:4 .65
+4:00 | C5:12 .6
+
+# the hook: the figure G D C Bb
+pattern chorus_l1 4x16 lead
+1:00 | G5:6 .8
+1:06 | D5:2 .65
+1:08 | C5:4 .7
+1:12 | Bb4:4 .65
+2:00 | C5:4 .65
+2:04 | D5:4 .7
+2:08 | F5:8 .75
+3:00 | G5:6 .8
+3:06 | D5:2 .65
+3:08 | C5:4 .7
+3:12 | Bb4:2 .6
+3:14 | A4:2 .55
+4:00 | Bb4:8 .7
+4:08 | D5:4 .6
+
+pattern chorus_l2 4x16 lead
+1:00 | G5:6 .8
+1:06 | D5:2 .65
+1:08 | C5:4 .7
+1:12 | Bb4:4 .65
+2:00 | C5:4 .65
+2:04 | D5:4 .7
+2:08 | F5:8 .75
+3:00 | G5:6 .8
+3:06 | A5:2 .7
+3:08 | Bb5:8 .85
+4:00 | A5:4 .7
+4:04 | G5:8 .75
+
+pattern bridge_l 4x16 lead
+1:00 | G5:8 .6
+1:08 | Eb5:8 .55
+2:00 | Bb5:8 .6
+2:08 | G5:8 .55
+3:00 | A5:8 .65
+3:08 | F5:8 .6
+4:00 | G5:8 .7
+4:08 | Fs5:8 .7
+
+section intro   verse_h+beat_in+arp16
+section intro2  verse_h+beat_in+arp16+fill@48
+section verse   verse_h+beat+bass8
+section verse_a verse_h+beat+bass8+arp16
+section chorus  chorus_h+beat+bass8+arp16
+section chor_f  chorus_h+beat+bass8+arp16+fill@48
+section bridge  bridge_h+bass_bridge+bridge_l
+section outro   chorus_h+beat+bass8+arp16
+
+order intro intro2
+order verse+verse_l1 verse_a+verse_l2 verse_a+verse_l1 verse_a+verse_l2
+order chorus+chorus_l1 chorus+chorus_l2 chorus+chorus_l1 chor_f+chorus_l2
+order verse_a+verse_l1 verse_a+verse_l2
+order chorus+chorus_l1 chorus+chorus_l2 chorus+chorus_l1 chor_f+chorus_l2
+order bridge*2
+order outro outro chorus_h+arp16+beat_in chorus_h+arp16

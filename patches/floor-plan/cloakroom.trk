@@ -1,0 +1,144 @@
+# cloakroom.trk -- "Cloakroom". 88 BPM, F minor, 16 rows per bar (swung by
+# the transport), 64 bars. A small dry room: kit, FM electric piano, bass,
+# a pluck that states the album's figure. Levels in cloakroom-form.trk.
+#
+#   Fm9 | Bbm9 | Dbmaj9 | C7b9
+#
+#   intro 4 | A 16 | B 16 | break 8 | A2 16 | outro 4
+#
+# The figure (1 5 4 b3): F C Bb Ab, on the pluck in the intro and outro.
+
+track kick  note vel                    # 1  kit kick; the duck trigger
+track snare note vel                    # 2  kit snare
+track hat   note vel                    # 3  kit hat
+track rim   note vel                    # 4  kit rim, a 7-row free loop
+track ep    note vel cva cvb cvd        # 5  6-op FM electric piano, four voices
+track bass  note vel                    # 6  synth-voice bass
+track pluck note vel                    # 7  synth-voice pluck
+
+# ---- the beat: a lazy boom-bap, snare laid back ----
+pattern beat 2x16 kick snare hat
+1:00 | x .9      | .          | x .55
+1:02 | .         | .          | x?.7 .25
+1:04 | .         | x@.06 .85  | x .45
+1:06 | .         | .          | x .3
+1:07 | x?.5 .45  | .          | .
+1:08 | .         | .          | x .5
+1:10 | x .75     | .          | x?.6 .25
+1:12 | .         | x@.08 .9   | x .45
+1:14 | .         | .          | x .3
+1:15 | .         | x?.35 .18  | .
+2:00 | x .85     | .          | x .55
+2:02 | .         | .          | x .25
+2:03 | x@.05 .5  | .          | .
+2:04 | .         | x@.06 .85  | x .45
+2:06 | .         | .          | x?.6 .3
+2:08 | .         | .          | x .5
+2:09 | x .6      | .          | .
+2:10 | .         | x?.4 .2    | x .3
+2:12 | .         | x@.08 .95  | x .45
+2:14 | .         | .          | x*2 .3
+2:15 | x?.4 .4   | .          | .
+
+pattern rim7 7 rim
+02 | x .4
+05 | x?.6 .25
+
+# ---- electric piano: Fm9 Bbm9 Dbmaj9 C7b9 ----
+pattern ep_a 4x16 ep
+1:00 | Ab3:7 .6 C4 Eb4 G4
+1:10 | x:4 .4
+1:14 | x?.5:2 .3
+2:00 | Ab3:7 .6 C4 Db4 F4
+2:10 | x:4 .45
+3:00 | Ab3:7 .6 C4 Eb4 F4
+3:10 | x:4 .4
+3:14 | x?.5:2 .3
+4:00 | G3:7 .65 Bb3 Db4 E4
+4:10 | x:3 .45
+4:13 | x@.1:3 .35
+
+pattern ep_hold 4x16 ep
+1:00 | Ab3:15 .45 C4 Eb4 G4
+2:00 | Ab3:15 .45 C4 Db4 F4
+3:00 | Ab3:15 .45 C4 Eb4 F4
+4:00 | G3:15 .5 Bb3 Db4 E4
+
+# ---- bass: root, a pickup, the fifth ----
+pattern bass_a 4x16 bass
+1:00 | F1 .8
+1:06 | off
+1:07 | F1@.1 .5
+1:08 | off
+1:10 | C2 .6
+1:13 | off
+1:14 | Eb2 .5
+1:15 | off
+2:00 | Bb1 .8
+2:06 | off
+2:10 | F1 .6
+2:13 | off
+2:14 | Ab1 .5
+2:15 | off
+3:00 | Db2 .8
+3:06 | off
+3:07 | Db2@.1 .5
+3:08 | off
+3:10 | Ab1 .6
+3:13 | off
+4:00 | C2 .85
+4:06 | off
+4:10 | G1 .6
+4:12 | Bb1 .55
+4:14 | B1 .55
+4:15 | off
+
+pattern bass_brk 4x16 bass
+1:00 | F1 .6
+1:12 | off
+2:00 | Bb1 .6
+2:12 | off
+3:00 | Db2 .6
+3:12 | off
+4:00 | C2 .65
+4:12 | off
+
+# ---- pluck: the figure, then a counter-line over B ----
+pattern figure 4x16 pluck
+1:00 | F4 .7
+1:06 | C5 .6
+2:00 | Bb4 .65
+2:06 | Ab4 .6
+3:00 | F4 .55
+3:10 | Eb4 .4
+4:00 | E4 .55
+4:08 | G4 .45
+
+pattern counter 4x16 pluck
+1:02 | C5 .55
+1:05 | Eb5 .45
+1:08 | G4 .5
+1:11 | Ab4 .5
+2:02 | Db5 .55
+2:05 | C5 .45
+2:08 | Ab4 .5
+2:12 | F4?.6 .35
+3:02 | Eb5 .55
+3:05 | F5 .45
+3:08 | C5 .5
+3:11 | Ab4 .5
+4:02 | Db5 .55
+4:05 | Bb4 .5
+4:08 | G4 .55
+4:11 | E4 .5
+4:14 | G4?.5 .35
+
+section intro ep_hold+figure
+section a     ep_a+beat+bass_a+rim7~
+section b     ep_a+beat+bass_a+counter+rim7~
+section brk   ep_hold+bass_brk+rim7~
+section brk2  ep_hold+bass_brk+figure+rim7~
+section a2    ep_a+beat+bass_a+counter+rim7~
+section out   ep_hold+figure
+
+order intro a*4 b*4 brk brk2 a2*4 out

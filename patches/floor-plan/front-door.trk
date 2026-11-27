@@ -1,0 +1,131 @@
+# front-door.trk -- "Front Door". 66 BPM, D major, 16 rows per bar, 44
+# bars. The closer: piano chords and melody, a pad, track 1's electric
+# piano, track 1's pluck; the album's figure in major (D A G F#) at last.
+# Levels in front-door-form.trk.
+#
+#   A  D | Bm | G | A                  (dry)
+#   B  D/F# | G | Em7 | Asus4 A        (a small room)
+#   C  Bm | G | D | A   x3             (the hall opens: the figure)
+#   D  G | A | F#m | Bm | G | A | D | D
+#   coda D (held into the frozen hall)
+#
+#   A 8 | B 8 | C 12 | D 8 | coda 8
+
+track chords note vel cva cvb cvd       # 1  piano chords (rolled), and the pad
+track mel    note vel                   # 2  piano melody
+track ep     note vel cva cvb cvd       # 3  track 1's FM electric piano
+track pluck  note vel                   # 4  track 1's pluck
+track ped    cva                        # 5  pedal
+
+pattern ped 16 ped
+00 | 0
+01 | 1
+
+pattern a_ch 4x16 chords
+1:00 | D3 .45 A3 D4 Fs4
+2:00 | B2 .45 Fs3 B3 D4
+3:00 | G2 .45 D3 G3 B3
+4:00 | A2 .45 E3 A3 Cs4
+
+pattern b_ch 4x16 chords
+1:00 | Fs2 .5 D3 A3 D4
+2:00 | G2 .5 D3 G3 B3
+3:00 | E2 .5 D3 G3 B3
+4:00 | A2 .5 D3 E3 A3
+4:08 | x .45 Cs3 E3 A3
+
+pattern c_ch 4x16 chords
+1:00 | B2 .55 Fs3 B3 D4
+2:00 | G2 .55 D3 G3 B3
+3:00 | D3 .55 A3 D4 Fs4
+4:00 | A2 .55 E3 A3 Cs4
+
+pattern d_ch 8x16 chords
+1:00 | G2 .65 D3 G3 B3
+2:00 | A2 .65 E3 A3 Cs4
+3:00 | Fs2 .65 Cs3 Fs3 A3
+4:00 | B2 .65 Fs3 B3 D4
+5:00 | G2 .6 D3 G3 B3
+6:00 | A2 .6 E3 A3 Cs4
+7:00 | D3 .6 A3 D4 Fs4
+8:00 | x .5
+
+pattern coda_ch 8x16 chords
+1:00 | D3 .4 A3 D4 Fs4
+5:00 | x .3
+
+pattern a_mel 4x16 mel
+1:00 | Fs5 .45
+1:08 | E5 .4
+1:12 | D5 .4
+2:00 | D5 .45
+2:08 | Cs5 .4
+2:12 | B4 .4
+3:00 | B4 .45
+3:08 | D5 .4
+4:00 | Cs5 .45
+4:08 | E5 .4
+
+pattern b_mel 4x16 mel
+1:00 | A5 .5
+1:08 | Fs5 .45
+2:00 | G5 .5
+2:06 | Fs5 .4
+2:08 | E5 .45
+2:12 | D5 .4
+3:00 | E5 .45
+3:08 | G5 .45
+4:00 | Fs5 .45
+4:08 | E5 .45
+
+pattern d_mel 8x16 mel
+1:00 | B5 .6
+1:08 | A5 .5
+1:12 | G5 .5
+2:00 | A5 .6
+2:08 | Cs6 .55
+3:00 | A5 .6
+3:06 | Fs5 .5
+3:08 | Cs6 .55
+4:00 | D6 .65
+4:08 | B5 .5
+5:00 | B5 .55
+5:08 | D6 .55
+6:00 | Cs6 .6
+6:08 | E6 .6
+7:00 | D6 .65
+7:08 | A5 .5
+8:00 | Fs5 .5
+
+# the figure in major (D A G F#), on track 1's electric piano
+pattern c_ep 4x16 ep
+1:00 | D5:6 .55 Fs4 A4 B4
+1:08 | A4:6 .45 Fs4 B3 D4
+2:00 | G4:6 .5 B3 D4 E4
+2:08 | Fs4:6 .5 G3 B3 D4
+3:00 | A4:12 .45 Fs4 D4 A3
+4:00 | E4:12 .45 Cs4 A3 G3
+
+pattern coda_ep 8x16 ep
+1:00 | A3:60 .4 D4 Fs4 E4
+
+# track 1's pluck: the figure once more, at the door
+pattern coda_pl 8x16 pluck
+1:00 | D5 .6
+1:08 | A4 .5
+2:00 | G4 .55
+2:08 | Fs4 .5
+3:00 | D4 .45
+
+section a     a_ch+a_mel+ped
+section b     b_ch+b_mel+ped
+section c     c_ch+c_ep+ped
+section c2    c_ch+c_ep+a_mel+ped
+section d     d_ch+d_mel+ped
+section coda  coda_ch+coda_ep+coda_pl+ped
+
+order a a
+order b b
+order c c2 c
+order d
+order coda

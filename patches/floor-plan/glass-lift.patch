@@ -1,0 +1,227 @@
+# glass-lift -- synth-pop with a gated snare. 108 BPM, G minor, 80 bars
+# (~2:58). Track 5 of "Floor Plan".
+#
+# Two spaces. The snare, clap and toms go into a big hall (`size` 2.2,
+# `decay` .88) whose return is cut off by a `gate` keyed from the dry
+# drums: it opens on every hit and slams shut about a quarter second
+# later (measured: open at 250 ms, 60 dB down by 300 ms), the eighties
+# gated-reverb sound made from a hall and a gate. Everything
+# melodic sits in a small bright glass room instead (`size` .6, little
+# damping). The pad runs through an `eq` whose `lp_freq` follows a form
+# lane, so it opens for the choruses and closes under the verses. The
+# lead's echo is a stereo `echo` (dotted eighth left, quarter right via
+# `spread`), with the send blooming in the bridge.
+#
+# Parts: kick, snare + clap, hats, tom fills (native kit); a four-voice
+# pad; an octave bass and a sixteenth arp that take their notes from the
+# pad's chord (`from pad`); a lead whose chorus hook is the album's figure
+# (G D C Bb).
+#
+#   intro 8 | verse 16 | chorus 16 | verse 8 | chorus 16 | bridge 8 | outro 8
+
+t    = transport { bpm: 108, division: 4, bars: 4, swing: 0.03 }
+song = tracker { file: "glass-lift.trk", seed: 8 }
+form = tracker { file: "glass-lift-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drums_lvl = func { rise: 0.2, fall: 0.3 }
+bass_lvl  = func { rise: 0.3, fall: 0.5 }
+pad_lvl   = func { rise: 1.5, fall: 1.5 }
+pcut_lvl  = func { rise: 3, fall: 2 }
+arp_lvl   = func { rise: 0.8, fall: 0.8 }
+lead_lvl  = func { rise: 0.3, fall: 0.8 }
+echo_lvl  = func { rise: 1.5, fall: 1.5 }
+gverb_lvl = func { rise: 0.3, fall: 0.3 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> pad_lvl.in
+form.cva4 -> pcut_lvl.in
+form.cva5 -> arp_lvl.in
+form.cva6 -> lead_lvl.in
+form.cva7 -> echo_lvl.in
+form.cva8 -> gverb_lvl.in
+form.cva9 -> main_lvl.in
+
+pump = sub { file: "../lib/duck.sub", depth_db: -6, release: 0.25, curve: exp }
+song.gate1 -> pump.trig
+drums_lvl -> pump.amount
+
+# ---- kit ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 54hz, decay: 0.36, bend: 2.6 }
+song.gate1 -> kick.trig
+song.vel1  -> kick.accent
+kick_s = sub { file: "../lib/strip.sub", gain: 2.6 }
+kick -> kick_s.in
+drums_lvl -> kick_s.level
+
+snare = sub { file: "../lib/kit/snare.sub", tune: 200hz, decay: 0.3, snap: 0.65 }
+clap = sub { file: "../lib/kit/clap.sub", tune: 1.25khz, decay: 0.16s }
+song.gate2 -> snare.trig
+song.vel2  -> snare.accent
+song.gate2 -> clap.trig
+song.vel2  -> clap.accent
+tom = sub { file: "../lib/kit/tom.sub", tune: 130hz, decay: 0.55 }
+song.gate4 -> tom.trig
+song.vel4  -> tom.accent
+sn = mix { levels: [1.0, 0.8, 0.9], pans: [0, 0.1, -0.2] }
+snare -> sn.in1
+clap  -> sn.in2
+tom   -> sn.in3
+snare_s = sub { file: "../lib/strip.sub", gain: 1.3, send_gain: 1.0 }
+sn.out_l -> snare_s.in_l
+sn.out_r -> snare_s.in_r
+drums_lvl -> snare_s.level
+
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.05s, tone: 10khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+hat_s = sub { file: "../lib/strip.sub", gain: 1.4, send_gain: 0.15, pos: 0.3 }
+hat -> hat_s.in
+drums_lvl -> hat_s.level
+
+# ---- the gated hall ----
+big = reverb { model: hall, size: 2.2, decay: 0.88, damp: 0.3, mix: 1, predelay: 0.004 }
+snare_s.fx -> big.in_l
+snare_s.fx -> big.in_r
+shut = gate { sidechain: external, threshold: -20, ratio: 50, range: 70, attack: 0.0005,
+              hold: 0.16, release: 0.02 }
+big.out_l -> shut.in_l
+big.out_r -> shut.in_r
+sn.out_l -> shut.side_l
+sn.out_r -> shut.side_r
+big_hl = svf { cutoff: 220, res: 0 }
+big_hr = svf { cutoff: 220, res: 0 }
+shut.out_l -> big_hl.in
+shut.out_r -> big_hr.in
+big_s = sub { file: "../lib/strip.sub", gain: 0.9, width: 1.2 }
+big_hl.hp -> big_s.in_l
+big_hr.hp -> big_s.in_r
+gverb_lvl -> big_s.level
+
+# ---- pad: four voices, low-passed by a lane ----
+pad = sub { file: "../lib/poly-pad.sub", n: 4, attack: 0.08, decay: 1.2, sustain: 0.75,
+            release: 0.5, cutoff: 2500, res: 0.15, detune: 0.007 }
+song.gate5 -> pad.gate
+song.vel5  -> pad.vel
+song.voct5 -> pad.p1
+song.cva5  -> pad.p2
+song.cvb5  -> pad.p3
+song.cvd5  -> pad.p4
+pad_ch = chorus { rate: 0.35, depth: 0.5 }
+pad -> pad_ch.in_l
+pad -> pad_ch.in_r
+pad_eq = eq { lp_freq: 700, mid1_freq: 300, mid1_gain: -3, mid1_q: 0.8 }
+pad_ch.out_l -> pad_eq.in_l
+pad_ch.out_r -> pad_eq.in_r
+pcut_lvl -> pad_eq.lp_freq : 7500
+pad_s = sub { file: "../lib/strip.sub", gain: 1.6, send_gain: 0.3, width: 1.4 }
+pad_eq.out_l -> pad_s.in_l
+pad_eq.out_r -> pad_s.in_r
+pad_lvl -> pad_s.level
+pump -> pad_s.duck
+
+# ---- bass: octaves ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0.25, sublvl: 0.5, sub_oct: 0, cutoff: 320,
+             res: 0.3, drive: 0.4, env_amt: 1400, attack: 0.002, decay: 0.35, sustain: 0.3,
+             release: 0.08 }
+song.voct6 -> bass.voct
+song.gate6 -> bass.gate
+song.vel6  -> bass.vel
+bass_s = sub { file: "../lib/strip.sub", gain: 1.3 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+pump -> bass_s.duck
+
+# ---- arp ----
+arp = sub { file: "../lib/synth-voice.sub", wave1: pulse, wave2: saw, blend: 0.3, pw: 0.35,
+            sustain: 0, decay: 0.35, release: 0.2, cutoff: 1500, env_amt: 3000, slope: 0 }
+song.voct7 -> arp.voct
+song.gate7 -> arp.gate
+song.vel7  -> arp.vel
+arp_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.5, pos: -0.3 }
+arp -> arp_s.in
+arp_lvl -> arp_s.level
+pump -> arp_s.duck
+
+# ---- lead, and its stereo echo ----
+lead = sub { file: "../lib/synth-voice.sub", wave1: saw, wave2: pulse, blend: 0.4, cutoff: 1400,
+             env_amt: 2500, res: 0.2, attack: 0.01, decay: 0.5, sustain: 0.65, release: 0.25,
+             glide: 0.04, vib: 0.005, vib_rate: 5.4hz }
+song.voct8 -> lead.voct
+song.gate8 -> lead.gate
+song.vel8  -> lead.vel
+lead_s = sub { file: "../lib/strip.sub", gain: 0.85, send_gain: 0.3, pos: 0.05 }
+lead -> lead_s.in
+lead_lvl -> lead_s.level
+throw = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 1 }
+lead -> throw.in
+lead_lvl -> throw.level
+echo_lvl -> throw.send
+dot8 = tempo { bpm: 108, beats: 0.75 }
+lr = echo { mode: stereo, time: 0ms, spread: 0.3333, feedback: 0.38, tone: 3500, mix: 1 }
+dot8.seconds -> lr.time
+throw.fx -> lr.in_l
+throw.fx -> lr.in_r
+echo_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 0.3 }
+lr.out_l -> echo_s.in_l
+lr.out_r -> echo_s.in_r
+pump -> echo_s.duck
+
+# ---- the glass room ----
+glass = reverb { model: hall, size: 0.6, decay: 0.55, damp: 0.15, mix: 1, predelay: 0.012 }
+pad_s.fx  -> glass.in_l
+arp_s.fx  -> glass.in_r
+lead_s.fx -> glass.in_l
+echo_s.fx -> glass.in_r
+hat_s.fx  -> glass.in_r
+glass_hl = svf { cutoff: 280, res: 0 }
+glass_hr = svf { cutoff: 280, res: 0 }
+glass.out_l -> glass_hl.in
+glass.out_r -> glass_hr.in
+glass_s = sub { file: "../lib/strip.sub", gain: 1.2 }
+glass_hl.hp -> glass_s.in_l
+glass_hr.hp -> glass_s.in_r
+pump -> glass_s.duck
+
+# ---- bus ----
+bus = saturate { drive: 3, bias: 0.2 }
+kick_s.l  -> bus.in_l
+kick_s.r  -> bus.in_r
+snare_s.l -> bus.in_l
+snare_s.r -> bus.in_r
+hat_s.l   -> bus.in_l
+hat_s.r   -> bus.in_r
+big_s.l   -> bus.in_l
+big_s.r   -> bus.in_r
+pad_s.l   -> bus.in_l
+pad_s.r   -> bus.in_r
+bass_s.l  -> bus.in_l
+bass_s.r  -> bus.in_r
+arp_s.l   -> bus.in_l
+arp_s.r   -> bus.in_r
+lead_s.l  -> bus.in_l
+lead_s.r  -> bus.in_r
+echo_s.l  -> bus.in_l
+echo_s.r  -> bus.in_r
+glass_s.l -> bus.in_l
+glass_s.r -> bus.in_r
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.8, true_peak: on, key_bus: 0.35,
+               clip_drive: 3 }
+7 -> master.makeup
+drums_lvl -> master.makeup : 1.5    # kick-less bridge gets less makeup
+1.1 -> master.width
+kick -> master.side_l : 0.7
+kick -> master.side_r : 0.7
+bus.out_l -> master.in_l
+bus.out_r -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

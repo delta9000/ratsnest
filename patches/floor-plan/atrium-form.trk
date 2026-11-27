@@ -1,0 +1,19 @@
+# atrium-form.trk -- one row per bar (54), slewed in the patch.
+track piano  cva   # 1
+track str    cva   # 2  strings
+track cello  cva   # 3
+track hall   cva   # 4  hall send scale
+track main   cva   # 5
+
+pattern form 54
+#    piano  str    cello  hall   main
+00 | .8   | 0    | 0    | .7   | 1     # A: piano alone in the hall
+08 | .85  | .55> | .5   | .8   | .     # B: strings enter
+23 | .    | .7   | .    | .    | .
+24 | .7   | .75  | .9   | .85  | .     # C: the cello
+40 | 1    | 1    | 1    | 1    | .     # D
+48 | .75  | .5   | 0    | 1    | .     # coda
+52 | .    | .3   | .    | .    | 1>
+53 | .    | .    | .    | .    | .7
+
+order form

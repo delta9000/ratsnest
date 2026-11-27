@@ -1,0 +1,254 @@
+# plant-room -- industrial techno among the boilers. 132 BPM, A minor, 100
+# bars (~3:02). Track 4 of "Floor Plan". The loud one.
+#
+# Dynamics are the subject. The master bus is a three-band compressor: a
+# `crossover` at 150 Hz and 3.5 kHz, a slow 4:1 on the lows so the kick and
+# bass sit still, a 3:1 on the mids, a fast 3:1 on the top that only tames
+# the hats; the bands sum into `saturate`, a serial soft clipper and a
+# true-peak limiter. The clap and hats go through a parallel `saturate`
+# (drive 14 dB at 35 % wet) for grit. The steam is pink noise through a
+# `gate` keyed from a tracker lane, so it hisses in sixteenth-note bursts.
+# The room is small and metallic (hall `size` .45, almost no damping) for
+# the pipes and the clap; the kick has its own dark rumble (the kick into
+# a hall, low-passed at 140 Hz, summed to mono, pumped by the kick).
+#
+# Parts: kick, clap, closed and open hats (native kit); two modal pipes
+# on 7 and 5 rows, the second striking the album's figure (A E D C) in the
+# break; a resonant ladder bass with cutoff per note; a three-voice stab
+# (Am, F/A, E/G#) in B; gated steam.
+#
+#   intro 16 | A 32 | break 16 | B 28 | outro 8
+
+t    = transport { bpm: 132, division: 4, bars: 4, swing: 0.04 }
+song = tracker { file: "plant-room.trk", seed: 17 }
+form = tracker { file: "plant-room-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drums_lvl = func { rise: 0.1, fall: 0.2 }
+hats_lvl  = func { rise: 0.5, fall: 0.5 }
+pipes_lvl = func { rise: 1, fall: 1 }
+bass_lvl  = func { rise: 0.2, fall: 0.3 }
+bcut_lvl  = func { rise: 2, fall: 0.5 }
+stab_lvl  = func { rise: 0.5, fall: 0.5 }
+steam_lvl = func { rise: 1, fall: 1 }
+rumb_lvl  = func { rise: 0.5, fall: 0.5 }
+main_lvl  = func { rise: 0.5, fall: 0.5 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> hats_lvl.in
+form.cva3 -> pipes_lvl.in
+form.cva4 -> bass_lvl.in
+form.cva5 -> bcut_lvl.in
+form.cva6 -> stab_lvl.in
+form.cva7 -> steam_lvl.in
+form.cva8 -> rumb_lvl.in
+form.cva9 -> main_lvl.in
+
+pump = sub { file: "../lib/duck.sub", depth_db: -8, release: 0.22, curve: exp }
+song.gate1 -> pump.trig
+drums_lvl -> pump.amount
+deep = sub { file: "../lib/duck.sub", depth_db: -18, release: 0.3, curve: exp }
+song.gate1 -> deep.trig
+
+# ---- kick and its rumble ----
+kick = sub { file: "../lib/kick.sub", tune: 49hz, decay: 0.32s, click: 0.45 }
+kick_a = vca { gain: 0 }
+kick -> kick_a.in
+song.vel1 -> kick_a.cv
+kick_s = sub { file: "../lib/strip.sub", gain: 0.7 }
+kick_a -> kick_s.in
+drums_lvl -> kick_s.level
+song.gate1 -> kick.trig
+
+boil = reverb { model: hall, size: 0.8, decay: 0.72, damp: 0.6, mix: 1, predelay: 0.01 }
+kick_a -> boil.in_l : 0.6
+kick_a -> boil.in_r : 0.6
+rumb_lp = svf { cutoff: 140, res: 0.2 }
+boil.out_l -> rumb_lp.in : 0.5
+boil.out_r -> rumb_lp.in : 0.5
+rumb_s = sub { file: "../lib/strip.sub", gain: 1.1 }
+rumb_lp.lp -> rumb_s.in
+rumb_lvl -> rumb_s.level
+deep -> rumb_s.duck
+
+# ---- clap and hats: a gritty bus ----
+clap = sub { file: "../lib/kit/clap.sub", tune: 1.2khz, decay: 0.2s }
+song.gate2 -> clap.trig
+song.vel2  -> clap.accent
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.045s, tone: 10khz }
+song.gate3 -> hat.trig
+song.vel3  -> hat.accent
+ohat = sub { file: "../lib/kit/hat_model.sub", decay: 0.22s, tone: 8.5khz }
+song.gate4 -> ohat.trig
+song.vel4  -> ohat.accent
+song.gate3 -> ohat.choke
+hats = mix { levels: [1.0, 0.8], pans: [0.15, -0.1] }
+hat  -> hats.in1
+ohat -> hats.in2
+hats_s = sub { file: "../lib/strip.sub", gain: 1.5, send_gain: 0.1 }
+hats.out_l -> hats_s.in_l
+hats.out_r -> hats_s.in_r
+hats_lvl -> hats_s.level
+pump -> hats_s.duck
+clap_s = sub { file: "../lib/strip.sub", gain: 2.2, send_gain: 0.5, pos: -0.05 }
+clap -> clap_s.in
+drums_lvl -> clap_s.level
+grit = saturate { drive: 14, bias: 0.15, mix: 0.35 }
+hats_s.l -> grit.in_l
+hats_s.r -> grit.in_r
+clap_s.l -> grit.in_l
+clap_s.r -> grit.in_r
+
+# ---- pipes ----
+pipe1 = modal { modes: 24 }
+song.voct5 -> pipe1.v_oct
+song.gate5 -> pipe1.strike
+0.92 -> pipe1.structure
+0.6 -> pipe1.brightness
+0.58 -> pipe1.damping
+0.12 -> pipe1.position
+pipe1_v = vca { gain: 0 }
+pipe1 -> pipe1_v.in
+song.vel5 -> pipe1_v.cv
+pipe1_s = sub { file: "../lib/strip.sub", gain: 0.28, send_gain: 0.6, pos: 0.45 }
+pipe1_v -> pipe1_s.in
+pipes_lvl -> pipe1_s.level
+pump -> pipe1_s.duck
+
+pipe2 = modal { modes: 24 }
+song.voct6 -> pipe2.v_oct
+song.gate6 -> pipe2.strike
+0.86 -> pipe2.structure
+0.5 -> pipe2.brightness
+0.66 -> pipe2.damping
+0.2 -> pipe2.position
+pipe2_v = vca { gain: 0 }
+pipe2 -> pipe2_v.in
+song.vel6 -> pipe2_v.cv
+pipe2_s = sub { file: "../lib/strip.sub", gain: 0.28, send_gain: 0.6, pos: -0.45 }
+pipe2_v -> pipe2_s.in
+pipes_lvl -> pipe2_s.level
+pump -> pipe2_s.duck
+
+# ---- bass: resonant ladder, cutoff per note ----
+bass = sub { file: "../lib/synth-voice.sub", blend: 0.2, sublvl: 0.5, sub_oct: 0, cutoff: 140,
+             res: 0.62, drive: 0.6, env_amt: 1600, attack: 0.002, decay: 0.6, sustain: 0.2,
+             release: 0.08, track: 0.3 }
+song.voct7 -> bass.voct
+song.gate7 -> bass.gate
+song.vel7  -> bass.vel
+song.cva7  -> bass.cut : 900
+bcut_lvl   -> bass.cut : 1400
+bass_s = sub { file: "../lib/strip.sub", gain: 1.4 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+pump -> bass_s.duck
+
+# ---- stab ----
+stab = sub { file: "../lib/poly-pad.sub", n: 3, attack: 0.002, decay: 0.9, sustain: 0.1,
+             release: 0.3, curve: exp, slope: 1, res: 0.3, cutoff: 700, env_amt: 3000 }
+song.gate8 -> stab.gate
+song.vel8  -> stab.vel
+song.voct8 -> stab.p1
+song.cva8  -> stab.p2
+song.cvb8  -> stab.p3
+stab_s = sub { file: "../lib/strip.sub", gain: 5.0, send_gain: 0.25, width: 1.2 }
+stab -> stab_s.in
+stab_lvl -> stab_s.level
+pump -> stab_s.duck
+
+# ---- steam: pink noise through a gate keyed by a lane ----
+steam = noise { color: pink, seed: 13 }
+steam_bp = svf { cutoff: 3200, res: 0.25 }
+steam -> steam_bp.in
+valve = gate { sidechain: external, threshold: -20, ratio: 40, range: 50, attack: 0.001,
+               hold: 0.01, release: 0.035 }
+steam_bp.bp -> valve.in_l
+steam_bp.bp -> valve.in_r
+song.gate9 -> valve.side_l
+song.gate9 -> valve.side_r
+steam_pan = lfo { freq: 0.23hz }
+steam_s = sub { file: "../lib/strip.sub", gain: 1.0, send_gain: 0.15 }
+valve.out_l -> steam_s.in
+steam_pan -> steam_s.pan : 0.6
+steam_lvl -> steam_s.level
+
+# ---- the metal room ----
+room = reverb { model: hall, size: 0.45, decay: 0.55, damp: 0.1, mix: 1, predelay: 0.008 }
+clap_s.fx  -> room.in_l
+hats_s.fx  -> room.in_r
+pipe1_s.fx -> room.in_r
+pipe2_s.fx -> room.in_l
+stab_s.fx  -> room.in_l
+steam_s.fx -> room.in_r
+room_hl = svf { cutoff: 300, res: 0 }
+room_hr = svf { cutoff: 300, res: 0 }
+room.out_l -> room_hl.in
+room.out_r -> room_hr.in
+room_s = sub { file: "../lib/strip.sub", gain: 0.6 }
+room_hl.hp -> room_s.in_l
+room_hr.hp -> room_s.in_r
+pump -> room_s.duck
+
+# ---- master: three-band compression ----
+dc = dcblock { cutoff: 15hz }
+kick_s.l  -> dc.in_l
+kick_s.r  -> dc.in_r
+rumb_s.l  -> dc.in_l
+rumb_s.r  -> dc.in_r
+grit.out_l -> dc.in_l
+grit.out_r -> dc.in_r
+pipe1_s.l -> dc.in_l
+pipe1_s.r -> dc.in_r
+pipe2_s.l -> dc.in_l
+pipe2_s.r -> dc.in_r
+bass_s.l  -> dc.in_l
+bass_s.r  -> dc.in_r
+stab_s.l  -> dc.in_l
+stab_s.r  -> dc.in_r
+steam_s.l -> dc.in_l
+steam_s.r -> dc.in_r
+room_s.l  -> dc.in_l
+room_s.r  -> dc.in_r
+
+tone = eq { hp_freq: 28, low_freq: 60, low_gain: 0.5, low_q: 2, mid1_freq: 350, mid1_gain: -1.5,
+            mid1_q: 0.9, high_freq: 9000, high_gain: 1 }
+dc.out_l -> tone.in_l
+dc.out_r -> tone.in_r
+trim_l = vca { gain: 1.35 }
+trim_r = vca { gain: 1.35 }
+tone.out_l -> trim_l.in
+tone.out_r -> trim_r.in
+xo = crossover { low: 150, high: 3500 }
+trim_l -> xo.in_l
+trim_r -> xo.in_r
+lo = compressor { threshold: -11, ratio: 4, knee: 6, attack: 25ms, release: 160ms, makeup: 1 }
+mid = compressor { threshold: -17, ratio: 3, knee: 6, attack: 8ms, release: 120ms, makeup: 4 }
+hi = compressor { threshold: -16, ratio: 3, knee: 6, attack: 2ms, release: 60ms, makeup: 3 }
+xo.low_l  -> lo.in_l
+xo.low_r  -> lo.in_r
+xo.mid_l  -> mid.in_l
+xo.mid_r  -> mid.in_r
+xo.high_l -> hi.in_l
+xo.high_r -> hi.in_r
+glue = saturate { drive: 4, bias: 0.1 }
+lo.out_l  -> glue.in_l
+lo.out_r  -> glue.in_r
+mid.out_l -> glue.in_l
+mid.out_r -> glue.in_r
+hi.out_l  -> glue.in_l
+hi.out_r  -> glue.in_r
+clip = clipper { mode: soft, threshold: -2.5, drive: 4.5, mix: 1 }
+glue.out_l -> clip.in_l
+glue.out_r -> clip.in_r
+brick = limiter { threshold: -1.0, release: 0.06, true_peak: on }
+clip.out_l -> brick.in_l
+clip.out_r -> brick.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+brick.out_l -> fade_l.in
+brick.out_r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

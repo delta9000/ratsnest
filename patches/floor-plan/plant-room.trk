@@ -1,0 +1,141 @@
+# plant-room.trk -- "Plant Room". 132 BPM, A minor, 16 rows per bar, 100
+# bars. Industrial techno: kick and rumble, clap, hats, pipes on 7 and 5
+# rows, a resonant bass, a stab, gated steam. Levels in plant-room-form.trk.
+#
+#   Am (pedal) ... F/A | E/A in B
+#
+#   intro 16 | A 32 | break 16 | B 28 | outro 8
+
+track kick  note vel                    # 1  kick; duck and comp key
+track clap  note vel                    # 2  clap
+track hat   note vel                    # 3  closed hat
+track ohat  note vel                    # 4  open hat
+track pipe1 note vel                    # 5  modal pipe, 7-row free loop
+track pipe2 note vel                    # 6  modal pipe, 5-row free loop / the figure
+track bass  note vel cva                # 7  resonant bass: cva = cutoff per note
+track stab  note vel cva cvb            # 8  stab, three voices
+track steam note                        # 9  steam gate (keys the noise gate)
+
+pattern kick4 16 kick
+lane kick 9...8...9...8...
+
+pattern kick4b 16 kick
+lane kick 9...8...9...8.5.
+
+pattern hats 16 hat ohat
+lane hat  4.6.4.6.4.6.4.6.
+lane ohat ..7...7...7...7.
+
+pattern hats16 16 hat ohat
+lane hat  5364536453645374
+lane ohat ..7...7...7...7.
+
+pattern clap 16 clap
+04 | x .85
+12 | x@.03 .9
+
+pattern clapfill 16 clap
+04 | x .85
+12 | x@.03 .9
+14 | x*2 .5
+15 | x*3 .6
+
+pattern pipes7 7 pipe1
+00 | A4 .6
+03 | E5?.6 .4
+
+pattern pipes5 5 pipe2
+00 | C5 .5
+02 | D5?.5 .35
+
+# the figure (1 5 4 b3 = A E D C) on the second pipe, in the break
+pattern figure 4x16 pipe2
+1:00 | A4 .75
+1:10 | E5 .6
+2:04 | D5 .65
+3:00 | C5 .7
+4:08 | B4?.6 .45
+
+pattern bass 16 bass
+00 | A1 .9 .3
+02 | A1 .6 .5
+03 | off
+04 | A1 .8 .35
+06 | A2 .55 .7
+07 | off
+08 | A1 .85 .4
+10 | G1 .6 .6
+11 | off
+12 | A1 .8 .45
+14 | C2 .6 .8
+15 | off
+
+pattern bass_f 16 bass
+00 | F1 .9 .3
+02 | F1 .6 .5
+03 | off
+04 | F1 .8 .35
+06 | F2 .55 .7
+07 | off
+08 | F1 .85 .4
+10 | E1 .6 .6
+11 | off
+12 | F1 .8 .45
+14 | A1 .6 .8
+15 | off
+
+pattern bass_e 16 bass
+00 | E1 .9 .3
+02 | E1 .6 .5
+03 | off
+04 | E1 .8 .35
+06 | E2 .55 .7
+07 | off
+08 | E1 .85 .4
+10 | D1 .6 .6
+11 | off
+12 | E1 .8 .45
+14 | Gs1 .6 .9
+15 | off
+
+pattern stab_a 2x16 stab
+1:06 | A3:2 .7 C4 E4
+2:03 | x:1 .5
+2:10 | x:2 .6
+
+pattern stab_f 2x16 stab
+1:06 | A3:2 .7 C4 F4
+2:03 | x:1 .5
+2:10 | x:2 .6
+
+pattern stab_e 2x16 stab
+1:06 | Gs3:2 .75 B3 E4
+2:03 | x:1 .55
+2:10 | x:2 .65
+
+pattern steam 16 steam
+lane steam x0.x0.x0x0.x0xx0
+
+pattern steam_brk 2x16 steam
+1:00 | x
+1:06 | off
+1:08 | x
+1:10 | off
+2:00 | x
+2:12 | off
+
+section in1   kick4+hats
+section in2   kick4+hats+clap+pipes7~
+section a     kick4+hats16+clap+bass+pipes7~+pipes5~+steam
+section a_st  stab_a+kick4b+hats16+clapfill+bass+pipes7~+pipes5~+steam
+section brk   figure+pipes7~+steam_brk
+section b_a   stab_a+kick4+hats16+clap+bass+pipes7~+pipes5~+steam
+section b_f   stab_f+kick4+hats16+clap+bass_f+pipes7~+pipes5~+steam
+section b_e   stab_e+kick4b+hats16+clapfill+bass_e+pipes7~+pipes5~+steam
+section out   kick4+hats+clap+pipes7~
+
+order in1*8 in2*8
+order a*12 a_st*2 a*12 a_st*2
+order brk*4
+order b_a b_f b_a b_e b_a b_f b_a b_e b_a b_f b_a b_e b_a b_f
+order out*8

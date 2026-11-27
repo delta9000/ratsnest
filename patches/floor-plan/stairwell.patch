@@ -1,0 +1,199 @@
+# stairwell -- dub techno in a concrete stairwell. 118 BPM, C minor, 88 bars
+# (~3:00). Track 2 of "Floor Plan".
+#
+# The echo is the instrument. A four-voice chord blip plays dry and quiet;
+# its send goes into a ping-pong `echo` (dotted eighth, repeats walking
+# left, right, left), whose feedback is a form lane that climbs into each
+# section change and runs long in the dub break. The echo's return is
+# band-limited by an `eq` (`hp_freq` 280, `lp_freq` 4500) and fed, with the
+# rim and the thrown pluck, into a tall bright hall (`size` 1.7, `decay`
+# .8, little damping: hard walls). Kick-keyed ducking on the returns and
+# the master bus.
+#
+# Parts: kick, offbeat hat, rim on a 5-row loop, shaker (native kit); the
+# chord blip (poly-pad, a short ladder pluck); a sine sub; a pluck that
+# throws the album's figure (C G F Eb) into the echo once every four bars
+# from B on, and twice in the dub break.
+#
+#   intro 8 | A 16 (Cm9) | B 24 (Cm9 Abmaj9 Fm9) | dub 8 | C 24 | outro 8
+
+t    = transport { bpm: 118, division: 4, bars: 4, swing: 0.06 }
+song = tracker { file: "stairwell.trk", seed: 5 }
+form = tracker { file: "stairwell-form.trk" }
+t.clock -> song.clock
+t.bar   -> form.clock
+
+drums_lvl = func { rise: 0.2, fall: 0.3 }
+bass_lvl  = func { rise: 0.3, fall: 0.6 }
+stab_lvl  = func { rise: 1, fall: 1 }
+send_lvl  = func { rise: 0.5, fall: 0.5 }
+fb_lvl    = func { rise: 1.5, fall: 0.6 }
+throw_lvl = func { rise: 0.5, fall: 2 }
+shk_lvl   = func { rise: 1, fall: 1 }
+verb_lvl  = func { rise: 3, fall: 3 }
+main_lvl  = func { rise: 1, fall: 1 }
+form.cva1 -> drums_lvl.in
+form.cva2 -> bass_lvl.in
+form.cva3 -> stab_lvl.in
+form.cva4 -> send_lvl.in
+form.cva5 -> fb_lvl.in
+form.cva6 -> throw_lvl.in
+form.cva7 -> shk_lvl.in
+form.cva8 -> verb_lvl.in
+form.cva9 -> main_lvl.in
+
+pump = sub { file: "../lib/duck.sub", depth_db: -7, release: 0.3, curve: exp }
+song.gate1 -> pump.trig
+drums_lvl -> pump.amount
+lift = sub { file: "../lib/duck.sub", depth_db: -4, release: 0.4, curve: exp }
+song.gate1 -> lift.trig
+drums_lvl -> lift.amount
+
+# ---- kit ----
+kick = sub { file: "../lib/kit/kick.sub", tune: 46hz, decay: 0.5, bend: 2.0 }
+song.gate1 -> kick.trig
+song.vel1  -> kick.accent
+kick_s = sub { file: "../lib/strip.sub", gain: 1.0 }
+kick -> kick_s.in
+drums_lvl -> kick_s.level
+
+hat = sub { file: "../lib/kit/hat_model.sub", decay: 0.07s, tone: 9khz }
+song.gate2 -> hat.trig
+song.vel2  -> hat.accent
+hat_s = sub { file: "../lib/strip.sub", gain: 1.5, send_gain: 0.1, pos: 0.2 }
+hat -> hat_s.in
+drums_lvl -> hat_s.level
+
+rim = sub { file: "../lib/kit/rim.sub", tune: 610hz, decay: 0.2 }
+song.gate3 -> rim.trig
+song.vel3  -> rim.accent
+rim_s = sub { file: "../lib/strip.sub", gain: 0.8, send_gain: 0.6, pos: -0.35 }
+rim -> rim_s.in
+shk_lvl -> rim_s.level
+
+shk = sub { file: "../lib/kit/hat_model.sub", tune: 0.4, decay: 0.035s, tone: 10khz }
+song.gate7 -> shk.trig
+song.vel7  -> shk.accent
+shk_pan = lfo { freq: 0.11hz }
+shk_s = sub { file: "../lib/strip.sub", gain: 1.6, send_gain: 0.15, pos: 0.3 }
+shk -> shk_s.in
+shk_pan -> shk_s.pan : 0.3
+shk_lvl -> shk_s.level
+pump -> shk_s.duck
+
+# ---- chord blip: dry and quiet ----
+stab = sub { file: "../lib/poly-pad.sub", n: 4, attack: 0.002, decay: 1.0, sustain: 0,
+             release: 0.5, curve: exp, slope: 1, res: 0.35, cutoff: 500, env_amt: 2400 }
+song.gate4 -> stab.gate
+song.vel4  -> stab.vel
+song.voct4 -> stab.p1
+song.cva4  -> stab.p2
+song.cvb4  -> stab.p3
+song.cvd4  -> stab.p4
+scut = lfo { freq: 0.031hz }
+scut -> stab.cut : 500
+stab_s = sub { file: "../lib/strip.sub", gain: 3.5, send_gain: 1.0, pos: 0.05 }
+stab -> stab_s.in
+stab_lvl -> stab_s.level
+send_lvl -> stab_s.send
+pump -> stab_s.duck
+
+# ---- sub ----
+bass = sub { file: "../lib/synth-voice.sub", wave1: sine, blend: 0, cutoff: 400, track: 0,
+             env_amt: 0, attack: 0.004, decay: 0.3, sustain: 0.85, release: 0.1 }
+song.voct5 -> bass.voct
+song.gate5 -> bass.gate
+song.vel5  -> bass.vel
+bass_s = sub { file: "../lib/strip.sub", gain: 0.75 }
+bass -> bass_s.in
+bass_lvl -> bass_s.level
+pump -> bass_s.duck
+
+# ---- the thrown pluck ----
+throw = sub { file: "../lib/synth-voice.sub", wave1: tri, wave2: pulse, blend: 0.4, pw: 0.3,
+              sustain: 0, decay: 0.8, release: 0.6, cutoff: 900, env_amt: 2000, slope: 0 }
+song.voct6 -> throw.voct
+song.gate6 -> throw.gate
+song.vel6  -> throw.vel
+throw_s = sub { file: "../lib/strip.sub", gain: 0.6, send_gain: 2.2, pos: -0.15 }
+throw -> throw_s.in
+throw_lvl -> throw_s.level
+
+# ---- the echo: ping-pong, dotted eighth ----
+dot8 = tempo { bpm: 118, beats: 0.75 }
+dub = echo { mode: ping, time: 0ms, feedback: 0, tone: 2400, mix: 1, slew: 0.3 }
+dot8.seconds -> dub.time
+wow = lfo { freq: 0.13hz }
+wow -> dub.time : 0.0015
+fb_lvl -> dub.feedback
+stab_s.fx  -> dub.in_l
+throw_s.fx -> dub.in_l
+band = eq { hp_freq: 280, lp_freq: 4500, mid1_freq: 900, mid1_gain: 2, mid1_q: 0.8 }
+dub.out_l -> band.in_l
+dub.out_r -> band.in_r
+echo_s = sub { file: "../lib/strip.sub", gain: 2.0, send_gain: 0.4 }
+band.out_l -> echo_s.in_l
+band.out_r -> echo_s.in_r
+lift -> echo_s.duck
+
+# ---- the stairwell: tall, hard walls ----
+well = reverb { model: hall, size: 1.7, decay: 0.8, damp: 0.2, mix: 1, predelay: 0.035 }
+echo_s.fx  -> well.in_l
+echo_s.fx  -> well.in_r
+rim_s.fx   -> well.in_l
+throw_s.fx -> well.in_r : 0.3
+hat_s.fx   -> well.in_r
+shk_s.fx   -> well.in_l
+stab_s.fx  -> well.in_r : 0.25
+well_hl = svf { cutoff: 260, res: 0 }
+well_hr = svf { cutoff: 260, res: 0 }
+well.out_l -> well_hl.in
+well.out_r -> well_hr.in
+well_s = sub { file: "../lib/strip.sub", gain: 1.8 }
+well_hl.hp -> well_s.in_l
+well_hr.hp -> well_s.in_r
+verb_lvl -> well_s.level
+lift -> well_s.duck
+
+# ---- tape hiss under everything ----
+hiss = noise { color: pink, seed: 9 }
+hiss_f = svf { cutoff: 5000, res: 0 }
+hiss -> hiss_f.in
+hiss_s = sub { file: "../lib/strip.sub", gain: 0.012, width: 1 }
+hiss_f.hp -> hiss_s.in
+
+master = sub { file: "../lib/master-chain.sub", ceiling: -1.8, true_peak: on, key_bus: 0.45,
+               low_gain: -2, mid1_gain: -1, mid2_gain: 1.5, clip_drive: 5 }
+9.5 -> master.makeup
+drums_lvl -> master.makeup : 2.5    # kick-less sections get less makeup
+1.1 -> master.width
+kick -> master.side_l : 0.8
+kick -> master.side_r : 0.8
+kick_s.l  -> master.in_l
+kick_s.r  -> master.in_r
+hat_s.l   -> master.in_l
+hat_s.r   -> master.in_r
+rim_s.l   -> master.in_l
+rim_s.r   -> master.in_r
+shk_s.l   -> master.in_l
+shk_s.r   -> master.in_r
+stab_s.l  -> master.in_l
+stab_s.r  -> master.in_r
+bass_s.l  -> master.in_l
+bass_s.r  -> master.in_r
+throw_s.l -> master.in_l
+throw_s.r -> master.in_r
+echo_s.l  -> master.in_l
+echo_s.r  -> master.in_r
+well_s.l  -> master.in_l
+well_s.r  -> master.in_r
+hiss_s.l  -> master.in_l
+hiss_s.r  -> master.in_r
+fade_l = vca { gain: 0 }
+fade_r = vca { gain: 0 }
+master.l -> fade_l.in
+master.r -> fade_r.in
+main_lvl -> fade_l.cv
+main_lvl -> fade_r.cv
+fade_l -> out.left
+fade_r -> out.right

@@ -1,0 +1,22 @@
+# cistern-form.trk -- one row per bar (52), slewed in the patch.
+track drips cva   # 1  water drops
+track drone cva   # 2
+track bell  cva   # 3
+track bowl  cva   # 4
+track pad   cva   # 5
+track dry   cva   # 6  dry share of everything (0 in the frozen bars)
+track freeze cva  # 7  hall freeze gate
+track main  cva   # 8
+
+pattern form 52
+#    drips  drone  bell   bowl   pad    dry    freeze main
+00 | .8   | 0    | 0    | 0    | 0    | 1    | 0    | 1     # water: drops into the hall
+08 | .6   | .8   | 0    | .7   | 0    | .    | .    | .     # the drone, the bowl
+12 | .5   | .9   | .9   | .7   | .8   | .    | .    | .     # chords and the figure
+36 | .    | .    | .    | .    | .    | 0    | 1    | .     # frozen: the hall holds, dry out
+40 | .7   | .8   | .8   | .7   | .7   | 1    | 0    | .     # thaw
+48 | .8   | .7   | 0    | .5   | 0    | .    | .    | .     # the drone alone
+50 | .    | .    | .    | .    | .    | .    | .    | 1>
+51 | .    | .    | .    | .    | .    | .    | .    | 0
+
+order form

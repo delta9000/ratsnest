@@ -1,0 +1,135 @@
+# corridor.trk -- "Corridor". 128 BPM, D dorian, 16 rows per bar, 96 bars.
+# Motorik: a kit that never stops, an eighth-note bass, plucked strings in
+# a Haas-widened echo, a sixteenth sequence, an organ, a lead in B with
+# the album's figure. Levels in corridor-form.trk.
+#
+#   A  Dm7 (4) | C (4) | G/B (4) | Dm7 (4)     one chord per four bars
+#   B  Bbmaj7 (4) | C (4) | Dm7 (4) | Dm7 (4)
+#
+#   intro 8 | A 24 | B 24 | hall 8 | A 24 | outro 8
+
+track kick  note vel                    # 1
+track snare note vel                    # 2
+track hat   note vel                    # 3
+track ohat  note vel                    # 4
+track harm  note vel cva cvb cvd        # 5  organ: the chord
+track bass  note vel from harm          # 6  eighth-note bass
+track pluck note vel from harm          # 7  plucked strings, through the Haas echo
+track seq   note vel from harm          # 8  sixteenth sequence
+track lead  note vel                    # 9  lead
+
+pattern motorik 16 kick snare hat ohat
+00 | x .9   | .       | x .6   | .
+02 | .      | .       | x .4   | .
+04 | x .85  | x .85   | x .55  | .
+06 | .      | .       | x .4   | .
+08 | x .9   | .       | x .6   | .
+10 | .      | .       | x .4   | x?.6 .4
+12 | x .85  | x .9    | x .55  | .
+14 | x?.3 .4 | .      | x .45  | .
+
+pattern kick_only 16 kick hat
+00 | x .8   | .
+04 | x .7   | .
+08 | x .8   | .
+12 | x .7   | x .3
+
+pattern a_h1 8x16 harm
+1:00 | D3 .55 F3 A3 C4
+5:00 | C3 .55 E3 G3 B3
+
+pattern a_h2 8x16 harm
+1:00 | B2 .55 D3 G3 A3
+5:00 | D3 .55 F3 A3 C4
+
+pattern b_h1 8x16 harm
+1:00 | Bb2 .55 D3 F3 A3
+5:00 | C3 .55 E3 G3 Bb3
+
+pattern b_h2 8x16 harm
+1:00 | D3 .55 F3 A3 C4
+
+pattern bass8 16 bass
+00 | t1-12 .85
+01 | off
+02 | t1-12 .6
+03 | off
+04 | t1-12 .8
+05 | off
+06 | t1 .55
+07 | off
+08 | t1-12 .8
+09 | off
+10 | t1-12 .6
+11 | off
+12 | t3-12 .75
+13 | off
+14 | t1-12 .6
+15 | off
+
+pattern pluck 16 pluck
+00 | t1+12 .7
+03 | t3+12 .5
+06 | t4+12 .55
+08 | t2+12 .5
+11 | t3+12 .45
+14 | t4 .4
+
+pattern seq 16 seq
+00 | t1+12 .6
+01 | t1+24 .35
+02 | t3+12 .45
+03 | t1+12 .35
+04 | t4 .5
+05 | t1+24 .35
+06 | t2+12 .45
+07 | t3+12 .35
+08 | t1+12 .55
+09 | t4+12 .35
+10 | t3+12 .45
+11 | t1+12 .35
+12 | t2+12 .5
+13 | t1+24 .35
+14 | t3+12 .45
+15 | t4 .35
+
+# the figure (1 5 4 b3 = D A G F), long and high
+pattern lead1 8x16 lead
+1:00  | D5:12 .7
+2:00  | A5:12 .7
+3:00  | G5:8 .7
+3:08  | F5:8 .65
+4:00  | E5:14 .6
+5:00  | C5:12 .65
+6:00  | G5:12 .7
+7:00  | F5:8 .7
+7:08  | E5:8 .65
+8:00  | D5:14 .6
+
+pattern lead2 8x16 lead
+1:00 | D5:12 .7
+2:00 | A5:12 .75
+3:00 | G5:8 .7
+3:08 | F5:8 .7
+4:00 | C6:14 .75
+5:00 | A5:16 .7
+6:00 | G5:8 .65
+6:08 | F5:8 .6
+7:00 | D5:28 .65
+
+section intro  a_h1+kick_only
+section a1     a_h1+motorik+bass8+pluck
+section a2     a_h2+motorik+bass8+pluck
+section as1    a_h1+motorik+bass8+pluck+seq
+section as2    a_h2+motorik+bass8+pluck+seq
+section b1     b_h1+motorik+bass8+pluck+seq+lead1
+section b2     b_h2+motorik+bass8+pluck+seq+lead2
+section hall   a_h1+pluck
+section out    a_h1+motorik+pluck
+
+order intro
+order a1 a2 as1
+order b1 b2 b1
+order hall
+order as1 as2 as1
+order out

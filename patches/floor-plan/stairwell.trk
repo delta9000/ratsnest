@@ -1,0 +1,119 @@
+# stairwell.trk -- "Stairwell". 118 BPM, C minor, 16 rows per bar, 88 bars.
+# Dub techno: the dry chord is a short blip, the ping-pong echo and the
+# stairwell's hall are the instrument. Levels in stairwell-form.trk.
+#
+#   Cm9 (one chord, twelve bars at a time) | Abmaj9 | Fm9 | Cm9
+#
+#   intro 8 | A 16 | B 24 | dub 8 | C 24 | outro 8
+
+track kick  note vel                    # 1  kick; the duck trigger
+track hat   note vel                    # 2  offbeat hat
+track rim   note vel                    # 3  rim, a 5-row free loop
+track stab  note vel cva cvb cvd        # 4  chord blip, four voices
+track bass  note vel                    # 5  sine sub
+track throw note vel                    # 6  pluck thrown into the echo: the figure
+track shk   note vel                    # 7  shaker, 16ths
+
+pattern four 16 kick hat
+00 | x .9   | .
+02 | .      | x .5
+04 | x .85  | .
+06 | .      | x?.3 .2
+08 | x .9   | x .55
+10 | .      | x .3
+12 | x .85  | .
+14 | .      | x?.5 .25
+
+pattern four_b 16 kick hat
+00 | x .9   | .
+02 | .      | x .55
+04 | x .85  | .
+06 | .      | x .5
+08 | x .9   | .
+10 | .      | x .55
+12 | x .85  | .
+14 | .      | x .5
+15 | x?.3 .4 | .
+
+pattern rim5 5 rim
+03 | x .45
+
+pattern shk16 16 shk
+lane shk 3241324132413251
+
+# ---- chord blips: Cm9 Abmaj9 Fm9 Cm9, four bars each by the order ----
+pattern stab_c 16 stab
+03 | Eb3:1 .7 G3 Bb3 D4
+10 | x:1 .5
+13 | x?.4:1 .35
+
+pattern stab_ab 16 stab
+03 | Eb3:1 .7 G3 C4 Bb3
+10 | x:1 .5
+13 | x?.4:1 .35
+
+pattern stab_f 16 stab
+03 | Eb3:1 .7 Ab3 C4 G4
+10 | x:1 .5
+13 | x?.4:1 .35
+
+pattern stab_sparse 16 stab
+03 | Eb3:1 .55 G3 Bb3 D4
+
+pattern bass_c 16 bass
+00 | C2 .8
+03 | off
+06 | C2 .55
+08 | off
+11 | G1 .6
+13 | off
+
+pattern bass_ab 16 bass
+00 | Ab1 .8
+03 | off
+06 | Ab1 .55
+08 | off
+11 | Eb2 .6
+13 | off
+
+pattern bass_f 16 bass
+00 | F1 .8
+03 | off
+06 | F1 .55
+08 | off
+11 | C2 .6
+13 | off
+
+# the figure (1 5 4 b3 = C G F Eb), thrown once per four bars
+pattern figure 4x16 throw
+1:00 | C5 .7
+1:06 | G4 .6
+2:00 | F4 .65
+2:06 | Eb4 .6
+
+pattern figure2 4x16 throw
+1:00 | C5 .7
+1:06 | G4 .6
+2:00 | F4 .65
+2:06 | Eb4 .6
+3:08 | G4?.6 .45
+4:00 | Bb4 .5
+
+section intro  stab_sparse+rim5~
+section intro2 stab_sparse+four+rim5~
+section a_c    stab_c+four+bass_c+rim5~
+section b_c    stab_c+four_b+bass_c+rim5~+shk16+figure~
+section b_ab   stab_ab+four_b+bass_ab+rim5~+shk16+figure~
+section b_f    stab_f+four_b+bass_f+rim5~+shk16+figure~
+section dub    stab_sparse+rim5~+figure2~
+section c_c    stab_c+four_b+bass_c+rim5~+shk16+figure~
+section c_ab   stab_ab+four_b+bass_ab+rim5~+shk16+figure~
+section c_f    stab_f+four_b+bass_f+rim5~+shk16+figure~
+section out    stab_sparse+four+rim5~
+
+order intro*4 intro2*4
+order a_c*16
+order b_c*4 b_ab*4 b_f*4 b_c*4 b_ab*4 b_f*4
+order dub*8
+order c_c*4 c_ab*4 c_f*4 c_c*4 c_ab*4 c_f*4
+order out*8
