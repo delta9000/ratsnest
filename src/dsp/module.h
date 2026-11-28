@@ -7,11 +7,18 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include "dsl/unit.h"
 
 namespace ms::dsp {
 
-// Discrete controls bypass parameter glides on reload/live edits.
-struct InputInfo  { const char* name; float def; bool glide = true; };
+// Discrete controls bypass parameter glides on reload/live edits. `unit` is
+// what a literal written for this input must measure, if it carries a suffix
+// (dsl/unit.h); the helpers below declare one.
+struct InputInfo  { const char* name; float def; bool glide = true; Unit unit = Unit::None; };
+constexpr InputInfo in_hz(const char* n, float d)   { return {n, d, true, Unit::Freq}; }
+constexpr InputInfo in_secs(const char* n, float d) { return {n, d, true, Unit::Time}; }
+constexpr InputInfo in_bpm(const char* n, float d)  { return {n, d, true, Unit::Tempo}; }
+constexpr InputInfo in_voct(const char* n, float d) { return {n, d, true, Unit::Pitch}; }
 enum class ConfigKind { Number, Text, Numbers, Enums, Texts };
 struct ConfigInfo {
   const char* name;

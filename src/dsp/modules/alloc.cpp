@@ -6,7 +6,7 @@
 
 namespace ms::dsp {
 namespace {
-constexpr InputInfo kIns[] = {{"gate", 0.f}, {"voct", 0.f}, {"vel", 1.f}};
+constexpr InputInfo kIns[] = {{"gate", 0.f}, in_voct("voct", 0.f), {"vel", 1.f}};
 constexpr const char* kModes[] = {"rr", "unison", nullptr};
 constexpr ConfigInfo kCfg[] = {{"n", nullptr, ConfigKind::Number, 4.0}, {"mode", kModes}};
 

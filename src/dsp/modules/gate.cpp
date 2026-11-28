@@ -16,9 +16,9 @@ constexpr InputInfo kIns[] = {
     {"threshold", -40.0f},  // dBFS
     {"ratio", 10.0f},       // dB of cut per dB under the threshold
     {"range", 60.0f},       // most cut, dB
-    {"attack", 0.001f},     // s, opening
-    {"hold", 0.02f},        // s
-    {"release", 0.1f}};     // s, closing
+    in_secs("attack", 0.001f),     // s, opening
+    in_secs("hold", 0.02f),        // s
+    in_secs("release", 0.1f)};     // s, closing
 constexpr const char* kSidechains[] = {"internal", "external", nullptr};
 constexpr ConfigInfo kCfg[] = {{"sidechain", kSidechains}};
 constexpr OutputInfo kOuts[] = {{"out_l"}, {"out_r"}, {"gain"}, {"gr"}, {"open"}};

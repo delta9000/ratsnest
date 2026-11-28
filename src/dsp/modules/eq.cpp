@@ -11,18 +11,18 @@ namespace {
 constexpr InputInfo kIns[] = {
     {"in_l", 0.0f},
     {"in_r", 0.0f},
-    {"hp_freq", 0.0f},
-    {"low_freq", 120.0f},
+    in_hz("hp_freq", 0.0f),
+    in_hz("low_freq", 120.0f),
     {"low_gain", 0.0f},       // dB
-    {"mid1_freq", 500.0f},
+    in_hz("mid1_freq", 500.0f),
     {"mid1_gain", 0.0f},      // dB
     {"mid1_q", 0.707f},
-    {"mid2_freq", 2500.0f},
+    in_hz("mid2_freq", 2500.0f),
     {"mid2_gain", 0.0f},      // dB
     {"mid2_q", 0.707f},
-    {"high_freq", 10000.0f},
+    in_hz("high_freq", 10000.0f),
     {"high_gain", 0.0f},      // dB
-    {"lp_freq", 0.0f},        // 0 = off
+    in_hz("lp_freq", 0.0f),        // 0 = off
     {"low_q", 1.0f},
     {"high_q", 1.0f}
 };

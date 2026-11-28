@@ -20,8 +20,8 @@ constexpr InputInfo kIns[] = {
     {"threshold", -18.0f}, // dBFS
     {"ratio", 4.0f},
     {"knee", 6.0f},        // dB
-    {"attack", 0.01f},     // s
-    {"release", 0.1f},     // s
+    in_secs("attack", 0.01f),     // s
+    in_secs("release", 0.1f),     // s
     {"makeup", 0.0f},      // dB
     {"mix", 1.0f}          // 0..1
 };

@@ -95,7 +95,12 @@ class Parser {
   }
 
   bool value(Value& v, int depth = 0) {
-    if (at(Tok::Number)) { v.kind = Value::Kind::Num; v.num = next().num; return true; }
+    if (at(Tok::Number)) {
+      v.kind = Value::Kind::Num;
+      v.unit = cur().unit;
+      v.num = next().num;
+      return true;
+    }
     if (at(Tok::Ident)) {
       v.kind = Value::Kind::Ident;
       v.str = next().text;
@@ -134,6 +139,7 @@ class Parser {
     cbl.line = first.line; cbl.col = first.col;
     if (at(Tok::Number)) {
       cbl.src.is_literal = true;
+      cbl.src.unit = cur().unit;
       cbl.src.literal = next().num;
       cbl.src.line = first.line; cbl.src.col = first.col;
     } else if (!endpoint(cbl.src)) { return; }

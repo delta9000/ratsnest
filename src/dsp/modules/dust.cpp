@@ -6,7 +6,7 @@
 
 namespace ms::dsp {
 namespace {
-constexpr InputInfo kIns[] = {{"rate", 10.f}};
+constexpr InputInfo kIns[] = {in_hz("rate", 10.f)};
 constexpr ConfigInfo kCfg[] = {{"seed", nullptr}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"trig"}};
 

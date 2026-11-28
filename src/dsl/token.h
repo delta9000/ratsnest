@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include "dsl/unit.h"
 
 namespace ms::dsl {
 enum class Tok {
@@ -13,6 +14,7 @@ struct Token {
   Tok kind;
   std::string text;
   double num = 0.0;
+  Unit unit = Unit::None;  // a Number's suffix
   int line = 1;
   int col = 1;
 };

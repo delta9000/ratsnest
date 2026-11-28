@@ -17,7 +17,7 @@ constexpr InputInfo kIns[] = {
     {"in_l", 0.0f},
     {"in_r", 0.0f},
     {"threshold", -0.1f}, // dBFS
-    {"release", 0.05f}    // s
+    in_secs("release", 0.05f)    // s
 };
 // The first entry is the default: true-peak detection unless asked not to.
 constexpr const char* kOnOff[] = {"on", "off", nullptr};

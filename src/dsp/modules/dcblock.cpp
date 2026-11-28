@@ -11,7 +11,7 @@ namespace {
 constexpr InputInfo kIns[] = {
     {"in_l", 0.f},
     {"in_r", 0.f},
-    {"cutoff", 10.f}
+    in_hz("cutoff", 10.f)
 };
 constexpr OutputInfo kOuts[] = {
     {"out_l"},

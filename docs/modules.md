@@ -33,10 +33,15 @@ seq = stepseq { steps: [0, 0.25, 0.58333], gates: [1, 0, 1] }
 
 Unit suffixes are `hz`, `khz`, `ms`, `s` and `bpm`, lowercase, written
 directly after the number (`2khz`, `250ms`). They are plain scale factors —
-`khz` ×1000, `ms` ×0.001, the rest ×1 — and are **not** checked against the
-parameter: `lfo { freq: 500ms }` is 0.5 Hz and `delay { time: 2hz }` is two
-seconds. Pick the suffix that matches the input's unit (Hz for `freq`/`cutoff`/
-`rate`, seconds for times, BPM for `bpm`). Omitted output means the first output
+`khz` ×1000, `ms` ×0.001, the rest ×1. Inputs that measure something declare
+it, and a suffix (or a note name) of the wrong kind is an error at its
+line:col: `lfo { freq: 500ms }`, `delay { time: 2hz }`, `clock { bpm: 2hz }`
+and `vco { freq: A4v }` (a v/oct note) all fail `check`. Frequency inputs
+(`freq`, `cutoff`, the eq `*_freq`, and the `rate` of `chorus`, `phaser`,
+`random` and `dust`) take `hz`/`khz`/`A4`; times (`attack`, `decay`,
+`release`, `hold`, `rise`, `fall`, delay and echo `time`/`slew`) take
+`s`/`ms`; `bpm` takes `bpm`; `v_oct`/`voct` take `A4v`. A bare number fits
+any input, and inputs that declare nothing accept any suffix. Omitted output means the first output
 (a bare `stepseq` name reads its `cv`, a bare `svf` its `lp`). Validate with
 `ratsnest check patch.patch`; `ratsnest render ... --stats [dur]` prints
 overall peak, true peak (dBTP), integrated loudness (LUFS, ITU-R BS.1770-4
@@ -658,7 +663,7 @@ input exactly. Examples: `switch { mode: seq, n: 4 }` (audio),
 
 `turing { len: 8, prob: .1, seed: 1 }` — inputs `clock`, `write`, `clear`,
 length `1..16`, mutation probability. Outputs normalized low-byte `out`,
-one-sample incoming-bit `pulse`, and current `bit1..bit8` gates. Prob 0 locks a
+one-sample `trig` when a high bit enters (named `pulse` before 2026-11), and current `bit1..bit8` gates. Prob 0 locks a
 loop; write forces a high incoming bit; clear zeros the whole register.
 
 ## `stepseq`

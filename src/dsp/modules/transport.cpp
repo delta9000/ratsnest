@@ -8,7 +8,7 @@
 namespace ms::dsp {
 namespace {
 constexpr InputInfo kIns[] = {
-    {"bpm", 120.f}, {"run", 1.f, false}, {"reset", 0.f, false}, {"swing", 0.f}};
+    in_bpm("bpm", 120.f), {"run", 1.f, false}, {"reset", 0.f, false}, {"swing", 0.f}};
 constexpr ConfigInfo kCfg[] = {
     {"beats", nullptr}, {"bars", nullptr}, {"division", nullptr}};
 constexpr OutputInfo kOuts[] = {{"clock"},     {"gate"},         {"beat"},

@@ -17,7 +17,7 @@ namespace {
 constexpr int kMaxVoices = 4;
 
 constexpr InputInfo kIns[] = {
-    {"in_l", 0.f}, {"in_r", 0.f}, {"rate", 0.5f}, {"depth", 0.5f}, {"mix", 0.5f}};
+    {"in_l", 0.f}, {"in_r", 0.f}, in_hz("rate", 0.5f), {"depth", 0.5f}, {"mix", 0.5f}};
 constexpr const char* kShapes[] = {"tri", "sine", nullptr};
 constexpr ConfigInfo kCfg[] = {
     {"voices", nullptr}, {"delay", nullptr}, {"swing", nullptr}, {"shape", kShapes}};

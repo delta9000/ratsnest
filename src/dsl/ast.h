@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "dsl/unit.h"
 
 namespace ms::dsl {
 
@@ -10,6 +11,7 @@ struct Value {
   double num = 0.0;
   std::string str;
   std::vector<Value> items;
+  Unit unit = Unit::None;  // a Num's suffix
 };
 
 struct ParamDecl { std::string name; Value value; int line = 0, col = 0; };
@@ -24,6 +26,7 @@ struct ModuleDecl {
 struct Endpoint {
   bool is_literal = false;
   double literal = 0.0;
+  Unit unit = Unit::None;  // the literal's suffix
   std::string module, port;  // port empty = default port
   int line = 0, col = 0;
 };
