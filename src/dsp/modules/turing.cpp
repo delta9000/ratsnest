@@ -12,7 +12,7 @@ namespace {
 constexpr InputInfo kIns[] = {{"clock", 0.f}, {"write", 0.f}, {"clear", 0.f},
                               {"len", 8.f}, {"prob", 0.1f}};
 constexpr ConfigInfo kCfg[] = {{"seed", nullptr}};
-constexpr OutputInfo kOuts[] = {{"out"}, {"pulse"}, {"bit1"}, {"bit2"},
+constexpr OutputInfo kOuts[] = {{"out"}, {"trig"}, {"bit1"}, {"bit2"},
                                 {"bit3"}, {"bit4"}, {"bit5"}, {"bit6"},
                                 {"bit7"}, {"bit8"}};
 class Turing final : public Module {
