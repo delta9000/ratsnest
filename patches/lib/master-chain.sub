@@ -16,9 +16,9 @@
 # constant cable, `1.1 -> mast.width`. Everything else is a param.
 #
 # Measured: the defaults are a polite master, not a loud one -- whole-step
-# (all defaults) -13.5 LUFS integrated with a TRUE peak of +1.7 dBTP over a
-# -0.4 dBFS sample ceiling; a pop mix staged a few dB lower read -16.7.
-# `true_peak: on` (a param: the limiter's detector config) fixes the overs.
+# (all defaults) about -13.5 LUFS integrated; a pop mix staged a few dB lower
+# read -16.7. The limiter holds TRUE peak under the -0.4 dBFS ceiling (it
+# read +1.7 dBTP when this bus limited sample peaks only).
 #
 # What it does NOT do, measured on two full songs (docs and numbers in
 # .claude/skills/ratsnest-composition/references/mastering.md):
@@ -33,10 +33,9 @@
 # - The soft clipper is PARALLEL (`clip_blend` 0.32): the dry share passes
 #   unclipped, so its output overshoots the -2.5 dB threshold by 2.4-3.4 dB.
 #   The limiter catches it; the clipper only rounds peaks.
-# - The limiter is SAMPLE-peak by default (`true_peak: off`, so older renders
-#   stay bit-identical). Inter-sample peaks land 1.6-2.3 dB over `ceiling`
-#   on a loud master. Set `true_peak: on`, or keep `ceiling` at -2.5 or
-#   lower, when the true peak matters (streaming, lossy encodes).
+# - The limiter detects TRUE peaks (`true_peak: on`, the default). With
+#   `true_peak: off` it limits sample peaks only, and inter-sample peaks
+#   land 1.6-2.3 dB over `ceiling` on a loud master.
 
 hp_freq    = param { default: 28 }
 low_freq   = param { default: 100 }
@@ -56,7 +55,7 @@ key_bus    = param { default: 0 }    # share of the bus in the comp key
 clip_drive = param { default: 6.5 }
 clip_blend = param { default: 0.32 }
 ceiling    = param { default: -0.4 }
-true_peak  = param { default: off }  # limiter detector: off = sample peaks
+true_peak  = param { default: on }   # limiter detector: off = sample peaks only
 
 in_l   = input {}
 in_r   = input {}

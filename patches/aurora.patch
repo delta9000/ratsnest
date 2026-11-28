@@ -130,6 +130,10 @@ kick_env -> mixer.lvl6 : -0.3
 probe_bus = scope { label: master_bus }
 mixer.out_l -> probe_bus.in
 
-mixer.out_l -> out.left
-mixer.out_r -> out.right
+# DC guard: the mix carried a -0.012 offset.
+dc = dcblock
+mixer.out_l -> dc.in_l
+mixer.out_r -> dc.in_r
+dc.out_l -> out.left
+dc.out_r -> out.right
 -0.38 -> out.level

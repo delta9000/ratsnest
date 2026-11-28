@@ -120,8 +120,8 @@ These settings are starting points, not neutral defaults:
   `width`/`makeup` are inputs for lanes. Their kick-keyed compressor does
   nothing in a kick-less section but still applies makeup (a breakdown came
   back 1 dB under its chorus); the default parallel clipper overshoots its
-  threshold by 2.4–3.4 dB; the limiter is sample-peak unless `true_peak: on`
-  (+1.6–2.3 dB between samples otherwise). Numbers and fixes:
+  threshold by 2.4–3.4 dB; the limiter catches it, and holds true peak (the
+  default `true_peak: on`; with `off` it overshoots +1.6–2.3 dB between samples). Numbers and fixes:
   `ratsnest-composition/references/mastering.md`.
 
 ## A song's voices and mix: synth-voice, strip, duck

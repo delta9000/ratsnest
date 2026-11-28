@@ -19,7 +19,8 @@ constexpr InputInfo kIns[] = {
     {"threshold", -0.1f}, // dBFS
     {"release", 0.05f}    // s
 };
-constexpr const char* kOnOff[] = {"off", "on", nullptr};
+// The first entry is the default: true-peak detection unless asked not to.
+constexpr const char* kOnOff[] = {"on", "off", nullptr};
 constexpr ConfigInfo kCfg[] = {{"true_peak", kOnOff}};
 constexpr OutputInfo kOuts[] = {
     {"out_l"},
@@ -38,7 +39,7 @@ class Limiter final : public Module {
     // sample, so it has fully settled by the time a peak leaves the delay.
     // The true-peak detector reports a peak kLag samples late, so the audio
     // waits that much longer, and the hold covers both samples around it.
-    tp_ = cfg_enum(cfg, "true_peak", kOnOff) == 1;
+    tp_ = cfg_enum(cfg, "true_peak", kOnOff) == 0;
     look_ = std::clamp(static_cast<int>(std::round(rate_ * 0.002f)), 1, kRing - 2 - TruePeak4x::kLag);
     delay_ = look_ + TruePeak4x::kLag * tp_;
     st_ = State{};

@@ -23,3 +23,4 @@ g.out_l -> verb.in_l
 g.out_r -> verb.in_r
 verb.out_l -> out.left
 verb.out_r -> out.right
+-0.12 -> out.level   # true peak was +0.7 dBTP at unity

@@ -44,9 +44,9 @@ Order matters: DC first (so nothing downstream sees offset), EQ before dynamics
 (so the compressor isn't triggered by mud you were going to cut anyway), width
 after compression (so the compressor stays stereo-linked on the real signal),
 clipper before limiter (the clipper shaves peaks so the limiter barely works).
-For a release master add `true_peak: on` to the limiter: sample-peak limiting
-lets dense mixes overshoot by 1.6–2.3 dB between samples (see `limiter` in
-`docs/modules.md`).
+The limiter detects true peaks by default; `true_peak: off` (sample-peak
+limiting) lets dense mixes overshoot by 1.6–2.3 dB between samples (see
+`limiter` in `docs/modules.md`).
 
 ## The calibration numbers
 
@@ -95,10 +95,9 @@ does that you have to plan around:
   the clip is parallel: the dry 68 % passes unclipped, so the clipper's
   output overshoots its −2.5 dB threshold by 2.4–3.4 dB. It rounds peaks; the
   limiter sets the ceiling. `clip_blend: 1` makes it a real (serial) clipper.
-- **The limiter is sample-peak unless told otherwise.** With the default
+- **The limiter holds true peak** (default `true_peak: on`). With
   `true_peak: off`, inter-sample peaks exceed `ceiling` by 1.6–2.3 dB on a
-  loud master (whole-step: −0.4 dBFS sample peak, +1.7 dBTP). Set
-  `true_peak: on`, or keep the ceiling at −2.5 dBFS or lower, for a release.
+  loud master (whole-step read −0.4 dBFS sample peak, +1.7 dBTP that way).
 
 `patches/lib/club-master.sub` is the club preset: glue at −18 dB 3:1 keyed
 by kick plus 35 % bus, serial soft clip at `drive` 12.5 dB, makeup 10.5 dB

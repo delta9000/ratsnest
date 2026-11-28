@@ -96,4 +96,4 @@ kick_env -> mixer.lvl6 : -0.25
 
 mixer.out_l -> out.left
 mixer.out_r -> out.right
--0.35 -> out.level
+-0.47 -> out.level   # -0.35 read +0.8 dBTP

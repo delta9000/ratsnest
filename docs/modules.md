@@ -1067,15 +1067,15 @@ grit.
 
 ## `limiter`
 
-`limiter { true_peak: off }` — inputs `in_l` 0, `in_r` 0, `threshold` -0.1, `release` 0.05; outputs `out_l`, `out_r`, `gain`, `gr`.
+`limiter { true_peak: on }` — inputs `in_l` 0, `in_r` 0, `threshold` -0.1, `release` 0.05; outputs `out_l`, `out_r`, `gain`, `gr`.
 A stereo-linked peak limiter with a fixed 2.0 ms lookahead.
-*   `true_peak`: Config, `off` (default) or `on`: detect inter-sample peaks (below).
+*   `true_peak`: Config, `on` (default) or `off`: detect inter-sample peaks (below).
 *   `threshold` (clamped `-24..0`, default -0.1): Target ceiling threshold in dBFS.
 *   `release` (clamped `0.001..2`, default 0.05): Release time in seconds.
 *   `gain`: Output. Current linear gain reduction factor.
 *   `gr`: Output. Current gain reduction in positive dB.
 
-Guarantees a hard sample-peak ceiling at the threshold with a 2.0 ms lookahead
+With `true_peak: off` it guarantees a hard sample-peak ceiling at the threshold with a 2.0 ms lookahead
 (96 samples at 48 kHz, which is also its latency). The gain reduction each
 sample needs is peak-held over the lookahead (or `min(release, 20 ms)` if
 longer, so bass does not ripple the gain), released with the `release` time
@@ -1092,8 +1092,9 @@ the reconstructed peak under the threshold: steady tones up to about
 0.36 fs (17 kHz at 48 kHz) stay under it; a lone crest falling between the
 4x points can still pass by up to 0.2 dB, as in any 4x meter. It costs 6 more samples of latency
 (2.125 ms at 48 kHz) and three 12-tap dot products per channel per sample.
-Use it on the final limiter of a master; `off` keeps older renders
-bit-identical.
+It is the default (since the render baseline, 2026-11-28: before it, the
+default was `off` and masters overshot); `off` is for a limiter used as an
+effect, or where the 0.125 ms of extra latency matters.
 
 ## `follow`
 
@@ -1800,8 +1801,8 @@ different depths.
 `master-chain.sub` takes `width` (default 1.15) and `makeup` (dB, default
 3.0) as **inputs**, so a form lane can ride them (`lane -> mast.width : 1.3`;
 a fixed value is a constant cable, `1.1 -> mast.width`); `key_bus` mixes the
-bus itself into the compressor key and `true_peak: on` sets the limiter's
-detector. `club-master.sub` is its loud preset (serial clipper, bus-assisted
+bus itself into the compressor key and `true_peak` (default `on`) sets the
+limiter's detector. `club-master.sub` is its loud preset (serial clipper, bus-assisted
 key, true-peak limiter at −1 dBTP: about −8.5 LUFS on a techno mix).
 
 ### Building a song's voices and mix (`lib/synth-voice.sub`, `lib/strip.sub`, `lib/duck.sub`)

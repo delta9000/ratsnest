@@ -11,11 +11,14 @@
 using namespace ms::dsp;
 
 namespace {
+// The sample-peak detector (`true_peak: off`): these tests pin its exact
+// lookahead and ceiling; the true-peak default is tested below.
 std::unique_ptr<Module> make_limiter(double rate = 48000.0) {
   const ModuleInfo* info = find_module("limiter");
   REQUIRE(info != nullptr);
   auto m = info->create();
   Config cfg;
+  cfg.push_back({"true_peak", ConfigValue{"off", 0.0, {}, false}});
   m->init(rate, cfg);
   return m;
 }
@@ -214,6 +217,22 @@ std::vector<float> limit_straddling_sine(bool true_peak, double hz) {
   return y;
 }
 }  // namespace
+
+TEST_CASE("limiter: true-peak detection is the default") {
+  const ModuleInfo* info = find_module("limiter");
+  REQUIRE(info != nullptr);
+  auto def = info->create();
+  def->init(48000.0, Config{});
+  auto tp = make_limiter_tp(true);
+  float a[4] = {0.0f, 0.0f, -0.1f, 0.05f}, b[4] = {0.0f, 0.0f, -0.1f, 0.05f};
+  float oa[4], ob[4];
+  for (int i = 0; i < 2000; ++i) {
+    a[0] = a[1] = b[0] = b[1] = 1.5f * std::sin(0.5f * std::numbers::pi_v<float> * (static_cast<float>(i) + 0.5f));
+    def->process(a, oa);
+    tp->process(b, ob);
+    REQUIRE(oa[0] == ob[0]);
+  }
+}
 
 TEST_CASE("limiter: true_peak holds the ceiling between samples") {
   const float ceiling = db_to_linear(-1.0f);

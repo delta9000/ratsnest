@@ -29,3 +29,4 @@ kbody -> kmix.in1
 kclk -> kmix.in2
 kmix.out_l -> out.left
 kmix.out_l -> out.right
+-0.07 -> out.level   # true peak was 0.0 dBTP at unity
