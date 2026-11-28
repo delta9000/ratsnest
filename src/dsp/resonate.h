@@ -240,8 +240,13 @@ class Rng {
 // burst through a feedback comb and a lowpass. f/cutoff normalized (f/fs).
 class Plucker {
  public:
-  void init(uint32_t seed) {
-    comb_.init(256);
+  // white_gain (dsp/util.h) keeps the burst's power per Hz across rates;
+  // span (samples per 48 kHz sample) keeps the comb's longest period, and so
+  // its tuning, the same in seconds.
+  void init(uint32_t seed, float white_gain = 1.0f, int span = 1) {
+    gain_ = white_gain;
+    max_period_ = 255.0f * static_cast<float>(span);
+    comb_.init(256 * static_cast<std::size_t>(span));
     svf_.reset();
     rng_.seed(seed);
     remaining_ = 0;
@@ -257,7 +262,7 @@ class Plucker {
     // untouched.
     period = std::fmin(std::fmax(period, 0.0f), 16777216.0f);
     remaining_ = static_cast<int>(period);
-    while (period >= 255.0f) period *= 0.5f;
+    while (period >= max_period_) period *= 0.5f;
     comb_period_ = period;
     comb_gain_ = (1.0f - position) * 0.8f;
     svf_.set_f_q_fast(std::min(cutoff, 0.499f), 1.0f);
@@ -265,7 +270,7 @@ class Plucker {
   float process() {
     float in = 0.0f;
     if (remaining_ > 0) {
-      in = rng_.bipolar();
+      in = rng_.bipolar() * gain_;
       --remaining_;
     }
     const float s = in + comb_gain_ * comb_.read_linear(comb_period_);
@@ -288,6 +293,8 @@ class Plucker {
   int remaining_ = 0;
   float comb_period_ = 0.0f;
   float comb_gain_ = 0.0f;
+  float gain_ = 1.0f;
+  float max_period_ = 255.0f;
 };
 
 }  // namespace ms::dsp::resonate
