@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <mutex>
 
+#include "engine/pw_buffers.h"
 #include "engine/rt_runner.h"
 #include "rt/denormal.h"
 
@@ -36,29 +37,7 @@ struct AudioIn::Impl {
     pw_buffer* b = pw_stream_dequeue_buffer(self->stream);
     if (b == nullptr) return;
     spa_buffer* buf = b->buffer;
-    if (buf->n_datas >= 1 && buf->datas[0].data != nullptr) {
-      // The chunk is peer-written metadata: keep the read inside maxsize.
-      const uint32_t maxsize = buf->datas[0].maxsize;
-      const uint32_t offset = std::min(buf->datas[0].chunk->offset, maxsize);
-      const uint32_t size = std::min(buf->datas[0].chunk->size, maxsize - offset);
-      const uint32_t stride = buf->datas[0].chunk->stride > 0
-          ? static_cast<uint32_t>(buf->datas[0].chunk->stride)
-          : static_cast<uint32_t>(sizeof(float));
-      const uint32_t n = size / stride;
-      const auto* base = static_cast<const uint8_t*>(buf->datas[0].data) + offset;
-      const auto* p = reinterpret_cast<const float*>(base);
-
-      AudioChunk chunk;
-      uint32_t i = 0;
-      while (i < n) {
-        uint32_t take = n - i;
-        if (take > 64) take = 64;
-        for (uint32_t k = 0; k < take; ++k) chunk.s[k] = p[i + k];
-        chunk.len = take;
-        self->runner->push_audio(chunk);
-        i += take;
-      }
-    }
+    pw::capture_chunks(*buf, [self](const AudioChunk& c) { self->runner->push_audio(c); });
     pw_stream_queue_buffer(self->stream, b);
   }
 

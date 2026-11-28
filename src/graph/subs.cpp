@@ -99,7 +99,7 @@ void subst_value(const ParamMap& params, dsl::Value& v) {
 
 // The numeric value of param `name`, if `name` is a param; reports (and
 // returns null) when it is one but not a number. `what` names the use.
-const double* numeric_param(Ctx& ctx, const std::string& file, const ParamMap& params,
+const dsl::Value* numeric_param(Ctx& ctx, const std::string& file, const ParamMap& params,
                             const std::string& name, int line, int col, const char* what) {
   auto it = params.find(name);
   if (it == params.end()) return nullptr;
@@ -107,7 +107,7 @@ const double* numeric_param(Ctx& ctx, const std::string& file, const ParamMap& p
     ctx.err(file, line, col, "param '" + name + "' used as a " + what + " must be a number");
     return nullptr;
   }
-  return &it->second.num;
+  return &it->second;
 }
 
 void substitute(Ctx& ctx, const std::string& file, dsl::PatchAst& body,
@@ -119,17 +119,18 @@ void substitute(Ctx& ctx, const std::string& file, dsl::PatchAst& body,
     }
   for (auto& c : body.cables) {
     if (!c.src.is_literal) {
-      if (const double* v = numeric_param(ctx, file, params, c.src.module, c.src.line,
-                                          c.src.col, "cable source")) {
+      if (const dsl::Value* v = numeric_param(ctx, file, params, c.src.module, c.src.line,
+                                              c.src.col, "cable source")) {
         c.src.is_literal = true;
-        c.src.literal = *v;
+        c.src.literal = v->num;
+        c.src.unit = v->unit;  // checked against the input it drives
         c.src.module.clear();
       }
     }
     if (!c.depth_ident.empty()) {
-      if (const double* v = numeric_param(ctx, file, params, c.depth_ident, c.line, c.col,
-                                          "cable depth")) {
-        c.depth = *v;
+      if (const dsl::Value* v = numeric_param(ctx, file, params, c.depth_ident, c.line, c.col,
+                                              "cable depth")) {
+        c.depth = v->num;
         c.depth_ident.clear();
       }
     }
@@ -140,7 +141,8 @@ void substitute(Ctx& ctx, const std::string& file, dsl::PatchAst& body,
 
 struct Interface {
   ParamMap params;
-  std::vector<std::pair<std::string, double>> inputs;
+  // Each input with its `default:` (a 0 at the input itself when none).
+  std::vector<std::pair<std::string, dsl::ParamDecl>> inputs;
   std::vector<std::string> outputs;
   bool any() const { return !params.empty() || !inputs.empty() || !outputs.empty(); }
   bool is_input(const std::string& n) const {
@@ -168,7 +170,7 @@ void scan_decl(Ctx& ctx, const std::string& file, const dsl::ModuleDecl& m, Inte
   } else if (m.type == "input") {
     const bool numeric = !d || d->value.kind == dsl::Value::Kind::Num;
     if (!numeric) ctx.err(file, d->line, d->col, "input '" + m.name + "' default must be a number");
-    f.inputs.emplace_back(m.name, d && numeric ? d->value.num : 0.0);
+    f.inputs.emplace_back(m.name, d && numeric ? *d : dsl::ParamDecl{"default", {}, m.line, m.col});
   } else if (m.type == "output") {
     f.outputs.push_back(m.name);
   }
@@ -369,12 +371,15 @@ class Splice {
 
   void drive_defaults() {
     for (const auto& [name, def] : f_.inputs) {
-      if (fed_inputs_.count(name) || def == 0.0) continue;
+      if (fed_inputs_.count(name) || def.value.num == 0.0) continue;
       for (const auto& t : in_targets_[name]) {
         dsl::CableDecl nc = t;
         nc.src = {};
         nc.src.is_literal = true;
-        nc.src.literal = def;
+        nc.src.literal = def.value.num;
+        nc.src.unit = def.value.unit;  // a mismatch reports at the default
+        nc.src.line = def.line;
+        nc.src.col = def.col;
         nc.dst.module = qualify(t.dst.module);
         out_.push_back(std::move(nc));
       }

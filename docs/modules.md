@@ -41,7 +41,10 @@ and `vco { freq: A4v }` (a v/oct note) all fail `check`. Frequency inputs
 `random` and `dust`) take `hz`/`khz`/`A4`; times (`attack`, `decay`,
 `release`, `hold`, `rise`, `fall`, delay and echo `time`/`slew`) take
 `s`/`ms`; `bpm` takes `bpm`; `v_oct`/`voct` take `A4v`. A bare number fits
-any input, and inputs that declare nothing accept any suffix. Omitted output means the first output
+any input, and inputs that declare nothing accept any suffix. A subpatch
+`param` or `input` default keeps its unit wherever it lands (`pitch = param
+{ default: 220hz }` cabled to a `rise` fails), and a mismatch from an unfed
+input's default reports at that default. Omitted output means the first output
 (a bare `stepseq` name reads its `cv`, a bare `svf` its `lp`). Validate with
 `ratsnest check patch.patch`; `ratsnest render ... --stats [dur]` prints
 overall peak, true peak (dBTP), integrated loudness (LUFS, ITU-R BS.1770-4

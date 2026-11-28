@@ -17,6 +17,7 @@
 #include <mutex>
 
 #include "engine/audio_safety.h"
+#include "engine/pw_buffers.h"
 #include "rt/denormal.h"
 
 namespace ms::engine {
@@ -45,16 +46,8 @@ struct PipewireOut::Impl {
     pw_buffer* b = pw_stream_dequeue_buffer(self->stream);
     if (b == nullptr) return;
     spa_buffer* buf = b->buffer;
-    if (buf->n_datas >= 2 && buf->datas[0].data != nullptr &&
-        buf->datas[1].data != nullptr) {
-      // Both planes are written for `frames`: bound by the smaller one.
-      const uint32_t cap =
-          std::min(buf->datas[0].maxsize, buf->datas[1].maxsize) /
-          static_cast<uint32_t>(sizeof(float));
-      uint32_t want =
-          b->requested != 0 ? static_cast<uint32_t>(b->requested) : cap;
-      const uint32_t frames = want < cap ? want : cap;
-
+    const uint32_t frames = pw::playback_frames(*buf, b->requested);
+    if (frames > 0) {
       auto* position = self->position.load(std::memory_order_relaxed);
       if (position != nullptr &&
           (position->clock.flags & SPA_IO_CLOCK_FLAG_XRUN_RECOVER) != 0) {
@@ -65,12 +58,7 @@ struct PipewireOut::Impl {
       auto* r = static_cast<float*>(buf->datas[1].data);
       self->fn(self->user, l, r, frames, position != nullptr ? position->clock.nsec : 0);
       clamp_device_buffer(l, r, frames);
-
-      for (uint32_t c = 0; c < 2; ++c) {
-        buf->datas[c].chunk->offset = 0;
-        buf->datas[c].chunk->stride = static_cast<int32_t>(sizeof(float));
-        buf->datas[c].chunk->size = frames * static_cast<uint32_t>(sizeof(float));
-      }
+      pw::mark_planes(*buf, frames);
     }
     pw_stream_queue_buffer(self->stream, b);
   }

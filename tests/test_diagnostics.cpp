@@ -144,3 +144,30 @@ TEST_CASE("a literal's unit must match what the input measures") {
                  "c = clock { bpm: 120bpm }\nm = vca { gain: 2s }\n"
                  "440hz -> o.freq\nC3v -> o.v_oct\no -> out.in\n").empty());
 }
+
+TEST_CASE("units carry through subpatch params and input defaults") {
+  const char* head =
+      "v = subdef {}\n"
+      "v.pitch = param { default: 220hz }\n"
+      "v.decay = input { default: 0.2s }\n"
+      "v.main = output {}\n"
+      "v.osc = vco { freq: v.pitch }\n"
+      "v.env = func\n";
+  auto patch = [&](const char* rest) { return std::string(head) + rest; };
+  // A param's default, and an override, land on a module param.
+  CHECK(diagnose(patch("v.decay -> v.env.fall\nv.osc -> v.main.in\n"
+                       "a = sub { def: v }\na.main -> out.in\n").c_str()).empty());
+  CHECK(has(only(diagnose(patch("v.decay -> v.env.fall\nv.osc -> v.main.in\n"
+                                "a = sub { def: v, pitch: 3s }\na.main -> out.in\n").c_str())),
+            "expects a frequency"));
+  // A param used as a cable source keeps its unit.
+  CHECK(has(only(diagnose(patch("v.pitch -> v.env.rise\nv.decay -> v.env.fall\n"
+                                "v.osc -> v.main.in\na = sub { def: v }\na.main -> out.in\n").c_str())),
+            "expects a time"));
+  // An unfed input's default drives its targets; a mismatch reports at the default.
+  const Diags d = diagnose(patch("v.decay -> v.osc.freq\nv.osc -> v.main.in\n"
+                                 "a = sub { def: v }\na.main -> out.in\n").c_str());
+  REQUIRE(d.size() == 1);
+  CHECK(has(d[0].msg, "expects a frequency"));
+  CHECK(d[0].line == 3);
+}
