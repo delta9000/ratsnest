@@ -227,7 +227,7 @@ TEST_CASE("limiter: true-peak detection is the default") {
   float a[4] = {0.0f, 0.0f, -0.1f, 0.05f}, b[4] = {0.0f, 0.0f, -0.1f, 0.05f};
   float oa[4], ob[4];
   for (int i = 0; i < 2000; ++i) {
-    a[0] = a[1] = b[0] = b[1] = 1.5f * std::sin(0.5f * std::numbers::pi_v<float> * (i + 0.5f));
+    a[0] = a[1] = b[0] = b[1] = 1.5f * std::sin(0.5f * std::numbers::pi_v<float> * (static_cast<float>(i) + 0.5f));
     def->process(a, oa);
     tp->process(b, ob);
     REQUIRE(oa[0] == ob[0]);
