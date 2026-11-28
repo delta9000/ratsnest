@@ -82,3 +82,8 @@ echo "installed ~/.clap/ratsnest.clap; patches: ${RATSNEST_PLUGIN_DIR:-${XDG_CON
 [tasks.complexity]
 description = "Complexity score for src/; fails if it grows past docs/complexity.json. --hotspots lists the worst functions."
 run = "python3 tools/complexity.py --check"
+
+[tasks.baseline]
+description = "Rewrite tests/data/render-baseline.txt after a deliberate sound change (commit it with the change)."
+depends = ["build"]
+run = "RATSNEST_UPDATE_BASELINE=1 ./build/mstests -tc='render baseline*'"
