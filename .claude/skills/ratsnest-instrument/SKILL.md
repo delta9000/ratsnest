@@ -154,7 +154,7 @@ mix.out_r -> r.in_r
 
 | Symptom | Cause |
 |---|---|
-| MIDI patch is silent under `render` | expected — `midi` has no offline transport |
+| MIDI patch is silent under `render` | give it a performance: `render --midi take.mid` |
 | Only one note sounds | `alloc`/`voice` not bound, or `n: 1` |
 | Voices all play the same pitch | you broadcast `q.out` instead of reading the bank `poly.voct` |
 | Polyphonic patch is 3× too loud | inside → outside is a straight sum; no `1/n` |

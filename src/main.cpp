@@ -23,6 +23,7 @@
 #include "graph/subs.h"
 #include "graph/tap.h"
 #include "io/loudness.h"
+#include "io/smf.h"
 #include "io/wav.h"
 #include "io/watcher.h"
 #include "rt/denormal.h"
@@ -43,6 +44,7 @@ int usage() {
       "                        timeline per window (default 10s)\n"
       "      --tap NAME[=node[.port]]  also write <out>.NAME.wav from that endpoint (stereo\n"
       "                        if it has l/r or out_l/out_r) and print its stats; repeatable\n"
+      "      --midi <file.mid>  play a Standard MIDI File into the patch's midi modules\n"
       "  ratsnest play   <patch> [options]   live PipeWire output; hot-reloads on save\n"
       "      --latency <N/RATE>  e.g. 256/48000\n"
       "      --rate <hz>         sample rate (default 48000)\n"
@@ -250,6 +252,14 @@ bool rate_option(const char* s, double& rate) {
   return false;
 }
 
+// --bits: 16, 24 or 32.
+bool bits_option(const char* s, int& bits) {
+  bits = std::atoi(s);
+  if (bits == 16 || bits == 24 || bits == 32) return true;
+  std::fprintf(stderr, "error: --bits takes 16, 24 or 32, not '%s'\n", s);
+  return false;
+}
+
 // When argv[i] is `name` and a value follows, consumes both and returns the
 // value; otherwise returns nullptr and leaves i alone.
 const char* option(int argc, char** argv, int& i, const char* name) {
@@ -273,6 +283,7 @@ struct RenderOpts {
   bool stats = false;
   int bits = 32;
   std::vector<ms::graph::Tap> taps;
+  std::string midi_path;  // --midi: a Standard MIDI File to play into the patch
 };
 
 bool parse_render(int argc, char** argv, RenderOpts& o) {
@@ -281,14 +292,9 @@ bool parse_render(int argc, char** argv, RenderOpts& o) {
     else if (const char* v = option(argc, argv, i, "-o")) o.out_path = v;
     else if (const char* v = option(argc, argv, i, "--start")) o.start_sec = parse_duration(v);
     else if (const char* v = option(argc, argv, i, "--rate")) { if (!rate_option(v, o.rate)) return false; }
-    else if (const char* v = option(argc, argv, i, "--bits")) {
-      o.bits = std::atoi(v);
-      if (o.bits != 16 && o.bits != 24 && o.bits != 32) {
-        std::fprintf(stderr, "error: --bits takes 16, 24 or 32, not '%s'\n", v);
-        return false;
-      }
-    }
+    else if (const char* v = option(argc, argv, i, "--bits")) { if (!bits_option(v, o.bits)) return false; }
     else if (const char* v = option(argc, argv, i, "--tap")) o.taps.push_back(ms::graph::parse_tap(v));
+    else if (const char* v = option(argc, argv, i, "--midi")) o.midi_path = v;
     else if (!std::strcmp(argv[i], "--stats")) {
       // The window length is optional: take the next word only if it is one.
       o.stats = true;
@@ -341,15 +347,35 @@ void print_stats(const std::vector<float>& l, const std::vector<float>& r,
   }
 }
 
+// --midi: each event reaches the engine at its own frame, before that
+// frame is processed (as RtRunner delivers live MIDI at a block start).
+struct MidiFeed {
+  std::vector<ms::io::TimedMidi> events;
+  size_t next = 0;
+  double rate = 48000.0;
+  size_t frame(size_t i) const {
+    return static_cast<size_t>(std::llround(std::max(0.0, events[i].seconds) * rate));
+  }
+  // Delivers every event due at or before frame `at`.
+  void deliver(ms::engine::Engine& e, size_t at) {
+    while (next < events.size() && frame(next) <= at) e.deliver_midi_event(events[next++].e);
+  }
+  // Frames from `at` that can run before the next event, at most n.
+  size_t span(size_t at, size_t n) const {
+    return next < events.size() ? std::min(n, frame(next) - at) : n;
+  }
+};
+
 // A stateful graph has no seek: --start runs it from zero and discards the
 // skipped samples. Block size cannot change the result (Engine::process is
 // per-sample; tests/test_integration.cpp pins it), so chunk the discard
 // instead of allocating a buffer for it.
-void skip_frames(ms::engine::Engine& engine, size_t skip) {
+void skip_frames(ms::engine::Engine& engine, size_t skip, MidiFeed& midi) {
   constexpr size_t kChunk = 4096;
   std::vector<float> sl(kChunk), sr(kChunk);
   for (size_t done = 0; done < skip;) {
-    const size_t n = std::min(kChunk, skip - done);
+    midi.deliver(engine, done);
+    const size_t n = midi.span(done, std::min(kChunk, skip - done));
     engine.process(sl.data(), sr.data(), n);
     done += n;
   }
@@ -398,9 +424,18 @@ bool finish_taps(const RenderOpts& o, const std::vector<Take>& takes) {
 // node's output can be read (identical either way: Engine::process is
 // per-sample, and the engine exposes only each node's latest output).
 void run_take(ms::engine::Engine& engine, const RenderOpts& o, std::vector<float>& l,
-              std::vector<float>& r, std::vector<Take>& takes) {
-  if (takes.empty()) return engine.process(l.data(), r.data(), l.size());
+              std::vector<float>& r, std::vector<Take>& takes, MidiFeed& midi, size_t skip) {
+  if (takes.empty()) {
+    for (size_t f = 0; f < l.size();) {
+      midi.deliver(engine, skip + f);
+      const size_t n = midi.span(skip + f, l.size() - f);
+      engine.process(&l[f], &r[f], n);
+      f += n;
+    }
+    return;
+  }
   for (size_t f = 0; f < l.size(); ++f) {
+    midi.deliver(engine, skip + f);
     engine.process(&l[f], &r[f], 1);
     for (size_t i = 0; i < takes.size(); ++i)
       for (size_t c = 0; c < takes[i].ch.size(); ++c)
@@ -424,17 +459,24 @@ int cmd_render(const std::string& patch, int argc, char** argv) {
   const std::string tap_err = ms::graph::add_taps(b, src, patch, o.rate, o.taps);
   if (!tap_err.empty()) { std::fprintf(stderr, "error: %s\n", tap_err.c_str()); return 1; }
   ms::engine::Engine engine(take_graph(patch, b));
+  MidiFeed midi;
+  midi.rate = o.rate;
+  if (!o.midi_path.empty()) {
+    std::string err;
+    midi.events = ms::io::read_smf(o.midi_path, err);
+    if (!err.empty()) { std::fprintf(stderr, "error: --midi %s\n", err.c_str()); return 1; }
+  }
 
   const size_t frames = static_cast<size_t>(o.seconds * o.rate);
   const size_t skip = static_cast<size_t>(o.start_sec * o.rate);
   std::vector<float> l(frames), r(frames);
   // Decaying filter tails hit denormals; match the PipeWire thread's FTZ.
   ms::rt::flush_denormals_on_this_thread();
-  skip_frames(engine, skip);
+  skip_frames(engine, skip, midi);
   std::vector<Take> takes;
   for (const ms::graph::Tap& t : o.taps)
     takes.push_back({std::vector<std::vector<float>>(t.nodes.size(), std::vector<float>(frames))});
-  run_take(engine, o, l, r, takes);
+  run_take(engine, o, l, r, takes, midi, skip);
   if (!write_take(o.out_path, o.rate, l, r, 2, o.bits)) {
     std::fprintf(stderr, "error: cannot write '%s'\n", o.out_path.c_str());
     return 1;

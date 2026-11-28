@@ -117,4 +117,5 @@ and it is kept dumb):
 
 - MIDI clock/transport sync (a future `midiclock` module; `clock` stays
   master otherwise), MPE, NRPN/14-bit CC, program change, MIDI out.
-- MIDI-file input for offline renders.
+- ~~MIDI-file input for offline renders.~~ Done 2026-11-28: `render --midi
+  file.mid` (src/io/smf.cpp), sample-accurate, format 0/1 with tempo map.
