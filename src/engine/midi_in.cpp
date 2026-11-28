@@ -18,7 +18,7 @@
 
 #include "dsp/module.h"
 #include "engine/rt_runner.h"
-#include "io/midi_bytes.h"
+#include "engine/pw_buffers.h"
 
 // --- Step 1: payload format, verified on the build machine ---------------
 // `grep -rn "SPA_CONTROL_UMP\|SPA_CONTROL_Midi" /usr/include/spa/` (headers
@@ -55,55 +55,19 @@ struct MidiIn::Impl {
   // the per-message output of spa_ump_to_midi -- neither is guaranteed to
   // already be running-status-free, so this is the single normalization
   // point (module.h: "running status is expanded by the producer").
-  void push_raw(const uint8_t* data, size_t len, uint64_t at_ns) {
-    io::parse_midi_bytes(data, len, [&](const dsp::MidiEvent& e) {
-      runner->push_midi(e, at_ns);  // drop-on-full; never blocks (RT rule 3)
-    });
-  }
-
-  // When an event at frame `offset` of this cycle should sound: one cycle
-  // later, at the same offset. The audio stream has usually rendered this
-  // cycle already, so the next one is the earliest every event can make;
-  // the fixed delay keeps the spacing the notes were played with.
-  static uint64_t at_ns(const spa_io_position* p, uint32_t offset) {
-    if (p == nullptr || p->clock.rate.denom == 0) return 0;  // unknown: next block
-    const double ns_per_frame = 1e9 * p->clock.rate.num / p->clock.rate.denom;
-    return p->clock.nsec +
-           static_cast<uint64_t>(static_cast<double>(offset + p->clock.duration) * ns_per_frame);
-  }
-
-  void handle_control(const spa_pod_control* c, const spa_io_position* p) {
-    const uint64_t at = at_ns(p, c->offset);
-    if (c->type == SPA_CONTROL_Midi) {
-      const auto* bytes = static_cast<const uint8_t*>(SPA_POD_BODY(&c->value));
-      push_raw(bytes, SPA_POD_BODY_SIZE(&c->value), at);
-    } else if (c->type == SPA_CONTROL_UMP) {
-      const auto* words = static_cast<const uint32_t*>(SPA_POD_BODY(&c->value));
-      size_t remaining = SPA_POD_BODY_SIZE(&c->value);
-      while (remaining >= 4) {
-        uint8_t midi_buf[8];
-        int n = spa_ump_to_midi(&words, &remaining, midi_buf, sizeof(midi_buf), &ump_state);
-        if (n < 0) break;       // malformed/oversized packet: drop the rest
-        if (n > 0) push_raw(midi_buf, static_cast<size_t>(n), at);
-      }
-    }
-    // Other control types (Properties, OSC) are not MIDI: ignored.
-  }
-
   static void on_process(void* userdata, spa_io_position* position) {
     auto* self = static_cast<Impl*>(userdata);
     pw_buffer* b = pw_filter_dequeue_buffer(self->port);
     if (b == nullptr) return;
     spa_buffer* buf = b->buffer;
     if (buf->n_datas >= 1 && buf->datas[0].data != nullptr) {
-      spa_data& d = buf->datas[0];
-      const auto* pod = static_cast<const spa_pod*>(
-          spa_pod_from_data(d.data, d.maxsize, d.chunk->offset, d.chunk->size));
-      if (pod != nullptr && spa_pod_is_sequence(pod) != 0) {
-        const auto* seq = reinterpret_cast<const spa_pod_sequence*>(pod);
-        const spa_pod_control* c;
-        SPA_POD_SEQUENCE_FOREACH(seq, c) self->handle_control(c, position);
-      }
+      const spa_data& d = buf->datas[0];
+      pw::midi_from_pod(
+          static_cast<const spa_pod*>(
+              spa_pod_from_data(d.data, d.maxsize, d.chunk->offset, d.chunk->size)),
+          position, self->ump_state, [self](const dsp::MidiEvent& e, uint64_t at) {
+            self->runner->push_midi(e, at);  // drop-on-full; never blocks (RT rule 3)
+          });
     }
     pw_filter_queue_buffer(self->port, b);
   }
