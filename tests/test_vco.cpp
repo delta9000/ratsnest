@@ -183,24 +183,72 @@ TEST_CASE("band-limited pulse preserves width DC and signal convention") {
   }
 }
 
-TEST_CASE("sync resets phase") {
+TEST_CASE("sync restarts the cycle wherever the slave was") {
+  // Two saws synced at different points of their cycles agree exactly once
+  // the restart's minBLEP has settled (32 samples).
   const ModuleInfo* info = find_module("vco");
-  auto m = info->create();
-  auto fresh = info->create();
   Config cfg;
   cfg.push_back({"wave", ConfigValue{"saw", 0, {}, false}});
-  m->init(48000.0, cfg);
-  fresh->init(48000.0, cfg);
-  float ins[7] = {100.f, 0.f, 0.f, 0.5f, 0.f, 0.f};
-  float o[1];
-  float fresh_out[1];
-  fresh->process(ins, fresh_out);
-  for (int i = 0; i < 100; ++i) m->process(ins, o);
-  float before = o[0];
-  ins[5] = 1.0f;  // sync rising edge
-  m->process(ins, o);
-  CHECK(o[0] != doctest::Approx(before));
-  CHECK(o[0] == doctest::Approx(fresh_out[0]).epsilon(1e-6));
+  auto a = info->create();
+  auto b = info->create();
+  a->init(48000.0, cfg);
+  b->init(48000.0, cfg);
+  float ins[7] = {100.f, 0.f, 0.f, 0.5f, 0.f, 0.f, 0.f};
+  float oa[1], ob[1];
+  for (int i = 0; i < 100; ++i) a->process(ins, oa);
+  ins[5] = 1.0f;  // sync rising edge, on a's 101st sample and b's first
+  a->process(ins, oa);
+  b->process(ins, ob);
+  CHECK(oa[0] != doctest::Approx(ob[0]));  // the BLEP still differs
+  for (int i = 0; i < 40; ++i) {
+    a->process(ins, oa);
+    b->process(ins, ob);
+  }
+  CHECK(oa[0] == ob[0]);
+  CHECK(oa[0] == doctest::Approx(-1.0f + 2.0f * 40.5f * 100.0f / 48000.0f).epsilon(1e-4));
+}
+
+TEST_CASE("hard sync is band-limited and keeps sub-sample timing") {
+  // A 1712 Hz saw synced to a 440 Hz sine: the output is periodic at 440 Hz,
+  // so all energy off its harmonics is aliasing. A bare phase reset left
+  // -15 dB of it; the minBLEP restart at the interpolated edge time, -62 dB.
+  const ModuleInfo* info = find_module("vco");
+  Config sine, saw;
+  sine.push_back({"wave", ConfigValue{"sine", 0, {}, false}});
+  saw.push_back({"wave", ConfigValue{"saw", 0, {}, false}});
+  auto m = info->create();
+  auto s = info->create();
+  m->init(48000.0, sine);
+  s->init(48000.0, saw);
+  float mi[7] = {440.f, 0.f, 0.f, 0.5f, 0.f, 0.f, 0.f};
+  float si[7] = {1712.f, 0.f, 0.f, 0.5f, 0.f, 0.f, 0.f};
+  constexpr int n = 48000;
+  std::vector<float> x(n);
+  float mo[1], so[1];
+  for (int i = 0; i < 2 * n; ++i) {
+    m->process(mi, mo);
+    si[5] = mo[0];
+    s->process(si, so);
+    if (i >= n) x[static_cast<size_t>(i - n)] = so[0];
+  }
+  // Energy at the 440 Hz harmonics vs total, Goertzel per harmonic over
+  // exactly 440 cycles (one second): harmonic bins are exact.
+  double total = 0.0, mean = 0.0;
+  for (float v : x) total += double(v) * v, mean += v;
+  mean /= n;
+  total -= n * mean * mean;  // DC is neither harmonic nor alias
+  double harm = 0.0;
+  for (int k = 1; k * 440 < 24000; ++k) {
+    const double w = 2.0 * std::numbers::pi * k * 440.0 / 48000.0;
+    double re = 0.0, im = 0.0;
+    for (int i = 0; i < n; ++i) {
+      re += x[static_cast<size_t>(i)] * std::cos(w * i);
+      im -= x[static_cast<size_t>(i)] * std::sin(w * i);
+    }
+    harm += 2.0 * (re * re + im * im) / n;
+  }
+  const double alias_db = 10.0 * std::log10(std::max(1e-30, (total - harm) / total));
+  CHECK(alias_db < -55.0);
 }
 
 TEST_CASE("band-limited vco survives hostile inputs and recovers") {

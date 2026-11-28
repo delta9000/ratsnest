@@ -200,8 +200,15 @@ Linear FM depth scales with the `freq` base, not the tracked pitch, so a fixed
 `fm` cable gives a brighter index on low notes than high ones. Pulse width is
 `pw + pwm` clamped to `0.05..0.95` (non-finite reads 0.5).
 Sine is analytic. Free-running triangle, saw, and pulse morph between shared
-Fourier-series tables whose highest partial stays below Nyquist; hard sync,
-fast FM, PWM, and phase modulation still create discontinuities and can alias.
+Fourier-series tables whose highest partial stays below Nyquist; fast FM, PWM
+and phase modulation still create discontinuities and can alias.
+Hard sync restarts the cycle at the sub-sample time the `sync` input crossed
+0.5 (interpolated between samples), and from the first sync on that vco draws
+ideal waveforms and band-limits every step with a minimum-phase BLEP (no added
+latency). A saw synced to a sine or saw master keeps its aliasing near
+-60 dB (a bare reset left -15 dB); a band-limited pulse master's ringing edge
+times the restart less exactly (about -29 dB). The triangle's corners are not
+corrected while synced (about -44 dB).
 The saw's Fourier reconstruction has brief Gibbs peaks up to about `+/-1.2`,
 and a band-limited pulse rings up to about `+/-1.3`; leave headroom downstream
 if it must reach the live device unclipped. Phase wraps in cycles; `freq: 0`
