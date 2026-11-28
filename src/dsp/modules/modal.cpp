@@ -127,8 +127,11 @@ class Modal final : public Module {
     float stiffness = resonate::stiffness_curve(structure);
     float harmonic = f;
     float stretch = 1.0f;
-    // 500 * 10^(4*damping): four decades of Q.
-    float q = 500.0f * std::exp2(damping * 4.0f * 3.3219281f);
+    // 500 * 10^(4*damping): four decades of Q. Rings runs at 48 kHz and
+    // its Q is 1 + f*q with f in cycles per sample, so a mode's decay time
+    // is q / (pi * rate): scaling q by rate / 48 kHz keeps decays in
+    // seconds at every rate (48 kHz unchanged).
+    float q = 500.0f * std::exp2(damping * 4.0f * 3.3219281f) * (rate_ / 48000.0f);
     float ba = 1.0f - structure;  // brightness attenuation (1-structure)^8
     ba *= ba;
     ba *= ba;

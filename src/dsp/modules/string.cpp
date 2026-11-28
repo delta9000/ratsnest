@@ -27,13 +27,14 @@ class StringModule final : public Module {
  public:
   void init(double rate, const Config& cfg) override {
     rate_ = static_cast<float>(rate);
+    fir_scale_ = static_cast<float>((rate / 48000.0) * (rate / 48000.0));
     line_.init(8192);
     stretch_.init(4096);  // holds up to 0.475 * kMaxDelay allpass samples
     fir_.reset();
     iir_.reset();
     exciter_.reset();
     const auto seed = static_cast<uint32_t>(cfg_num(cfg, "seed", 1.0));
-    plucker_.init(seed);
+    plucker_.init(seed, white_gain(rate), samples_per_48k(rate));
     noise_rng_.seed(seed ^ 0x9e3779b9u);
     exc_dc_.init(1.0f - 10.0f / rate_);
     bridge_dc_.init(1.0f - 20.0f / rate_);
@@ -212,7 +213,10 @@ class StringModule final : public Module {
       damping_cutoff += to_inf * (128.0f - damping_cutoff);
     }
 
-    fir_.configure(g_loop, b, kBlock);
+    // The loop FIR's rolloff, 1 - (1-b)*w^2/4 near DC, is in cycles per
+    // sample; widening (1-b) by (rate/48k)^2 puts it at the same Hz at every
+    // rate (Rings runs at 48 kHz; unchanged there). b >= -1 keeps |H| <= 1.
+    fir_.configure(g_loop, std::max(-1.0f, b - (1.0f - b) * (fir_scale_ - 1.0f)), kBlock);
     iir_.set_f_q_accurate(damping_f, 0.5f);
     iir_.flush_denormals();
     exciter_.flush_denormals();
@@ -247,6 +251,7 @@ class StringModule final : public Module {
   }
 
   float rate_ = 48000.0f;
+  float fir_scale_ = 1.0f;
   resonate::DelayLine line_;
   resonate::DelayLine stretch_;
   resonate::DampingFir fir_;

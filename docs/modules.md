@@ -14,6 +14,12 @@ the runtime registry. It documents implemented behavior, not roadmap entries.
   types and enum entries are checked before a graph is installed.
 - No normalling is implicit. Seeded modules are repeatable. Runtime state
   survives hot reload when module name and type remain unchanged.
+- Modules are voiced at 48 kHz and sound the same at other rates (`render
+  --rate`, ratsnest.clap in a 44.1 or 96 kHz host): times, corners and decays
+  are in seconds and Hz, white noise keeps its power per Hz (so at 96 kHz it
+  reads ±1.41 full band, the same below 24 kHz), and impulses last one 48 kHz
+  sample. tests/test_rate_invariance.cpp holds this to 0.5 dB. Random sources
+  draw different sequences at different rates.
 
 ## DSL essentials
 
@@ -375,10 +381,11 @@ Colors describe approximate power-spectrum slopes:
 | `violet` | +6 dB/oct below Nyquist | Differentiated white; high-frequency emphasis |
 
 Slopes are approximations over the audio band, not exact at DC or Nyquist.
-Pink coefficients are calibrated around 44.1/48 kHz and shift in Hz with sample
-rate. Brown's 10 Hz corner scales with sample rate. Colors have different RMS
-levels; there is no loudness matching or hard clipping. White/violet are bounded
-by ±1; filtered colors may exceed ±1. Equal seeds and rates reproduce streams;
+Every color keeps its level per Hz at any sample rate: white is scaled by
+`sqrt(rate / 48 kHz)`, the pink filter's corners stay at their 48 kHz Hz, and
+brown's 10 Hz corner is in Hz. Colors have different RMS levels; there is no
+loudness matching or hard clipping. At 48 kHz and below, white/violet are
+bounded by ±1 (±1.41 at 96 kHz); filtered colors may exceed ±1. Equal seeds and rates reproduce streams;
 filter/RNG state survives reload. Use `random` for slow wandering CV.
 
 ## `dust`
@@ -386,6 +393,9 @@ filter/RNG state survives reload. Use `random` for slow wandering CV.
 `dust { rate: 10hz, seed: 1 }` — audio-rate input `rate` is average events per
 second, clamped to `0..sample_rate`. Outputs `out` (uniform bipolar random
 impulses, zero between events) and `trig` (1 on event samples, otherwise 0).
+An event lasts one 48 kHz sample at any rate (2 samples at 96 kHz; below
+48 kHz one sample, scaled by `rate / 48 kHz`), so a click carries the same
+energy everywhere.
 This is a Bernoulli trial per sample; timing is irregular, not a clock.
 Adjacent events can keep `trig` high across samples, so rising-edge destinations
 can merge them at high rates. Zero rate silences both outputs. Seeded and
@@ -1275,6 +1285,8 @@ docs/attribution.md). Bowed and blown textures come from `noise -> vca -> m.in` 
 Like Rings, it reads `freq`/`v_oct`/`structure`/`brightness`/`damping` every 32
 samples (`position` is ramped per sample; `strike` and `in` are sample-exact);
 the fundamental clamps to a quarter of the sample rate (12 kHz at 48 kHz).
+Rings runs at 48 kHz; here the Q ladder is scaled by `rate / 48 kHz` so a
+mode's decay is the same in seconds at every rate.
 
 ## `string`
 
@@ -1292,6 +1304,8 @@ Config `seed`: equal seeds repeat plucks exactly. Reaches ~5.9 Hz at 48 kHz
 and clamps at a quarter of the sample rate. Like Rings, controls are read every
 32 samples and the loop delay, pickup position, dispersion and phase
 compensation are ramped per sample; `strike` and `in` are sample-exact.
+Away from 48 kHz the loop FIR's rolloff, the pluck burst's level and the pluck
+comb's longest period are rescaled so a pluck sounds the same at any rate.
 
 ## `piano`
 

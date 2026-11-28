@@ -29,6 +29,16 @@ inline int round_clamp(float value, int lo, int hi, int fallback) {
 // A logic level as a gate signal.
 inline float as_gate(bool high) { return high ? 1.0f : 0.0f; }
 
+// Sample rates are referred to 48 kHz, where every module was voiced.
+// White noise with a fixed per-sample variance spreads the same power over
+// a wider band at a higher rate, so anything filtered out of it comes out
+// quieter (-3 dB at 96 kHz). Scaling it by this keeps its power per Hz, and
+// so every band of it, the same at every rate (1 at 48 kHz).
+inline float white_gain(double rate) { return static_cast<float>(std::sqrt(rate / 48000.0)); }
+// How many samples one 48 kHz sample lasts: an impulse held this long has
+// the same energy, and the same spectrum below 24 kHz, at every rate.
+inline int samples_per_48k(double rate) { return std::max(1, static_cast<int>(std::lround(rate / 48000.0))); }
+
 // Gate/trigger rising edge (spec §4: gates rise through 0.5). The previous
 // sample is kept raw, so a NaN never counts as low.
 struct RisingEdge {
