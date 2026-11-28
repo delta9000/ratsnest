@@ -50,9 +50,19 @@ Prefer mise tasks (see `mise tasks`):
     mise run render -- patches/first.patch -d 10s -o take.wav
     mise run play -- patches/first.patch          # live PipeWire + hot-reload
     mise run complexity   # score for src/; fails past docs/complexity.json
+    mise run baseline     # rewrite tests/data/render-baseline.txt (deliberate sound change)
     mise run syx -- bank.syx -o patches/dx/bank   # 6-op SysEx voices -> .sub (docs/fm-syx.md)
     ./build/ratsnest plugins [file]   # installed CLAP plugins, ids, params
     mise run plugin-install   # ratsnest.clap -> ~/.clap; patches in ~/.config/ratsnest/plugins (docs/plugin.md)
+
+## Render baseline
+
+The `render_baseline` test renders every native patch (8 s, 48 kHz) and
+compares levels and brightness per second against
+`tests/data/render-baseline.txt`, to 0.2 dB. A change that moves any patch's
+sound fails it. If the move is intended, run `mise run baseline` and commit
+the rewritten file in the same commit, saying in the message which patches
+moved and why. A new patch joins the baseline in the commit that adds it.
 
 ## Complexity budget
 

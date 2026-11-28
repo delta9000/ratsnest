@@ -78,7 +78,14 @@ enable_testing()
 file(GLOB MSTEST_SOURCES CONFIGURE_DEPENDS tests/*.cpp)
 add_executable(mstests ${MSTEST_SOURCES})
 target_link_libraries(mstests PRIVATE mscore doctest::doctest)
-add_test(NAME unit COMMAND mstests)
+add_test(NAME unit COMMAND mstests "-tce=render baseline*")
+# Every patch rendered and compared to tests/data/render-baseline.txt
+# (tests/test_baseline.cpp). Its own entry so ctest -j runs it beside the
+# rest. Not under sanitizers: they cannot change a float, and every patch
+# already runs sanitized in test_rt_alloc.
+if(NOT RATSNEST_SAN)
+  add_test(NAME render_baseline COMMAND mstests "-tc=render baseline*")
+endif()
 
 # A tiny CLAP plugin for the `plugin` module's tests (tests/test_plugin.cpp).
 add_library(rn_test_tone MODULE tests/plugin/test_tone.cpp)
