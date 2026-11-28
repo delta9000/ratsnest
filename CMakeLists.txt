@@ -187,6 +187,17 @@ add_test(NAME cli_render_bad_bits
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 100ms --bits 12 -o ${CMAKE_CURRENT_BINARY_DIR}/first-bad.wav)
 set_tests_properties(cli_render_bad_bits PROPERTIES PASS_REGULAR_EXPRESSION "error: --bits takes 16, 24 or 32")
+# --midi plays a file into a MIDI patch, which otherwise renders silent.
+add_test(NAME cli_render_midi
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/keys-poly.patch
+          -d 4s --midi ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/scale.mid --stats
+          -o ${CMAKE_CURRENT_BINARY_DIR}/keys-midi.wav)
+set_tests_properties(cli_render_midi PROPERTIES
+  PASS_REGULAR_EXPRESSION "\npeak +-[0-9]?[0-9]\\.[0-9] dBFS")
+add_test(NAME cli_render_midi_missing
+  COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/keys-poly.patch
+          -d 1s --midi /nonexistent.mid -o ${CMAKE_CURRENT_BINARY_DIR}/keys-missing.wav)
+set_tests_properties(cli_render_midi_missing PROPERTIES PASS_REGULAR_EXPRESSION "error: --midi cannot read")
 add_test(NAME cli_render_tap_unknown
   COMMAND ratsnest render ${CMAKE_CURRENT_SOURCE_DIR}/patches/first.patch
           -d 1s -o ${CMAKE_CURRENT_BINARY_DIR}/first-tap.wav --tap x=osc3)

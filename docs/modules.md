@@ -900,8 +900,10 @@ voice (`0.005 -> ch.p2`). See Voice groups and `lib/poly-pad.sub`.
 output banks `gate1..16`, `voct1..16`, `vel1..16`, plus `bend`, `at`, `cc1..cc4`.
 Pure event -> CV: it consumes raw MIDI (via the engine's `midi-in` port; see
 `docs/superpowers/specs/2026-07-11-midi-design.md`) and never touches the
-audio graph's inputs. Offline `render` has no transport, so a midi module
-outputs defaults there — a keyboard nobody is playing.
+audio graph's inputs. Offline, `render --midi song.mid` plays a Standard MIDI
+File (format 0/1, any tempo map; each event lands on its own sample) into
+every midi module; without it a midi module outputs defaults there — a
+keyboard nobody is playing.
 
 There are deliberately **no** mono convenience outputs named `gate`/`voct`/
 `vel`: those bare spellings are reserved by the voice-group bank-resolution
