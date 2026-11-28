@@ -30,7 +30,7 @@ overrides a `param`; unknown keys are compile errors, so a typo is caught by
 | `lib/poly-pad.sub` | `n` 4 (1..8; cable `p1`..`pN`), `strum` 0 (s), synth-voice's `wave1`/`wave2`/`blend`/`detune`/`cutoff`/`res`/`slope`/`track`/`env_amt`/`hp`/ADSR/`curve` at its pad preset, `osc_lvl` .25 per voice | `p1`..`p8` (v/oct; uncabled = 0, A3), `gate`, `vel` (1), `level` (1), `cut` (0, Hz) | `main` (sum of voices) |
 | `lib/strip.sub` | `gain` 1, `pos` 0, `width` 1, `send_gain` 0 | `in` or `in_l`/`in_r`, `level` (1), `duck` (1), `pan` (0), `send` (1) | `l`, `r`, `fx` |
 | `lib/duck.sub` | `depth_db` −6, `attack` .004, `release` .25, `curve` lin | `trig`, `amount` (1) | `gain` |
-| `lib/master-chain.sub` | EQ, `comp_thr` −16, `comp_ratio` 2.4, `comp_blend` .85, `key_bus` 0, `clip_drive` 6.5, `clip_blend` .32, `ceiling` −0.4, `true_peak` off | `in_l`/`in_r`, `side_l`/`side_r`, `width` (1.15), `makeup` (3.0 dB) | `l`, `r` |
+| `lib/master-chain.sub` | EQ, `comp_thr` −16, `comp_ratio` 2.4, `comp_blend` .85, `key_bus` 0, `clip_drive` 6.5, `clip_blend` .32, `ceiling` −0.4, `true_peak` on | `in_l`/`in_r`, `side_l`/`side_r`, `width` (1.15), `makeup` (3.0 dB) | `l`, `r` |
 | `lib/club-master.sub` | `ceiling` −1.0 (dBTP), `drive` 12.5, `key_bus` .35 | as master-chain; `width` (1.0), `makeup` (10.5) | `l`, `r` |
 
 ## A song's voices and mix: synth-voice, strip, duck

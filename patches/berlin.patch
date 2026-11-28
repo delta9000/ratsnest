@@ -77,8 +77,13 @@ osc2 -> amp2.in
 pad -> pad_amp.in
 
 # ---- master: saws panned L/R, pad centered, slow level swell ----
-amp1    -> out.left : 0.5
-amp2    -> out.right : 0.5
-pad_amp -> out.in : 1.0
+# The PWM pad's pulse carries DC (-0.055 at the output); block it.
+dc = dcblock
+amp1    -> dc.in_l : 0.5
+amp2    -> dc.in_r : 0.5
+pad_amp -> dc.in_l : 1.0
+pad_amp -> dc.in_r : 1.0
+dc.out_l -> out.left
+dc.out_r -> out.right
 -0.2 -> out.level
 evo_level -> out.level : 0.15

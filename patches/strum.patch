@@ -19,4 +19,4 @@ poly.spread -> harp.osc.v_oct : 0.004
 harp.osc -> harp.pluck.in
 poly.gate -> harp.pluck.strike
 harp.pluck -> out.in : 0.45
--0.5 -> out.level
+-0.53 -> out.level   # -0.5 read 0.0 dBTP
