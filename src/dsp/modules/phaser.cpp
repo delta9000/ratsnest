@@ -21,7 +21,7 @@ constexpr float kFMin = 100.0f;
 constexpr float kFMax = 4000.0f;
 
 constexpr InputInfo kIns[] = {
-    {"in", 0.f}, {"rate", 0.3f}, {"depth", 0.6f}, {"feedback", 0.3f}, {"mix", 0.5f}};
+    {"in", 0.f}, in_hz("rate", 0.3f), {"depth", 0.6f}, {"feedback", 0.3f}, {"mix", 0.5f}};
 constexpr const char* kShapes[] = {"tri", "sine", nullptr};
 constexpr ConfigInfo kCfg[] = {
     {"stages", nullptr}, {"spread", nullptr}, {"shape", kShapes}};

@@ -60,6 +60,12 @@ std::string enum_error(const dsp::ConfigInfo& ci, const dsl::Value& v) {
          dsl::did_you_mean(v.str, vals);
 }
 
+// `freq: 2s` would otherwise run at 2 Hz: hz, s and bpm only mark a number.
+std::string unit_error(const std::string& input, Unit got, Unit want) {
+  return "input '" + input + "' expects " + unit_name(want) + " or a bare number, not " +
+         unit_name(got);
+}
+
 bool finite_num(const dsl::Value& v) {
   return v.kind == dsl::Value::Kind::Num && std::isfinite(v.num);
 }
@@ -180,6 +186,9 @@ class Compiler {
                    // `a4` lexes as a name: notes are the uppercase spelling.
                    (p.value.kind == dsl::Value::Kind::Ident ? " (note names are uppercase, e.g. A4)" : ""),
                    m.file);
+      const Unit want = info.inputs[static_cast<size_t>(slot)].unit;
+      if (!unit_fits(p.value.unit, want))
+        return err(p.line, p.col, unit_error(p.name, p.value.unit, want), m.file);
       n.input_base[static_cast<size_t>(slot)] = static_cast<float>(p.value.num);
       return;
     }
@@ -221,6 +230,9 @@ class Compiler {
                  " (inputs: " + dsl::join(inputs) + ")", c.file);
     }
     if (c.src.is_literal) {
+      const Unit want = dn.info->inputs[static_cast<size_t>(dslot)].unit;
+      if (!unit_fits(c.src.unit, want))
+        return err(c.src.line, c.src.col, unit_error(dport, c.src.unit, want), c.file);
       dn.input_base[static_cast<size_t>(dslot)] += static_cast<float>(c.src.literal * c.depth);
       return;
     }

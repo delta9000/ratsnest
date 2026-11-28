@@ -7,7 +7,7 @@
 namespace ms::dsp {
 namespace {
 constexpr size_t kMaxPartials = 128;
-constexpr InputInfo kIns[] = {{"freq", 220.f}, {"v_oct", 0.f}, {"gain", 1.f},
+constexpr InputInfo kIns[] = {in_hz("freq", 220.f), in_voct("v_oct", 0.f), {"gain", 1.f},
                               {"tilt", 0.f}, {"phase", 0.f}, {"sync", 0.f}};
 constexpr ConfigInfo kCfg[] = {{"levels", nullptr, ConfigKind::Numbers},
                                {"ratios", nullptr, ConfigKind::Numbers},

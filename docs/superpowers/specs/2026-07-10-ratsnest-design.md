@@ -59,6 +59,8 @@ comment   = "#" … end-of-line ;
 ```
 
 - **Units** are optional sugar over floats: `hz`, `khz`, `ms`, `s`, `bpm`.
+  An input may declare what it measures; a literal of another kind is a
+  compile error (docs/modules.md).
 - **Value kinds:** scalar (`0.4`, `800hz`), enum (`saw`, `minor`), string
   (`"reel1.wav"`), array (`[0, 3, 5, 7, 10]`, `[x, x, _, x]` for gate
   patterns). Arrays serve sequencers, scales, and mixer channel params.

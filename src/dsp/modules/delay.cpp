@@ -8,10 +8,10 @@
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"in", 0.f},        {"time", 0.4f},
+constexpr InputInfo kIns[] = {{"in", 0.f},        in_secs("time", 0.4f),
                               {"pitch", 0.f},     {"feedback", 0.35f},
                               {"mix", 0.5f},      {"tone", 8000.f},
-                              {"slew", 0.1f}};
+                              in_secs("slew", 0.1f)};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
 class Delay final : public Module {

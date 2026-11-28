@@ -15,7 +15,7 @@ namespace {
 using piano::KeyDesign;
 using piano::kKeys;
 
-constexpr InputInfo kIns[] = {{"gate", 0.f, false}, {"voct", 0.f},  {"vel", 0.f},
+constexpr InputInfo kIns[] = {{"gate", 0.f, false}, in_voct("voct", 0.f),  {"vel", 0.f},
                               {"hardness", 0.5f},   {"detune", 1.f}, {"decay", 1.f},
                               {"stretch", 1.f},     {"pedal", 0.f},  {"noise", 1.f}};
 constexpr ConfigInfo kCfgs[] = {{"seed", nullptr}};

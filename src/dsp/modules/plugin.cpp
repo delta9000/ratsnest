@@ -27,7 +27,7 @@ constexpr size_t kParams = 8;
 constexpr size_t kMaxEvents = 256;
 
 constexpr InputInfo kIns[] = {
-    {"in_l", 0.0f}, {"in_r", 0.0f}, {"gate", 0.0f, false}, {"voct", 0.0f}, {"vel", 0.8f},
+    {"in_l", 0.0f}, {"in_r", 0.0f}, {"gate", 0.0f, false}, in_voct("voct", 0.0f), {"vel", 0.8f},
     {"p1", 0.0f}, {"p2", 0.0f}, {"p3", 0.0f}, {"p4", 0.0f},
     {"p5", 0.0f}, {"p6", 0.0f}, {"p7", 0.0f}, {"p8", 0.0f},
 };

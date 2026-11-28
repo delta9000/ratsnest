@@ -12,7 +12,7 @@
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"in", 0.f}, {"cutoff", 1000.f}, {"res", 0.f}, {"v_oct", 0.f}};
+constexpr InputInfo kIns[] = {{"in", 0.f}, in_hz("cutoff", 1000.f), {"res", 0.f}, in_voct("v_oct", 0.f)};
 constexpr OutputInfo kOuts[] = {{"lp"}, {"bp"}, {"hp"}};
 
 // Damping k at res 1 (negative: the filter self-oscillates there) and the

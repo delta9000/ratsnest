@@ -64,10 +64,13 @@ std::string lower(std::string s) {
   return s;
 }
 
-bool unit_factor(std::string_view u, double& factor) {
-  if (u == "hz" || u == "s" || u == "bpm") { factor = 1.0; return true; }
-  if (u == "khz") { factor = 1000.0; return true; }
-  if (u == "ms") { factor = 0.001; return true; }
+bool unit_factor(std::string_view u, double& factor, Unit& kind) {
+  struct Suffix { std::string_view name; double factor; Unit kind; };
+  constexpr Suffix kSuffixes[] = {{"hz", 1.0, Unit::Freq},   {"khz", 1000.0, Unit::Freq},
+                                  {"s", 1.0, Unit::Time},    {"ms", 0.001, Unit::Time},
+                                  {"bpm", 1.0, Unit::Tempo}};
+  for (const auto& x : kSuffixes)
+    if (u == x.name) { factor = x.factor; kind = x.kind; return true; }
   return false;
 }
 
@@ -95,8 +98,8 @@ class Lexer {
   // below accepts, so it reads as "no such character").
   char at(size_t k = 0) const { return i_ + k < src_.size() ? src_[i_ + k] : '\0'; }
 
-  void push(Tok k, std::string text, double num, int l, int c) {
-    r_.tokens.push_back(Token{k, std::move(text), num, l, c});
+  void push(Tok k, std::string text, double num, int l, int c, Unit u = Unit::None) {
+    r_.tokens.push_back(Token{k, std::move(text), num, u, l, c});
   }
   void err(int l, int c, std::string msg) {
     r_.errors.push_back(Diag{l, c, std::move(msg), {}});
@@ -157,11 +160,12 @@ class Lexer {
     const double v = std::strtod(std::string(digits).c_str(), nullptr);
     const std::string unit(take_while(word_char));
     double factor = 1.0;
-    if (!unit.empty() && !unit_factor(unit, factor))
+    Unit kind = Unit::None;
+    if (!unit.empty() && !unit_factor(unit, factor, kind))
       err(tl, tc, "unknown unit '" + unit + "'" +
-                      (unit_factor(lower(unit), factor) ? " (units are lowercase: " + lower(unit) + ")"
-                                                         : " (hz, khz, ms, s, bpm)"));
-    push(Tok::Number, "", (neg ? -v : v) * factor, tl, tc);
+                      (unit_factor(lower(unit), factor, kind) ? " (units are lowercase: " + lower(unit) + ")"
+                                                               : " (hz, khz, ms, s, bpm)"));
+    push(Tok::Number, "", (neg ? -v : v) * factor, tl, tc, kind);
   }
 
   // Note-name literal (A4, Cs4, Bb2). Uppercase letters are otherwise unused,
@@ -175,7 +179,8 @@ class Lexer {
     take_while(word_char);
     const std::string_view tok = src_.substr(start, i_ - start);
     double val = 0.0;
-    if (!hash && note_num(tok, val)) return push(Tok::Number, "", val, tl, tc);
+    if (!hash && note_num(tok, val))
+      return push(Tok::Number, "", val, tl, tc, tok.back() == 'v' ? Unit::Pitch : Unit::Freq);
     err(tl, tc, "'" + std::string(tok) + "' is not a note name (A4; Cs4 for sharp -- '#' starts"
                 " a comment; Bb2 for flat; A4v for v/oct) nor a name (names are lowercase)");
     // Recover as the name it probably meant, so one typo reports once.

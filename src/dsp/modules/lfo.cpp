@@ -7,7 +7,7 @@
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"freq", 1.f}, {"reset", 0.f}, {"phase", 0.f}};
+constexpr InputInfo kIns[] = {in_hz("freq", 1.f), {"reset", 0.f}, {"phase", 0.f}};
 constexpr const char* kWaves[] = {"sine", "tri", "saw", "square", nullptr};
 constexpr ConfigInfo kCfg[] = {{"wave", kWaves}};
 constexpr OutputInfo kOuts[] = {{"out"}};

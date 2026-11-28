@@ -23,7 +23,7 @@ constexpr float kTopExcess = 0.9f;
 constexpr float kComp = 0.6f;
 
 constexpr InputInfo kIns[] = {
-    {"in", 0.f}, {"cutoff", 1000.f}, {"res", 0.f}, {"drive", 0.f}, {"v_oct", 0.f}};
+    {"in", 0.f}, in_hz("cutoff", 1000.f), {"res", 0.f}, {"drive", 0.f}, in_voct("v_oct", 0.f)};
 constexpr OutputInfo kOuts[] = {{"out"}};
 
 // tanh(y)/y, the saturator's secant gain (1 at the origin, -> 1/|y| when hot).

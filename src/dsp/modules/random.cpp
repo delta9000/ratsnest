@@ -8,7 +8,7 @@
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"rate", 1.f}, {"smooth", 1.f}};
+constexpr InputInfo kIns[] = {in_hz("rate", 1.f), {"smooth", 1.f}};
 constexpr ConfigInfo kCfg[] = {{"seed", nullptr}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"stepped"}};
 

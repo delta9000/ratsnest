@@ -4,7 +4,7 @@
 
 namespace ms::dsp {
 namespace {
-constexpr InputInfo kIns[] = {{"bpm", 120.f}, {"beats", 1.f}};
+constexpr InputInfo kIns[] = {in_bpm("bpm", 120.f), {"beats", 1.f}};
 constexpr OutputInfo kOuts[] = {{"seconds"}, {"hz"}};
 class Tempo final : public Module {
  public:

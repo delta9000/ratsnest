@@ -11,9 +11,9 @@
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"in_l", 0.f},     {"in_r", 0.f},  {"time", 0.375f},
+constexpr InputInfo kIns[] = {{"in_l", 0.f},     {"in_r", 0.f},  in_secs("time", 0.375f),
                               {"feedback", 0.4f}, {"mix", 0.5f},  {"tone", 6000.f},
-                              {"spread", 0.f},    {"slew", 0.1f}};
+                              {"spread", 0.f},    in_secs("slew", 0.1f)};
 constexpr const char* kModes[] = {"ping", "stereo", nullptr};
 constexpr ConfigInfo kCfg[] = {{"mode", kModes}};
 constexpr OutputInfo kOuts[] = {{"out_l"}, {"out_r"}};

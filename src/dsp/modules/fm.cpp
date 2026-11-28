@@ -50,7 +50,7 @@ constexpr double kDbCeil = 2.0;
 constexpr double kDbFloor = -15.0;
 
 constexpr InputInfo kIns[] = {
-    {"gate", 0.f},   {"freq", 220.f}, {"v_oct", 0.f},  {"vel", 1.f},
+    {"gate", 0.f},   in_hz("freq", 220.f), in_voct("v_oct", 0.f),  {"vel", 1.f},
     {"lvl1", 0.f},   {"lvl2", 0.f},   {"lvl3", 0.f},   {"lvl4", 0.f},
     {"lvl5", 0.f},   {"lvl6", 0.f},   {"ratio1", 0.f}, {"ratio2", 0.f},
     {"ratio3", 0.f}, {"ratio4", 0.f}, {"ratio5", 0.f}, {"ratio6", 0.f},

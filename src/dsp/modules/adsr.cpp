@@ -7,10 +7,10 @@ namespace ms::dsp {
 namespace {
 
 constexpr InputInfo kIns[] = {{"gate", 0.f},
-                              {"attack", 0.005f},
-                              {"decay", 0.15f},
+                              in_secs("attack", 0.005f),
+                              in_secs("decay", 0.15f),
                               {"sustain", 0.7f},
-                              {"release", 0.3f}};
+                              in_secs("release", 0.3f)};
 constexpr const char* kCurves[] = {"lin", "exp", "log", "quad", nullptr};
 constexpr ConfigInfo kCfg[] = {{"curve", kCurves}};
 constexpr OutputInfo kOuts[] = {{"out"}};

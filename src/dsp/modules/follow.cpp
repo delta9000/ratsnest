@@ -6,8 +6,8 @@ namespace {
 
 constexpr InputInfo kIns[] = {
     {"in", 0.0f},
-    {"attack", 0.01f},   // s
-    {"release", 0.1f},   // s
+    in_secs("attack", 0.01f),   // s
+    in_secs("release", 0.1f),   // s
     {"thresh", 0.1f},    // unipolar gate threshold
 };
 constexpr const char* kModes[] = {"peak", "rms", nullptr};

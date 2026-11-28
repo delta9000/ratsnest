@@ -6,7 +6,7 @@
 namespace ms::dsp {
 namespace {
 
-constexpr InputInfo kIns[] = {{"bpm", 120.f}, {"run", 1.f}, {"reset", 0.f}};
+constexpr InputInfo kIns[] = {in_bpm("bpm", 120.f), {"run", 1.f}, {"reset", 0.f}};
 constexpr OutputInfo kOuts[] = {{"out"}, {"run"}};
 
 class ClockModule final : public Module {

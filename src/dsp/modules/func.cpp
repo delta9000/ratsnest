@@ -8,7 +8,7 @@ namespace ms::dsp {
 namespace {
 
 constexpr InputInfo kIns[] = {
-    {"trig", 0.f}, {"in", 0.f}, {"rise", 0.01f}, {"fall", 0.1f}};
+    {"trig", 0.f}, {"in", 0.f}, in_secs("rise", 0.01f), in_secs("fall", 0.1f)};
 constexpr const char* kCurves[] = {"lin", "exp", "log", "quad", nullptr};
 constexpr const char* kCycle[] = {"off", "on", nullptr};
 constexpr ConfigInfo kCfg[] = {{"curve", kCurves}, {"cycle", kCycle}};

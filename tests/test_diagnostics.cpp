@@ -126,3 +126,21 @@ TEST_CASE("subpatch instances: unknown ports and params list the interface") {
       only(diagnose((std::string(tmpl) + "k = sub { def: td, tunes: 3 }\nk -> out.in\n").c_str()));
   CHECK(has(param, "no param 'tunes' (did you mean 'tune'?) (params: tune)"));
 }
+
+TEST_CASE("a literal's unit must match what the input measures") {
+  // hz, s and bpm scale by 1: without the check, each of these ran silently.
+  CHECK(has(only(diagnose("o = vco { freq: 2s }\no -> out.in\n")), "expects a frequency"));
+  CHECK(has(only(diagnose("e = adsr { attack: 440hz }\ne -> out.in\n")), "expects a time"));
+  CHECK(has(only(diagnose("l = lfo { freq: 120bpm }\nl -> out.in\n")), "not a tempo"));
+  CHECK(has(only(diagnose("o = vco { freq: A4v }\no -> out.in\n")), "not a v/oct pitch"));
+  CHECK(has(only(diagnose("o = vco { v_oct: A4 }\no -> out.in\n")), "expects a v/oct pitch"));
+  CHECK(has(only(diagnose("c = clock { bpm: 2hz }\nc -> out.in\n")), "expects a tempo"));
+  const Diags cable = diagnose("o = vco\n3ms -> o.freq\no -> out.in\n");
+  REQUIRE(cable.size() == 1);
+  CHECK(cable[0].line == 2);
+  CHECK(cable[0].col == 1);
+  // Matching units, bare numbers, and inputs that declare no unit all pass.
+  CHECK(diagnose("o = vco { freq: A4, v_oct: 0 }\ne = adsr { attack: 5ms }\n"
+                 "c = clock { bpm: 120bpm }\nm = vca { gain: 2s }\n"
+                 "440hz -> o.freq\nC3v -> o.v_oct\no -> out.in\n").empty());
+}
